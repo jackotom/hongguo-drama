@@ -70,7 +70,7 @@ async function main() {
     axios.get = original;
     await new Promise(resolve => server.close(resolve));
   }
-  assert.equal(require('../package.json').version, '1.1.7');
+  assert.equal(require('../package.json').version, '1.81.0');
   assert.equal(require('../package.json').dependencies.axios, '1.20.0');
   assert.equal(require('axios/package.json').version, '1.20.0');
   console.log('Share security: invalid input, text, redirects, gzip limit and dependency checks passed');

@@ -305,7 +305,7 @@ https://github.com/user-attachments/assets/b95f4f60-b57c-495f-a30e-62ac2b0bda11
 
 ## 版本与验证范围
 
-当前正式版为 **1.80**，源码配置版本为 `1.80.0`。具体安装包、签名公证与验证记录，以[1.80 发行页](https://github.com/jackotom/hongguo-drama/releases/tag/v1.80)为准。
+当前已发布的正式版为 **1.80**，源码配置版本为 `1.81.0`（尚未打标签或发布安装包）。已发布安装包、签名公证与验证记录，以[1.80 发行页](https://github.com/jackotom/hongguo-drama/releases/tag/v1.80)为准。
 
 本版新增应用内更新。Mac 原生更新检查采用独立应用标识与签名测试包，验证 Squirrel 更新链路；这类结果不等于最终发行包字节的生产跨版本升级。Windows CI 的安装版检查覆盖隔离安装、启动和同版本重装资料保留，也不等于真实跨版本升级或实体 Windows 验证。各项实际执行结果和签名公证状态由发行页单独列明。
 

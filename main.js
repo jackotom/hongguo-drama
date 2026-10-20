@@ -210,6 +210,17 @@ function getDefaultSettings() {
   };
 }
 
+// 启动时记下系统/终端原来的代理。之后 direct/custom 会改写这些变量，
+// 「跟随系统」必须读这份快照，否则会把上一次的直连或手动代理当成系统代理。
+const PROXY_ENV_KEYS = ['HTTP_PROXY', 'HTTPS_PROXY', 'http_proxy', 'https_proxy'];
+const originalProxyEnv = Object.fromEntries(PROXY_ENV_KEYS.map((key) => [key, process.env[key]]));
+let activeProxyAuth = null;
+
+function snapshotProxyUrl() {
+  return originalProxyEnv.HTTPS_PROXY || originalProxyEnv.https_proxy
+    || originalProxyEnv.HTTP_PROXY || originalProxyEnv.http_proxy || null;
+}
+
 /**
  * 计算当前生效的代理 URL。
  * 返回 { mode, url }：
@@ -248,11 +259,8 @@ function resolveProxyConfig(settings) {
     }
     return { mode: 'custom', url: `${protocol}://${auth}${host}${port ? ':' + port : ''}` };
   }
-  // system：以环境变量为准
-  const envUrl =
-    process.env.HTTPS_PROXY || process.env.https_proxy ||
-    process.env.HTTP_PROXY || process.env.http_proxy || null;
-  return { mode: 'system', url: envUrl };
+  // system：以启动时的环境变量为准，不读已经被本进程改写过的值
+  return { mode: 'system', url: snapshotProxyUrl() };
 }
 
 function publicProxyUrl(value) {
@@ -274,22 +282,50 @@ function publicProxyError(message, settings, resolved) {
  * 因此红果 API 解析与视频下载都会走代理，无需改动业务代码。
  */
 function applyProxyToEnv(resolved) {
-  const keys = ['HTTP_PROXY', 'HTTPS_PROXY', 'http_proxy', 'https_proxy'];
-  for (const k of keys) {
-    if (resolved.url) process.env[k] = resolved.url;
-    else delete process.env[k];
+  for (const key of PROXY_ENV_KEYS) {
+    if (resolved.mode === 'system') {
+      if (originalProxyEnv[key]) process.env[key] = originalProxyEnv[key];
+      else delete process.env[key];
+    } else if (resolved.mode === 'custom' && resolved.url) {
+      process.env[key] = resolved.url;
+    } else {
+      delete process.env[key];
+    }
   }
+}
+
+// Chromium 的 proxyRules 会忽略 URL 里的账号密码；窗口请求改由 login 事件提供认证。
+function proxyRuleForSession(resolved) {
+  let url;
+  try { url = new URL(resolved.url); } catch (_) { return null; }
+  const protocol = (url.protocol || 'http:').replace(/:$/, '').toLowerCase();
+  const hostname = url.hostname.includes(':') ? `[${url.hostname}]` : url.hostname;
+  if (!hostname) return null;
+  const port = url.port;
+  return {
+    rule: port ? `${protocol}://${hostname}:${port}` : `${protocol}://${hostname}`,
+    auth: url.username ? {
+      host: url.hostname,
+      port: port ? Number(port) : 0,
+      username: decodeURIComponent(url.username),
+      password: decodeURIComponent(url.password || ''),
+    } : null,
+  };
 }
 
 /** 让 Electron 窗口自身的请求（如封面图）也走代理 */
 async function applyProxyToSession(resolved) {
+  activeProxyAuth = null;
   try {
     const ses = session.defaultSession;
     if (!ses) return;
     if (resolved.mode === 'direct') {
       await ses.setProxy({ mode: 'direct' });
     } else if (resolved.mode === 'custom' && resolved.url) {
-      await ses.setProxy({ mode: 'fixed_servers', proxyRules: resolved.url });
+      const built = proxyRuleForSession(resolved);
+      if (!built) return;
+      activeProxyAuth = built.auth;
+      await ses.setProxy({ mode: 'fixed_servers', proxyRules: built.rule });
     } else {
       await ses.setProxy({ mode: 'system' });
     }
@@ -297,6 +333,16 @@ async function applyProxyToSession(resolved) {
     console.error('[Proxy] 设置窗口代理失败');
   }
 }
+
+app.on('login', (event, _webContents, _details, authInfo, callback) => {
+  if (!authInfo || !authInfo.isProxy || !activeProxyAuth) return;
+  const host = String(authInfo.host || '').replace(/^\[|\]$/g, '').toLowerCase();
+  if (!host || host !== String(activeProxyAuth.host || '').toLowerCase()) return;
+  const port = Number(authInfo.port) || 0;
+  if (activeProxyAuth.port && port && port !== activeProxyAuth.port) return;
+  event.preventDefault();
+  callback(activeProxyAuth.username, activeProxyAuth.password);
+});
 
 /** 统一入口：设置变化或启动时调用 */
 async function applyProxySettings(settings) {
@@ -316,13 +362,19 @@ function getCurrentSettings() {
   return { ...merged, max_concurrent: MAX_CONCURRENT_DOWNLOADS };
 }
 
-// 净化文件夹/文件名称（移除非法字符、结尾的点和空格）
+// 净化文件夹/文件名称（移除非法字符、结尾的点和空格、Windows 保留名）
 function sanitizeFolderName(name) {
-  return String(name || '')
+  let cleaned = String(name || '')
     .replace(/[<>:"/\\|?*\u0000-\u001f]/g, '')
-    .replace(/[. ]+$/g, '')
-    .trim()
-    .slice(0, 80) || '';
+    .replace(/^ +/, '');
+  // 先按码位截断，避免把 emoji 切成半个；再去掉结尾的点或空格。
+  const chars = Array.from(cleaned);
+  if (chars.length > 80) cleaned = chars.slice(0, 80).join('');
+  cleaned = cleaned.replace(/[. ]+$/g, '');
+  if (/^(con|prn|aux|nul|com[1-9]|lpt[1-9])(\..*)?$/i.test(cleaned)) {
+    cleaned = `_${cleaned}`.replace(/[. ]+$/g, '');
+  }
+  return cleaned;
 }
 
 // 按命名模板渲染文件名，返回 名称(不含扩展名) 或 null
@@ -1316,15 +1368,20 @@ let mergeTasks = []; // { id, seriesId, seriesTitle, status, progress, output, t
 
 function resolveFfmpeg(name) {
   const executable = process.platform === 'win32' ? `${name}.exe` : name;
+  // 正式包只用随包二进制。PATH / WinGet 只留给开发运行，避免打包后误用系统上的任意同名程序。
+  const devLookup = typeof app !== 'undefined' && app.isPackaged !== true;
   const candidates = [
     // 可执行资源必须位于 asar 外；Finder 启动不依赖终端的 PATH。
     process.resourcesPath ? path.join(process.resourcesPath, 'bin', executable) : null,
     path.join(__dirname, 'build', 'ffmpeg', `${process.platform}-${process.arch}`, executable),
     path.join(__dirname, 'build', 'ffmpeg', executable),
-    ...(process.env.PATH || '').split(path.delimiter)
-      .map(dir => process.platform === 'win32' ? dir.replace(/^"(.*)"$/, '$1') : dir)
-      .filter(Boolean).map(dir => path.join(dir, executable)),
   ];
+  if (devLookup) {
+    for (const dir of (process.env.PATH || '').split(path.delimiter)) {
+      const bare = process.platform === 'win32' ? dir.replace(/^"(.*)"$/, '$1') : dir;
+      if (bare) candidates.push(path.join(bare, executable));
+    }
+  }
   for (const c of candidates) {
     if (!c) continue;
     try {
@@ -1332,8 +1389,8 @@ function resolveFfmpeg(name) {
       if (fs.statSync(c).isFile()) return c;
     } catch (_) {}
   }
-  // 兜底：扫 winget 安装目录
-  if (process.platform !== 'win32' || !process.env.LOCALAPPDATA) return null;
+  // 兜底：开发时扫 winget 安装目录
+  if (!devLookup || process.platform !== 'win32' || !process.env.LOCALAPPDATA) return null;
   try {
     const base = path.join(process.env.LOCALAPPDATA || '', 'Microsoft', 'WinGet', 'Packages');
     if (base && fs.existsSync(base)) {
@@ -1403,20 +1460,50 @@ ipcMain.handle('get-ffmpeg-status', async () => {
   return { success: true, ffmpeg: ff, ffprobe: fp, available: !!ff && !!fp };
 });
 
-// 在文件管理器中定位文件
+function pathInside(root, target) {
+  if (!root || !target) return false;
+  let base = path.resolve(String(root));
+  let file = path.resolve(String(target));
+  try { if (fs.existsSync(base)) base = fs.realpathSync(base); } catch (_) {}
+  try { if (fs.existsSync(file)) file = fs.realpathSync(file); } catch (_) {}
+  if (process.platform === 'win32') {
+    base = base.toLowerCase();
+    file = file.toLowerCase();
+  }
+  const rel = path.relative(base, file);
+  return rel === '' || (rel !== '..' && !rel.startsWith(`..${path.sep}`) && !path.isAbsolute(rel));
+}
+
+function mediaRoots() {
+  const roots = [];
+  try {
+    const root = String(getCurrentSettings().root || '').trim();
+    if (root) roots.push(root);
+  } catch (_) {}
+  try {
+    const downloads = app.getPath('downloads');
+    if (downloads) roots.push(downloads);
+  } catch (_) {}
+  return roots;
+}
+
+function isInsideMediaRoot(target) {
+  return mediaRoots().some((root) => pathInside(root, target));
+}
+
+// 在文件管理器中定位文件。只选中下载目录里的文件，不用 openPath，避免把缺失路径的父级当成可执行文件启动。
 ipcMain.handle('show-in-folder', async (event, filePath) => {
   try {
-    if (!filePath) return { success: false, error: '缺少路径' };
-    if (fs.existsSync(filePath)) {
-      shell.showItemInFolder(filePath);
-      return { success: true };
-    }
-    const dir = path.dirname(filePath);
-    if (fs.existsSync(dir)) {
-      await shell.openPath(dir);
-      return { success: true };
-    }
-    return { success: false, error: '路径不存在' };
+    if (typeof filePath !== 'string' || !filePath.trim()) return { success: false, error: '缺少路径' };
+    const resolved = path.resolve(filePath);
+    if (!isInsideMediaRoot(resolved)) return { success: false, error: '只能打开下载目录中的文件' };
+    let target = resolved;
+    if (!fs.existsSync(target)) target = path.dirname(resolved);
+    if (!isInsideMediaRoot(target) || !fs.existsSync(target)) return { success: false, error: '路径不存在' };
+    const stat = fs.statSync(target);
+    if (!stat.isFile() && !stat.isDirectory()) return { success: false, error: '路径不存在' };
+    shell.showItemInFolder(target);
+    return { success: true };
   } catch (e) {
     return { success: false, error: e.message };
   }
@@ -2505,6 +2592,9 @@ async function transcodeForPlayback(payload, job = { controller: new AbortContro
     const { seriesId, vidIndex, filePath, force } = payload || {};
     const quality = playbackQuality(payload.quality, payload.vid || seriesId);
     if (!seriesId || vidIndex == null) return { success: false, error: '缺少剧集信息' };
+    if (filePath && fs.existsSync(filePath) && !isInsideMediaRoot(filePath)) {
+      return { success: false, error: '只能转码下载目录中的视频' };
+    }
     if (!(filePath && fs.existsSync(filePath)) && (/^(xifan|hema|custom):/.test(String(seriesId)) || /^(xifan|hema|custom):/.test(String(payload.vid)))) {
       const current = await hongguo.fetchEpisodeList(seriesId);
       checkCancelled();
@@ -2961,12 +3051,36 @@ ipcMain.handle('select-folder', async () => {
   return result.filePaths[0];
 });
 
-ipcMain.handle('get-settings', async () => getCurrentSettings());
+const SETTINGS_KEYS = ['root', 'name_format', 'max_concurrent', 'download_quality', 'auto_delete_watched', 'compat_mode', 'cache_next_episode', 'show_danmaku_controls', 'app_updates_enabled', 'watch_updates_enabled', 'watch_sequels_enabled', 'watch_notifications_enabled', 'proxy_enabled', 'proxy_mode', 'proxy_host', 'proxy_port', 'proxy_username', 'proxy_password'];
+
+function settingsForRenderer(settings) {
+  const copy = { ...settings };
+  copy.proxy_password_set = !!copy.proxy_password;
+  delete copy.proxy_password;
+  return copy;
+}
+
+function applyEditableSettings(current, incoming) {
+  const source = incoming && typeof incoming === 'object' ? incoming : {};
+  const merged = { ...current };
+  for (const key of SETTINGS_KEYS) {
+    if (key === 'proxy_password') continue;
+    if (Object.prototype.hasOwnProperty.call(source, key)) merged[key] = source[key];
+  }
+  if (source.clear_proxy_password === true) merged.proxy_password = '';
+  else if (typeof source.proxy_password === 'string' && source.proxy_password.length > 0) merged.proxy_password = source.proxy_password;
+  else merged.proxy_password = current.proxy_password || '';
+  merged.custom_sources = current.custom_sources;
+  return merged;
+}
+
+ipcMain.handle('get-settings', async () => settingsForRenderer(getCurrentSettings()));
 
 ipcMain.handle('save-settings', async (event, settings) => {
   try {
-    const wasCheckingUpdates = getCurrentSettings().app_updates_enabled !== false;
-    const merged = { ...getDefaultSettings(), ...(settings || {}), custom_sources:getCurrentSettings().custom_sources };
+    const current = getCurrentSettings();
+    const wasCheckingUpdates = current.app_updates_enabled !== false;
+    const merged = applyEditableSettings(current, settings);
     merged.download_quality = normalizeDownloadQuality(merged.download_quality);
     store.saveSettings(merged);
     if (merged.app_updates_enabled === false) appUpdateInstaller?.cancel();
@@ -2995,7 +3109,7 @@ ipcMain.handle('get-proxy-status', async () => {
 
 // 用当前表单值实测代理是否连通（未保存也能测）
 ipcMain.handle('test-proxy', async (event, draft) => {
-  const settings = { ...getCurrentSettings(), ...(draft || {}) };
+  const settings = applyEditableSettings(getCurrentSettings(), draft);
   const resolved = resolveProxyConfig(settings);
   if (resolved.mode === 'custom' && !resolved.url) {
     return { success: false, error: '请填写完整的代理地址与端口' };

@@ -11,10 +11,11 @@ const decryption = main.slice(main.indexOf('async function decryptContentKeyFile
 assert(discovery.startsWith('function resolveFfmpeg(') && decryption.startsWith('async function decryptContentKeyFile('));
 const root = fs.mkdtempSync(path.join(os.tmpdir(), 'hongguo-ffmpeg-'));
 
-function load(platform = 'win32') {
+function load(platform = 'win32', packaged = false) {
   const dir = fs.mkdtempSync(path.join(root, 'case-'));
   const context = vm.createContext({
     fs, path: { ...path, delimiter: platform === 'win32' ? ';' : ':' }, __dirname: dir,
+    app: { isPackaged: packaged },
     process: { platform, arch: 'x64', resourcesPath: path.join(dir, 'resources'), env: { PATH: '' } },
   });
   vm.runInContext(discovery + '\n' + decryption, context, { filename: source });
@@ -50,6 +51,16 @@ function load(platform = 'win32') {
     const h = load(), ff = h.tool('Microsoft/WinGet/Packages/Gyan.FFmpeg/build/bin/ffmpeg.exe');
     h.context.process.env.LOCALAPPDATA = h.dir;
     assert.equal(h.context.resolveFfmpeg('ffmpeg'), ff);
+  });
+  await check('Packaged builds ignore PATH and WinGet', () => {
+    const h = load('win32', true), system = h.tool('system/ffmpeg.exe'), winget = h.tool('Microsoft/WinGet/Packages/Gyan.FFmpeg/build/bin/ffmpeg.exe');
+    h.context.process.env.PATH = path.dirname(system);
+    h.context.process.env.LOCALAPPDATA = h.dir;
+    assert.equal(h.context.resolveFfmpeg('ffmpeg'), null);
+    const bundled = h.tool('resources/bin/ffmpeg.exe');
+    assert.equal(h.context.resolveFfmpeg('ffmpeg'), bundled);
+    assert.notEqual(bundled, system);
+    assert.notEqual(bundled, winget);
   });
   await check('Missing tools explain recovery before native decryption starts', async () => {
     const h = load();

@@ -13,7 +13,11 @@ const checks = [
   ['compatibility cache and shared preparation cannot bypass source access', async () => {
     const handlers = {};
     let cacheReads = 0;
-    const context = { AbortController, randomUUID, console, ipcMain: { handle: (name, fn) => handlers[name] = fn },
+    const context = { AbortController, randomUUID, console, playbackQuality: (value = 'auto', vid = '') => {
+      if (!['auto', '720p', '1080p'].includes(value)) throw new Error('在线播放清晰度无效，请选择自动、720p 或 1080p');
+      if (value !== 'auto' && /^(xifan|hema|custom):/.test(String(vid))) throw new Error('此来源暂不支持指定在线播放清晰度，请选择自动');
+      return value;
+    }, ipcMain: { handle: (name, fn) => handlers[name] = fn },
       hongguo: { fetchEpisodeList: async () => ({ episodes: [{ vid: 'xifan:huabo:a:2', vid_index: 2, locked: true }] }) },
       compatPreparing: new Map(), compatRequests: new Map(), compatClearing: null, compatPathFor: () => 'cached',
       fs: { existsSync: () => { cacheReads++; return true; }, statSync: () => ({ size: 200000 }), utimesSync() {} },

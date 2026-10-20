@@ -1,19 +1,17 @@
-@echo off
-title ºì¹û¶Ì¾çÏÂÔØÆ÷ - Æô¶¯Æ÷
+ï»¿@echo off
+chcp 65001 >nul
 cd /d "%~dp0"
-
-REM ÓÅÏÈÔËĞĞÃâ°²×°°æ£»Èô²»´æÔÚÔòÌáÊ¾°²×°
-if exist "dist\win-unpacked\ºì¹û¶Ì¾çÏÂÔØÆ÷.exe" (
-    echo ÕıÔÚÆô¶¯ºì¹û¶Ì¾çÏÂÔØÆ÷£¨ÂÌÉ«°æ£©...
-    start "" "dist\win-unpacked\ºì¹û¶Ì¾çÏÂÔØÆ÷.exe"
-    exit /b
+if exist "dist\win-unpacked\çº¢æœçŸ­å‰§.exe" (
+  start "" "dist\win-unpacked\çº¢æœçŸ­å‰§.exe"
+  exit /b 0
 )
-
-if exist "dist\ºì¹û¶Ì¾çÏÂÔØÆ÷-Setup-1.0.0.exe" (
-    echo Î´ÕÒµ½ÂÌÉ«°æ£¬½«´ò¿ª°²×°°ü£¬Çë°²×°ºóÊ¹ÓÃ¡£
-    start "" "dist\ºì¹û¶Ì¾çÏÂÔØÆ÷-Setup-1.0.0.exe"
-    exit /b
+for %%F in ("dist\çº¢æœçŸ­å‰§-*-ä¾¿æºç‰ˆ.exe") do (
+  start "" "%%~fF"
+  exit /b 0
 )
-
-echo Î´ÕÒµ½¿ÉÖ´ĞĞÎÄ¼ş£¬ÇëÏÈÔËĞĞ npm run build ´ò°ü¡£
+for %%F in ("dist\hongguo-downloader-*-win-x64-setup.exe") do (
+  start "" "%%~fF"
+  exit /b 0
+)
+echo æœªæ‰¾åˆ°å·²æ‰“åŒ…çš„ç¨‹åºã€‚è¯·å…ˆæ‰§è¡Œ npm run buildï¼Œæˆ–åŒå‡»ã€Œå¼€å‘æ¨¡å¼.batã€ã€‚
 pause

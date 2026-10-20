@@ -1,6 +1,6 @@
 {
   "name": "hongguo-downloader",
-  "version": "1.80.0",
+  "version": "1.81.0",
   "description": "红果短剧播放与下载",
   "main": "main.js",
   "license": "GPL-3.0",
@@ -18,7 +18,8 @@
     "zip": "node scripts/make-zip.js",
     "setup:ffmpeg:mac": "node scripts/setup-ffmpeg-mac.js",
     "build:mac": "node scripts/setup-ffmpeg-mac.js arm64 x64 && npm run build:react && electron-builder --mac dmg zip --arm64 --x64 --publish never",
-    "build:mac:dir": "node scripts/setup-ffmpeg-mac.js arm64 x64 && npm run build:react && electron-builder --mac --arm64 --x64 --dir --publish never"
+    "build:mac:dir": "node scripts/setup-ffmpeg-mac.js arm64 x64 && npm run build:react && electron-builder --mac --arm64 --x64 --dir --publish never",
+    "test": "node scripts/test.cjs"
   },
   "dependencies": {
     "anime4k-webgpu": "1.0.0",
@@ -28,12 +29,20 @@
   "devDependencies": {
     "@vitejs/plugin-react": "^4.3.4",
     "concurrently": "^8.2.2",
-    "electron": "44.6.0",
+    "electron": "44.9.1",
     "electron-builder": "26.15.3",
+    "esbuild": "0.21.5",
+    "js-yaml": "4.3.2",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
+    "semver": "7.7.4",
     "vite": "^5.4.11",
     "wait-on": "^7.2.0"
+  },
+  "overrides": {
+    "shell-quote": "1.12.0",
+    "joi": "17.13.8",
+    "source-map-js": "1.2.2"
   },
   "build": {
     "appId": "io.github.jackotom.hongguo-drama-mac",

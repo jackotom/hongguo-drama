@@ -11,16 +11,21 @@ const root = fs.mkdtempSync(path.join(os.tmpdir(), 'hongguo-safety-'));
 let serial = 0, failures = 0;
 function load(settings = {}, overrides = {}) {
   const dir = path.join(root, String(++serial)); fs.mkdirSync(dir);
-  const handlers = {}, app = new EventEmitter();
+  const handlers = {}, app = new EventEmitter(), opened = [], proxyCalls = [];
+  let stored = { root: dir, ...settings };
   Object.assign(app, { getVersion: () => 'test', getPath: () => dir, commandLine: { appendSwitch() {} }, requestSingleInstanceLock: () => true, whenReady: () => ({ then() {} }) });
-  const electron = { app, ipcMain: { handle: (name, fn) => handlers[name] = fn }, protocol: { registerSchemesAsPrivileged() {} } };
-  const store = { getSettings: () => ({ root: dir, ...settings }), saveTasks() {}, saveSeries() {}, saveSettings() {} };
+  const electron = {
+    app, ipcMain: { handle: (name, fn) => handlers[name] = fn }, protocol: { registerSchemesAsPrivileged() {} },
+    shell: { showItemInFolder: target => { opened.push(target); }, openPath: async target => { opened.push(`open:${target}`); return ''; } },
+    session: { defaultSession: { setProxy: async options => { proxyCalls.push(options); } } },
+  };
+  const store = { getSettings: () => ({ ...stored }), saveTasks() {}, saveSeries() {}, saveSettings(next) { stored = { ...next }; } };
   const context = vm.createContext({ require: name => overrides[name] || (name === 'electron' ? electron : name === './src/store' ? store : req(name)), __dirname: path.dirname(source), process: { ...process, env: { ...process.env } }, console: { log() {}, warn() {}, error() {} }, Buffer, URL, Response, Request, Headers, AbortController, setTimeout, clearTimeout });
   vm.runInContext(fs.readFileSync(source, 'utf8'), context, { filename: source });
   require('./fixtures/trusted-ipc.cjs')(context, handlers);
   const pump = context.pumpQueue;
   context.pumpQueue = () => {}; // Inspect queued destinations without fetching media.
-  return { context, handlers, dir, pump, run: code => vm.runInContext(code, context), set(name, value) { context.fixture = value; vm.runInContext(`${name} = fixture`, context); } };
+  return { app, context, handlers, dir, pump, opened, proxyCalls, settings: () => stored, run: code => vm.runInContext(code, context), set(name, value) { context.fixture = value; vm.runInContext(`${name} = fixture`, context); } };
 }
 function task(id, dir, status = 'completed', filename = `${id}.mp4`, index = 1) {
   return { id, type: 'hongguo', status, filename, savePath: path.join(dir, filename), customDir: dir, hongguoInfo: { vid: id, series_id: 'S', series_title: 'Short', vid_index: index } };
@@ -132,6 +137,100 @@ async function check(name, run) { try { await run(); console.log('PASS ' + name)
     const store = context.module.exports; store.init(target); store.saveTasks([{ id: 'saved' }]); const before = fs.readFileSync(target, 'utf8'); fail = true;
     assert.throws(() => store.saveTasks([{ id: 'unsaved' }]), /simulated disk full/);
     assert.equal(fs.readFileSync(target, 'utf8'), before); assert.equal(store.getTasks()[0].id, 'saved');
+  });
+  await check('folder names reject Windows reserved device names without splitting emoji', () => {
+    const name = load().context.sanitizeFolderName;
+    assert.equal(name('CON'), '_CON');
+    assert.equal(name('con.txt'), '_con.txt');
+    assert.equal(name('aux'), '_aux');
+    assert.equal(name('nul '), '_nul');
+    assert.equal(name('COM1'), '_COM1');
+    assert.equal(name('LPT9.dat'), '_LPT9.dat');
+    assert.equal(name('ok.'), 'ok');
+    assert.equal(name('concert'), 'concert');
+    const emoji = '😀'.repeat(81);
+    assert.equal(Array.from(name(emoji)).length, 80);
+    assert.equal(name('尾部空格  '), '尾部空格');
+  });
+  await check('show-in-folder reveals only real files inside the download root', async () => {
+    const h = load();
+    const inside = path.join(h.dir, 'clip.mp4');
+    fs.writeFileSync(inside, 'video');
+    assert.equal((await h.handlers['show-in-folder']({}, inside)).success, true);
+    assert.deepEqual(h.opened, [inside]);
+    const outside = path.join(root, 'outside.exe');
+    fs.writeFileSync(outside, 'nope');
+    h.opened.length = 0;
+    assert.equal((await h.handlers['show-in-folder']({}, outside)).success, false);
+    assert.equal((await h.handlers['show-in-folder']({}, path.join(outside, 'missing'))).success, false);
+    const link = path.join(h.dir, 'linked.mp4');
+    fs.symlinkSync(outside, link);
+    assert.equal((await h.handlers['show-in-folder']({}, link)).success, false);
+    assert.deepEqual(h.opened, []);
+  });
+  await check('playback transcode rejects an existing file outside the download root', async () => {
+    const h = load();
+    const outside = path.join(root, 'foreign.mp4');
+    fs.writeFileSync(outside, Buffer.alloc(1200));
+    const result = await h.handlers['transcode-for-playback']({}, { seriesId: 'S', vidIndex: 1, filePath: outside });
+    assert.equal(result.success, false);
+    assert.match(result.error, /下载目录/);
+    const inside = path.join(h.dir, 'local.mp4');
+    fs.writeFileSync(inside, Buffer.alloc(1200));
+    const allowed = h.context.isInsideMediaRoot(inside);
+    assert.equal(allowed, true);
+  });
+  await check('settings omit the proxy password and ignore undeclared keys', async () => {
+    const h = load({ proxy_password: 'secret-fixture', proxy_username: 'test-user', custom_sources: [{ id: 'keep' }] });
+    const visible = await h.handlers['get-settings']({});
+    assert.equal(visible.proxy_password, undefined);
+    assert.equal(visible.proxy_password_set, true);
+    assert.equal(JSON.stringify(visible).includes('secret-fixture'), false);
+    const saved = await h.handlers['save-settings']({}, { proxy_password: '', injected: true, max_concurrent: 4, custom_sources: [{ id: 'evil' }] });
+    assert.equal(saved.success, true);
+    assert.equal(h.settings().proxy_password, 'secret-fixture');
+    assert.equal(h.settings().injected, undefined);
+    assert.equal(h.settings().max_concurrent, 4);
+    assert.deepEqual(h.settings().custom_sources, [{ id: 'keep' }]);
+    await h.handlers['save-settings']({}, { proxy_password: 'next-secret' });
+    assert.equal(h.settings().proxy_password, 'next-secret');
+    await h.handlers['save-settings']({}, { clear_proxy_password: true });
+    assert.equal(h.settings().proxy_password, '');
+    assert.equal((await h.handlers['get-settings']({})).proxy_password_set, false);
+  });
+  await check('system proxy restores the startup environment and proxy auth stays out of proxy rules', async () => {
+    const previous = process.env.HTTPS_PROXY;
+    process.env.HTTPS_PROXY = 'http://startup-proxy:1';
+    try {
+      const h = load();
+      await h.context.applyProxySettings({ proxy_enabled: true, proxy_mode: 'custom', proxy_host: '127.0.0.1', proxy_port: '9', proxy_username: 'user', proxy_password: 'pw' });
+      assert.equal(h.context.process.env.HTTPS_PROXY, 'http://user:pw@127.0.0.1:9');
+      assert.equal(JSON.stringify(h.proxyCalls).includes('pw'), false);
+      assert.equal(h.proxyCalls.at(-1).proxyRules, 'http://127.0.0.1:9');
+      let auth = null;
+      h.app.emit('login', { preventDefault() {} }, null, null, { isProxy: true, host: '127.0.0.1', port: 9 }, (user, password) => { auth = [user, password]; });
+      assert.deepEqual(auth, ['user', 'pw']);
+      auth = null;
+      h.app.emit('login', { preventDefault() {} }, null, null, { isProxy: false, host: '127.0.0.1', port: 9 }, (user, password) => { auth = [user, password]; });
+      assert.equal(auth, null);
+      await h.context.applyProxySettings({ proxy_enabled: true, proxy_mode: 'system' });
+      assert.equal(h.context.process.env.HTTPS_PROXY, 'http://startup-proxy:1');
+      await h.context.applyProxySettings({ proxy_enabled: false });
+      assert.equal(h.context.process.env.HTTPS_PROXY, undefined);
+      await h.context.applyProxySettings({ proxy_enabled: true, proxy_mode: 'system' });
+      assert.equal(h.context.process.env.HTTPS_PROXY, 'http://startup-proxy:1');
+    } finally {
+      if (previous === undefined) delete process.env.HTTPS_PROXY;
+      else process.env.HTTPS_PROXY = previous;
+    }
+  });
+  await check('proxy connectivity test keeps a saved password when the draft leaves it blank', async () => {
+    let seen;
+    const settings = { proxy_enabled: true, proxy_mode: 'custom', proxy_host: '127.0.0.1', proxy_port: 7890, proxy_username: 'test-user', proxy_password: 'secret-fixture' };
+    const h = load(settings, { axios: { get: async (_url, options) => { seen = options; return { status: 200 }; } } });
+    const result = await h.handlers['test-proxy']({}, { ...settings, proxy_password: '' });
+    assert.equal(seen.proxy.auth.password, 'secret-fixture');
+    assert.equal(JSON.stringify(result).includes('secret-fixture'), false);
   });
   await check('proxy status and test result never expose credentials', async () => {
     const settings = { proxy_enabled: true, proxy_mode: 'custom', proxy_host: '127.0.0.1', proxy_port: 7890, proxy_username: 'test-user', proxy_password: 'secret-fixture' };

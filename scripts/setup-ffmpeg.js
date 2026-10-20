@@ -15,6 +15,7 @@
 const fs = require('fs');
 const path = require('path');
 const https = require('https');
+const crypto = require('crypto');
 const { execFileSync } = require('child_process');
 
 const ROOT = path.resolve(__dirname, '..');
@@ -22,9 +23,23 @@ const DEST = path.join(ROOT, 'build', 'ffmpeg');
 const ZIP = path.join(ROOT, 'build', 'ffmpeg-essentials.zip');
 const TMP = path.join(ROOT, 'build', '_ffmpeg_tmp');
 
-const URL =
-  process.env.FFMPEG_ZIP_URL ||
-  'https://github.com/GyanD/codexffmpeg/releases/download/7.1/ffmpeg-7.1-essentials_build.zip';
+const OFFICIAL_URL = 'https://github.com/GyanD/codexffmpeg/releases/download/7.1/ffmpeg-7.1-essentials_build.zip';
+// SHA-256 of the official 7.1 essentials zip. A mirror or FFMPEG_ZIP_URL override must match a pinned hash.
+const OFFICIAL_SHA256 = 'fa7d4d7e795db0e2503f49f105f46ed5852386f0cfdd819899be3b65ebde24fc';
+const URL = process.env.FFMPEG_ZIP_URL || OFFICIAL_URL;
+
+function expectedSha256(url) {
+  if (url === OFFICIAL_URL) return OFFICIAL_SHA256;
+  const pinned = String(process.env.FFMPEG_ZIP_SHA256 || '').trim().toLowerCase();
+  if (!/^[a-f0-9]{64}$/.test(pinned)) {
+    throw new Error('自定义 FFMPEG_ZIP_URL 必须同时设置 FFMPEG_ZIP_SHA256（64 位十六进制）');
+  }
+  return pinned;
+}
+
+function sha256File(file) {
+  return crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex');
+}
 
 function exists(p) {
   try { return fs.existsSync(p) && fs.statSync(p).size > 1024 * 1024; } catch (_) { return false; }
@@ -84,7 +99,12 @@ function download(url, dest, redirects = 0) {
 
   console.log('正在下载 ffmpeg essentials（约 88MB）…');
   await download(URL, ZIP);
-  console.log('下载完成：' + (fs.statSync(ZIP).size / 1048576).toFixed(1) + 'MB');
+  const digest = sha256File(ZIP);
+  if (digest !== expectedSha256(URL)) {
+    fs.rmSync(ZIP, { force: true });
+    throw new Error('ffmpeg 压缩包 SHA-256 不匹配，已删除下载文件');
+  }
+  console.log('下载完成并校验通过：' + (fs.statSync(ZIP).size / 1048576).toFixed(1) + 'MB');
 
   console.log('正在解压…');
   fs.rmSync(TMP, { recursive: true, force: true });

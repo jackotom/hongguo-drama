@@ -100,6 +100,7 @@ function SettingsPage({ active = true, preview = false }) {
       const editable = ['root', 'name_format', 'download_quality', 'show_danmaku_controls', 'max_concurrent', 'proxy_enabled', 'proxy_mode', 'proxy_host', 'proxy_port', 'proxy_username', 'proxy_password', 'watch_updates_enabled', 'watch_sequels_enabled', 'watch_notifications_enabled', 'app_updates_enabled'];
       const submitted = { ...current };
       for (const key of editable) if (Object.hasOwn(next, key)) submitted[key] = next[key];
+      if (isProxy) submitted.clear_proxy_password = next.clear_proxy_password === true && !String(next.proxy_password || '');
       const res = await window.electronAPI.saveSettings(submitted);
       if (!res?.success) throw new Error(res?.error || '设置未保存，请重试');
       setSettings(submitted);
@@ -133,7 +134,8 @@ function SettingsPage({ active = true, preview = false }) {
       proxy_host: settings.proxy_host || '127.0.0.1',
       proxy_port: settings.proxy_port || 7890,
       proxy_username: settings.proxy_username || '',
-      proxy_password: settings.proxy_password || '',
+      proxy_password: '',
+      clear_proxy_password: false,
     });
     setTestResult(null);
     setSaveError('');
@@ -425,14 +427,18 @@ function SettingsPage({ active = true, preview = false }) {
                         type="password"
                         className="input-field"
                         aria-label="代理密码"
-                        placeholder="密码"
+                        placeholder={settings.proxy_password_set ? '已保存，留空表示不修改' : '密码'}
                         autoComplete="new-password"
                         value={proxyDraft.proxy_password}
                         disabled={!proxyDraft.proxy_enabled}
-                        onChange={(e) => patchDraft('proxy_password', e.target.value)}
+                        onChange={(e) => {
+                          patchDraft('proxy_password', e.target.value);
+                          if (e.target.value) patchDraft('clear_proxy_password', false);
+                        }}
                       />
                     </div>
-                    <p className="settings-hint">代理无需认证时留空即可</p>
+                    <p className="settings-hint">{proxyDraft.clear_proxy_password ? '保存后将清除已保存的密码。' : settings.proxy_password_set ? '已保存密码。输入新密码可替换；留空则保持不变。' : '代理无需认证时留空即可'}</p>
+                    {settings.proxy_password_set && <button type="button" className="btn btn-outline" disabled={!proxyDraft.proxy_enabled} onClick={() => { patchDraft('proxy_password', ''); patchDraft('clear_proxy_password', true); }}>清除已保存密码</button>}
                   </div>
                 )}
               </div>

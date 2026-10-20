@@ -40,6 +40,8 @@ jobs:
           node-version: '22'
           cache: npm
       - run: npm ci --no-audit --no-fund
+      - name: Run unit and platform checks
+        run: npm test
       - name: Check Windows FFmpeg discovery
         run: node scripts/check-ffmpeg-resolution.cjs
       - uses: actions/download-artifact@v4

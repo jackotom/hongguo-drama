@@ -77,7 +77,8 @@ async function check() {
   assert.match((await browseList()).error, /超时/);
 
   const browse = fs.readFileSync(path.join(root, 'src/components/Browse.jsx'), 'utf8');
-  assert.match(browse, /<option value="hema">河马短剧<\/option>/);
+  assert.match(browse, /mediaSources\.map\(\(\{ id, label \}\) => <option key=\{id\} value=\{id\}>\{label\}<\/option>\)/);
+  assert.match(fs.readFileSync(path.join(root, 'src/components/mediaSourcesModel.mjs'), 'utf8'), /id: 'hema', label: '河马短剧'/);
   assert.match(browse, /source !== 'hongguo' && !totalPages && \(page > 1 \|\| meta.hasMore\)/);
   assert.match(browse, /西饭热播榜暂未接入/);
   const paging = browse.slice(browse.indexOf('  const gotoPage ='), browse.indexOf('  // ===== 打开某部剧'));
