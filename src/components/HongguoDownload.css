@@ -18,7 +18,8 @@
 .series-tags { display: flex; flex-wrap: wrap; gap: 14px; }
 .badge { font-size: 12px; color: var(--text-secondary); }
 .badge-new { font-size: 11px; line-height: 1.5; color: var(--success); background: var(--success-bg); border: 1px solid var(--success-border); border-radius: 5px; padding: 1px 5px; white-space: nowrap; }
-.batch-action-bar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.batch-action-bar { display: flex; flex-direction: column; align-items: flex-end; gap: 10px; }
+.batch-action-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
 .controls-row { display: flex; flex-wrap: wrap; gap: 16px; justify-content: space-between; align-items: center; margin-bottom: 20px; }
 .select-buttons, .range-filter { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .divider { height: 16px; width: 1px; margin: 0 5px; background: var(--border); }
@@ -64,6 +65,16 @@
 .batch-quality-control { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 12px; color: var(--text-secondary); }
 .batch-quality-control .input-field { width: auto; max-width: 100%; min-height: 36px; }
 .batch-quality-hint { margin: 0 0 16px; }
+
+/* 文字导出勾选：作为 batch-action-bar 的第二行，按钮行下方，不是独立区块 */
+.batch-export-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; }
+.batch-export-title { font-size: 12px; color: var(--text-secondary); margin-right: 2px; }
+.batch-export-check { display: inline-flex; align-items: center; gap: 6px; padding: 4px 11px; font-size: 12px; border: 1px solid var(--border); border-radius: 999px; cursor: pointer; user-select: none; transition: background-color .15s, border-color .15s, color .15s; }
+.batch-export-check:hover { border-color: var(--accent-border, var(--accent)); }
+.batch-export-check:has(input:checked) { background: var(--accent-soft); color: var(--accent-text); border-color: var(--accent-border); font-weight: 600; }
+.batch-export-check:has(input:disabled) { opacity: .55; cursor: default; }
+.batch-export-check input { width: 14px; height: 14px; margin: 0; accent-color: var(--accent); }
+.batch-export-note { flex-basis: 100%; font-size: 12px; color: var(--text-secondary); }
 
 .search-more {
   display: flex;

@@ -5,6 +5,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getPublicDetails: (seriesId, vid) => ipcRenderer.invoke('get-public-details', seriesId, vid),
   getEpisodeComments: options => ipcRenderer.invoke('get-episode-comments', options),
   getEpisodeDanmaku: options => ipcRenderer.invoke('get-episode-danmaku', options),
+  onTextExportDone: (cb) => {
+    const listener = (_e, data) => cb(data);
+    ipcRenderer.on('text-export-done', listener);
+    return () => ipcRenderer.removeListener('text-export-done', listener);
+  },
   setStealthMode: enabled => ipcRenderer.invoke('set-stealth-mode', enabled),
   onStealthState: cb => {
     const listener = (_event, state) => cb(state);

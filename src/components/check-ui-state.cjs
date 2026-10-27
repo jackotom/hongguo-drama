@@ -1135,6 +1135,71 @@ async function mount(file, api, props = {}, storage = null) {
     assert.ok(ui.button('下载选中集数 (1/2)')); assert.ok(ui.find(n => n.props.className?.startsWith('episode-card') && n.props.disabled));
     await ui.button('下载选中集数').props.onClick(); assert.equal(submitted.episodes.length, 1); assert.equal(submitted.episodes[0].vid_index, 2); ui.unmount();
   });
+  await test('HongguoDownload 勾选导出立即下载并订阅后台 text-export-done 回报', async () => {
+    let submitted, exportCb;
+    const data = detail('7503745441910017049');
+    const ui = await mount('HongguoDownload', {
+      getSettings: async () => ({ export_text: { danmaku: false, comments: false, reviews: false } }),
+      // 下载响应立即返回，不再带 export 结果（导出转后台）
+      hongguoDownloadBatch: async (p) => { submitted = p; return { success: true, count: 2, exportRequested: true }; },
+      onTextExportDone: (cb) => { exportCb = cb; return () => {}; },
+      saveSettings: async () => ({ success: true }),
+    });
+    await ui.flush();
+    ui.find(n => n.props.onSelectSeries).props.onSelectSeries(data); ui.render();
+    for (const label of ['弹幕', '评论', '剧评']) {
+      const box = ui.find(n => n.props.type === 'checkbox' && n.props['aria-label'] === label);
+      assert.ok(box, `缺少「${label}」导出勾选`);
+      box.props.onChange({ target: { checked: true } }); ui.render();
+    }
+    await ui.button('下载选中集数').props.onClick(); await ui.flush();
+    assert.equal(submitted.export.danmaku, true); assert.equal(submitted.export.comments, true); assert.equal(submitted.export.reviews, true);
+    assert.ok(ui.text().includes('提交'), '提交后立刻反馈，不等文字导出');
+    assert.ok(typeof exportCb === 'function', '必须订阅 text-export-done 以接收后台结果');
+    exportCb({ seriesId: '7503745441910017049', danmaku: { ok: 2, fail: 0, skipped: 0 }, comments: { ok: 1, fail: 0, skipped: 0 }, reviews: { ok: 1, fail: 0, skipped: 0 } });
+    ui.render();
+    assert.ok(ui.text().includes('弹幕 2'), '后台事件回报各类型条数');
+    assert.ok(ui.text().includes('评论 1'));
+    ui.unmount();
+  });
+  await test('HongguoDownload 只勾选评论时事件不把未勾选类型报成"0 条"', async () => {
+    let exportCb;
+    const data = detail('7503745441910017049');
+    const ui = await mount('HongguoDownload', {
+      getSettings: async () => ({ export_text: {} }),
+      hongguoDownloadBatch: async () => ({ success: true, count: 2, exportRequested: true }),
+      onTextExportDone: (cb) => { exportCb = cb; return () => {}; },
+      saveSettings: async () => ({ success: true }),
+    });
+    await ui.flush();
+    ui.find(n => n.props.onSelectSeries).props.onSelectSeries(data); ui.render();
+    ui.find(n => n.props.type === 'checkbox' && n.props['aria-label'] === '评论').props.onChange({ target: { checked: true } }); ui.render();
+    await ui.button('下载选中集数').props.onClick(); await ui.flush();
+    exportCb({ seriesId: '7503745441910017049', danmaku: { ok: 0, fail: 0, skipped: 0 }, comments: { ok: 2, fail: 0, skipped: 0 }, reviews: { ok: 0, fail: 0, skipped: 0 } });
+    ui.render();
+    assert.ok(ui.text().includes('评论 2'), '只播报勾选的评论');
+    assert.ok(!ui.text().includes('弹幕 0'), '未勾选的弹幕不应报"弹幕 0"');
+    assert.ok(!ui.text().includes('剧评 0'), '未勾选的剧评不应报"剧评 0"');
+    ui.unmount();
+  });
+  await test('HongguoDownload 非红果来源隐藏导出勾选且提交不带导出', async () => {
+    let submitted;
+    const data = detail('xifan:test:A');
+    const ui = await mount('HongguoDownload', {
+      // 模拟上次在红果剧记得的勾选：切到非红果来源也不应出现/生效
+      getSettings: async () => ({ export_text: { danmaku: true, comments: true, reviews: true } }),
+      hongguoDownloadBatch: async (p) => { submitted = p; return { success: true, count: 2 }; },
+    });
+    await ui.flush();
+    ui.find(n => n.props.onSelectSeries).props.onSelectSeries(data); ui.render();
+    assert.ok(!ui.find(n => n.props.type === 'checkbox' && n.props['aria-label'] === '弹幕'), '非红果来源应隐藏弹幕勾选');
+    assert.ok(!ui.find(n => n.props.type === 'checkbox' && n.props['aria-label'] === '剧评'), '非红果来源应隐藏剧评勾选');
+    await ui.button('下载选中集数').props.onClick(); await ui.flush();
+    assert.equal(submitted.export.danmaku, false);
+    assert.equal(submitted.export.comments, false);
+    assert.equal(submitted.export.reviews, false);
+    ui.unmount();
+  });
   await test('xifan browse locks selection and starts the first unlocked episode', async () => {
     const data = detail('X'); data.episodes[0].locked = true; let played, submitted;
     const ui = await mount('Browse', { getSeriesList: async () => [], browseCategories: async () => [], browseList: async () => ({ success: true, results: [{ series_id: 'X', series_title: 'X' }] }), searchResolve: async () => ok(data), getSeriesEpisodes: async () => ok(data), playSeries: async p => { played = p; return { success: false }; }, hongguoDownloadBatch: async p => { submitted = p; return { success: false }; } });

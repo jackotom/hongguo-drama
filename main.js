@@ -56,6 +56,7 @@ const { availableRelease } = require('./src/native/app-update');
 const { fetchPublicDetails } = require('./src/native/public-details');
 const { fetchEpisodeComments } = require('./src/native/episode-comments');
 const { fetchDanmaku, setDeviceIdentityFile } = require('./src/native/danmaku');
+const { exportSeriesText } = require('./src/native/text-export');
 const mediaAccess = require('./src/native/media-access').createMediaAccess(process.env.VITE_DEV_SERVER_URL);
 const rendererSecurity = require('./src/native/renderer-security').createRendererSecurity(
   path.join(__dirname, 'dist-react', 'index.html'), process.env.VITE_DEV_SERVER_URL);
@@ -3453,12 +3454,34 @@ async function enqueueEpisodes({ seriesId, seriesTitle, episodes, cover, quality
 
 ipcMain.handle('hongguo-download-batch', async (event, payload) => {
   try {
-    const { seriesId, seriesTitle, episodes, quality } = payload || {};
+    const { seriesId, seriesTitle, episodes, quality, export: exportKinds } = payload || {};
     if (!Array.isArray(episodes) || episodes.length === 0) {
       return { success: false, error: '未选择集数' };
     }
     const count = await enqueueEpisodes({ seriesId, seriesTitle, episodes, quality });
-    return { success: true, count, requested: episodes.length };
+    const kinds = exportKinds || {};
+    const wantExport = kinds.danmaku === true || kinds.comments === true || kinds.reviews === true;
+    // 文字导出转后台：不阻塞下载响应，任何异常都吞掉并经事件回报，绝不影响视频下载。
+    if (wantExport) {
+      try {
+        const settings = getCurrentSettings();
+        const root = (settings.root && String(settings.root).trim()) ? String(settings.root).trim() : app.getPath('downloads');
+        const cleanTitle = sanitizeFolderName(seriesTitle) || '红果短剧';
+        const downloadDir = seriesDownloadDir(root, seriesId, cleanTitle);
+        try { fs.mkdirSync(downloadDir, { recursive: true }); } catch (_) {}
+        const stems = episodes.map(ep => ({
+          vid: ep.vid, vid_index: ep.vid_index,
+          stem: uniqueEpisodeFilename(settings, cleanTitle, ep).replace(/\.mp4$/, ''),
+        }));
+        exportSeriesText({ seriesId, seriesTitle, episodes: stems, kinds, downloadDir, reviewsBaseName: cleanTitle })
+          .then(r => sendToRenderer('text-export-done', { seriesId, ...r }))
+          .catch(error => sendToRenderer('text-export-done', { seriesId, failed: true, error: String(error?.message || error) }));
+      } catch (error) {
+        console.error('[Hongguo] 文字导出启动失败:', error.message);
+        sendToRenderer('text-export-done', { seriesId, failed: true, error: error.message });
+      }
+    }
+    return { success: true, count, requested: episodes.length, exportRequested: wantExport };
   } catch (error) {
     console.error('[Hongguo] 提交批量下载失败:', error.message);
     return { success: false, error: error.message };
@@ -3779,7 +3802,7 @@ ipcMain.handle('select-folder', async () => {
   return result.filePaths[0];
 });
 
-const SETTINGS_KEYS = ['root', 'name_format', 'max_concurrent', 'download_quality', 'auto_delete_watched', 'compat_mode', 'cache_next_episode', 'show_danmaku_controls', 'app_updates_enabled', 'watch_updates_enabled', 'watch_sequels_enabled', 'watch_notifications_enabled', 'search_app_enabled', 'proxy_enabled', 'proxy_mode', 'proxy_host', 'proxy_port', 'proxy_username', 'proxy_password'];
+const SETTINGS_KEYS = ['root', 'name_format', 'max_concurrent', 'download_quality', 'export_text', 'auto_delete_watched', 'compat_mode', 'cache_next_episode', 'show_danmaku_controls', 'app_updates_enabled', 'watch_updates_enabled', 'watch_sequels_enabled', 'watch_notifications_enabled', 'search_app_enabled', 'proxy_enabled', 'proxy_mode', 'proxy_host', 'proxy_port', 'proxy_username', 'proxy_password'];
 
 function settingsForRenderer(settings) {
   const copy = { ...settings };
