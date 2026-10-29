@@ -1,5 +1,5 @@
 /**
- * main.js - 红果短剧 4.6 下载器（独立版）主进程
+ * main.js - 红果短剧 4.7 下载器（独立版）主进程
  *
  * 功能：
  *   1. 红果短剧解析（分享链接 / series_id -> 全剧集列表）
@@ -2878,7 +2878,7 @@ function registerLocalProtocol() {
       if (range === false) return new Response(null, { status: 416, headers: { 'Content-Range': `bytes */${size}` } });
       if (range) {
         const { start, end } = range;
-        return new Response(request.method === 'HEAD' ? null : fs.createReadStream(filePath, { start, end }), {
+        return new Response(request.method === 'HEAD' ? null : Readable.toWeb(fs.createReadStream(filePath, { start, end })), {
           status: 206,
           headers: {
             'Content-Type': 'video/mp4',
@@ -2889,7 +2889,7 @@ function registerLocalProtocol() {
         });
       }
 
-      return new Response(request.method === 'HEAD' ? null : fs.createReadStream(filePath), {
+      return new Response(request.method === 'HEAD' ? null : Readable.toWeb(fs.createReadStream(filePath)), {
         status: 200,
         headers: {
           'Content-Type': 'video/mp4',
@@ -4925,6 +4925,7 @@ function createWindow() {
     BrowserWindow,
     isTrustedUrl: rendererSecurity.isTrustedUrl,
     store,
+    screen,
   });
   episodePanel.attach(mainWindow);
   mainWindow.webContents.once('did-finish-load', () => {

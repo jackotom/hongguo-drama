@@ -20,6 +20,7 @@ function fixture(platform = 'darwin', options = {}) {
     throw Object.assign(new Error('denied'), { response: { status: 403 } });
   }, { isCancel: () => false });
   const context = vm.createContext({ require: name => name === 'electron' ? { app, BrowserWindow: Window,
+    screen: { getDisplayMatching: () => ({ workArea: { x: 0, y: 0, width: 1920, height: 1080 } }) },
     ipcMain: { handle: (name, fn) => handlers[name] = fn }, protocol: { registerSchemesAsPrivileged() {} },
     dialog: { showErrorBox: (title, message) => state.errors.push({ title, message }) } }
     : name === 'fs' ? Object.create(fs) : name === './src/store' ? store : name === 'axios' ? axios

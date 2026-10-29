@@ -57,6 +57,40 @@ function fixture({ prepare, transcode, enqueue, quality = '720p', initial = 'mis
     await f.ui.button('重试本集').props.onClick(); await f.ui.flush();
     assert.equal(source(f.ui), 'file:///A-1.mp4'); assert.equal(alert(f.ui), undefined); f.ui.unmount();
   });
+  for (const failure of ['response', 'throw']) await test(`${failure} enqueue failure permits a fresh explicit retry without a phantom task`, async () => {
+    let attempts = 0;
+    const f = fixture({ enqueue: async () => {
+      if (++attempts === 1) {
+        if (failure === 'throw') throw new Error('任务提交失败');
+        return { success: false, error: '任务提交失败' };
+      }
+      f.states.set('A:1', 'pending');
+      return { success: true, count: 1 };
+    } });
+    await f.ui.flush();
+    assert.equal(f.states.get('A:1'), 'missing');
+    assert(f.ui.text().includes('任务提交失败'));
+    await f.ui.button('重试本集').props.onClick(); await f.ui.flush();
+    assert.equal(f.downloads.length, 2, 'explicit retry must reach the download API after an unsuccessful submission');
+    assert(f.ui.button('取消等待'));
+    assert(!f.ui.text().includes('已尝试下载'));
+    f.ui.unmount();
+  });
+  await test('a removed download does not leave a phantom attempt blocking a later explicit retry', async () => {
+    const f = fixture(); await f.ui.flush(); assert.equal(f.downloads.length, 1);
+    f.states.delete('A:1'); await poll(f.ui);
+    await f.ui.button('重试本集').props.onClick(); await f.ui.flush();
+    assert.equal(f.downloads.length, 2, 'absence of a real task must allow a new submission');
+    assert(f.ui.button('取消等待')); f.ui.unmount();
+  });
+  await test('retry waits for an existing pending download without submitting again', async () => {
+    const f = fixture(); await f.ui.flush(); assert.equal(f.downloads.length, 1);
+    f.ui.button('取消等待').props.onClick(); await f.ui.flush();
+    await f.ui.button('重试本集').props.onClick(); await f.ui.flush();
+    assert.equal(f.downloads.length, 1);
+    assert(f.ui.button('取消等待'), 'an accepted pending task must remain a usable fallback');
+    assert.equal(alert(f.ui), undefined); f.ui.unmount();
+  });
   await test('retry uses refreshed local instead of a stale online choice', async () => {
     const f = fixture({ enqueue: async () => ({ success: false, error: '加入失败' }) }); await f.ui.flush();
     f.states.set('A:1', 'completed'); await f.ui.button('重试本集').props.onClick(); await f.ui.flush();
@@ -118,7 +152,7 @@ function fixture({ prepare, transcode, enqueue, quality = '720p', initial = 'mis
     await f.ui.flush(); f.ui.metadata(); f.ui.media.currentTime = 18; f.ui.error(2); await f.ui.flush();
     await poll(f.ui); assert(alert(f.ui)); assert.equal(f.ui.media.paused, true);
     const before = f.ui.prepares.length; await f.ui.button('重试本集').props.onClick(); await f.ui.flush();
-    assert.equal(f.ui.prepares.length, before + 1); assert.equal(f.downloads.length, 1);
+    assert.equal(f.ui.prepares.length, before + 1); assert.equal(f.downloads.length, 2, 'an explicit retry can resubmit a previously rejected download');
     f.ui.episode(1); await f.ui.flush();
     assert.equal(f.ui.prepares.length, before + 2, 'explicit selection must not strand playback on a rejected local file'); f.ui.unmount();
   });

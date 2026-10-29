@@ -1,4 +1,4 @@
-# Hongguo Drama 4.6: three-platform release candidate; publication is coordinated separately.
+# Hongguo Drama 4.7: three-platform release candidate; publication is coordinated separately.
 name: Windows x64 release candidate
 on:
   workflow_dispatch:

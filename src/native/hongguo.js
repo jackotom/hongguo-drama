@@ -644,6 +644,15 @@ async function fetchPlayUrlSingle(vid, sid, options = {}) {
 function sourceFailure(source, error) {
   const message = String(error?.message || '');
   const code = String(error?.code || '');
+  if (code === 'DEVICE_REGISTRATION_FAILED') {
+    const reason = String(error.registrationFailure || '');
+    const descriptions = { TIMEOUT: '请求超时', NETWORK_ERROR: '网络连接失败', EMPTY_RESPONSE: '上游返回空响应',
+      INVALID_RESPONSE: '上游未返回有效设备编号', BUSINESS_REJECTED: '上游拒绝注册', SECURITY_BLOCKED: '注册请求被安全校验阻止' };
+    const detail = Object.hasOwn(descriptions, reason) ? descriptions[reason]
+      : /^HTTP_[3-5]\d{2}$/.test(reason) ? `HTTP ${reason.slice(5)}` : '';
+    return { source, code: /^(?:TIMEOUT|NETWORK_ERROR|HTTP_[3-5]\d{2})$/.test(reason) ? reason : code,
+      message: `匿名播放设备注册失败${detail ? `（${detail}）` : ''}，请检查网络，10 秒后重试` };
+  }
   const status = Number(error?.status || error?.response?.status || message.match(/HTTP\s+(\d{3})/)?.[1]);
   if (status >= 300 && status <= 599) return { source, code: `HTTP_${status}`, message: `请求失败（HTTP ${status}）` };
   if (code === 'SECURITY_BLOCKED' || code.startsWith('ERR_WEB_MEDIA_')) return { source, code: 'SECURITY_BLOCKED', message: '片源地址被安全校验阻止' };
@@ -653,7 +662,9 @@ function sourceFailure(source, error) {
   if (['ECONNABORTED', 'ETIMEDOUT', 'TIMEOUT'].includes(code) || /超时|timeout/i.test(message)) return { source, code: 'TIMEOUT', message: '请求超时' };
   if (['ENOTFOUND', 'EAI_AGAIN', 'ECONNRESET', 'ECONNREFUSED', 'EHOSTUNREACH', 'ENETUNREACH', 'EPIPE', 'ERR_NETWORK', 'ERR_CANCELED'].includes(code)) return { source, code: 'NETWORK_ERROR', message: '网络连接失败，请稍后重试' };
   if (code === 'PREVIEW_ONLY') return { source, code, message: '网页仅提供预览，未作为完整片源' };
-  if (code === 'DEVICE_REGISTRATION_FAILED') return { source, code, message: '匿名播放设备注册失败，请检查网络或重启应用后重试' };
+  if (code === 'QUALITY_UNAVAILABLE') return { source, code, message: ['720p', '1080p'].includes(error?.quality)
+    ? `本集暂无尺寸可确认且满足 ${error.quality} 的 H.264/HEVC 片源，未降级` : '未取得满足所选清晰度的片源，未降级' };
+  if (code === 'NO_COMPATIBLE_SOURCE') return { source, code, message: '本集暂未提供兼容的 H.264/HEVC 片源' };
   if (code === 'BUSINESS_REJECTED') return { source, code, message: '接口暂时拒绝本次请求' };
   if (code === 'MISSING_MODEL' || /未返回目录数据/.test(message)) return { source, code: 'MISSING_MODEL', message: '接口未返回本集片源模型' };
   if (code === 'INVALID_RESPONSE' || /空响应|有效数据|目录数据不完整|JSON/.test(message)) return { source, code: 'INVALID_RESPONSE', message: '片源数据无法解析' };

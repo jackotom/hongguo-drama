@@ -338,7 +338,14 @@ function Player({ target, onNavigate, onSeriesSelected, onFloatingChange, active
       if (!latest || latest.locked) throw new Error(latest?.locked ? '该集已锁定，请在来源平台确认' : '无法刷新本集状态，请重试');
       if (usableLocal(latest, intent.seriesId)) { resumeLocal(latest, intent.seekTo, intent.autoplay); return; }
       const key = `${intent.selection}:${intent.seriesId}:${intent.vid}`;
-      if (fallbackAttemptRef.current === key) throw new Error('本集已尝试下载，请在下载管理检查或手动重试下载');
+      if (latest.taskId && ['pending', 'downloading'].includes(latest.status)) {
+        intent.submitting = false;
+        setPlaybackError(''); setWaitingFor(intent.vidIndex);
+        return;
+      }
+      if (fallbackAttemptRef.current === key) throw new Error(latest.taskId
+        ? '本集已有下载任务，请在下载管理检查或手动重试下载'
+        : '本集未能加入下载，请点击“重试本集”或“下载本集”重新尝试');
       const settings = stateRef.current.qualityLoading ? await window.electronAPI.getSettings() : null;
       if (!isCurrentFallback(intent)) return;
       const quality = stateRef.current.onlineQuality !== 'auto' ? stateRef.current.onlineQuality : stateRef.current.qualityLoading
@@ -837,6 +844,7 @@ function Player({ target, onNavigate, onSeriesSelected, onFloatingChange, active
     if (usableLocal(latest, String(activeSeriesId))) { resumeLocal(latest, currentPosition()); return; }
     setCompatMap(prev => { const next = { ...prev }; delete next[currentIndex]; return next; });
     if (onlineSourceRef.current === `${activeSeriesId}:${currentIndex}` || current?.status !== 'completed') {
+      fallbackAttemptRef.current = null;
       reconnectAttemptRef.current = null;
       startOnlinePlay(currentIndex, currentPosition(), true);
     } else goToEpisode(currentIndex, currentPosition());

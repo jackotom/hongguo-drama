@@ -49,6 +49,70 @@ function routeFixture() {
   return { ...native, state };
 }
 const checks = [
+  ['Missing explicit quality remains distinct from incompatible automatic sources without leaking raw messages', async () => {
+    for (const quality of ['720p', '1080p']) {
+      const app = appFixture({ low: { main_url: media('low'), codec_type: 'h264', width: 360, height: 640 } });
+      const f = load('hongguo.js', { './app-source': app });
+      const result = await f.fetchPlayUrlSingle('11', '1', { quality });
+      assert.equal(result.sources[0].code, 'QUALITY_UNAVAILABLE');
+      assert(result.error.includes(`满足 ${quality}`));
+      assert(result.error.includes('未降级'));
+    }
+    const app = appFixture({ incompatible: { main_url: media('av1'), codec_type: 'av1', width: 1080, height: 1920 } });
+    await assert.rejects(app.fetchAppPlayUrl('11'), error => error.code === 'NO_COMPATIBLE_SOURCE');
+    for (const quality of ['720p', '1080p']) {
+      const f = load('hongguo.js', { './app-source': app });
+      const result = await f.fetchPlayUrlSingle('11', '1', { quality });
+      assert.equal(result.sources[0].code, 'NO_COMPATIBLE_SOURCE', 'incompatible codecs must not be misreported as missing resolution');
+    }
+    for (const code of ['QUALITY_UNAVAILABLE', 'NO_COMPATIBLE_SOURCE']) {
+      const f = load('hongguo.js', { './app-source': { fetchAppPlayUrl: async () => {
+        throw Object.assign(new Error('secret https://signed.invalid/?token=private'), { code, quality: 'secret' });
+      } } });
+      const result = await f.fetchPlayUrlSingle('11', '1', { quality: '1080p' });
+      assert.equal(result.sources[0].code, code);
+      assert.doesNotMatch(JSON.stringify(result), /secret|signed\.invalid|private/);
+    }
+  }],
+  ['Registration failures retain safe details and remain retryable only for transient causes', async () => {
+    for (const [failure, expected, detail] of [
+      [{ code: 'ECONNRESET' }, 'NETWORK_ERROR', '网络连接失败'],
+      [{ code: 'ETIMEDOUT' }, 'TIMEOUT', '请求超时'],
+      [{ status: 503 }, 'HTTP_503', 'HTTP 503'],
+      [{ status: 403 }, 'HTTP_403', 'HTTP 403'],
+      [{ code: 'EMPTY_RESPONSE' }, 'DEVICE_REGISTRATION_FAILED', '空响应'],
+      [{ code: 'INVALID_RESPONSE' }, 'DEVICE_REGISTRATION_FAILED', '有效设备编号'],
+      [{ code: 'BUSINESS_REJECTED' }, 'DEVICE_REGISTRATION_FAILED', '拒绝注册'],
+      [{ code: 'SECURITY_BLOCKED' }, 'DEVICE_REGISTRATION_FAILED', '安全校验'],
+      [{ code: 'secret' }, 'DEVICE_REGISTRATION_FAILED', '10 秒后重试'],
+    ]) {
+      const device = load('playback-device.js', {});
+      const getPlaybackDevice = async request => device.getPlaybackDevice(async (...args) => {
+        if (['EMPTY_RESPONSE', 'INVALID_RESPONSE', 'BUSINESS_REJECTED', 'SECURITY_BLOCKED'].includes(failure.code)) {
+          throw Object.assign(new Error('secret'), failure);
+        }
+        return request(...args);
+      });
+      const routedApp = load('app-source.js', { './playback-device': { getPlaybackDevice }, axios: async config => {
+        if (failure.status) return { status: failure.status, headers: {}, data: 'secret' };
+        throw Object.assign(new Error('secret https://signed.invalid/?token=private'), failure);
+      } });
+      const f = load('hongguo.js', { './app-source': routedApp });
+      const result = await f.fetchPlayUrlSingle('11', '1', { quality: '720p' });
+      assert.equal(result.sources[0].code, failure.code === 'secret' ? 'NETWORK_ERROR' : expected);
+      assert.match(result.error, /匿名播放设备注册失败/);
+      assert.ok(result.error.includes(detail));
+      assert.doesNotMatch(JSON.stringify(result), /secret|signed\.invalid|private/);
+    }
+    for (const registrationFailure of ['secret', 'constructor', 'toString', '__proto__']) {
+      const f = load('hongguo.js', { './app-source': { fetchAppPlayUrl: async () => {
+        throw Object.assign(new Error('secret'), { code: 'DEVICE_REGISTRATION_FAILED', registrationFailure });
+      } } });
+      const result = await f.fetchPlayUrlSingle('11', '1', { quality: '720p' });
+      assert.equal(result.sources[0].message, '匿名播放设备注册失败，请检查网络，10 秒后重试');
+      assert.doesNotMatch(JSON.stringify(result), /secret|function|\[object/);
+    }
+  }],
   ['App network failures retain only safe codes and aggregate into distinct reasons', async () => {
     for (const [code, expected] of [['ECONNABORTED', 'TIMEOUT'], ['ETIMEDOUT', 'TIMEOUT'],
       ['ENOTFOUND', 'NETWORK_ERROR'], ['ECONNRESET', 'NETWORK_ERROR'], ['ERR_NETWORK', 'NETWORK_ERROR'],

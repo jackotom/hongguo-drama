@@ -72,8 +72,12 @@ const checks = [
     assert.equal(higher.url, mediaUrl('high'));
   }],
   ['explicit tiers reject absent, unknown-size and unsupported streams', async () => {
-    for (const rows of [{}, { unknown: stream('unknown', 0, 0) }, { unsupported: stream('bad', 1080, 1920, 'bytevc2') }]) {
-      await assert.rejects(appFixture(rows).fetchAppPlayUrl('11', { quality: '1080p' }), /1080p/);
+    for (const [rows, code] of [
+      [{}, 'NO_COMPATIBLE_SOURCE'],
+      [{ unknown: stream('unknown', 0, 0) }, 'QUALITY_UNAVAILABLE'],
+      [{ unsupported: stream('bad', 1080, 1920, 'bytevc2') }, 'NO_COMPATIBLE_SOURCE'],
+    ]) {
+      await assert.rejects(appFixture(rows).fetchAppPlayUrl('11', { quality: '1080p' }), { code });
     }
   }],
   ['auto preserves H264 priority and accepts legacy missing dimensions', async () => {

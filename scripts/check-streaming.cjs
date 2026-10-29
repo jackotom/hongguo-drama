@@ -366,6 +366,30 @@ function load(fetchPlayUrlSingle, overrides = {}) {
       assert.equal(response.status, 416, range); assert.equal(response.headers.get('content-range'), 'bytes */10');
     }
   });
+  await check('recovery: cancelling local reads during seek never closes an already closed stream', async () => {
+    const h = hload(async () => ({})), file = path.join(root, 'local-cancel.mp4');
+    fs.writeFileSync(file, Buffer.alloc(1024 * 1024));
+    const url = h.context.localPlayUrl(file), errors = [];
+    const onError = error => errors.push(error);
+    process.on('uncaughtException', onError);
+    try {
+      for (const headers of [{}, { range: 'bytes=65536-' }]) {
+        for (let index = 0; index < 40; index++) {
+          const response = await h.protocols['hongguo-local'](new Request(url, { headers }));
+          const reader = response.body.getReader();
+          for (let count = 0; count < index % 18; count++) if ((await reader.read()).done) break;
+          const pending = reader.read();
+          await new Promise(resolve => setImmediate(resolve));
+          await reader.cancel();
+          await pending;
+        }
+      }
+      await sleep(20);
+      assert.deepEqual(errors.map(error => error.code), [], 'seeking must not raise an uncaught stream-close error');
+    } finally {
+      process.removeListener('uncaughtException', onError);
+    }
+  });
   for (const h of harnesses) {
     h.context.clearOnlineCache();
     h.run('for (const task of downloadTasks) task.cancelSource?.cancel("fixture cleanup")');

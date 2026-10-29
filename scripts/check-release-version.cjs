@@ -1,7 +1,7 @@
 const assert = require('node:assert/strict');
 const { availableRelease } = require('../src/native/app-update');
 
-const ordered = ['1.7', '1.8', '1.9', '1.71', '1.74', '1.75', '1.75.1', '1.76', '1.99', '1.100', '2.0', '2.9', '3.0', '3.1', '3.2', '3.3', '3.4', '3.5', '3.6', '3.7', '3.8', '3.9', '4.0', '4.1', '4.2', '4.3', '4.4', '4.5', '4.6'];
+const ordered = ['1.7', '1.8', '1.9', '1.71', '1.74', '1.75', '1.75.1', '1.76', '1.99', '1.100', '2.0', '2.9', '3.0', '3.1', '3.2', '3.3', '3.4', '3.5', '3.6', '3.7', '3.8', '3.9', '4.0', '4.1', '4.2', '4.3', '4.4', '4.5', '4.6', '4.7'];
 let checks = 0;
 for (let current = 0; current < ordered.length; current++) {
   for (let next = 0; next < ordered.length; next++) {
@@ -22,7 +22,7 @@ for (const flags of [{ prerelease: true }, { draft: true }]) {
 }
 const pkg = require('../package.json');
 const lock = require('../package-lock.json');
-assert.equal(pkg.version, '4.6.0', 'Current source release target must be 4.6.0');
+assert.equal(pkg.version, '4.7.0', 'Current source release target must be 4.7.0');
 assert.equal(lock.version, pkg.version, 'Lockfile version must match the release');
 assert.equal(lock.packages[''].version, pkg.version, 'Lockfile root package must match the release');
 assert.match(pkg.version, /^\d+\.\d+\.0$/, 'Release versions use two public components and an internal zero patch');
@@ -54,8 +54,9 @@ assert.equal(availableRelease({ tag_name: 'v4.3' }, '4.2.0').version, '4.3');
 assert.equal(availableRelease({ tag_name: 'v4.4' }, '4.3.0').version, '4.4');
 assert.equal(availableRelease({ tag_name: 'v4.5' }, '4.4.0').version, '4.5');
 assert.equal(availableRelease({ tag_name: 'v4.6' }, '4.5.0').version, '4.6');
-for (const current of ['4.6', '4.6.0']) {
-  for (const tag of ['v4.6', '4.6', 'v4.6.0', '4.6.0']) {
+assert.equal(availableRelease({ tag_name: 'v4.7' }, '4.6.0').version, '4.7');
+for (const current of ['4.7', '4.7.0']) {
+  for (const tag of ['v4.7', '4.7', 'v4.7.0', '4.7.0']) {
     assert.equal(availableRelease({ tag_name: tag }, current), null, `${current} equals ${tag}`);
   }
 }

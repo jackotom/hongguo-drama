@@ -1,4 +1,4 @@
-// 红果短剧 4.6：界面入口；目录双线与验证范围见 docs/release-4.6.md。
+// 红果短剧 4.7：界面入口；目录双线与验证范围见 docs/release-4.7.md。
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';

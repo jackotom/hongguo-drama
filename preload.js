@@ -1,4 +1,4 @@
-// 红果短剧 4.6：桌面桥接入口，发行说明见 docs/release-4.6.md。
+// 红果短剧 4.7：桌面桥接入口，发行说明见 docs/release-4.7.md。
 const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('electronAPI', {

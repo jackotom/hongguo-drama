@@ -57,6 +57,7 @@ function load(platform = 'darwin') {
   let menu;
   const electron = {
     app, BrowserWindow: Window, ipcMain: { handle() {} },
+    screen: { getDisplayMatching: () => ({ workArea: { x: 0, y: 0, width: 1920, height: 1080 } }) },
     Menu: { buildFromTemplate: x => x, setApplicationMenu: x => { menu = x; } },
     session: { defaultSession: { setProxy: async () => {} } },
     protocol: { registerSchemesAsPrivileged() {}, handle() {} },

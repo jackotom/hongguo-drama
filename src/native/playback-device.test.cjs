@@ -10,7 +10,7 @@ const vm = require('node:vm');
 
 const source = fs.readFileSync(path.join(__dirname, 'playback-device.js'), 'utf8');
 const endpoint = 'https://log5-applog-lf.fqnovel.com/service/2/device_register/?tt_data=a&cronet_version=8d40f833_2026-03-03&ttnet_version=4.2.243.31-douyin&use_store_region_cookie=1';
-const failureMessage = '匿名播放设备注册失败，请重启应用后重试';
+const failureMessage = '匿名播放设备注册失败，请检查网络，10 秒后重试';
 function load(clock = Date) {
     const module = { exports: {} };
     vm.runInNewContext(source, {
@@ -149,7 +149,7 @@ test('binary request decrypts to authenticated gzip JSON with the fixed anonymou
     assert.doesNotMatch(JSON.stringify(payload), /"(?:account|account_id|user_id|uid|sessionid|session_id|device_token|access_token|refresh_token|cookie|cookies|authorization|password|phone_number)"\s*:/i);
 });
 
-test('synchronous and asynchronous failures remain cached and expose only a safe registration error', async () => {
+test('synchronous and asynchronous failures share a safe error during cooldown', async () => {
     for (const synchronous of [true, false]) {
         const get = load();
         let calls = 0;
@@ -165,12 +165,75 @@ test('synchronous and asynchronous failures remain cached and expose only a safe
         const error = results[0].reason;
         assert.equal(error.code, 'DEVICE_REGISTRATION_FAILED');
         assert.equal(error.message, failureMessage);
-        assert.deepEqual(Object.keys(error), ['code']);
+        assert.deepEqual(Object.keys(error), ['code', 'registrationFailure']);
+        assert.equal(error.registrationFailure, 'TIMEOUT');
         assert.equal(error.cause, undefined);
         assert.doesNotMatch(String(error.stack) + JSON.stringify(error), /PRIVATE_RESPONSE_SENTINEL/);
         assert.equal(get(() => assert.fail('no later retry')), first);
         await assert.rejects(first, { code: 'DEVICE_REGISTRATION_FAILED' });
     }
+});
+
+test('initial registration failure recovers after cooldown without a restart or concurrent device churn', async () => {
+    let now = Date.now(), calls = 0;
+    const get = load({ now: () => now });
+    const fail = async () => { calls++; throw Object.assign(new Error('PRIVATE_RESPONSE_SENTINEL'), { code: 'ECONNRESET' }); };
+    const first = get(fail);
+    await assert.rejects(first, { code: 'DEVICE_REGISTRATION_FAILED' });
+    now += 9999;
+    assert.equal(get(() => assert.fail('cooldown must prevent retries')), first);
+    assert.equal(calls, 1);
+    now++;
+    let finish;
+    const recovered = get(() => { calls++; return new Promise(resolve => { finish = resolve; }); });
+    assert.notEqual(recovered, first, 'a transient failure must not stay cached for the entire process');
+    const concurrent = Array.from({ length: 20 }, () => get(() => assert.fail('share recovery')));
+    assert.ok(concurrent.every(promise => promise === recovered));
+    await Promise.resolve();
+    finish({ device_id: '123', install_id: '456' });
+    const identity = await recovered;
+    assert.ok((await Promise.all(concurrent)).every(value => value === identity));
+    now += 60000;
+    assert.equal(get(() => assert.fail('keep successful identity')), recovered);
+    assert.equal(calls, 2);
+});
+
+test('a repeated registration failure starts a new cooldown instead of a retry storm', async () => {
+    let now = Date.now(), calls = 0;
+    const get = load({ now: () => now });
+    const fail = async () => { calls++; throw new Error('PRIVATE_RESPONSE_SENTINEL'); };
+    const first = get(fail);
+    await assert.rejects(first);
+    now += 10000;
+    const second = get(fail);
+    assert.notEqual(second, first);
+    await assert.rejects(second);
+    now += 9999;
+    assert.equal(get(() => assert.fail('second cooldown')), second);
+    assert.equal(calls, 2);
+});
+
+test('registration reports only whitelisted failure reasons without retaining response or credentials', async () => {
+    for (const [input, expected] of [
+        [{ code: 'ETIMEDOUT' }, 'TIMEOUT'], [{ code: 'ECONNABORTED' }, 'TIMEOUT'],
+        [{ code: 'ENOTFOUND' }, 'NETWORK_ERROR'], [{ code: 'ECONNRESET' }, 'NETWORK_ERROR'],
+        [{ code: 'ERR_NETWORK' }, 'NETWORK_ERROR'], [{ status: 403 }, 'HTTP_403'],
+        [{ status: 503 }, 'HTTP_503'], [{ code: 'EMPTY_RESPONSE' }, 'EMPTY_RESPONSE'],
+        [{ code: 'INVALID_RESPONSE' }, 'INVALID_RESPONSE'], [{ code: 'SECURITY_BLOCKED' }, 'SECURITY_BLOCKED'],
+        [{ code: 'PRIVATE_RESPONSE_SENTINEL', status: 'PRIVATE_RESPONSE_SENTINEL' }, 'UNKNOWN'],
+    ]) {
+        await assert.rejects(load()(async () => {
+            throw Object.assign(new Error('PRIVATE_RESPONSE_SENTINEL'), input, { response: { device_token: 'PRIVATE_RESPONSE_SENTINEL' } });
+        }), error => {
+            assert.equal(error.code, 'DEVICE_REGISTRATION_FAILED');
+            assert.equal(error.registrationFailure, expected);
+            assert.equal(error.message, failureMessage);
+            assert.doesNotMatch(String(error.stack) + JSON.stringify(error), /PRIVATE_RESPONSE_SENTINEL/);
+            return true;
+        });
+    }
+    await assert.rejects(load()(async () => ({ device_id: '0', install_id: '456' })), { registrationFailure: 'INVALID_RESPONSE' });
+    await assert.rejects(load()(async () => ({ code: 1, device_id: '123', install_id: '456' })), { registrationFailure: 'BUSINESS_REJECTED' });
 });
 
 test('fallback IDs accept only positive digit strings or safe integers without losing precision', async () => {

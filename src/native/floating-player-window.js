@@ -22,11 +22,13 @@ function attachFloatingPlayerWindow(mainWindow, {
   BrowserWindow,
   isTrustedUrl,
   store,
+  screen,
   platform = process.platform,
 } = {}) {
   if (!mainWindow?.webContents?.setWindowOpenHandler || typeof BrowserWindow !== 'function'
-    || typeof store?.getSettings !== 'function' || typeof store?.saveSettings !== 'function') {
-    throw new TypeError('attachFloatingPlayerWindow requires a window, BrowserWindow and settings store');
+    || typeof store?.getSettings !== 'function' || typeof store?.saveSettings !== 'function'
+    || typeof screen?.getDisplayMatching !== 'function') {
+    throw new TypeError('attachFloatingPlayerWindow requires a window, BrowserWindow, screen and settings store');
   }
 
   let floatingWindow = null;
@@ -92,7 +94,10 @@ function attachFloatingPlayerWindow(mainWindow, {
           height: clamp(finalOptions.height, MIN_HEIGHT, MAX_HEIGHT, 270),
         };
         const initialSize = lastKnownSize || loadSavedSize() || requestedSize;
-        lastKnownSize = initialSize;
+        const area = screen.getDisplayMatching(mainWindow.getBounds()).workArea;
+        const width = Math.min(initialSize.width, Math.max(MIN_WIDTH, area.width - 32));
+        const height = Math.min(initialSize.height, Math.max(MIN_HEIGHT, area.height - 32));
+        lastKnownSize = { width, height };
         const webPreferences = {
           ...(finalOptions.webPreferences || {}),
           sandbox: true,
@@ -105,8 +110,11 @@ function attachFloatingPlayerWindow(mainWindow, {
         delete webPreferences.preload;
         const child = new BrowserWindow({
           ...finalOptions,
-          width: initialSize.width,
-          height: initialSize.height,
+          width,
+          height,
+          x: area.x + Math.max(0, area.width - width - 16),
+          y: area.y + Math.max(0, area.height - height - 16),
+          show: true,
           useContentSize: false,
           minWidth: MIN_WIDTH,
           minHeight: MIN_HEIGHT,
@@ -163,6 +171,8 @@ function attachFloatingPlayerWindow(mainWindow, {
           child.webContents.on(eventName, event => event.preventDefault());
         }
         child.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
+        child.show();
+        child.focus();
         return child.webContents;
       },
     };

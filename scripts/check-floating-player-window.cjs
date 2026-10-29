@@ -64,6 +64,8 @@ class FakeWindow extends EventEmitter {
   setMenuBarVisibility(value) { this.calls.push(['setMenuBarVisibility', value]); }
   setMinimumSize(width, height) { this.calls.push(['setMinimumSize', width, height]); }
   setMaximumSize(width, height) { this.calls.push(['setMaximumSize', width, height]); }
+  show() { this.calls.push(['show']); }
+  focus() { this.calls.push(['focus']); }
   setVisibleOnAllWorkspaces(value, options) { this.calls.push(['setVisibleOnAllWorkspaces', value, options]); }
   close() {
     if (this.destroyed) return;
@@ -86,14 +88,19 @@ class BrowserWindow extends FakeWindow {
 }
 
 const trustedUrl = 'file:///trusted/index.html';
-function fixture({ store = makeStore(), platform = 'darwin' } = {}) {
+function fixture({ store = makeStore(), platform = 'darwin', workArea = { x: -1920, y: 40, width: 1920, height: 1040 } } = {}) {
   const mainWindow = new FakeWindow({});
+  mainWindow.getBounds = () => ({ x: -1700, y: 100, width: 1100, height: 750 });
   mainWindow.url = trustedUrl;
   const trustedChecks = [];
   attachFloatingPlayerWindow(mainWindow, {
     BrowserWindow,
     store,
     platform,
+    screen: { getDisplayMatching(bounds) {
+      assert.deepEqual(bounds, mainWindow.getBounds(), 'use the display containing the main window');
+      return { workArea };
+    } },
     isTrustedUrl(url) {
       trustedChecks.push(url);
       return url === trustedUrl;
@@ -143,6 +150,9 @@ function closeMain(mainWindow) {
     const finalOptions = {
       width: 120,
       height: 9999,
+      show: false,
+      x: 99999,
+      y: 99999,
       titleBarStyle: 'hiddenInset',
       webPreferences: {
         preload: '/inherited/preload.js',
@@ -157,6 +167,9 @@ function closeMain(mainWindow) {
     const child = open(finalOptions);
     assert.equal(child.options.width, 240);
     assert.equal(child.options.height, 900);
+    assert.equal(child.options.show, true, 'the player must be shown even when popup options hide it');
+    assert.equal(child.options.x, -256, 'anchor to the right of the opener display work area');
+    assert.equal(child.options.y, 164, 'anchor above the taskbar with a 16px margin');
     assert.equal(child.options.frame, true);
     assert.equal(child.options.titleBarStyle, 'default');
     assert.equal(child.options.alwaysOnTop, true);
@@ -176,6 +189,8 @@ function closeMain(mainWindow) {
       ['setMenuBarVisibility', false],
       ['setMinimumSize', 240, 160],
       ['setMaximumSize', 900, 900],
+      ['show'],
+      ['focus'],
     ]);
     for (const eventName of ['will-navigate', 'will-redirect']) {
       let prevented = false;
@@ -197,6 +212,17 @@ function closeMain(mainWindow) {
     const reopened = open({ width: 420, height: 740 });
     assert.deepEqual(reopened.getBounds(), { width: 520, height: 310 }, 'saved size must override window features');
     reopened.close();
+    closeMain(mainWindow);
+  }
+
+  {
+    const { mainWindow, open } = fixture({ workArea: { x: 120, y: -700, width: 900, height: 620 } });
+    const child = open({ width: 900, height: 900 });
+    assert.equal(child.options.width, 868);
+    assert.equal(child.options.height, 588);
+    assert.equal(child.options.x, 136);
+    assert.equal(child.options.y, -684, 'a tall saved player must fit entirely on a smaller display');
+    child.close();
     closeMain(mainWindow);
   }
 
@@ -347,7 +373,7 @@ function closeMain(mainWindow) {
   assert.ok(attachAt > protectAt, 'floating player wiring must follow rendererSecurity.protectWindow');
   assert.match(
     mainSource.slice(attachAt),
-    /attachFloatingPlayerWindow\(mainWindow, \{\s*BrowserWindow,\s*isTrustedUrl: rendererSecurity\.isTrustedUrl,\s*store,/,
+    /attachFloatingPlayerWindow\(mainWindow, \{\s*BrowserWindow,\s*isTrustedUrl: rendererSecurity\.isTrustedUrl,\s*store,\s*screen,/,
   );
 
   console.log('PASS floating player window: trust, safety, debounced size persistence, failure fallback, flush and lifecycle');
