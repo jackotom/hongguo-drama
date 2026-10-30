@@ -25,23 +25,23 @@
 
 
 
-**当前正式版：4.9**（内部 `4.9.0`）。新增老电脑H.264优先和全局老板键；老板键可隐藏Dock并在恢复后保持暂停，普通小窗保留Dock与跨全屏显示。双Mac已签名、公证和装订，Windows EXE未签名。详见 [4.9说明](docs/release-4.9.md)。
+**当前正式版：5.0**（内部 `5.0.0`）。观看记录的两个选项会记住本机选择；明确季号正常归组，模糊关系仅作提示，不参与低季隐藏、批量归组、更新红点或系统通知。双Mac已签名、公证和装订，Windows EXE未签名。详见 [5.0说明](docs/release-5.0.md)。
 
-
-| 设备 | 下载 4.9 | 安装方式 |
+| 设备 | 下载 5.0 | 安装方式 |
 |---|---|---|
-| Apple 芯片 Mac（M 系列），macOS 13+ | [下载 DMG](https://github.com/jackotom/hongguo-drama/releases/download/v4.9/Hongguo-4.9-mac-arm64.dmg) | 打开 DMG，拖入「应用程序」后启动；后续支持应用内更新 |
-| Intel Mac，macOS 13+ | [下载 DMG](https://github.com/jackotom/hongguo-drama/releases/download/v4.9/Hongguo-4.9-mac-x64.dmg) | 打开 DMG，拖入「应用程序」后启动；后续支持应用内更新 |
-| Windows x64（推荐安装版） | [下载安装版 EXE](https://github.com/jackotom/hongguo-drama/releases/download/v4.9/hongguo-downloader-4.9-win-x64-setup.exe) | 按向导安装，后续支持应用内更新 |
-| Windows x64（便携版） | [下载便携 EXE](https://github.com/jackotom/hongguo-drama/releases/download/v4.9/hongguo-downloader-4.9-win-x64.exe) · [下载便携 ZIP](https://github.com/jackotom/hongguo-drama/releases/download/v4.9/hongguo-downloader-4.9-win-x64.zip) | 直接运行 EXE；ZIP 解压后运行同一程序，后续仍需手动替换 |
+| Apple 芯片 Mac（M 系列），macOS 13+ | [下载 DMG](https://github.com/jackotom/hongguo-drama/releases/download/v5.0/Hongguo-5.0-mac-arm64.dmg) | 打开 DMG，拖入「应用程序」后启动；后续支持应用内更新 |
+| Intel Mac，macOS 13+ | [下载 DMG](https://github.com/jackotom/hongguo-drama/releases/download/v5.0/Hongguo-5.0-mac-x64.dmg) | 打开 DMG，拖入「应用程序」后启动；后续支持应用内更新 |
+| Windows x64（推荐安装版） | [下载安装版 EXE](https://github.com/jackotom/hongguo-drama/releases/download/v5.0/hongguo-downloader-5.0-win-x64-setup.exe) | 按向导安装，后续支持应用内更新 |
+| Windows x64（便携版） | [下载便携 EXE](https://github.com/jackotom/hongguo-drama/releases/download/v5.0/hongguo-downloader-5.0-win-x64.exe) · [下载便携 ZIP](https://github.com/jackotom/hongguo-drama/releases/download/v5.0/hongguo-downloader-5.0-win-x64.zip) | 直接运行 EXE；ZIP 解压后运行同一程序，后续仍需手动替换 |
 
-[查看最新正式版](https://github.com/jackotom/hongguo-drama/releases/latest) · [4.9 更新说明与源码](https://github.com/jackotom/hongguo-drama/releases/tag/v4.9) · [SHA256 校验文件](https://github.com/jackotom/hongguo-drama/releases/download/v4.9/SHA256SUMS.txt)
+[查看最新正式版](https://github.com/jackotom/hongguo-drama/releases/latest) · [5.0 更新说明与源码](https://github.com/jackotom/hongguo-drama/releases/tag/v5.0) · [SHA256 校验文件](https://github.com/jackotom/hongguo-drama/releases/download/v5.0/SHA256SUMS.txt)
 
-- **升级到 4.9**：4.8 安装版可使用应用内更新；也可退出旧程序后替换 Mac 应用或运行 Windows 安装包。便携版保留同目录的 `data` 后手动替换；1.75 及更早版本需要手动安装。
+
+- **升级到 5.0**：4.9 安装版可使用应用内更新；也可退出旧程序后替换 Mac 应用或运行 Windows 安装包。便携版保留同目录的 `data` 后手动替换；1.75 及更早版本需要手动安装。
 - **后续更新**：Mac 与 Windows 安装版可在应用内下载新版，下载完成后由你点击重启安装，不强制升级。Windows 便携版继续通过发行页下载并手动替换。
-- **Mac**：正式包的 Developer ID 签名、Apple 公证和票据装订状态见本版发行页。无需全局关闭 Gatekeeper；公证不等于 App Store 审核或内容授权。
+- **Mac**：正式包完成 Developer ID 签名、Apple 公证 Accepted 和票据装订。无需全局关闭 Gatekeeper；公证不等于 App Store 审核或内容授权。
 - **Windows**：安装版和便携版 EXE 尚未签名，可能出现系统安全提示。请核对官方下载来源；便携版首次启动会展开临时运行文件。安装版沿用原用户资料目录；3.4 起便携版把设置和下载记录放在程序目录的 `data` 文件夹，移动程序时请连同该文件夹一起保留。安装版与便携版不能同时运行（同一应用只允许一个实例）；更换版本前请先退出正在运行的窗口。
-- **普通使用只需上表安装文件**：Assets 中的 Mac 更新 ZIP、`latest*.yml` 和 `.blockmap` 供更新程序使用；`source` 文件和 GitHub 自动生成的 Source code 是源码，不能直接运行。
+- **普通使用只需上表安装文件**：发行页中的 Mac 更新 ZIP、`latest*.yml` 和 `.blockmap` 供更新程序使用；`source` 文件和 GitHub 自动生成的 Source code 是源码，不能直接运行。
 
 本项目是社区维护的开源修改版，**不是红果、西饭或河马的官方客户端，也未获平台官方背书**。不提供付费分集解锁；剧集、清晰度和可用范围取决于来源平台。
 
@@ -72,18 +72,20 @@
 
 ## 5.0 观看记录记忆与疑似同剧提示
 
-- “检查更新”旁的检测范围、“隐藏同剧低季”记住本机选择，重新打开和重启后保留。
+- “检查更新”旁的检测范围、“隐藏同剧低季”会记住本机选择，重新打开页面及应用后恢复。
 - 支持第9季、10季、中文数字及括号内季号等明确写法；同来源、同剧名的明确季号继续正常归组。
-- 裸数字后缀、标题中间换数字和轻微改名只显示“疑似同剧（仅提示）”，不影响低季隐藏、批量归组或更新红点。
-- 点击疑似项不会清除原剧更新标记；不删除任何观看记录或视频。
-- 当前为5.0发行目标，正式下载暂保留4.9；最终签名公证与三端验收完成后更新下载。详见 [5.0说明](docs/release-5.0.md)。
+- 裸数字后缀、标题中间换数字、中英文数字变化和轻微改名只显示“疑似同剧（仅提示）”。
+- 疑似项不会进入隐藏、批量归组、更新红点或系统通知；点击核对也不会清除原剧更新标记。
+- 同一剧号后续改为明确季名时，新标题覆盖旧疑似缓存，转入确定续作后可正常清除更新标记。
+- 大幅改名仍可能漏提示；标题相近不能证明作品关系，不同记录和视频不会被删除。
+- 5.0 已正式发布，三端下载和最终验收回执见 [5.0说明](docs/release-5.0.md)。
 
 ## 4.9 老电脑兼容、老板键与小窗修复
 
 - 新增“老电脑（H.264优先）”：优先兼容片源，开启兼容模式时对已知 H.265 片源提前转码，减少先黑屏再失败的情况。
 - 修复 Mac 自带画中画、隐身小窗导致整个应用 Dock 图标消失的问题。
 - 设置新增可录入组合键的老板键：全局暂停并隐藏所有播放窗口，Mac同时隐藏Dock；再次按键恢复窗口与图标，保持暂停。
-- 4.9 已正式发布，上方为三端正式下载。验收与限制见 [4.9说明](docs/release-4.9.md)。
+- 4.9 为上一正式版；历史验收与限制见 [4.9说明](docs/release-4.9.md)。
 
 ## 4.8 自动1080P优先与失败换档
 
