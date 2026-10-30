@@ -1,5 +1,5 @@
 @echo off
-rem Hongguo Drama 5.0 source candidate - version metadata: package.json
+rem Hongguo Drama 5.1 source candidate - version metadata: package.json
 title 红果短剧下载器 - 开发模式
 cd /d "%~dp0"
 

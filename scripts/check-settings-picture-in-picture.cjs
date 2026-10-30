@@ -18,7 +18,12 @@ const text = node => typeof node === 'string' || typeof node === 'number' ? Stri
   const builtinIndex = settingsSource.indexOf('<BuiltinSources');
   assert.ok(shortcutIndex >= 0 && shortcutIndex < pictureModeIndex && pictureModeIndex < builtinIndex, 'picture-in-picture setting must sit between shortcuts and built-in sources');
   assert.match(appSource, /label: '红果账号'/);
-  assert.match(appSource, /<span>红果账号<\/span>/);
+  assert.match(appSource, /id: 'manager'[^\n]+\n\s*\{ id: 'account', label: '红果账号'/, 'account follows download management');
+  const sidebarMenu = appSource.split('<nav className="sidebar-menu">')[1].split('</nav>')[0];
+  assert.match(sidebarMenu, /MENU\.filter\(\(item\) => item\.id !== 'settings'\)\.map/, 'main navigation includes the account entry');
+  const sidebarFooter = appSource.split('<div className="sidebar-footer">')[1].split('</aside>')[0];
+  assert.doesNotMatch(sidebarFooter, /account|红果账号/, 'footer must not duplicate the account entry');
+  assert.match(sidebarFooter, /navigate\('settings'\)/, 'settings stays in the footer');
   assert.doesNotMatch(appSource, /登录管理/);
   assert.doesNotMatch(accountSource, /登录管理/);
 
@@ -112,5 +117,5 @@ const text = node => typeof node === 'string' || typeof node === 'number' ? Stri
     accountUi.unmount();
   }
 
-  console.log('PASS settings picture-in-picture mode: default custom, partial autosave, visible failure/recovery, card placement; account navigation labels and page title use 红果账号');
+  console.log('PASS settings picture-in-picture mode; 红果账号 follows 下载管理, 设置 stays in footer, account page opens');
 })().catch(error => { console.error(error); process.exitCode = 1; });

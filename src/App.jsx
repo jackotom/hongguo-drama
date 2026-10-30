@@ -166,7 +166,7 @@ export default function App() {
         </div>
         <nav className="sidebar-menu">
           <div className="sidebar-group-label">内容</div>
-          {MENU.filter((item) => item.id !== 'settings' && item.id !== 'account').map((item) => {
+          {MENU.filter((item) => item.id !== 'settings').map((item) => {
             const Icon = item.icon;
             return (
               <button key={item.id} className={`sidebar-item ${page === item.id ? 'active' : ''}`}
@@ -177,10 +177,6 @@ export default function App() {
           })}
         </nav>
         <div className="sidebar-footer">
-          <button className={`sidebar-item ${page === 'account' ? 'active' : ''}`}
-            aria-current={page === 'account' ? 'page' : undefined} onClick={() => navigate('account')}>
-            <User size={19} /><span>红果账号</span>
-          </button>
           <button className={`sidebar-item ${page === 'settings' ? 'active' : ''}`}
             aria-current={page === 'settings' ? 'page' : undefined} onClick={() => navigate('settings')}>
             <Settings size={19} /><span>设置</span>
