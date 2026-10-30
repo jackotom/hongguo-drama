@@ -29,8 +29,8 @@ function historyRows(removedId = '') {
   return listHistory(series, playback);
 }
 
-function mount(rows) {
-  let cursor = 0, tree, loadCount = 0, onUpdated, checkedRequests = [], removals = [];
+function mount(rows, storage = new Map()) {
+  let cursor = 0, tree, loadCount = 0, onUpdated, checkedRequests = [], removals = [], plays = [], acknowledgements = [];
   let delayedRemove = false, pendingRemove, removeError = '';
   const slots = [], effects = [], pendingLoads = [];
   let delayedLoads = false;
@@ -67,6 +67,8 @@ function mount(rows) {
       return { success: true, checked: 1, failed: 0, remaining: 0 };
     },
     checkWatchHistoryItem: async () => ({ success: true, checked: 0 }),
+    playSeries: async payload => { plays.push({ ...payload }); return { success: true }; },
+    acknowledgeWatchUpdates: async id => { acknowledgements.push(id); return { success: true }; },
     removeWatchHistory: id => {
       removals.push(id);
       const result = removeError ? { success: false, error: removeError } : { success: true };
@@ -81,7 +83,10 @@ function mount(rows) {
     module,
     exports: module.exports,
     require: name => name === 'react' ? react : name === './icons' ? { Play: Icon, RefreshCw: Icon, Clock: Icon } : {},
-    window: { electronAPI: api },
+    window: { electronAPI: api, localStorage: {
+      getItem: key => storage.get(key) ?? null,
+      setItem: (key, value) => storage.set(key, value),
+    } },
   });
   const render = () => {
     cursor = 0;
@@ -116,6 +121,7 @@ function mount(rows) {
     triggerUpdated: () => onUpdated(),
     checkedRequests,
     removals,
+    plays, acknowledgements,
     loadCount: () => loadCount,
   };
 }
@@ -176,6 +182,73 @@ const button = (ui, label) => ui.find(node => node.type === 'button' && text(nod
   assert.ok(button(ui, '已看完 2'));
   assert.deepEqual(ui.checkedRequests, [], 'changing the view must not run update checks');
   assert.deepEqual(ui.removals, [], 'changing the view must not remove records');
+
+  const preferencesKey = 'hongguo:watch-history-preferences';
+  const storage = new Map();
+  const savedUi = mount(() => historyRows(), storage);
+  await savedUi.flush();
+  savedUi.find(node => node.type === 'select').props.onChange({ target: { value: 'latest' } });
+  await savedUi.flush();
+  savedUi.find(node => node.type === 'input').props.onChange({ target: { checked: true } });
+  await savedUi.flush();
+  const restartedUi = mount(() => historyRows(), storage);
+  await restartedUi.flush();
+  assert.equal(restartedUi.find(node => node.type === 'select').props.value, 'latest', 'detection scope must survive a fresh page instance');
+  assert.equal(restartedUi.find(node => node.type === 'input').props.checked, true, 'hide-low-seasons must survive a fresh page instance');
+  button(restartedUi, '检查更新').props.onClick();
+  await restartedUi.flush();
+  assert.deepEqual(restartedUi.checkedRequests, [{ scope: 'latest' }], 'the restored scope must reach the update request');
+  restartedUi.find(node => node.type === 'input').props.onChange({ target: { checked: false } });
+  await restartedUi.flush();
+  const shownUi = mount(() => historyRows(), storage);
+  await shownUi.flush();
+  assert.equal(shownUi.find(node => node.type === 'input').props.checked, false, 'unchecking must also persist');
+  for (const stored of ['broken json', 'null', JSON.stringify({ scope: 'unknown', hideLowSeasons: 'true' })]) {
+    const invalidUi = mount(() => historyRows(), new Map([[preferencesKey, stored]]));
+    await invalidUi.flush();
+    assert.equal(invalidUi.find(node => node.type === 'select').props.value, 'all');
+    assert.equal(invalidUi.find(node => node.type === 'input').props.checked, false);
+  }
+  const blockedUi = mount(() => historyRows(), {
+    get() { throw new Error('storage unavailable'); },
+    set() { throw new Error('storage unavailable'); },
+  });
+  await blockedUi.flush();
+  blockedUi.find(node => node.type === 'input').props.onChange({ target: { checked: true } });
+  await blockedUi.flush();
+  assert.equal(blockedUi.find(node => node.type === 'input').props.checked, true, 'storage failures must not block the current selection');
+  assert.match(text(blockedUi.find(node => node.props.role === 'status')), /未能保存/);
+
+  const similarSeries = [
+    { series_id: '1000091', series_title: 'AAA1BBB', total: 1 },
+    { series_id: '1000092', series_title: 'AAA2BBB', total: 1 },
+  ];
+  const similarRows = listHistory(similarSeries, Object.fromEntries(similarSeries.map(item => [item.series_id, {
+    watched: true, vid_index: 1, currentTime: 1, updatedAt: 100,
+  }])));
+  const similarUi = mount(() => similarRows);
+  await similarUi.flush();
+  similarUi.find(node => node.type === 'input').props.onChange({ target: { checked: true } });
+  await similarUi.flush();
+  assert.ok(button(similarUi, '全部 2'), 'fuzzy matches must remain visible when low seasons are hidden');
+  assert.ok(similarUi.find(node => node.type === 'span' && text(node) === '疑似同剧（仅提示）'));
+  assert.ok(similarUi.find(node => node.type === 'button' && text(node) === 'AAA2BBB'), 'the suspected title must be available for inspection');
+  await button(similarUi, 'AAA2BBB').props.onClick();
+  await similarUi.flush();
+  assert.deepEqual(similarUi.plays, [{ seriesId: '1000092', vidIndex: 1 }]);
+  assert.deepEqual(similarUi.acknowledgements, [], 'opening an unconfirmed match must not acknowledge the original series');
+
+  const promoted = { series_id: '1000093', series_title: 'AAA1BBB第二季' };
+  const promotedRows = listHistory([similarSeries[0]], { '1000091': {
+    watched: true, vid_index: 1, currentTime: 1, updatedAt: 100,
+    sequels: [promoted], similarSeries: [{ ...promoted, series_title: 'AAA1BBB二' }],
+  } });
+  assert.deepEqual(promotedRows[0].similarSeries, [], 'previously confirmed IDs must not retain stale fuzzy labels');
+  const promotedUi = mount(() => promotedRows);
+  await promotedUi.flush();
+  await button(promotedUi, promoted.series_title).props.onClick();
+  await promotedUi.flush();
+  assert.deepEqual(promotedUi.acknowledgements, ['1000091'], 'opening the promoted confirmed sequel must acknowledge its original series');
 
   button(ui, '未看完 5').props.onClick();
   await ui.flush();

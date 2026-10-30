@@ -1,5 +1,5 @@
 /**
- * main.js - 红果短剧 4.9 下载器（独立版）主进程
+ * main.js - 红果短剧 5.0 下载器（独立版）主进程
  *
  * 功能：
  *   1. 红果短剧解析（分享链接 / series_id -> 全剧集列表）
@@ -3893,6 +3893,8 @@ async function checkHistoryRow(row, context) {
         const combined = new Map((previousRecord.sequels || []).map(item => [item.series_id, item]));
         for (const item of candidates) combined.set(item.series_id, item);
         next.sequels = [...combined.values()].slice(-20);
+        next.similarSeries = watchHistory.findSimilarSeries(currentSeries,
+          [...(Array.isArray(previousRecord.similarSeries) ? previousRecord.similarSeries : []), ...(sequelResponse.candidates || sequelResponse.results || [])]);
         next.lastSequelCheckError = sequelResponse.partial ? (sequelResponse.error || '请稍后重试') : '';
         if (sequelResponse.success === true && sequelResponse.partial !== true) next.lastSequelCheckAt = Date.now();
       }

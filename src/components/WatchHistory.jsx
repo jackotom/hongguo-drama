@@ -2,6 +2,8 @@ import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Play, RefreshCw, Clock } from './icons';
 import './WatchHistory.css';
 
+const PREFERENCES_KEY = 'hongguo:watch-history-preferences';
+
 export default function WatchHistory({ active = true, onNavigate }) {
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -12,8 +14,16 @@ export default function WatchHistory({ active = true, onNavigate }) {
   const [error, setError] = useState('');
   const [status, setStatus] = useState('');
   const [filter, setFilter] = useState('all');
-  const [hideLowSeasons, setHideLowSeasons] = useState(false);
-  const [scope, setScope] = useState('all');
+  const [preferences, setPreferences] = useState(() => {
+    try {
+      const saved = JSON.parse(window.localStorage.getItem(PREFERENCES_KEY));
+      return {
+        scope: ['all', 'latest', 'unfinished', 'skip-completed-low'].includes(saved?.scope) ? saved.scope : 'all',
+        hideLowSeasons: saved?.hideLowSeasons === true,
+      };
+    } catch { return { scope: 'all', hideLowSeasons: false }; }
+  });
+  const { scope, hideLowSeasons } = preferences;
   const [progress, setProgress] = useState(null);
   const request = useRef(0);
   const openingRef = useRef(false);
@@ -21,6 +31,12 @@ export default function WatchHistory({ active = true, onNavigate }) {
   const listedRows = hideLowSeasons ? rows.filter(row => !row.hasHigherSeason) : rows;
   const completedCount = listedRows.filter(row => row.completed === true).length;
   const visibleRows = listedRows.filter(row => filter === 'all' || (row.completed === true) === (filter === 'completed'));
+
+  const savePreferences = next => {
+    setPreferences(next);
+    try { window.localStorage.setItem(PREFERENCES_KEY, JSON.stringify(next)); }
+    catch { setStatus('本次选择已生效，但未能保存；重启后可能恢复默认。'); }
+  };
 
   const load = async () => {
     const version = ++request.current;
@@ -108,6 +124,8 @@ export default function WatchHistory({ active = true, onNavigate }) {
         const result = await window.electronAPI.playSeries({ seriesId: row.series_id, vidIndex: row.vid_index, resume: true });
         if (!result?.success) throw new Error(result?.error || '打开播放器失败');
       }
+      // An unconfirmed title match must not clear the original show's update markers.
+      if (sequel && row.similarSeries?.some(item => item.series_id === sequel.series_id)) return;
       const acknowledged = await window.electronAPI.acknowledgeWatchUpdates(row.series_id, { total: row.total, sequelIds: (row.sequels || []).map(item => item.series_id) });
       if (!acknowledged?.success) throw new Error(acknowledged?.error || '更新标记保存失败');
       if (version === openingRequest.current) setRows(current => current.map(item => item.series_id === row.series_id ? { ...item, hasUpdates: false, unreadEpisodes: 0 } : item));
@@ -123,7 +141,7 @@ export default function WatchHistory({ active = true, onNavigate }) {
     <div className="history-header">
       <div><h1 id="history-title">观看记录</h1><p>继续上次的故事。记录仅保存在这台电脑。</p></div>
       <div className="history-tools">
-        <select className="history-scope" value={scope} onChange={event => setScope(event.target.value)} disabled={checking || !!checkingRow || loading} aria-label="批量检测范围">
+        <select className="history-scope" value={scope} onChange={event => savePreferences({ ...preferences, scope: event.target.value })} disabled={checking || !!checkingRow || loading} aria-label="批量检测范围">
           <option value="all">全部记录</option>
           <option value="latest">仅最高季</option>
           <option value="unfinished">仅未看完</option>
@@ -144,7 +162,7 @@ export default function WatchHistory({ active = true, onNavigate }) {
         ].map(([value, label, count]) => <button key={value} type="button" aria-pressed={filter === value} disabled={loading} onClick={() => setFilter(value)}>{label} {count}</button>)}
       </div>
       <label className="history-display-option" title="只调整当前列表；批量检测范围不变，也不会删除记录">
-        <input type="checkbox" checked={hideLowSeasons} disabled={loading} onChange={event => setHideLowSeasons(event.target.checked)} />
+        <input type="checkbox" checked={hideLowSeasons} disabled={loading} onChange={event => savePreferences({ ...preferences, hideLowSeasons: event.target.checked })} />
         <span>隐藏同剧低季</span>
       </label>
     </div>
@@ -180,6 +198,9 @@ export default function WatchHistory({ active = true, onNavigate }) {
       </div>
       </div>
       {!!row.sequels?.length && <div className="history-sequels"><span>疑似续作</span>{row.sequels.map(sequel => <button key={sequel.series_id} className="btn btn-outline btn-sm" disabled={!active || !!opening || !!removing} onClick={() => resume(row, sequel)}>{sequel.series_title}</button>)}</div>}
+      {!!row.similarSeries?.length && <div className="history-sequels" title="名称相近，仅供核对；不会用于隐藏低季或批量归组">
+        <span>疑似同剧（仅提示）</span>{row.similarSeries.map(candidate => <button key={candidate.series_id} className="btn btn-outline btn-sm" disabled={!active || !!opening || !!removing} onClick={() => resume(row, candidate)}>{candidate.series_title}</button>)}
+      </div>}
       {row.lastEpisodeCheckError && <p className="history-check-error">分集更新检查未完成：{row.lastEpisodeCheckError}</p>}
       {row.lastSequelCheckError && <p className="history-check-error">续作检查未完成：{row.lastSequelCheckError}</p>}
       {!row.lastEpisodeCheckError && !row.lastSequelCheckError && row.lastCheckError && <p className="history-check-error">更新检查未完成：{row.lastCheckError}</p>}

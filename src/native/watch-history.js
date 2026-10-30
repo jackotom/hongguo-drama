@@ -17,6 +17,7 @@ function listHistory(series, playback, showSequels = true) {
   return watched.map(item => {
     const record = playback[item.series_id];
     const sequels = showSequels && Array.isArray(record.sequels) ? record.sequels : [];
+    const confirmedIds = new Set(sequels.map(candidate => String(candidate.series_id)));
     const seen = new Set(record.seenSequelIds || []);
     const total = Math.max(totalEpisodes(item), record.knownTotal || 0);
     const family = familyKey(item), season = seasonOf(item);
@@ -25,6 +26,8 @@ function listHistory(series, playback, showSequels = true) {
       total, completed: total > 0 && Number.isInteger(record.completedEpisode) && record.completedEpisode >= total,
       vid_index: record.vid_index, currentTime: record.currentTime, updatedAt: record.updatedAt,
       unreadEpisodes: record.unreadEpisodes || 0, sequels,
+      similarSeries: showSequels ? findSimilarSeries(item, [...(Array.isArray(record.similarSeries) ? record.similarSeries : []), ...watched])
+        .filter(candidate => !confirmedIds.has(candidate.series_id)) : [],
       hasUpdates: record.unreadEpisodes > 0 || sequels.some(candidate => !seen.has(candidate.series_id)),
       season, isLatestSeason: !!family && season === latestByFamily.get(family),
       hasHigherSeason: !!family && season < latestByFamily.get(family),
@@ -58,7 +61,7 @@ function applyEpisodeUpdate(record, oldSeries, freshSeries, now = Date.now()) {
 
 function seasonTitle(title) {
   const text = String(title || '').normalize('NFKC').replace(/\s+/g, '').toLowerCase();
-  const match = text.match(/^(.*?)(?:第([一二三四五六七八九十百零两\d]+)[季部]|[（(]([一二三四五六七八九十百零两\d]+)[）)]|season(\d+))$/i);
+  const match = text.match(/^(.*?)(?:(?:第)?([一二三四五六七八九十百零两\d]+)[季部]|[（(](?:第)?([一二三四五六七八九十百零两\d]+)(?:[季部])?[）)]|season(\d+))$/i);
   if (!match) return { base: text, season: 1, explicit: false };
   const value = match[2] || match[3] || match[4];
   let season = Number(value);
@@ -114,6 +117,41 @@ function findSequels(series, candidates) {
 
 function sequelKeyword(series) { return seasonTitle(series.series_title).base; }
 
+function similarTitles(left, right) {
+  const a = Array.from(left), b = Array.from(right), length = Math.max(a.length, b.length);
+  // shortcut: at most two edits and 20% of the title; broader renames need source metadata.
+  const limit = Math.min(2, Math.floor(length / 5));
+  if (Math.min(a.length, b.length) < 4 || length > 200 || Math.abs(a.length - b.length) > limit) return false;
+  let previous = Array.from({ length: b.length + 1 }, (_, index) => index);
+  for (let i = 1; i <= a.length; i++) {
+    const current = [i];
+    for (let j = 1; j <= b.length; j++) {
+      current[j] = Math.min(current[j - 1] + 1, previous[j] + 1, previous[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+    }
+    if (Math.min(...current) > limit) return false;
+    previous = current;
+  }
+  return previous[b.length] <= limit;
+}
+
+function findSimilarSeries(series, candidates) {
+  const current = seasonTitle(series?.series_title), family = familyKey(series);
+  if (!family) return [];
+  const normalize = title => title.replace(/[\p{P}\p{S}]/gu, '').replace(/[零〇一二三四五六七八九十百两\d]+/g, '#');
+  const title = normalize(current.base), source = sourceOf(String(series.series_id));
+  const seen = new Set([String(series.series_id)]), results = [];
+  const latest = new Map(candidates.map(candidate => [String(candidate?.series_id || ''), candidate]));
+  for (const candidate of latest.values()) {
+    const id = String(candidate?.series_id || ''), next = seasonTitle(candidate?.series_title);
+    if (seen.has(id) || sourceOf(id) !== source || next.invalid || familyKey(candidate) === family) continue;
+    if (!similarTitles(title, normalize(next.base))) continue;
+    seen.add(id);
+    results.push({ series_id: id, series_title: String(candidate.series_title) });
+    if (results.length === 5) break;
+  }
+  return results;
+}
+
 function acknowledge(record, snapshot) {
   const knownTotal = record.knownTotal || 0;
   const visibleTotal = snapshot ? Number(snapshot.total) || 0 : knownTotal;
@@ -124,4 +162,4 @@ function acknowledge(record, snapshot) {
     seenSequelIds: [...new Set([...(record.seenSequelIds || []), ...visibleIds.filter(id => knownIds.has(id))])] };
 }
 
-module.exports = { listHistory, recordPlayback, applyEpisodeUpdate, seasonTitle, sourceOf, familyKey, seasonOf, findSequels, sequelKeyword, acknowledge };
+module.exports = { listHistory, recordPlayback, applyEpisodeUpdate, seasonTitle, sourceOf, familyKey, seasonOf, findSequels, findSimilarSeries, sequelKeyword, acknowledge };

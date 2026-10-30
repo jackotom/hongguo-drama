@@ -64,7 +64,7 @@ function mountHistory({ missing = false, playError = '', resolveError = '', lock
  let cursor = 0, tree;
  const react = {
   createElement: (type, props, ...children) => ({ type, props: props || {}, children: children.flat(Infinity) }),
-  useState: initial => { const i = cursor++; if (!(i in slots)) slots[i] = initial; return [slots[i], value => { slots[i] = typeof value === 'function' ? value(slots[i]) : value; }]; },
+  useState: initial => { const i = cursor++; if (!(i in slots)) slots[i] = typeof initial === 'function' ? initial() : initial; return [slots[i], value => { slots[i] = typeof value === 'function' ? value(slots[i]) : value; }]; },
   useRef: initial => { const i = cursor++; return slots[i] ||= { current: initial }; },
   useEffect: (fn, deps) => { const i = cursor++; if (!slots[i] || deps.some((value, j) => !Object.is(value, slots[i][j]))) { slots[i] = deps; effects.push(fn); } },
  };
