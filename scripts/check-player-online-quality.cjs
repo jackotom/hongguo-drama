@@ -10,6 +10,132 @@ let failures = 0;
 async function check(name, fn) { try { await fn(); console.log('PASS ' + name); } catch (e) { failures++; console.error('FAIL ' + name + ': ' + e.message); } }
 (async () => {
 if (process.argv[2] !== 'main') {
+  await check('automatic playback requests 1080 first and prepares the next episode at 1080', async () => {
+    const ui = mount({ props: { target: { seriesId: 'A', vidIndex: 1, ts: 1 } } });
+    try {
+      await ui.flush(); assert.equal(ui.prepares[0].quality, '1080p');
+      assert.match(text(select(ui)), /1080[Pp]/);
+      ui.metadata(); await ui.flush();
+      assert(ui.prepares.some(p => p.prefetch && p.quality === '1080p'));
+    } finally { ui.unmount(); }
+  });
+  for (const failure of ['response', 'throw']) await check(`${failure} 1080 preparation failure automatically selects 720 without downloading`, async () => {
+    const downloads = [];
+    const ui = mount({ props: { target: { seriesId: 'A', vidIndex: 1, ts: 1 } },
+      prepare: async p => {
+        if (p.quality === '1080p') {
+          if (failure === 'throw') throw Error('1080 unavailable');
+          return { success: false, error: '1080 unavailable' };
+        }
+        return { success: true, url: 'hongguo-stream://720' };
+      }, apiOverrides: { downloadSingleEpisode: async (...args) => { downloads.push(args); return { success: true }; } } });
+    try {
+      await ui.flush(); assert.deepEqual(ui.prepares.map(p => p.quality), ['1080p', '720p']);
+      assert.equal(downloads.length, 0); assert.equal(ui.find(n => n.type === 'video').props.src, 'hongguo-stream://720');
+      assert.equal(select(ui).props.value, 'auto', 'fallback must not overwrite the saved automatic choice');
+    } finally { ui.unmount(); }
+  });
+  for (const code of [2, 3, 4]) await check(`automatic runtime media error ${code} advances quality and preserves paused position`, async () => {
+    const downloads = [];
+    const ui = mount({ props: { target: { seriesId: 'A', vidIndex: 1, ts: 1 } }, settings: { cache_next_episode: false },
+      transcode: async () => ({ success: false, error: 'decoder cannot recover this quality' }),
+      apiOverrides: { downloadSingleEpisode: async (...args) => { downloads.push(args); return { success: false, error: 'No source' }; } } });
+    try {
+      await ui.flush(); ui.metadata(); ui.media.currentTime = 31; ui.media.pause();
+      ui.error(code); await ui.flush(); assert.equal(ui.prepares.at(-1).quality, '720p');
+      ui.metadata(); assert.equal(ui.media.currentTime, 31); assert.equal(ui.media.paused, true);
+      ui.error(code); await ui.flush(); assert.equal(ui.prepares.at(-1).quality, 'auto');
+      ui.metadata(); assert.equal(ui.media.currentTime, 31); assert.equal(ui.media.paused, true);
+      assert.deepEqual(ui.prepares.map(p => p.quality), ['1080p', '720p', 'auto']);
+      if (code !== 3) { ui.error(code); await ui.flush(); assert.equal(downloads.length, 1); }
+      assert.equal(ui.prepares.length, 3, 'exhaustion must not restart the 1080 ladder');
+    } finally { ui.unmount(); }
+  });
+  await check('late automatic quality failure cannot affect a newly selected episode', async () => {
+    let failFirst;
+    const ui = mount({ props: { target: { seriesId: 'A', vidIndex: 1, ts: 1 } },
+      prepare: p => p.vidIndex === 1 ? new Promise(resolve => { failFirst = resolve; })
+        : Promise.resolve({ success: true, url: 'hongguo-stream://second' }) });
+    try {
+      await ui.flush(); ui.episode(2); await ui.flush();
+      failFirst({ success: false, error: 'late failure' }); await ui.flush();
+      assert.equal(ui.find(n => n.type === 'video').props.src, 'hongguo-stream://second');
+      assert.equal(ui.prepares.filter(p => p.vidIndex === 1).length, 1);
+      assert.equal(ui.prepares.at(-1).quality, '1080p');
+    } finally { ui.unmount(); }
+  });
+  await check('automatic exhaustion submits one 1080-priority download and explicit retry restarts at 1080', async () => {
+    const downloads = [];
+    const ui = mount({ props: { target: { seriesId: 'A', vidIndex: 1, ts: 1 } },
+      prepare: async () => ({ success: false, error: 'No source' }),
+      apiOverrides: { downloadSingleEpisode: async (...args) => { downloads.push(args); return { success: false, error: 'No download' }; } } });
+    try {
+      await ui.flush(); assert.deepEqual(ui.prepares.map(p => p.quality), ['1080p', '720p', 'auto']);
+      assert.equal(downloads.length, 1); assert.equal(downloads[0][2], '1080p');
+      await ui.button('重试本集').props.onClick(); await ui.flush();
+      assert.deepEqual(ui.prepares.slice(3).map(p => p.quality), ['1080p', '720p', 'auto']);
+      assert.equal(downloads.length, 2);
+    } finally { ui.unmount(); }
+  });
+  await check('automatic quality handoff retains autoplay and restarting an episode prefers 1080 again', async () => {
+    const ui = mount({ props: { target: { seriesId: 'A', vidIndex: 1, ts: 1 } }, settings: { cache_next_episode: false } });
+    try {
+      await ui.flush(); ui.metadata(); ui.media.currentTime = 19;
+      ui.error(2); await ui.flush(); ui.metadata();
+      assert.equal(ui.media.currentTime, 19); assert.equal(ui.media.paused, false);
+      ui.episode(2); await ui.flush(); assert.equal(ui.prepares.at(-1).quality, '1080p');
+    } finally { ui.unmount(); }
+  });
+  await check('late automatic failure cannot downgrade a new manual quality choice', async () => {
+    let failAutomatic;
+    const ui = mount({ props: { target: { seriesId: 'A', vidIndex: 1, ts: 1 } },
+      prepare: p => p.quality === '1080p' ? new Promise(resolve => { failAutomatic = resolve; })
+        : Promise.resolve({ success: true, url: 'hongguo-stream://manual-720' }) });
+    try {
+      await ui.flush(); select(ui).props.onChange({ target: { value: '720p' } }); await ui.flush();
+      failAutomatic({ success: false, error: 'late 1080 failure' }); await ui.flush();
+      assert.equal(select(ui).props.value, '720p');
+      assert.equal(ui.find(n => n.type === 'video').props.src, 'hongguo-stream://manual-720');
+      assert.deepEqual(ui.prepares.map(p => p.quality), ['1080p', '720p']);
+    } finally { ui.unmount(); }
+  });
+  await check('decoder exhaustion reaches one download after all automatic quality steps', async () => {
+    let downloads = 0;
+    const ui = mount({ props: { target: { seriesId: 'A', vidIndex: 1, ts: 1 } }, settings: { cache_next_episode: false },
+      transcode: async () => ({ success: false, error: 'decoder unavailable' }),
+      apiOverrides: { downloadSingleEpisode: async () => { downloads++; return { success: false, error: 'download failed' }; } } });
+    try {
+      await ui.flush();
+      for (let i = 0; i < 3; i++) { ui.metadata(); ui.error(3); await ui.flush(); }
+      assert.deepEqual(ui.prepares.map(p => p.quality), ['1080p', '720p', 'auto']);
+      assert.equal(downloads, 1); assert(alert(ui));
+    } finally { ui.unmount(); }
+  });
+  await check('automatic 1080 decoding can retain quality through compatibility before downgrading', async () => {
+    const ui = mount({ props: { target: { seriesId: 'A', vidIndex: 1, ts: 1 } }, settings: { cache_next_episode: false } });
+    try {
+      await ui.flush(); ui.metadata(); ui.media.currentTime = 21; ui.error(3); await ui.flush();
+      assert.equal(ui.transcodes.length, 1); assert.equal(ui.transcodes[0].quality, '1080p');
+      assert.deepEqual(ui.prepares.map(p => p.quality), ['1080p']);
+      ui.metadata(); assert.equal(ui.media.currentTime, 21);
+      ui.error(3); await ui.flush(); ui.metadata(); ui.error(3); await ui.flush();
+      assert.equal(ui.transcodes.length, 2, 'one compatibility rebuild is retained');
+      assert.equal(ui.prepares.at(-1).quality, '720p', 'exhausted compatibility must still advance quality');
+    } finally { ui.unmount(); }
+  });
+  await check('automatic decoder failure changes quality when compatibility is disabled', async () => {
+    const ui = mount({ props: { target: { seriesId: 'A', vidIndex: 1, ts: 1 } },
+      settings: { cache_next_episode: false, compat_mode: false } });
+    try {
+      await ui.flush(); ui.metadata(); ui.error(3); await ui.flush();
+      assert.equal(ui.prepares.at(-1).quality, '720p'); assert.equal(ui.transcodes.length, 0);
+    } finally { ui.unmount(); }
+  });
+  await check('third-party online playback never requests unsupported 1080 or 720 tiers', async () => {
+    const ui = mount({ props: { target: { seriesId: 'xifan:A', vidIndex: 1, ts: 1 } }, seriesId: 'xifan:A' });
+    try { await ui.flush(); assert.deepEqual(ui.prepares.map(p => p.quality), ['auto']); }
+    finally { ui.unmount(); }
+  });
   await check('scheduled source retry stays waiting and terminal error remains visible', async () => {
     let status = 'missing', retryAt = null, error = '';
     let failed;

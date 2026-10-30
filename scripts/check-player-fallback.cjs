@@ -93,8 +93,9 @@ function fixture({ prepare, transcode, enqueue, quality = '720p', initial = 'mis
   });
   await test('retry uses refreshed local instead of a stale online choice', async () => {
     const f = fixture({ enqueue: async () => ({ success: false, error: '加入失败' }) }); await f.ui.flush();
+    const attempts = f.ui.prepares.length;
     f.states.set('A:1', 'completed'); await f.ui.button('重试本集').props.onClick(); await f.ui.flush();
-    assert.equal(source(f.ui), 'file:///A-1.mp4'); assert.equal(f.ui.prepares.length, 1); f.ui.unmount();
+    assert.equal(source(f.ui), 'file:///A-1.mp4'); assert.equal(f.ui.prepares.length, attempts); f.ui.unmount();
   });
   for (const status of ['failed', 'stopped', 'missing']) await test(`${status} download ends waiting without repeated automatic enqueue`, async () => {
     const f = fixture(); await f.ui.flush(); assert.equal(f.downloads.length, 1);
@@ -133,7 +134,7 @@ function fixture({ prepare, transcode, enqueue, quality = '720p', initial = 'mis
     const f = fixture({ prepare: async () => ({ success: true, url: 'hongguo-stream://bad-codec' }),
       transcode: async () => ({ success: false, error: '无法转换片源' }) });
     await f.ui.flush(); f.ui.metadata(); f.ui.media.currentTime = 16; f.ui.media.pause();
-    f.ui.error(3); await f.ui.flush(); f.ui.metadata(); f.ui.error(3); await f.ui.flush();
+    for (let attempt = 0; attempt < 3; attempt++) { f.ui.error(3); await f.ui.flush(); f.ui.metadata(); }
     assert.equal(f.downloads.length, 1); f.states.set('A:1', 'completed'); await poll(f.ui); f.ui.metadata();
     assert.equal(source(f.ui), 'file:///A-1.mp4'); assert.equal(f.ui.media.currentTime, 16);
     assert.equal(f.ui.media.paused, true); f.ui.unmount();
@@ -141,7 +142,7 @@ function fixture({ prepare, transcode, enqueue, quality = '720p', initial = 'mis
   for (const code of [2, 4]) await test(`exhausted online media error ${code} downloads once and retains paused position`, async () => {
     const f = fixture({ prepare: async () => ({ success: true, url: 'hongguo-stream://unavailable' }) });
     await f.ui.flush(); f.ui.metadata(); f.ui.media.currentTime = 29; f.ui.media.pause();
-    f.ui.error(code); await f.ui.flush(); f.ui.metadata(); f.ui.error(code); await f.ui.flush();
+    for (let attempt = 0; attempt < 3; attempt++) { f.ui.error(code); await f.ui.flush(); f.ui.metadata(); }
     assert.equal(f.downloads.length, 1); assert(f.ui.button('取消等待'));
     f.states.set('A:1', 'completed'); await poll(f.ui); f.ui.metadata();
     assert.equal(source(f.ui), 'file:///A-1.mp4'); assert.equal(f.ui.media.currentTime, 29);
@@ -152,9 +153,11 @@ function fixture({ prepare, transcode, enqueue, quality = '720p', initial = 'mis
     await f.ui.flush(); f.ui.metadata(); f.ui.media.currentTime = 18; f.ui.error(2); await f.ui.flush();
     await poll(f.ui); assert(alert(f.ui)); assert.equal(f.ui.media.paused, true);
     const before = f.ui.prepares.length; await f.ui.button('重试本集').props.onClick(); await f.ui.flush();
-    assert.equal(f.ui.prepares.length, before + 1); assert.equal(f.downloads.length, 2, 'an explicit retry can resubmit a previously rejected download');
-    f.ui.episode(1); await f.ui.flush();
-    assert.equal(f.ui.prepares.length, before + 2, 'explicit selection must not strand playback on a rejected local file'); f.ui.unmount();
+    assert.deepEqual(f.ui.prepares.slice(before).map(p => p.quality), ['1080p', '720p', 'auto']);
+    assert.equal(f.downloads.length, 2, 'an explicit retry can resubmit a previously rejected download');
+    const selectedAt = f.ui.prepares.length; f.ui.episode(1); await f.ui.flush();
+    assert.deepEqual(f.ui.prepares.slice(selectedAt).map(p => p.quality), ['1080p', '720p', 'auto'],
+      'explicit selection must not strand playback on a rejected local file'); f.ui.unmount();
   });
   process.exitCode = failures ? 1 : 0;
 })();

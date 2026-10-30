@@ -326,10 +326,10 @@ export default function PlayerControls({ danmaku, enhancement, shortcuts = DEFAU
             <div role="group" aria-label="选择播放清晰度">
               {(supportsOnlineQuality ? ['auto', '720p', '1080p'] : ['auto']).map(quality => <button type="button" key={quality} aria-label={`选择 ${quality === 'auto' ? '自动' : quality.toUpperCase()}`}
                 aria-pressed={onlineQuality === quality} onClick={() => { setSelectionPanel(null); qualityButtonRef.current?.focus(); if (quality !== onlineQuality) onQualityChange(quality); }}>
-                <span>{quality === 'auto' ? (supportsOnlineQuality ? '自动（兼容优先）' : '由片源决定') : quality.toUpperCase()}</span><span aria-hidden="true">{onlineQuality === quality ? '✓' : ''}</span>
+                <span>{quality === 'auto' ? (supportsOnlineQuality ? '自动（1080P优先）' : '由片源决定') : quality.toUpperCase()}</span><span aria-hidden="true">{onlineQuality === quality ? '✓' : ''}</span>
               </button>)}
             </div>
-            <p className="player-quality-hint">{supportsOnlineQuality ? '网页片源清晰度上限由上游决定，自动模式可能仅有低清画面。720P / 1080P 使用 App/API 片源；不可用会提示，不会自动降级。切换后保留播放进度。' : '此来源的清晰度由片源决定，暂不支持指定画质。当前画面分辨率不代表来源的最高画质。'}</p>
+            <p className="player-quality-hint">{supportsOnlineQuality ? '自动先尝试1080P，失败后切换720P，再尝试兼容片源。手动选择720P / 1080P保持固定画质，不会自动降级；切换时保留进度和暂停状态。' : '此来源的清晰度由片源决定，暂不支持指定画质。当前画面分辨率不代表来源的最高画质。'}</p>
           </div>}
         </div>
         <div className="player-controls-volume">

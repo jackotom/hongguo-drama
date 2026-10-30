@@ -11,7 +11,7 @@ const videoEnhancementStub = {
 const shortcutSource = transformSync(fs.readFileSync(path.join(__dirname, '../src/shortcuts.js'), 'utf8'), { loader: 'js', format: 'cjs' }).code;
 const source = transformSync(fs.readFileSync(path.join(__dirname, '../src/components/Player.jsx'), 'utf8'), { loader: 'jsx', format: 'cjs' }).code;
 
-function mount({ local = false, localIndexes = [], saved = null, transcode, prepare, props = {}, episodeCount = 2, storage = new Map(), seriesId = 'A', settings = {}, lockedIndexes = [], apiOverrides = {}, now = () => Date.now() } = {}) {
+function mount({ local = false, localIndexes = [], localQuality, saved = null, transcode, prepare, props = {}, episodeCount = 2, storage = new Map(), seriesId = 'A', settings = {}, lockedIndexes = [], apiOverrides = {}, now = () => Date.now() } = {}) {
   // Playback fixtures model an explicit play command; target:null exercises passive library entry.
   props = { setEpisodesOpen() {}, ...((local || saved) ? { target: { seriesId, resume: true, ts: 1 } } : {}), ...props };
   const slots = [], effects = [], cleanups = [], saves = [], prepares = [], transcodes = [], cancelled = [];
@@ -57,7 +57,7 @@ function mount({ local = false, localIndexes = [], saved = null, transcode, prep
   const episodes = Array.from({ length: episodeCount }, (_, i) => i + 1).map(n => {
     const isLocal = local || localIndexes.includes(n);
     return { vid_index: n, vid: `v${n}`, locked: lockedIndexes.includes(n), status: isLocal ? 'completed' : 'missing',
-      ...(isLocal ? { fileUrl: `file:///mock-${n}.mp4`, savePath: `/mock-${n}.mp4` } : {}) };
+      ...(isLocal ? { fileUrl: `file:///mock-${n}.mp4`, savePath: `/mock-${n}.mp4`, ...(localQuality ? { actualQuality: localQuality } : {}) } : {}) };
   });
   const api = {
     getSeriesList: async () => [{ series_id: seriesId }],
@@ -137,6 +137,7 @@ module.exports = { mount };
 
 if (require.main === module) (async () => {
   let failures = 0;
+  const fixedPlayback = () => ({ storage: new Map([['hongguo:online-quality', '1080p']]), localQuality: '1080p' });
   const test = async (name, fn) => { if (process.argv[2] && !name.includes(process.argv[2])) return; try { await fn(); console.log(`PASS ${name}`); } catch (e) { failures++; console.error(`FAIL ${name}: ${e.stack}`); } };
   await test('removed history stays removed through hidden player unload and new playback can record again', async () => {
     for (const resume of [false, true]) {
@@ -186,8 +187,8 @@ if (require.main === module) (async () => {
       assert.equal(ui.scrollArea.scrollTop, 360);
     } finally { ui.unmount(); }
   });
-  await test('online unsupported-source error reconnects once without decoder certainty or automatic transcode', async () => {
-    const ui = mount({ props: { target: { seriesId: 'A', vidIndex: 1, ts: 1 } } }); await ui.flush();
+  await test('fixed-quality online unsupported-source error reconnects once without decoder certainty or automatic transcode', async () => {
+    const ui = mount({ ...fixedPlayback(), props: { target: { seriesId: 'A', vidIndex: 1, ts: 1 } } }); await ui.flush();
     ui.error(4); await ui.flush();
     assert.equal(ui.prepares.length, 2); assert.equal(ui.prepares[1].force, true);
     ui.error(4); await ui.flush();
@@ -211,8 +212,8 @@ if (require.main === module) (async () => {
     assert.equal(ui.events.has('keydown'), false, 'hidden player must not capture keys');
     assert.equal([...ui.timers.values()].some(t => t.delay === 2000), false, 'hidden idle detail polling must stop'); ui.unmount();
   });
-  await test('online decoding error auto-falls back once and retains time', async () => {
-    const ui = mount({ props: { target: { seriesId: 'A', vidIndex: 1, ts: 1 } } }); await ui.flush(); ui.metadata(); ui.media.currentTime = 27;
+  await test('fixed-quality online decoding error auto-falls back once and retains time', async () => {
+    const ui = mount({ ...fixedPlayback(), props: { target: { seriesId: 'A', vidIndex: 1, ts: 1 } } }); await ui.flush(); ui.metadata(); ui.media.currentTime = 27;
     ui.error(3); ui.error(3); await ui.flush(); assert.equal(ui.transcodes.length, 1);
     assert.equal(ui.find(n => n.type === 'video').props.src, 'file:///mock-compat.mp4'); ui.metadata();
     assert.equal(ui.media.currentTime, 27); ui.error(4); await ui.flush();
@@ -267,7 +268,7 @@ if (require.main === module) (async () => {
     ui.unmount();
   });
   await test('failed automatic transcode does not loop on repeated decode events', async () => {
-    const ui = mount({ local: true, transcode: async () => ({ success: false, error: 'mock failure' }) }); await ui.flush(); ui.metadata();
+    const ui = mount({ ...fixedPlayback(), local: true, transcode: async () => ({ success: false, error: 'mock failure' }) }); await ui.flush(); ui.metadata();
     ui.error(3); await ui.flush(); ui.error(3); await ui.flush();
     ui.error(3); await ui.flush();
     assert.equal(ui.transcodes[0].filePath, '/mock-1.mp4');
@@ -283,7 +284,7 @@ if (require.main === module) (async () => {
     assert.equal(pending.find(n => n.type === 'video').props.src, 'file:///mock-2.mp4'); pending.unmount();
   });
   await test('reconnecting online does not transcode the failed local download again', async () => {
-    const ui = mount({ local: true, settings: { cache_next_episode: false, compat_mode: false }, transcode: async () => ({ success: false, error: 'bad local media' }) });
+    const ui = mount({ ...fixedPlayback(), local: true, settings: { cache_next_episode: false, compat_mode: false }, transcode: async () => ({ success: false, error: 'bad local media' }) });
     await ui.flush(); ui.metadata(); ui.error(3); await ui.flush();
     await ui.button('转码后播放').props.onClick(); await ui.flush();
     assert.equal(ui.transcodes[0].filePath, '/mock-1.mp4');
@@ -293,7 +294,7 @@ if (require.main === module) (async () => {
     ui.unmount();
   });
   await test('failed local conversion followed by unavailable online source does not invent a decode failure', async () => {
-    const ui = mount({ local: true, transcode: async () => ({ success: false, error: 'mock failure' }) });
+    const ui = mount({ ...fixedPlayback(), local: true, transcode: async () => ({ success: false, error: 'mock failure' }) });
     await ui.flush(); ui.metadata(); ui.error(4); await ui.flush();
     assert.equal(ui.transcodes.length, 1, 'local unsupported media gets one conversion attempt');
     assert.equal(ui.prepares.length, 1, 'failed local conversion reconnects online once');
@@ -304,8 +305,8 @@ if (require.main === module) (async () => {
     assert.ok(ui.button('重新连接片源')); assert.ok(ui.button('转码后播放'), 'explicit recovery remains available');
     ui.unmount();
   });
-  await test('network failure refreshes the same episode once and retains position', async () => {
-    const ui = mount({ settings: { cache_next_episode: false } }); await ui.flush(); await ui.button('播放本集').props.onClick(); await ui.flush(); ui.metadata();
+  await test('fixed-quality network failure refreshes the same episode once and retains position', async () => {
+    const ui = mount({ ...fixedPlayback(), settings: { cache_next_episode: false } }); await ui.flush(); await ui.button('播放本集').props.onClick(); await ui.flush(); ui.metadata();
     ui.media.currentTime = 42; ui.error(2); await ui.flush();
     assert.equal(ui.prepares.length, 2, 'network failure should reconnect once');
     assert.equal(ui.prepares[1].force, true);
@@ -315,7 +316,7 @@ if (require.main === module) (async () => {
     assert.ok(ui.button('重试本集')); ui.unmount();
   });
   await test('failed local conversion falls back online once without deleting the download', async () => {
-    const ui = mount({ local: true, settings: { cache_next_episode: false }, transcode: async () => ({ success: false, error: 'bad local media' }) });
+    const ui = mount({ ...fixedPlayback(), local: true, settings: { cache_next_episode: false }, transcode: async () => ({ success: false, error: 'bad local media' }) });
     await ui.flush(); ui.metadata(); ui.media.currentTime = 18;
     ui.error(3); await ui.flush();
     assert.equal(ui.prepares.length, 1, 'failed local conversion should reconnect online');
@@ -327,7 +328,7 @@ if (require.main === module) (async () => {
     ui.unmount();
   });
   await test('retry keeps online recovery instead of returning to the broken local file', async () => {
-    const ui = mount({ local: true, settings: { cache_next_episode: false } });
+    const ui = mount({ ...fixedPlayback(), local: true, settings: { cache_next_episode: false } });
     await ui.flush(); ui.metadata(); ui.media.currentTime = 23;
     ui.error(2); await ui.flush(); ui.metadata();
     ui.error(2); await ui.flush();

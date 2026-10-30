@@ -129,7 +129,7 @@ const source = transformSync(fs.readFileSync(path.join(__dirname, '../src/compon
   assert.match(nodeText(find('当前播放信息')), /第 2 集/);
   find('清晰度').props.onClick(); render();
   assert.match(nodeText(find('清晰度面板')), /360P.*640.*360/);
-  assert.match(nodeText(find('清晰度面板')), /网页.*上限.*上游/);
+  assert.match(nodeText(find('清晰度面板')), /自动.*1080P.*720P.*兼容片源/);
   assert.match(nodeText(find('清晰度面板')), /未自动降级|不会自动降级/);
   find('选择 1080P').props.onClick(); render(); assert.equal(props.onlineQuality, '1080p');
   find('清晰度').props.onClick(); render();
