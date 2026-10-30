@@ -36,11 +36,19 @@ function load(platform = 'darwin') {
     quit() {},
   });
   const windows = [];
+  class View extends EventEmitter {
+    constructor() { super(); this.children = []; this.bounds = { width: 1100, height: 750 }; }
+    addChildView(view) { this.children.push(view); }
+    getBounds() { return this.bounds; }
+    setBounds(bounds) { this.bounds = bounds; }
+  }
   class Window extends EventEmitter {
     constructor(options) {
       super(); this.options = options; this.destroyed = false;
+      Window.current = this; this.contentView = new View();
       this.webContents = new EventEmitter();
-      Object.assign(this.webContents, { setWindowOpenHandler() {}, send() {}, isDestroyed: () => this.destroyed, setZoomFactor: value => { this.zoomFactor = value; } });
+      Object.assign(this.webContents, { setWindowOpenHandler() {}, send() {}, loadFile: () => Promise.resolve(), loadURL: () => Promise.resolve(),
+        isDestroyed: () => this.destroyed, setZoomFactor: value => { this.zoomFactor = value; } });
       windows.push(this);
     }
     static getAllWindows() { return windows.filter(w => !w.destroyed); }
@@ -54,11 +62,15 @@ function load(platform = 'darwin') {
     focus() { this.focused = true; }
     close() { this.destroyed = true; this.emit('closed'); }
   }
+  class WebContentsView extends View {
+    constructor(options) { super(); this.options = options; this.webContents = Window.current.webContents; }
+  }
   let menu;
   const electron = {
-    app, BrowserWindow: Window, ipcMain: { handle() {} },
+    app, BrowserWindow: Window, BaseWindow: Window, View, WebContentsView, ipcMain: { handle() {} },
     screen: { getDisplayMatching: () => ({ workArea: { x: 0, y: 0, width: 1920, height: 1080 } }) },
     Menu: { buildFromTemplate: x => x, setApplicationMenu: x => { menu = x; } },
+    dialog: { showErrorBox: (_title, message) => { throw new Error(message); } },
     session: { defaultSession: { setProxy: async () => {} } },
     protocol: { registerSchemesAsPrivileged() {}, handle() {} },
   };

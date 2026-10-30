@@ -1,30 +1,68 @@
-// Reuse the playing window so media, stream sessions and playback position stay intact.
-function createStealthController({ screen, getWindow }) {
+// Move the same live renderer into a native macOS panel; media sessions stay intact.
+function createStealthController({ screen, getWindow, BaseWindow, View, platform = process.platform }) {
   let previous = null;
   let timer = null;
   let concealed = false;
-  const send = win => win.webContents.send('stealth-state', { enabled: !!previous, concealed });
+  let panel = null;
+  let contentView = null;
+  let closingPanel = false;
+  const send = () => {
+    const main = getWindow();
+    if (main && !main.isDestroyed()) main.webContents.send('stealth-state', { enabled: !!previous, concealed });
+  };
   const reveal = win => { concealed = false; win.setOpacity(1); };
   const setEnabled = enabled => {
-    const win = getWindow();
+    let win = getWindow();
     if (!win || win.isDestroyed()) return;
     if (enabled === !!previous) return;
     if (!enabled) {
       clearInterval(timer); timer = null;
       const saved = previous;
       previous = null;
+      concealed = false;
+      if (panel) {
+        const host = panel;
+        panel = null;
+        host.setContentView(new View());
+        win.setContentView(contentView);
+        contentView = null;
+        if (!closingPanel) host.close();
+        win.show(); win.focus();
+        win.webContents.focus();
+        send();
+        return;
+      }
       reveal(win);
       win.setMinimumSize(...saved.minimum);
       win.setBounds(saved.bounds);
       win.setAlwaysOnTop(saved.onTop);
-      win.setVisibleOnAllWorkspaces?.(saved.visibleOnAllWorkspaces, { visibleOnFullScreen: true });
+      win.setVisibleOnAllWorkspaces?.(saved.visibleOnAllWorkspaces, { visibleOnFullScreen: true, skipTransformProcessType: true });
       win.setFullScreenable(true);
       if (saved.maximized) win.maximize();
-      send(win);
+      send();
       return;
     }
     previous = { bounds: win.getNormalBounds(), minimum: win.getMinimumSize(), onTop: win.isAlwaysOnTop(), maximized: win.isMaximized(),
       visibleOnAllWorkspaces: typeof win.isVisibleOnAllWorkspaces === 'function' ? win.isVisibleOnAllWorkspaces() : false };
+    if (platform === 'darwin') {
+      try {
+        panel = new BaseWindow({ type: 'panel', show: false, title: win.getTitle() });
+        contentView = win.contentView;
+        win.setContentView(new View());
+        panel.setContentView(contentView);
+      } catch (error) {
+        if (contentView) win.setContentView(contentView);
+        panel?.destroy(); panel = null; contentView = null; previous = null;
+        throw error;
+      }
+      panel.on('close', () => {
+        closingPanel = true;
+        try { if (previous) setEnabled(false); }
+        finally { closingPanel = false; }
+      });
+      win.hide();
+      win = panel;
+    }
     if (win.isMaximized()) win.unmaximize();
     const cursor = screen.getCursorScreenPoint();
     const area = screen.getDisplayNearestPoint(cursor).workArea;
@@ -32,10 +70,12 @@ function createStealthController({ screen, getWindow }) {
     win.setMinimumSize(Math.min(300, width), Math.min(360, height));
     win.setBounds({ width, height, x: Math.max(area.x, Math.min(cursor.x - Math.round(width / 2), area.x + area.width - width)), y: Math.max(area.y, Math.min(cursor.y - 60, area.y + area.height - height)) });
     win.setAlwaysOnTop(true);
-    win.setVisibleOnAllWorkspaces?.(true, { visibleOnFullScreen: true });
+    // Keep the app's Dock identity while changing the window's workspace visibility.
+    win.setVisibleOnAllWorkspaces?.(true, { visibleOnFullScreen: true, skipTransformProcessType: true });
     win.setFullScreenable(false);
     reveal(win);
-    send(win);
+    if (panel) { panel.show(); panel.focus(); getWindow().webContents.focus(); }
+    send();
     timer = setInterval(() => {
       if (win.isDestroyed()) { clearInterval(timer); timer = null; return; }
       const p = screen.getCursorScreenPoint(), b = win.getBounds();
@@ -44,10 +84,14 @@ function createStealthController({ screen, getWindow }) {
       concealed = outside;
       // Opacity keeps the hit region available; polling restores it even when no DOM hover fires.
       win.setOpacity(concealed ? 0 : 1);
-      send(win);
+      send();
     }, 100);
     timer.unref?.();
   };
-  return { setEnabled, get enabled() { return !!previous; }, dispose() { clearInterval(timer); timer = null; previous = null; concealed = false; } };
+  return { setEnabled, get enabled() { return !!previous; }, dispose() {
+    if (previous) setEnabled(false);
+    clearInterval(timer); timer = null; previous = null; concealed = false;
+    panel?.destroy(); panel = null; contentView = null;
+  } };
 }
 module.exports = { createStealthController };

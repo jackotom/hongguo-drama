@@ -6,6 +6,7 @@ export default function useStealthWindow() {
   const resume = useRef(null);
   const concealed = useRef(false);
   const busy = useRef(false);
+  useEffect(() => window.electronAPI.onBossKeyState?.(() => { resume.current = null; }), []);
   const toggleStealth = async enabled => {
     if (busy.current) return;
     busy.current = true;

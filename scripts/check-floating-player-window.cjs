@@ -33,6 +33,7 @@ class FakeWindow extends EventEmitter {
     this.maximized = false;
     this.fullScreen = false;
     this.calls = [];
+    this.dockVisible = true;
     this.bounds = { width: options.width, height: options.height };
     this.normalBounds = { ...this.bounds };
     this.webContents = new EventEmitter();
@@ -66,7 +67,10 @@ class FakeWindow extends EventEmitter {
   setMaximumSize(width, height) { this.calls.push(['setMaximumSize', width, height]); }
   show() { this.calls.push(['show']); }
   focus() { this.calls.push(['focus']); }
-  setVisibleOnAllWorkspaces(value, options) { this.calls.push(['setVisibleOnAllWorkspaces', value, options]); }
+  setVisibleOnAllWorkspaces(value, options) {
+    this.calls.push(['setVisibleOnAllWorkspaces', value, options]);
+    if (!options?.skipTransformProcessType) this.dockVisible = !options?.visibleOnFullScreen;
+  }
   close() {
     if (this.destroyed) return;
     this.emit('close');
@@ -165,6 +169,8 @@ function closeMain(mainWindow) {
       },
     };
     const child = open(finalOptions);
+    assert.equal(child.dockVisible, true, 'opening PiP must preserve the Dock icon');
+    assert.equal(child.options.type, 'panel', 'macOS PiP must cover fullscreen apps without hiding the Dock');
     assert.equal(child.options.width, 240);
     assert.equal(child.options.height, 900);
     assert.equal(child.options.show, true, 'the player must be shown even when popup options hide it');
@@ -184,7 +190,7 @@ function closeMain(mainWindow) {
     assert.equal(child.options.webPreferences.webviewTag, false);
     assert.equal(Object.hasOwn(child.options.webPreferences, 'preload'), false);
     assert.deepEqual(child.calls, [
-      ['setVisibleOnAllWorkspaces', true, { visibleOnFullScreen: true }],
+      ['setVisibleOnAllWorkspaces', true, { visibleOnFullScreen: true, skipTransformProcessType: true }],
       ['setAlwaysOnTop', true],
       ['setMenuBarVisibility', false],
       ['setMinimumSize', 240, 160],
@@ -362,6 +368,7 @@ function closeMain(mainWindow) {
       false,
       'non-darwin platforms must not call setVisibleOnAllWorkspaces',
     );
+    assert.equal(child.options.type, undefined, 'native panels are macOS only');
     child.close();
     closeMain(mainWindow);
   }

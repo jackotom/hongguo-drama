@@ -1,4 +1,4 @@
-// 红果短剧 4.8：桌面桥接入口，发行说明见 docs/release-4.8.md。
+// 红果短剧 4.9：桌面桥接入口，发行说明见 docs/release-4.9.md。
 const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('electronAPI', {
@@ -11,6 +11,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
     return () => ipcRenderer.removeListener('text-export-done', listener);
   },
   setStealthMode: enabled => ipcRenderer.invoke('set-stealth-mode', enabled),
+  getBossKeyState: () => ipcRenderer.invoke('get-boss-key-state'),
+  setBossKey: value => ipcRenderer.invoke('set-boss-key', value),
+  onBossKeyState: cb => {
+    const listener = (_event, state) => cb(state);
+    ipcRenderer.on('boss-key-state', listener);
+    return () => ipcRenderer.removeListener('boss-key-state', listener);
+  },
   onStealthState: cb => {
     const listener = (_event, state) => cb(state);
     ipcRenderer.on('stealth-state', listener);

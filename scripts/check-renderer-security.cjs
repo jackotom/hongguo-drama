@@ -10,11 +10,18 @@ const file = path.resolve(__dirname, '../main.js'), req = createRequire(file);
 const handlers = {}, opened = [];
 const app = new EventEmitter();
 Object.assign(app, { getVersion: () => 'test', getPath: () => '/synthetic', commandLine: { appendSwitch() {} }, requestSingleInstanceLock: () => true, whenReady: () => ({ then() {} }) });
+class View extends EventEmitter {
+  constructor() { super(); this.children = []; this.bounds = { width: 1100, height: 750 }; }
+  addChildView(view) { this.children.push(view); }
+  getBounds() { return this.bounds; }
+  setBounds(bounds) { this.bounds = bounds; }
+}
 class Window extends EventEmitter {
   constructor(options) {
     super(); this.options = options; this.bounds = { x: 100, y: 100, width: options.width, height: options.height };
+    Window.current = this; this.contentView = new View();
     this.webContents = new EventEmitter();
-    Object.assign(this.webContents, { mainFrame: { url: pathToFileURL(path.join(path.dirname(file), 'dist-react/index.html')).href }, setWindowOpenHandler: fn => { this.openHandler = fn; }, send() {}, setZoomFactor: value => { this.zoomFactor = value; } });
+    Object.assign(this.webContents, { mainFrame: { url: pathToFileURL(path.join(path.dirname(file), 'dist-react/index.html')).href }, setWindowOpenHandler: fn => { this.openHandler = fn; }, send() {}, loadFile() {}, setZoomFactor: value => { this.zoomFactor = value; } });
   }
   isDestroyed() { return false; }
   getContentSize() { return [this.bounds.width, this.bounds.height]; }
@@ -27,7 +34,10 @@ class Window extends EventEmitter {
   setMenuBarVisibility() {}
   loadFile() {}
 }
-const electron = { app, BrowserWindow: Window, screen: { getDisplayMatching: () => ({ workArea: { x: 0, y: 0, width: 1920, height: 1080 } }) }, ipcMain: { handle: (name, fn) => { handlers[name] = fn; } }, protocol: { registerSchemesAsPrivileged() {} }, shell: { openExternal: async url => { opened.push(url); } } };
+class WebContentsView extends View {
+  constructor(options) { super(); this.options = options; this.webContents = Window.current.webContents; }
+}
+const electron = { app, BrowserWindow: Window, BaseWindow: Window, View, WebContentsView, screen: { getDisplayMatching: () => ({ workArea: { x: 0, y: 0, width: 1920, height: 1080 } }) }, ipcMain: { handle: (name, fn) => { handlers[name] = fn; } }, protocol: { registerSchemesAsPrivileged() {} }, shell: { openExternal: async url => { opened.push(url); } } };
 const context = vm.createContext({ require: name => name === 'electron' ? electron : name === './src/store' ? { setErrorHandler() {}, getSettings: () => ({}), saveSettings() {} } : req(name), __dirname: path.dirname(file), process, Buffer, URL, AbortController, setTimeout, clearTimeout, console: { log() {}, warn() {}, error() {} } });
 vm.runInContext(fs.readFileSync(file, 'utf8'), context, { filename: file });
 context.createWindow();
@@ -52,6 +62,15 @@ async function check(name, fn) { try { await fn(); } catch (error) { failures.pu
     assert.equal(win.zoomFactor, 1, 'landscape restores bounds without changing font size');
   });
   await check('sandbox enabled', () => assert.equal(win.options.webPreferences.sandbox, true));
+  if (process.platform === 'darwin') await check('Mac renderer remains in a resizable movable view', () => {
+    const view = win.contentView.children[0];
+    assert.equal(view.webContents, win.webContents);
+    assert.equal(view.options.webPreferences.sandbox, true);
+    assert.equal(view.options.webPreferences.nodeIntegration, false);
+    win.contentView.bounds = { width: 400, height: 568 };
+    win.contentView.emit('bounds-changed');
+    assert.deepEqual({ ...view.bounds }, { x: 0, y: 0, width: 400, height: 568 });
+  });
   await check('trusted page can invoke IPC', async () => assert.equal((await handlers['get-app-info'](event)).version, 'test'));
   await check('foreign window rejected', async () => assert.rejects(async () => handlers['get-app-info']({ sender: {}, senderFrame: event.senderFrame }), /窗口请求无效/));
   await check('subframe rejected', async () => assert.rejects(async () => handlers['get-app-info']({ sender: event.sender, senderFrame: { url: event.senderFrame.url } }), /窗口请求无效/));

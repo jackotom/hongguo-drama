@@ -386,6 +386,10 @@
 .shortcut-record { min-width: 76px; font-variant-numeric: tabular-nums; }
 .shortcut-record.is-recording { border-color: var(--accent); color: var(--accent-text); background: var(--accent-soft); }
 .shortcut-error { color: var(--danger); }
+.boss-key-row { gap: 8px; }
+.boss-key-toggle { display: flex; align-items: center; gap: 6px; white-space: nowrap; }
+.boss-key-input { flex: 1; min-width: 0; }
+.boss-key-hint { grid-column: 1 / -1; }
 @media (max-width: 620px) { .shortcut-settings-list { grid-template-columns: 1fr; } }
 
 .settings-inline-save { display: flex; align-items: center; gap: 16px; }

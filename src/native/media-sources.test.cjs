@@ -32,7 +32,7 @@ test('IPC persists source changes, notifies every window, and blocks disabled se
     const source = fs.readFileSync(path.join(__dirname, '../../main.js'), 'utf8');
     const context = {
       require: name => { assert.equal(name, './src/native/media-sources'); return { getMediaSources, setBuiltinSourceEnabled }; },
-      store, getCurrentSettings: () => store.getSettings(),
+      store, mainWindow: null, getCurrentSettings: () => store.getSettings(),
       seriesSearch: { searchSeries: (keyword, load) => load(keyword) },
       BrowserWindow: { getAllWindows: () => [1, 2].map(id => ({ webContents: { isDestroyed: () => false, send: event => events.push([id, event]) } })) },
       ipcMain: { handle: (name, fn) => handlers[name] = fn }, console,

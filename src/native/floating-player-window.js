@@ -121,6 +121,7 @@ function attachFloatingPlayerWindow(mainWindow, {
           maxWidth: MAX_WIDTH,
           maxHeight: MAX_HEIGHT,
           frame: true,
+          ...(platform === 'darwin' ? { type: 'panel' } : {}),
           titleBarStyle: 'default',
           alwaysOnTop: true,
           autoHideMenuBar: true,
@@ -161,7 +162,8 @@ function attachFloatingPlayerWindow(mainWindow, {
           if (finalizeFloatingWindow === finalize) finalizeFloatingWindow = null;
         });
         if (platform === 'darwin') {
-          child.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+          // Process transformation hides the whole app from the Dock.
+          child.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true, skipTransformProcessType: true });
         }
         child.setAlwaysOnTop(true);
         child.setMenuBarVisibility(false);

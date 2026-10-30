@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { SHORTCUT_ACTIONS, DEFAULT_SHORTCUTS, formatShortcut, readShortcuts, saveShortcuts, shortcutKey, subscribeShortcuts, validateShortcuts } from '../shortcuts';
+import BossKeySettings from './BossKeySettings';
 
 export default function ShortcutSettings({ active = true }) {
   const capturedKey = useRef(null);
@@ -43,7 +44,7 @@ export default function ShortcutSettings({ active = true }) {
       <h2 id="shortcut-settings-title">播放快捷键</h2>
       <button type="button" className="btn btn-outline" onClick={() => save({ ...DEFAULT_SHORTCUTS })}>恢复默认</button>
     </div>
-    <p className="settings-hint" id="shortcut-settings-help">点击按键后录入。支持单键或 Shift 组合；Esc 取消。仅在播放页生效，输入文字时不响应。</p>
+    <p className="settings-hint" id="shortcut-settings-help">播放操作点击按键后录入，支持单键或 Shift 组合；Esc 取消。仅在播放页生效，输入文字时不响应。老板键使用全局组合键，单独启用。</p>
     <div className="shortcut-settings-list">
       {SHORTCUT_ACTIONS.map(action => <div className="shortcut-settings-row" key={action.id}>
         <span id={`shortcut-label-${action.id}`}>{action.label}</span>
@@ -56,6 +57,7 @@ export default function ShortcutSettings({ active = true }) {
           {recording === action.id ? '请按新键…' : formatShortcut(bindings[action.id])}
         </button>
       </div>)}
+      <BossKeySettings active={active} />
     </div>
     {error && <p className="settings-hint shortcut-error" role="alert">{error}</p>}
     <p className="settings-hint" role="status" aria-live="polite">{recording ? `正在更改「${SHORTCUT_ACTIONS.find(action => action.id === recording)?.label}」` : message}</p>

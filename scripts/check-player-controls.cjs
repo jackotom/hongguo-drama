@@ -130,7 +130,7 @@ const source = transformSync(fs.readFileSync(path.join(__dirname, '../src/compon
   find('清晰度').props.onClick(); render();
   assert.match(nodeText(find('清晰度面板')), /360P.*640.*360/);
   assert.match(nodeText(find('清晰度面板')), /自动.*1080P.*720P.*兼容片源/);
-  assert.match(nodeText(find('清晰度面板')), /未自动降级|不会自动降级/);
+  assert.match(nodeText(find('清晰度面板')), /手动720P \/ 1080P保持固定画质/);
   find('选择 1080P').props.onClick(); render(); assert.equal(props.onlineQuality, '1080p');
   find('清晰度').props.onClick(); render();
   assert.equal(find('选择 1080P').props['aria-pressed'], true);

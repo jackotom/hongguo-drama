@@ -309,7 +309,7 @@ export default function PlayerControls({ danmaku, enhancement, shortcuts = DEFAU
           {!!episodes.length && <button type="button" ref={episodeButtonRef} aria-label="选集" aria-haspopup="dialog" aria-expanded={selectionPanel === 'episodes'}
             onClick={() => toggleSelection('episodes')}>选集</button>}
           {onQualityChange && <button type="button" ref={qualityButtonRef} aria-label="清晰度" aria-haspopup="dialog" aria-expanded={selectionPanel === 'quality'}
-            onClick={() => toggleSelection('quality')}>{onlineQuality === 'auto' ? (media.width > 0 && media.height > 0 ? `${Math.min(media.width, media.height)}P` : '自动') : onlineQuality.toUpperCase()}</button>}
+            onClick={() => toggleSelection('quality')}>{onlineQuality === 'compat' ? '老电脑' : onlineQuality === 'auto' ? (media.width > 0 && media.height > 0 ? `${Math.min(media.width, media.height)}P` : '自动') : onlineQuality.toUpperCase()}</button>}
           {selectionPanel === 'episodes' && <div className="player-controls-popover player-episode-popover" role="dialog" aria-label="选集面板" style={{ maxHeight: selectionHeight }}>
             <div className="player-popover-heading"><strong>选集</strong><span>第 {currentIndex} 集 / 共 {episodes.length} 集</span></div>
             <div className="player-episode-grid">
@@ -324,12 +324,12 @@ export default function PlayerControls({ danmaku, enhancement, shortcuts = DEFAU
             <div className="player-popover-heading"><strong>清晰度</strong></div>
             <p className="player-quality-current">当前画面：{media.width > 0 && media.height > 0 ? `${Math.min(media.width, media.height)}P（${media.width} × ${media.height}）` : '等待视频信息'}</p>
             <div role="group" aria-label="选择播放清晰度">
-              {(supportsOnlineQuality ? ['auto', '720p', '1080p'] : ['auto']).map(quality => <button type="button" key={quality} aria-label={`选择 ${quality === 'auto' ? '自动' : quality.toUpperCase()}`}
+              {(supportsOnlineQuality ? ['auto', 'compat', '720p', '1080p'] : ['auto']).map(quality => <button type="button" key={quality} aria-label={`选择 ${quality === 'compat' ? '老电脑' : quality === 'auto' ? '自动' : quality.toUpperCase()}`}
                 aria-pressed={onlineQuality === quality} onClick={() => { setSelectionPanel(null); qualityButtonRef.current?.focus(); if (quality !== onlineQuality) onQualityChange(quality); }}>
-                <span>{quality === 'auto' ? (supportsOnlineQuality ? '自动（1080P优先）' : '由片源决定') : quality.toUpperCase()}</span><span aria-hidden="true">{onlineQuality === quality ? '✓' : ''}</span>
+                <span>{quality === 'compat' ? '老电脑（H.264优先）' : quality === 'auto' ? (supportsOnlineQuality ? '自动（1080P优先）' : '由片源决定') : quality.toUpperCase()}</span><span aria-hidden="true">{onlineQuality === quality ? '✓' : ''}</span>
               </button>)}
             </div>
-            <p className="player-quality-hint">{supportsOnlineQuality ? '自动先尝试1080P，失败后切换720P，再尝试兼容片源。手动选择720P / 1080P保持固定画质，不会自动降级；切换时保留进度和暂停状态。' : '此来源的清晰度由片源决定，暂不支持指定画质。当前画面分辨率不代表来源的最高画质。'}</p>
+            <p className="player-quality-hint">{supportsOnlineQuality ? '自动优先1080P，失败后尝试720P和兼容片源。老电脑优先H.264，画质可能降低；开启兼容模式时，已知H.265片源提前转码，CPU较慢仍需等待。手动720P / 1080P保持固定画质；切换保留进度和暂停状态。' : '此来源的清晰度由片源决定，暂不支持指定画质。当前画面分辨率不代表来源的最高画质。'}</p>
           </div>}
         </div>
         <div className="player-controls-volume">

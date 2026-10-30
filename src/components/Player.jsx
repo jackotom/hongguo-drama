@@ -68,7 +68,7 @@ function Player({ target, onNavigate, onSeriesSelected, onFloatingChange, active
   const [playbackRate, setPlaybackRate] = useState(1);
   const [downloadQuality, setDownloadQuality] = useState('auto');
   const [onlineQualityChoice, setOnlineQualityChoice] = useState(() => {
-    try { const value = window.localStorage.getItem('hongguo:online-quality'); return ['720p', '1080p'].includes(value) ? value : 'auto'; }
+    try { const value = window.localStorage.getItem('hongguo:online-quality'); return ['720p', '1080p', 'compat'].includes(value) ? value : 'auto'; }
     catch { return 'auto'; }
   });
   const supportsOnlineQuality = !/^(xifan|hema|custom):/.test(activeSeriesId);
@@ -119,6 +119,15 @@ function Player({ target, onNavigate, onSeriesSelected, onFloatingChange, active
   const mergeDialogGenerationRef = useRef(0);
   const pendingSeekRef = useRef(0); // 切集后要跳转的秒数
   const pendingAutoplayRef = useRef(false);
+  const bossHiddenRef = useRef(false);
+  useEffect(() => window.electronAPI.onBossKeyState?.(state => {
+    bossHiddenRef.current = state.hidden === true;
+    pendingAutoplayRef.current = false;
+    const video = videoRef.current;
+    video?.pause();
+    const owner = video?.ownerDocument || document;
+    if (owner.pictureInPictureElement) owner.exitPictureInPicture?.().catch(() => {});
+  }), []);
   const activeRef = useRef(playbackActive);
   activeRef.current = playbackActive;
   const navigationVersion = useRef(0);
@@ -213,7 +222,7 @@ function Player({ target, onNavigate, onSeriesSelected, onFloatingChange, active
   const resetPlayback = useCallback((autoplay = true, preservePrefetch = false) => {
     fallbackRef.current = null;
     setPlaybackRequested(true);
-    pendingAutoplayRef.current = autoplay && activeRef.current;
+    pendingAutoplayRef.current = autoplay && activeRef.current && !bossHiddenRef.current;
     setAutoAdvancing(false);
     persistPosition(true);
     const previous = loadedMediaRef.current;
@@ -307,7 +316,7 @@ function Player({ target, onNavigate, onSeriesSelected, onFloatingChange, active
 
   const usableLocal = useCallback((ep, seriesId) => ep && !ep.locked && ep.status === 'completed' && ep.fileUrl
     && localMediaKey(seriesId, ep) !== rejectedLocalRef.current
-    && (stateRef.current.onlineQuality === 'auto' || /^(xifan|hema|custom):/.test(seriesId)
+    && (['auto', 'compat'].includes(stateRef.current.onlineQuality) || /^(xifan|hema|custom):/.test(seriesId)
       || Number.parseInt(ep.actualQuality, 10) >= Number.parseInt(stateRef.current.onlineQuality, 10)), []);
 
   const resumeLocal = useCallback((ep, seekTo, autoplay = true) => {
@@ -349,9 +358,9 @@ function Player({ target, onNavigate, onSeriesSelected, onFloatingChange, active
         : '本集未能加入下载，请点击“重试本集”或“下载本集”重新尝试');
       const settings = stateRef.current.qualityLoading ? await window.electronAPI.getSettings() : null;
       if (!isCurrentFallback(intent)) return;
-      let quality = stateRef.current.onlineQuality !== 'auto' ? stateRef.current.onlineQuality : stateRef.current.qualityLoading
+      let quality = stateRef.current.onlineQuality === 'compat' ? 'auto' : stateRef.current.onlineQuality !== 'auto' ? stateRef.current.onlineQuality : stateRef.current.qualityLoading
         ? (['1080p', '720p'].includes(settings?.download_quality) ? settings.download_quality : 'auto') : stateRef.current.downloadQuality;
-      if (quality === 'auto' && !/^(xifan|hema|custom):/.test(intent.seriesId)) quality = '1080p';
+      if (quality === 'auto' && stateRef.current.onlineQuality !== 'compat' && !/^(xifan|hema|custom):/.test(intent.seriesId)) quality = '1080p';
       fallbackAttemptRef.current = key;
       setPlaybackError(''); setWaitingFor(intent.vidIndex);
       // Enqueue validates quality and reuses an existing task; cancelling playback never stops that shared download.
@@ -576,7 +585,9 @@ function Player({ target, onNavigate, onSeriesSelected, onFloatingChange, active
 
   const compatUrl = current ? compatMap[current.vid_index] : null;
   const isOnlinePlaying = onlineVid && current && current.vid === onlineVid && onlineUrl;
-  const canPlay = !!(playbackRequested && !playbackError && !onlineProgress && current && !current.locked && (compatUrl || usableLocal(current, String(activeSeriesId)) || isOnlinePlaying));
+  const needsCompat = autoCompat && onlineQuality === 'compat' && isOnlinePlaying && !compatUrl
+    && /^(hevc|h265|h265_hvc1|hvc1|hev1|bytevc1)$/i.test(onlineRequestRef.current?.codec || '');
+  const canPlay = !!(playbackRequested && !playbackError && !onlineProgress && !needsCompat && current && !current.locked && (compatUrl || usableLocal(current, String(activeSeriesId)) || isOnlinePlaying));
   const playableSource = compatUrl || (isOnlinePlaying ? onlineUrl : current?.fileUrl) || '';
   // 原生全屏依附于 video 节点。准备下一集时保留结束帧，换源不换节点。
   if (canPlay) lastVideoSrcRef.current = playableSource;
@@ -607,7 +618,7 @@ function Player({ target, onNavigate, onSeriesSelected, onFloatingChange, active
       const ep = episodes.find((e) => e.vid_index === vidIndex);
       if (!ep || ep.locked) return;
       const request = { requestId: crypto.randomUUID(), seriesId: String(activeSeriesId), vidIndex,
-        quality: onlineRequestRef.current?.playbackQuality || onlineQuality, version: mediaVersion.current };
+        quality: onlineRequestRef.current?.playbackQuality || (onlineQuality === 'compat' ? 'auto' : onlineQuality), version: mediaVersion.current };
       if (compatRequestRef.current?.version === request.version && compatRequestRef.current?.vidIndex === vidIndex) return;
       autoCompatAttemptRef.current = { version: request.version, force };
       pendingSeekRef.current = currentPosition();
@@ -688,6 +699,10 @@ function Player({ target, onNavigate, onSeriesSelected, onFloatingChange, active
     startCompatPlay(vidIndex, force);
   }, [autoCompat, compatMap, startCompatPlay, reconnectOnce]);
 
+  useEffect(() => {
+    if (needsCompat && playbackRequested && !playbackError && !onlineProgress) tryAutoCompat(currentIndex);
+  }, [needsCompat, playbackRequested, playbackError, onlineProgress, currentIndex, tryAutoCompat]);
+
   const clearCompatCache = async () => {
     const affected = !!compatMap[currentIndex] || !!compatRequestRef.current;
     if (affected) stopPlayback('兼容播放已停止，可重试本集继续观看');
@@ -746,7 +761,7 @@ function Player({ target, onNavigate, onSeriesSelected, onFloatingChange, active
       }
       const quality = stateRef.current.onlineQuality;
       const qualities = quality === 'auto' && !/^(xifan|hema|custom):/.test(activeSeriesId)
-        ? AUTO_ONLINE_QUALITIES : [quality];
+        ? AUTO_ONLINE_QUALITIES : [quality === 'compat' ? 'auto' : quality];
       onlineSourceRef.current = `${activeSeriesId}:${vidIndex}`;
       const seekTo = resumeAt ?? (vidIndex === stateRef.current.currentIndex ? currentPosition() : 0);
       const prefetched = force === false
@@ -803,6 +818,7 @@ function Player({ target, onNavigate, onSeriesSelected, onFloatingChange, active
           return;
         }
         request.streamId = res.streamId;
+        request.codec = res.codec;
         request.prepared = true;
         if (!usedPrefetch && !res.cached) setMediaBuffering(true);
         setOnlineUrl(res.url);
@@ -874,7 +890,7 @@ function Player({ target, onNavigate, onSeriesSelected, onFloatingChange, active
   };
 
   const changeOnlineQuality = (quality) => {
-    if (!['auto', '720p', '1080p'].includes(quality) || !supportsOnlineQuality) return;
+    if (!['auto', '720p', '1080p', 'compat'].includes(quality) || !supportsOnlineQuality) return;
     const seekTo = currentPosition();
     const autoplay = loadedMediaRef.current ? !loadedMediaRef.current.element.paused : pendingAutoplayRef.current;
     setOnlineQualityChoice(quality);
@@ -940,7 +956,7 @@ function Player({ target, onNavigate, onSeriesSelected, onFloatingChange, active
         vidIndex: episode.vid_index, quality: onlineQuality, ready: false };
       prefetchRef.current = [...prefetchRef.current, request];
       request.promise = window.electronAPI.prepareOnlinePlay({ ...request,
-        quality: onlineQuality === 'auto' && supportsOnlineQuality ? '1080p' : onlineQuality, prefetch: true })
+        quality: onlineQuality === 'compat' ? 'auto' : onlineQuality === 'auto' && supportsOnlineQuality ? '1080p' : onlineQuality, prefetch: true })
         .catch(error => ({ success: false, error: error?.message || String(error) }))
         .then(result => {
           request.ready = result?.success === true;
@@ -1414,9 +1430,10 @@ function Player({ target, onNavigate, onSeriesSelected, onFloatingChange, active
           <label className="player-download-quality">
             <span>在线播放清晰度</span>
             <select className="input-field" aria-label="在线播放清晰度" value={onlineQuality}
-              disabled={!supportsOnlineQuality} title="自动优先1080P，失败后尝试720P和兼容片源；手动指定画质保持固定。"
+              disabled={!supportsOnlineQuality} title="自动优先1080P；老电脑优先H.264片源，必要时提前转码；手动指定画质保持固定。"
               onChange={event => changeOnlineQuality(event.target.value)}>
               <option value="auto">{supportsOnlineQuality ? '自动（1080P优先）' : '由片源决定'}</option>
+              <option value="compat">老电脑（H.264优先）</option>
               <option value="720p">720P</option>
               <option value="1080p">1080P</option>
             </select>
@@ -1645,7 +1662,7 @@ function Player({ target, onNavigate, onSeriesSelected, onFloatingChange, active
             onTimeUpdate={prepareNextEpisode}
             onPlay={(event) => {
               const media = loadedMediaRef.current;
-              if (!activeRef.current || !canPlay || playbackVersion !== mediaVersion.current || !media || media.version !== mediaVersion.current || media.element !== event.currentTarget) {
+              if (bossHiddenRef.current || !activeRef.current || !canPlay || playbackVersion !== mediaVersion.current || !media || media.version !== mediaVersion.current || media.element !== event.currentTarget) {
                 event.currentTarget.pause();
                 return;
               }

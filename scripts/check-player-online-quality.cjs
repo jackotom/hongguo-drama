@@ -10,6 +10,82 @@ let failures = 0;
 async function check(name, fn) { try { await fn(); console.log('PASS ' + name); } catch (e) { failures++; console.error('FAIL ' + name + ': ' + e.message); } }
 (async () => {
 if (process.argv[2] !== 'main') {
+  await check('old computer choice persists and prefetch uses compatible source selection', async () => {
+    const storage = new Map();
+    const ui = mount({ storage, props: { target: { seriesId: 'A', vidIndex: 1, ts: 1 } } });
+    try {
+      await ui.flush(); ui.metadata(); ui.media.currentTime = 24; ui.media.paused = true;
+      select(ui).props.onChange({ target: { value: 'compat' } }); await ui.flush();
+      assert.equal(select(ui).props.value, 'compat');
+      assert.equal(storage.get('hongguo:online-quality'), 'compat');
+      assert.equal(ui.prepares.at(-1).quality, 'auto', 'do not request HEVC-only 1080 tier');
+      ui.metadata(); await ui.flush();
+      assert.equal(ui.media.currentTime, 24); assert.equal(ui.media.paused, true);
+      await ui.media.play(); await ui.flush();
+      assert.equal(ui.prepares.filter(p => p.prefetch).at(-1).quality, 'auto');
+      ui.episode(2); await ui.flush();
+      assert.equal(select(ui).props.value, 'compat'); assert.equal(ui.transcodes.length, 0);
+    } finally { ui.unmount(); }
+    const reopened = mount({ storage, props: { target: { seriesId: 'A', vidIndex: 1, ts: 1 } } });
+    try { await reopened.flush(); assert.equal(select(reopened).props.value, 'compat'); assert.equal(reopened.prepares[0].quality, 'auto'); }
+    finally { reopened.unmount(); }
+  });
+  await check('old computer mode converts known HEVC before exposing the original video', async () => {
+    const storage = new Map([['hongguo:online-quality', 'compat']]);
+    let finish;
+    const ui = mount({ storage, props: { target: { seriesId: 'A', vidIndex: 1, ts: 1 } },
+      prepare: async () => ({ success: true, url: 'hongguo-stream://hevc', codec: 'bytevc1' }),
+      transcode: () => new Promise(resolve => { finish = resolve; }) });
+    try {
+      await ui.flush();
+      assert.equal(ui.transcodes.length, 1, 'convert without waiting for a black frame or media error');
+      assert.equal(ui.transcodes[0].quality, 'auto'); assert.equal(ui.transcodes[0].filePath, null);
+      assert.notEqual(ui.find(n => n.type === 'video')?.props.src, 'hongguo-stream://hevc');
+      finish({ success: true, url: 'file:///compatible.mp4' }); await ui.flush();
+      assert.equal(ui.find(n => n.type === 'video').props.src, 'file:///compatible.mp4');
+      ui.metadata(); await ui.flush(); ui.episode(2); await ui.flush();
+      assert.equal(ui.transcodes.length, 2, 'next episode uses the same proactive path');
+    } finally { ui.unmount(); }
+  });
+  await check('old computer mode respects disabled automatic conversion and retains downloaded originals', async () => {
+    const storage = new Map([['hongguo:online-quality', 'compat']]);
+    const local = mount({ local: true, storage });
+    try { await local.flush(); assert.equal(local.prepares.length, 0); assert.equal(local.find(n => n.type === 'video').props.src, 'file:///mock-1.mp4'); }
+    finally { local.unmount(); }
+    const disabled = mount({ storage, settings: { compat_mode: false }, props: { target: { seriesId: 'A', vidIndex: 1, ts: 1 } },
+      prepare: async () => ({ success: true, url: 'hongguo-stream://hevc', codec: 'hevc' }) });
+    try { await disabled.flush(); assert.equal(disabled.transcodes.length, 0); assert.equal(disabled.find(n => n.type === 'video').props.src, 'hongguo-stream://hevc'); }
+    finally { disabled.unmount(); }
+  });
+  await check('old computer proactive conversion cancels cleanly and ignores a late previous episode', async () => {
+    let finish;
+    const ui = mount({ storage: new Map([['hongguo:online-quality', 'compat']]),
+      props: { target: { seriesId: 'A', vidIndex: 1, ts: 1 } },
+      prepare: async p => ({ success: true, url: `hongguo-stream://episode-${p.vidIndex}`, codec: p.vidIndex === 1 ? 'hevc' : 'h264' }),
+      transcode: () => new Promise(resolve => { finish = resolve; }) });
+    try {
+      await ui.flush(); assert.equal(ui.transcodes.length, 1);
+      ui.episode(2); await ui.flush();
+      assert.equal(ui.cancelled[0].requestId, ui.transcodes[0].requestId);
+      finish({ success: true, url: 'file:///stale-compat.mp4' }); await ui.flush();
+      assert.equal(ui.find(n => n.type === 'video').props.src, 'hongguo-stream://episode-2');
+      assert.equal(ui.transcodes.length, 1, 'H.264 must play directly');
+    } finally { ui.unmount(); }
+  });
+  await check('old computer conversion failure is bounded and downloads with compatible quality', async () => {
+    const downloads = [];
+    const ui = mount({ storage: new Map([['hongguo:online-quality', 'compat']]),
+      props: { target: { seriesId: 'A', vidIndex: 1, ts: 1 } },
+      prepare: async () => ({ success: true, url: 'hongguo-stream://hevc', codec: 'hevc' }),
+      transcode: async () => ({ success: false, error: 'conversion failed' }),
+      apiOverrides: { downloadSingleEpisode: async (...args) => { downloads.push(args); return { success: false, error: 'download failed' }; } } });
+    try {
+      await ui.flush(); await ui.flush();
+      assert.equal(ui.transcodes.length, 2, 'one original and one refreshed source, then stop');
+      assert.equal(ui.prepares.length, 2); assert.deepEqual(downloads, [['A', 1, 'auto']]);
+      assert.ok(alert(ui));
+    } finally { ui.unmount(); }
+  });
   await check('automatic playback requests 1080 first and prepares the next episode at 1080', async () => {
     const ui = mount({ props: { target: { seriesId: 'A', vidIndex: 1, ts: 1 } } });
     try {
@@ -193,6 +269,16 @@ if (process.argv[2] !== 'main') {
   vm.runInNewContext(prefix+'\nmodule.exports={fixture,dirs};',{module,require,__dirname,console,process,Buffer,URL,Response,Request,Headers,AbortController,setTimeout,clearTimeout});
   const {fixture,dirs}=module.exports;
   try {
+    await check('online IPC retains codec through direct, prefetched and cached preparation without media URLs', async () => {
+      const h = fixture();
+      h.run("hongguo.fetchPlayUrlSingle = async () => ({ url: 'https://media.example/private-source.mp4', codec: 'hevc' });");
+      for (const prefetch of [false, true, true]) {
+        const result = await h.handlers['prepare-online-play']({}, { vid: '11', seriesId: '1', vidIndex: 1, quality: 'auto', prefetch });
+        assert.equal(result.success, true); assert.equal(result.codec, 'hevc');
+        assert.ok(!JSON.stringify(result).includes('media.example'));
+      }
+      h.context.clearOnlineCache();
+    });
     await check('episode IPC exposes retry diagnostics and verified quality',async()=>{
       const h=fixture(); h.run("downloadTasks=[{id:'t',hongguoInfo:{series_id:'1',vid:'11',vid_index:1},savePath:'/absent',status:'failed',error:'真实错误',retryAt:123,actualQuality:'1080p'}]; collectSeriesEpisodeFiles=()=>({ordered:[]});");
       const ep=(await h.handlers['get-series-episodes']({},'1')).data.episodes[0];

@@ -1,5 +1,5 @@
 /**
- * main.js - 红果短剧 4.8 下载器（独立版）主进程
+ * main.js - 红果短剧 4.9 下载器（独立版）主进程
  *
  * 功能：
  *   1. 红果短剧解析（分享链接 / series_id -> 全剧集列表）
@@ -8,7 +8,7 @@
  *   4. 下载管理：进度推送、暂停/取消、重试、删除、打开所在文件夹
  *   5. 设置：下载目录、命名规则、并发数（JSON 文件持久化）
  */
-const { app, BrowserWindow, ipcMain: rawIpcMain, dialog, shell, session, protocol, Menu, Notification, screen, safeStorage } = require('electron');
+const { app, BrowserWindow, BaseWindow, View, WebContentsView, globalShortcut, ipcMain: rawIpcMain, dialog, shell, session, protocol, Menu, Notification, screen, safeStorage } = require('electron');
 const path = require('path');
 const IS_PREVIEW = require('./package.json').name === 'hongguo-experience-preview';
 if (IS_PREVIEW) {
@@ -67,6 +67,7 @@ const APP_VERSION = app.getVersion() || '1.0.0';
 
 const APP_TITLE = IS_PREVIEW ? '红果短剧预览' : '红果短剧';
 const { createStealthController } = require('./src/native/stealth-window');
+const { createBossKeyController } = require('./src/native/boss-key');
 
 let mainWindow = null;
 let appUpdateInstaller = null;
@@ -76,7 +77,7 @@ let pendingUpdateOperations = 0;
 let quitCleanup = null;
 let quitReady = false;
 let mergeTempCleanup = null;
-const UPDATE_BLOCKED_CHANNELS = new Set(['hongguo-download-batch', 'download-single-episode', 'retry-task', 'retry-tasks', 'resume-all', 'merge-series', 'transcode-for-playback', 'prepare-online-play', 'save-settings']);
+const UPDATE_BLOCKED_CHANNELS = new Set(['hongguo-download-batch', 'download-single-episode', 'retry-task', 'retry-tasks', 'resume-all', 'merge-series', 'transcode-for-playback', 'prepare-online-play', 'save-settings', 'set-boss-key']);
 const ipcMain = {
   handle(channel, handler) {
     rawIpcMain.handle(channel, async (event, ...args) => {
@@ -1434,8 +1435,8 @@ ipcMain.handle('get-media-sources', async () => ({ success: true, sources: requi
 ipcMain.handle('set-builtin-source-enabled', async (_event, id, enabled) => {
   try {
     store.saveSettings(require('./src/native/media-sources').setBuiltinSourceEnabled(getCurrentSettings(), id, enabled));
-    for (const win of BrowserWindow.getAllWindows()) {
-      if (!win.webContents.isDestroyed()) win.webContents.send('media-sources-changed');
+    for (const win of new Set([mainWindow, ...BrowserWindow.getAllWindows()])) {
+      if (win?.webContents && !win.webContents.isDestroyed()) win.webContents.send('media-sources-changed');
     }
     return { success: true };
   } catch (error) { return { success: false, error: error.message }; }
@@ -3051,7 +3052,7 @@ ipcMain.handle('prepare-online-play', async (event, payload) => {
             }
           };
           const prepared = await withMediaRecovery(sourceVid,seriesId,{playInfo:checkedPlayInfo,quality,force,signal:controller.signal},async playInfo => {
-            const entry = {quality,size:0,lastUsed:Date.now(),seriesId:String(seriesId||''),vidIndex:Number(vidIndex)||0};
+            const entry = {quality,codec:playInfo.codec || '',size:0,lastUsed:Date.now(),seriesId:String(seriesId||''),vidIndex:Number(vidIndex)||0};
             if (playInfo.format === 'hls') await prepareHlsEntry(playInfo,entry,controller.signal,received => progress(received,0));
             else if (!prefetch && !playInfo.spadeA && !playInfo.contentKey) return {...entry,playInfo};
             else {
@@ -3076,7 +3077,7 @@ ipcMain.handle('prepare-online-play', async (event, payload) => {
     if (!onlineSessions.has(streamId)) throw new Error('已取消播放');
     session.entry = { ...entry }; entry.lastUsed = Date.now();
     return { success: true, url: `${STREAM_SCHEME}://play/${streamId}`, streamId, size: entry.size,
-      cached, streaming: !!entry.playInfo };
+      cached, streaming: !!entry.playInfo, codec: entry.codec || '' };
   } catch (error) {
     releaseOnlineSession(streamId);
     return { success: false, error: error.message, code: error.code };
@@ -4821,7 +4822,17 @@ ipcMain.handle('open-external-url', async (event, url) => {
 let windowLayout = 'landscape';
 let landscapeBounds = null;
 let layoutChanging = false;
-const stealth = createStealthController({ screen, getWindow: () => mainWindow });
+const stealth = createStealthController({ screen, BaseWindow, View, getWindow: () => mainWindow });
+const bossKey = createBossKeyController({ globalShortcut, getWindows: () => BaseWindow.getAllWindows(), getMainWindow: () => mainWindow, store,
+  dock: process.platform === 'darwin' ? app.dock : undefined });
+ipcMain.handle('get-boss-key-state', () => bossKey.getState());
+ipcMain.handle('set-boss-key', (_event, value) => {
+  const result = settingsSaveQueue.then(() => ({ success: true, ...bossKey.set(value) }))
+    .catch(error => ({ success: false, error: error.message }));
+  settingsSaveQueue = result.then(() => {});
+  return result;
+});
+app.on('will-quit', () => bossKey.dispose());
 function syncMainWindowScale() {
   if (!mainWindow || mainWindow.isDestroyed()) return;
   const scale = getWindowScale(getCurrentSettings().ui_zoom);
@@ -4892,7 +4903,7 @@ ipcMain.handle('set-window-layout', async (event, mode) => {
 function createWindow() {
   windowLayout = 'landscape';
   landscapeBounds = null;
-  mainWindow = new BrowserWindow({
+  const options = {
     width: 1100,
     height: 750,
     minWidth: 900,
@@ -4911,7 +4922,22 @@ function createWindow() {
       nodeIntegration: false,
       sandbox: true,
     },
-  });
+  };
+  mainWindow = process.platform === 'darwin' ? new BaseWindow(options) : new BrowserWindow(options);
+  if (process.platform === 'darwin') {
+    // Own the live view so stealth can move it to a panel without recreating the player.
+    const root = mainWindow.contentView;
+    const view = new WebContentsView({ webPreferences: options.webPreferences });
+    mainWindow.webContents = view.webContents;
+    root.addChildView(view);
+    const resizeView = () => {
+      const { width, height } = root.getBounds();
+      view.setBounds({ x: 0, y: 0, width, height });
+    };
+    root.on('bounds-changed', resizeView);
+    resizeView();
+  }
+  const contents = mainWindow.webContents;
 
   mainWindow.setMenuBarVisibility(false);
   mainWindow.on('resize', syncMainWindowScale);
@@ -4934,10 +4960,11 @@ function createWindow() {
 
   // 开发模式加载 vite dev server，生产模式加载打包产物
   const devUrl = process.env.VITE_DEV_SERVER_URL;
+  const page = process.platform === 'darwin' ? mainWindow.webContents : mainWindow;
   if (devUrl) {
-    mainWindow.loadURL(devUrl);
+    page.loadURL(devUrl);
   } else {
-    mainWindow.loadFile(path.join(__dirname, 'dist-react', 'index.html'));
+    page.loadFile(path.join(__dirname, 'dist-react', 'index.html'));
   }
 
   mainWindow.on('close', event => {
@@ -4948,6 +4975,7 @@ function createWindow() {
   });
   mainWindow.on('closed', () => {
     stealth.dispose();
+    if (process.platform === 'darwin' && !contents.isDestroyed()) contents.destroy();
     mediaAccess.clear();
     clearOnlineCache();
     for (const job of compatPreparing.values()) { job.cancelled = true; job.controller.abort(); }
@@ -4981,6 +5009,8 @@ if (hasSingleInstanceLock) app.whenReady().then(async () => {
     registerLocalProtocol();
     const settings = getCurrentSettings();
 
+    bossKey.start();
+
     // 代理必须在创建窗口、发起任何请求之前生效
     startupStage = '初始化网络';
     const proxyStartup = await applyProxyForStartup(settings);
@@ -4998,6 +5028,7 @@ if (hasSingleInstanceLock) app.whenReady().then(async () => {
     }
 
     app.on('activate', () => {
+      if (bossKey.hidden && bossKey.restore()) return;
       stealth.setEnabled(false);
       syncMainWindowScale();
       // 搜索窗口可能仍在后台，不能用所有窗口数量判断主窗口是否存在。
