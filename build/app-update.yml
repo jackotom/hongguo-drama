@@ -1,4 +1,4 @@
-# 红果短剧 5.1：应用内更新来源；实际版本读取发行清单。
+# 红果短剧 5.2：应用内更新来源；实际版本读取发行清单。
 provider: github
 owner: jackotom
 repo: hongguo-drama

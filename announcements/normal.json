@@ -1,6 +1,6 @@
 {
-  "id": "release-5.1-20261030-01",
-  "title": "红果短剧 5.1 已更新",
-  "body": "修复了已知问题\n\n完整说明和三端下载见 https://github.com/jackotom/hongguo-drama/releases/tag/v5.1。",
-  "active": true
+    "id": "release-5.1-20261030-01",
+    "title": "红果短剧 5.1 已更新",
+    "body": "修复了已知问题\n\n完整说明和三端下载见 https://github.com/jackotom/hongguo-drama/releases/tag/v5.1。",
+    "active": true
 }

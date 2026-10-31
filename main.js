@@ -1,5 +1,5 @@
 /**
- * main.js - 红果短剧 5.1 下载器（独立版）主进程
+ * main.js - 红果短剧 5.2 下载器（独立版）主进程
  *
  * 功能：
  *   1. 红果短剧解析（分享链接 / series_id -> 全剧集列表）
@@ -51,7 +51,7 @@ const watchHistory = require('./src/native/watch-history');
 const { createAccountService, safeMessage: accountSafeMessage } = require('./src/native/account-session');
 const seriesSearch = require('./src/native/series-search');
 const { searchHongguo } = require('./src/native/hongguo-search');
-const { fitWindowBounds, getWindowScale, saveWindowZoom } = require('./src/native/window-layout');
+const { fitWindowBounds, getWindowScale, saveWindowZoom, restoreMainWindowBounds, rememberMainWindowBounds } = require('./src/native/window-layout');
 const { createEpisodePanelController } = require('./src/native/episode-panel');
 const { availableRelease } = require('./src/native/app-update');
 const { createAnnouncementService } = require('./src/native/app-announcements');
@@ -4910,6 +4910,7 @@ function createWindow() {
     height: 750,
     minWidth: 900,
     minHeight: 620,
+    ...(process.platform === 'darwin' ? restoreMainWindowBounds(store, screen) : {}),
     title: APP_TITLE,
     ...(process.platform === 'darwin' ? {
       titleBarStyle: 'hiddenInset',
@@ -4956,6 +4957,9 @@ function createWindow() {
     screen,
   });
   episodePanel.attach(mainWindow);
+  if (process.platform === 'darwin') rememberMainWindowBounds(mainWindow, {
+    store, screen, isNormal: () => !stealth.enabled && windowLayout === 'landscape' && !layoutChanging,
+  });
   mainWindow.webContents.once('did-finish-load', () => {
     if (storageError) sendToRenderer('storage-error', storageError);
   });
