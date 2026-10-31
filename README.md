@@ -25,19 +25,19 @@
 
 
 
-**当前正式版：5.1**（内部 `5.1.0`）。修复了已知问题。双Mac已签名、公证和装订，Windows EXE未签名。详见 [5.1说明](docs/release-5.1.md)。
+**当前正式版：5.2**（内部 `5.2.0`）。macOS 启动恢复普通主窗口位置和大小，原显示器不在时回默认。双Mac已签名、公证和装订；Windows EXE未签名。详见 [5.2说明](docs/release-5.2.md)。
 
-| 设备 | 下载 5.1 | 安装方式 |
+| 设备 | 下载 5.2 | 安装方式 |
 |---|---|---|
-| Apple 芯片 Mac（M 系列），macOS 13+ | [下载 DMG](https://github.com/jackotom/hongguo-drama/releases/download/v5.1/Hongguo-5.1-mac-arm64.dmg) | 打开 DMG，拖入「应用程序」后启动；后续支持应用内更新 |
-| Intel Mac，macOS 13+ | [下载 DMG](https://github.com/jackotom/hongguo-drama/releases/download/v5.1/Hongguo-5.1-mac-x64.dmg) | 打开 DMG，拖入「应用程序」后启动；后续支持应用内更新 |
-| Windows x64（推荐安装版） | [下载安装版 EXE](https://github.com/jackotom/hongguo-drama/releases/download/v5.1/hongguo-downloader-5.1-win-x64-setup.exe) | 按向导安装，后续支持应用内更新 |
-| Windows x64（便携版） | [下载便携 EXE](https://github.com/jackotom/hongguo-drama/releases/download/v5.1/hongguo-downloader-5.1-win-x64.exe) · [下载便携 ZIP](https://github.com/jackotom/hongguo-drama/releases/download/v5.1/hongguo-downloader-5.1-win-x64.zip) | 直接运行 EXE；ZIP 解压后运行同一程序，后续仍需手动替换 |
+| Apple 芯片 Mac（M 系列），macOS 13+ | [下载 DMG](https://github.com/jackotom/hongguo-drama/releases/download/v5.2/Hongguo-5.2-mac-arm64.dmg) | 打开 DMG，拖入「应用程序」后启动；后续支持应用内更新 |
+| Intel Mac，macOS 13+ | [下载 DMG](https://github.com/jackotom/hongguo-drama/releases/download/v5.2/Hongguo-5.2-mac-x64.dmg) | 打开 DMG，拖入「应用程序」后启动；后续支持应用内更新 |
+| Windows x64（推荐安装版） | [下载安装版 EXE](https://github.com/jackotom/hongguo-drama/releases/download/v5.2/hongguo-downloader-5.2-win-x64-setup.exe) | 按向导安装，后续支持应用内更新 |
+| Windows x64（便携版） | [下载便携 EXE](https://github.com/jackotom/hongguo-drama/releases/download/v5.2/hongguo-downloader-5.2-win-x64.exe) · [下载便携 ZIP](https://github.com/jackotom/hongguo-drama/releases/download/v5.2/hongguo-downloader-5.2-win-x64.zip) | 直接运行 EXE；ZIP 解压后运行同一程序，后续仍需手动替换 |
 
-[查看最新正式版](https://github.com/jackotom/hongguo-drama/releases/latest) · [5.1 更新说明与源码](https://github.com/jackotom/hongguo-drama/releases/tag/v5.1) · [SHA256 校验文件](https://github.com/jackotom/hongguo-drama/releases/download/v5.1/SHA256SUMS.txt)
+[查看最新正式版](https://github.com/jackotom/hongguo-drama/releases/latest) · [5.2 更新说明与源码](https://github.com/jackotom/hongguo-drama/releases/tag/v5.2) · [SHA256 校验文件](https://github.com/jackotom/hongguo-drama/releases/download/v5.2/SHA256SUMS.txt)
 
 
-- **升级到 5.1**：5.0 安装版可使用应用内更新；也可退出旧程序后替换 Mac 应用或运行 Windows 安装包。便携版保留同目录的 `data` 后手动替换；1.75 及更早版本需要手动安装。
+- **升级到 5.2**：5.1 安装版可使用应用内更新；也可退出旧程序后替换 Mac 应用或运行 Windows 安装包。便携版保留同目录的 `data` 后手动替换；1.75 及更早版本需要手动安装。
 - **后续更新**：Mac 与 Windows 安装版可在应用内下载新版，下载完成后由你点击重启安装，不强制升级。Windows 便携版继续通过发行页下载并手动替换。
 - **Mac**：正式包完成 Developer ID 签名、Apple 公证 Accepted 和票据装订。无需全局关闭 Gatekeeper；公证不等于 App Store 审核或内容授权。
 - **Windows**：安装版和便携版 EXE 尚未签名，可能出现系统安全提示。请核对官方下载来源；便携版首次启动会展开临时运行文件。安装版沿用原用户资料目录；3.4 起便携版把设置和下载记录放在程序目录的 `data` 文件夹，移动程序时请连同该文件夹一起保留。安装版与便携版不能同时运行（同一应用只允许一个实例）；更换版本前请先退出正在运行的窗口。
@@ -70,13 +70,13 @@
 3. 打开详情点「立即播放」，也可选择集数与清晰度加入下载队列。
 4. 下次从「我的剧库」或「观看记录」接着看；下载进度、失败重试和整剧合并在「下载管理」。
 
-## 5.2 macOS 窗口恢复（待发布）
+## 5.2 macOS 窗口恢复
 
 - 重启应用或关闭主窗口后从 Dock 重开，恢复普通主窗口的位置和大小。
 - 最大化、全屏、最小化、隐身小窗和竖屏布局不覆盖普通窗口记录，启动仍为普通窗口。
 - 原显示器不在时回默认位置和大小；同屏可用区域缩小时，窗口保持在屏幕内。
 - 正常退出时保存；崩溃或强制退出不保证保存本次调整。
-- 本轮发行目标为5.2，正式下载暂保留5.1。见 [5.2说明](docs/release-5.2.md)。
+- 5.2已正式发布；三端下载与验证范围见 [5.2说明](docs/release-5.2.md)。
 
 ## 5.1 更新说明
 
