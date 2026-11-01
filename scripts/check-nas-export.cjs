@@ -14,7 +14,7 @@ const series = { series_id: seriesId, series_title: '示例剧第二季', cover:
   episodes: [1, 2].map(index => ({ vid: `769124936409782991${index}`, vid_index: index, title: `第${index}集` })) };
 const metadataFetcher = async () => ({ success: true, description: '剧情 <简介> & 人物', cover: series.cover });
 const posterFetcher = async () => Buffer.from([0xff, 0xd8, 0xff, 0xe0]);
-function temp(t) { const root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'hongguo-nas-'))); t.after(() => fs.rmSync(root, { recursive: true, force: true })); return root; }
+function temp(t) { const root = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), 'hongguo-nas-'))); t.after(() => fs.rmSync(root, { recursive: true, force: true })); return root; }
 const prepare = root => nas.prepareNasExport({ root, folderName: '示例剧-identity', series }, { metadataFetcher, posterFetcher });
 
 test('public metadata uses the matching source introduction and cover', () => {
