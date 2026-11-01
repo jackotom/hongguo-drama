@@ -1,6 +1,6 @@
 {
-  "id": "release-5.3-pending-20261101",
-  "title": "红果短剧 5.3 准备中",
-  "body": "新增下载到 NAS：直接保存到已挂载目录，同层封面、简介及 NFO，规范分集命名。正式下载暂保留5.2。",
-  "active": false
+  "id": "release-5.3-20261101-01",
+  "title": "红果短剧 5.3 已更新",
+  "body": "新增「下载到 NAS」：先挂载共享目录，再为每部剧选择独立文件夹。视频与封面、简介、NFO 同层保存，规范分集命名，已有视频复用、缺失资料补齐；下载管理可直接打开所选目录。\n\n资料以来源实际提供为准，独立保存而非内嵌 MP4；实体 NAS 和媒体库识别尚未实测。\n\n完整说明和三端下载：https://github.com/jackotom/hongguo-drama/releases/tag/v5.3",
+  "active": true
 }
