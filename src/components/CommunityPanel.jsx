@@ -9,7 +9,7 @@ const reviewDate = value => {
   return Number.isNaN(date.getTime()) ? '' : date.toLocaleDateString('zh-CN', { timeZone: 'Asia/Shanghai' });
 };
 
-export default function CommunityPanel({ seriesId, episodeId, title, cover, children }) {
+export default function CommunityPanel({ seriesId, episodeId, title, cover, children, trailingAction }) {
   const id = String(seriesId || '');
   const panelId = useId();
   const [openedSeries, setOpenedSeries] = useState('');
@@ -68,6 +68,7 @@ export default function CommunityPanel({ seriesId, episodeId, title, cover, chil
         }}>复制分享链接</button>
         <button type="button" className={`btn ${favorite ? 'community-favorited' : 'btn-outline'}`} aria-pressed={favorite} onClick={() => setLibrary(saveLocalSeries({ id, title, cover, favorite: !favorite }))}>{favorite ? '已收藏到本机' : '收藏到本机'}</button>
         <button type="button" className="btn btn-outline" aria-expanded={opened} aria-controls={panelId} onClick={() => setOpenedSeries(opened ? '' : id)}>{opened ? '收起剧评' : '查看公开剧评'}</button>
+        {trailingAction && <div className="community-action-trailing">{trailingAction}</div>}
       </div>
     </div>
     {library.error && <p className="community-error" role="alert">{library.error}</p>}

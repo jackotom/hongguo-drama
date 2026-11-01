@@ -1,6 +1,6 @@
 {
-  "id": "release-5.2-20261031-01",
-  "title": "红果短剧 5.2 已更新",
-  "body": "macOS 启动时恢复普通主窗口的位置和大小；原显示器不在时回默认。\n\n完整说明和三端下载见 https://github.com/jackotom/hongguo-drama/releases/tag/v5.2。",
-  "active": true
+  "id": "release-5.3-pending-20261101",
+  "title": "红果短剧 5.3 准备中",
+  "body": "新增下载到 NAS：直接保存到已挂载目录，同层封面、简介及 NFO，规范分集命名。正式下载暂保留5.2。",
+  "active": false
 }

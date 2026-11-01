@@ -26,7 +26,10 @@ function parsePublicDetails(html, seriesId, vid = '', options = {}) {
   if (vid && String(data.vid) !== vid) throw new Error('来源页面分集不匹配');
   const social = data.seriesSocialInfo || {};
   return { success: true, series_id: seriesId, episode_id: vid || null,
-    ...publicMetadata(data.seriesDetail), rating: count(social.rating), rating_count: count(social.rating_count),
+    ...publicMetadata(data.seriesDetail),
+    description: typeof data.seriesDetail.series_intro === 'string' ? data.seriesDetail.series_intro : '',
+    cover: typeof data.seriesDetail.series_cover === 'string' ? data.seriesDetail.series_cover : '',
+    rating: count(social.rating), rating_count: count(social.rating_count),
     like_count: count(social.series_like_count), favorite_count: count(social.series_favorite_count),
     reviews: reviews(social.reviews, options.reviewsLimit ?? 50), episode_reviews: vid ? reviews(data.episodeSocialInfo?.reviews, options.reviewsLimit ?? 50) : null,
     episode_like_count: vid ? count(data.episodeSocialInfo?.episode_like_count) : null,

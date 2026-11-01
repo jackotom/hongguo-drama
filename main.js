@@ -1,5 +1,5 @@
 /**
- * main.js - 红果短剧 5.2 下载器（独立版）主进程
+ * main.js - 红果短剧 5.3 下载器（独立版）主进程
  *
  * 功能：
  *   1. 红果短剧解析（分享链接 / series_id -> 全剧集列表）
@@ -59,6 +59,7 @@ const { fetchPublicDetails } = require('./src/native/public-details');
 const { fetchEpisodeComments } = require('./src/native/episode-comments');
 const { fetchDanmaku, setDeviceIdentityFile } = require('./src/native/danmaku');
 const { exportSeriesText } = require('./src/native/text-export');
+const { prepareNasExport, inspectNasEpisode, copyNasEpisode, nasEpisodeFilename, checkNasDirectory } = require('./src/native/nas-export');
 const mediaAccess = require('./src/native/media-access').createMediaAccess(process.env.VITE_DEV_SERVER_URL);
 const rendererSecurity = require('./src/native/renderer-security').createRendererSecurity(
   path.join(__dirname, 'dist-react', 'index.html'), process.env.VITE_DEV_SERVER_URL);
@@ -77,7 +78,7 @@ let pendingUpdateOperations = 0;
 let quitCleanup = null;
 let quitReady = false;
 let mergeTempCleanup = null;
-const UPDATE_BLOCKED_CHANNELS = new Set(['hongguo-download-batch', 'download-single-episode', 'retry-task', 'retry-tasks', 'resume-all', 'merge-series', 'transcode-for-playback', 'prepare-online-play', 'save-settings', 'set-boss-key']);
+const UPDATE_BLOCKED_CHANNELS = new Set(['hongguo-download-batch', 'download-single-episode', 'download-series-to-nas', 'retry-task', 'retry-tasks', 'resume-all', 'merge-series', 'transcode-for-playback', 'prepare-online-play', 'save-settings', 'set-boss-key']);
 const ipcMain = {
   handle(channel, handler) {
     rawIpcMain.handle(channel, async (event, ...args) => {
@@ -946,6 +947,23 @@ function publishDownloadFile(temporary, destination) {
   fs.unlinkSync(temporary);
 }
 
+async function completeNasExports(task) {
+  if (!task.nasDestination && !task.nasTargets?.length) return [];
+  const warnings = [];
+  for (const destination of task.nasDestination ? [task.nasDestination] : task.nasTargets || []) {
+    try {
+      await copyNasEpisode(task, destination);
+      sendToRenderer('nas-export-done', { seriesId: task.hongguoInfo.series_id, vidIndex: task.hongguoInfo.vid_index, success: true });
+    } catch (_) {
+      const error = 'NAS 整理失败，请确认共享目录在线后再次点击「下载到 NAS」重试；本地视频已保留';
+      warnings.push(error);
+      sendToRenderer('nas-export-done', { seriesId: task.hongguoInfo.series_id, vidIndex: task.hongguoInfo.vid_index, success: false, error });
+    }
+  }
+  task.nasWarning = warnings.join('；');
+  return warnings;
+}
+
 async function executeHongguoDownload(task) {
   const { id, hongguoInfo, filename } = task;
   const { vid, series_title } = hongguoInfo || {};
@@ -974,7 +992,11 @@ async function executeHongguoDownload(task) {
     };
     const root = String(settings.root || '').trim() || app.getPath('downloads');
     const downloadDir = task.customDir || seriesDownloadDir(root, hongguoInfo?.series_id, series_title);
-    fs.mkdirSync(downloadDir, { recursive: true });
+    if (task.nasDestination) {
+      if (task.pathConflict) throw new Error('NAS 文件路径与其他分集冲突，请检查所选文件夹后重试');
+      await checkNasDirectory(task.nasDestination);
+    }
+    else fs.mkdirSync(downloadDir, { recursive: true });
     const finalPath = task.savePath || path.join(downloadDir, filename);
     task.savePath = finalPath;
     // Recheck source access before reusing an existing third-party file or URL.
@@ -986,6 +1008,8 @@ async function executeHongguoDownload(task) {
     if (fs.existsSync(finalPath)) {
       if (!hasCompleteTaskFile(task)) throw new Error('已有本地文件不完整或路径冲突，文件已保留，请先自行检查或移除');
       task.actualQuality = await verifyDownloadQuality(finalPath, quality, true);
+      source.token.throwIfRequested();
+      await completeNasExports(task);
       source.token.throwIfRequested();
       task.status = 'completed'; task.progress = 100; task.endTime = Date.now(); delete task.sourceRetries;
       saveDownloadTasks(); sendToRenderer('download-completed', { id, path: finalPath });
@@ -1072,6 +1096,8 @@ async function executeHongguoDownload(task) {
         publishDownloadFile(tmpPath, finalPath);
       }
     });
+    await completeNasExports(task);
+    source.token.throwIfRequested();
     task.status = 'completed'; task.progress = 100; task.endTime = Date.now(); delete task.sourceRetries;
     if (task.qualityNotice) task.qualityNotice = task.qualityNotice.replace('正在下载', '已下载');
     saveDownloadTasks(); sendToRenderer('download-completed', { id, path: finalPath, actualQuality: task.actualQuality, qualityNotice: task.qualityNotice || '' });
@@ -2152,6 +2178,7 @@ function repairTaskDestination(task) {
   const conflicts = downloadTasks.filter(other => other !== task && other.savePath === task.savePath && String(other.hongguoInfo?.vid) !== String(task.hongguoInfo?.vid));
   if (conflicts.length) for (const item of [task, ...conflicts]) item.pathConflict = true;
   if (!task.pathConflict) return;
+  if (task.nasDestination) return;
   const settings = getCurrentSettings(), info = task.hongguoInfo || {};
   task.customDir = seriesDownloadDir(settings.root || app.getPath('downloads'), info.series_id, info.series_title);
   const filename = uniqueEpisodeFilename(settings, info.series_title, { vid_index: info.vid_index, title: info.ep_title });
@@ -3499,7 +3526,7 @@ ipcMain.handle('decode-capability', async () => ({
  * 把若干集加入下载队列（批量下载与播放器「下载本集」共用）。
  * 返回新建的任务数。
  */
-async function enqueueEpisodes({ seriesId, seriesTitle, episodes, cover, quality }) {
+async function enqueueEpisodes({ seriesId, seriesTitle, episodes, cover, quality, nasDestination }) {
   if (!Array.isArray(episodes) || episodes.length === 0) return 0;
   const settings = getCurrentSettings();
   const downloadQuality = normalizeDownloadQuality(quality ?? settings.download_quality);
@@ -3516,20 +3543,39 @@ async function enqueueEpisodes({ seriesId, seriesTitle, episodes, cover, quality
   }
 
   // Validate duplicate quality before changing the queue or files. Never replace a user's file.
+  const nasReady = new Set();
   for (const ep of episodes) {
     const dup = downloadTasks.find(t => String(t.hongguoInfo?.vid) === String(ep.vid));
-    if (!dup) continue;
-    if (['pending', 'downloading'].includes(dup.status) && normalizeDownloadQuality(dup.downloadQuality) !== downloadQuality) {
+    if (dup && ['pending', 'downloading'].includes(dup.status) && normalizeDownloadQuality(dup.downloadQuality) !== downloadQuality) {
       throw new Error('同一集已有其他清晰度的下载任务，请先停止该任务再重新选择');
     }
-    if (dup.status === 'completed' && hasCompleteTaskFile(dup)) {
+    if (dup?.status === 'completed' && hasCompleteTaskFile(dup)) {
       dup.actualQuality = await verifyDownloadQuality(dup.savePath, downloadQuality, true);
     }
+    if (nasDestination) {
+      const finalPath = path.join(nasDestination.directory, nasEpisodeFilename(nasDestination, ep));
+      if (dup && (dup.status === 'downloading' || runningDownloads.has(dup.id)) && dup.savePath !== finalPath)
+        throw new Error('该剧正在下载到其他位置，请先暂停下载，再选择新的保存文件夹');
+      if (downloadTasks.some(task => task !== dup && task.savePath === finalPath && String(task.hongguoInfo?.vid) !== String(ep.vid)))
+        throw new Error('所选目录的视频路径与其他分集冲突，未覆盖已有文件');
+      const target = await inspectNasEpisode(nasDestination, ep);
+      if (target.status === 'existing') {
+        await verifyDownloadQuality(target.path, downloadQuality, true);
+        nasReady.add(String(ep.vid));
+      } else if (dup?.status === 'completed' && hasCompleteTaskFile(dup)) {
+        await copyNasEpisode(dup, nasDestination);
+        nasReady.add(String(ep.vid));
+      } else if (target.status === 'conflict') throw new Error('所选目录已有无法确认的同名视频，未覆盖，请检查后重试');
+    }
   }
+  // No await follows this check until queue persistence, so active runs cannot be retargeted midway.
+  if (nasDestination && episodes.some(ep => downloadTasks.some(task => String(task.hongguoInfo?.vid) === String(ep.vid) &&
+      (task.status === 'downloading' || runningDownloads.has(task.id)) && task.savePath !== path.join(nasDestination.directory, nasEpisodeFilename(nasDestination, ep)))))
+    throw new Error('该剧正在下载到其他位置，请先暂停下载，再选择新的保存文件夹');
   const root = (settings.root && String(settings.root).trim()) ? String(settings.root).trim() : app.getPath('downloads');
   const cleanSeriesTitle = sanitizeFolderName(seriesTitle) || '红果短剧';
-  const downloadDir = seriesDownloadDir(root, seriesId, cleanSeriesTitle);
-  try { fs.mkdirSync(downloadDir, { recursive: true }); } catch (_) {}
+  const downloadDir = nasDestination ? nasDestination.directory : seriesDownloadDir(root, seriesId, cleanSeriesTitle);
+  if (!nasDestination) { try { fs.mkdirSync(downloadDir, { recursive: true }); } catch (_) {} }
 
   const batchId = 'hongguobatch_' + randomUUID();
   const firstCover = cover || (episodes[0] && episodes[0].cover) || '';
@@ -3548,7 +3594,7 @@ async function enqueueEpisodes({ seriesId, seriesTitle, episodes, cover, quality
   const previousQueue = downloadQueue.slice();
   for (const ep of episodes) {
     const epIndexStr = String(ep.vid_index).padStart(3, '0');
-    const filename = uniqueEpisodeFilename(settings, cleanSeriesTitle, ep);
+    const filename = nasDestination ? nasEpisodeFilename(nasDestination, ep) : uniqueEpisodeFilename(settings, cleanSeriesTitle, ep);
     const finalPath = path.join(downloadDir, filename);
 
     // 已有同一集在队列/已完成，避免重复建任务
@@ -3556,9 +3602,18 @@ async function enqueueEpisodes({ seriesId, seriesTitle, episodes, cover, quality
       (t) => t.hongguoInfo && String(t.hongguoInfo.vid) === String(ep.vid)
     );
     if (dup) {
+      changedTasks.push({ task: dup, previous: { ...dup } });
+      if (nasDestination) {
+        Object.assign(dup, { savePath: finalPath, customDir: downloadDir, filename, nasDestination, downloadQuality, nasWarning: '', pathConflict: false });
+        delete dup.nasTargets;
+        if (nasReady.has(String(ep.vid)) && dup.status !== 'downloading' && !runningDownloads.has(dup.id)) {
+          Object.assign(dup, { status: 'completed', progress: 100, endTime: Date.now() });
+          delete dup.error;
+          downloadQueue = downloadQueue.filter(task => task !== dup);
+        }
+      }
       // 已停止或失败的重新入队
       if (dup.status === 'stopped' || dup.status === 'failed' || (dup.status === 'completed' && !hasCompleteTaskFile(dup))) {
-        changedTasks.push({ task: dup, previous: { ...dup } });
         repairTaskDestination(dup);
         dup.status = 'pending';
         dup.cancelled = false;
@@ -3585,8 +3640,9 @@ async function enqueueEpisodes({ seriesId, seriesTitle, episodes, cover, quality
       platform: 'hongguo',
       type: 'hongguo',
       downloadQuality,
-      status: 'pending',
-      progress: 0,
+      ...(nasDestination ? { nasDestination } : {}),
+      status: nasReady.has(String(ep.vid)) ? 'completed' : 'pending',
+      progress: nasReady.has(String(ep.vid)) ? 100 : 0,
       receivedBytes: 0,
       totalBytes: 0,
       startTime: Date.now(),
@@ -3606,23 +3662,48 @@ async function enqueueEpisodes({ seriesId, seriesTitle, episodes, cover, quality
     };
 
     downloadTasks.unshift(task);
-    downloadQueue.push(task);
+    if (task.status === 'pending') downloadQueue.push(task);
     sendToRenderer('download-task-added', task);
-    created++;
+    if (task.status === 'pending') created++;
   }
 
   try { saveDownloadTasks(); }
   catch (error) {
     // An unpersisted submission must not start later through another queue action.
     downloadTasks = downloadTasks.filter(task => task.batchId !== batchId);
-    for (const { task, previous } of changedTasks) Object.assign(task, previous);
-    downloadQueue = previousQueue;
-    sendToRenderer('download-queue-changed', {});
+    restoreQueueTasks({ snapshots: changedTasks, previousQueue });
     throw error;
   }
   pumpQueue();
   return created;
 }
+
+const nasSubmissions = new Set();
+ipcMain.handle('download-series-to-nas', async (_event, seriesId, quality) => {
+  const sid = String(seriesId || '');
+  if (nasSubmissions.has(sid)) return { success: false, error: '本剧正在整理到 NAS，请等待本次提交完成' };
+  nasSubmissions.add(sid);
+  try {
+    const entry = seriesRegistry.find(item => String(item.series_id) === sid);
+    if (!entry?.episodes?.length) return { success: false, error: '未找到该剧档案，请先打开剧集' };
+    const selection = await dialog.showOpenDialog(mainWindow, {
+      title: '选择已挂载的 NAS 共享文件夹', buttonLabel: '保存到此目录', properties: ['openDirectory'],
+    });
+    if (selection.canceled || !selection.filePaths?.[0]) return { success: false, canceled: true };
+    const folderName = `${sanitizeFolderName(entry.series_title) || '未命名短剧'}-${createHash('sha256').update(sid).digest('hex').slice(0, 12)}`;
+    const { destination, warnings } = await prepareNasExport({ root: selection.filePaths[0], folderName, series: entry });
+    const wanted = entry.episodes.filter(episode => !episode.locked);
+    const locked = entry.episodes.length - wanted.length;
+    if (locked) warnings.push(`${locked} 集已锁定，需在来源平台解锁后再下载`);
+    const count = await enqueueEpisodes({ seriesId: sid, seriesTitle: entry.series_title, episodes: wanted,
+      cover: entry.cover, quality, nasDestination: destination });
+    const copied = wanted.filter(episode => downloadTasks.some(task => String(task.hongguoInfo?.series_id) === sid &&
+      String(task.hongguoInfo?.vid) === String(episode.vid) && task.nasDestination?.directory === destination.directory &&
+      task.status === 'completed' && hasCompleteTaskFile(task))).length;
+    return { success: true, count, copied, warnings, directory: destination.directory };
+  } catch (error) { return { success: false, error: error.message || 'NAS 下载提交失败，请检查共享目录后重试' }; }
+  finally { nasSubmissions.delete(sid); }
+});
 
 ipcMain.handle('hongguo-download-batch', async (event, payload) => {
   try {
@@ -4436,6 +4517,10 @@ ipcMain.handle('cleanup-watched-episode', async (_event, seriesId, vidIndex) => 
   try {
     const sid = String(seriesId), idx = Number(vidIndex);
     if (!sid || !Number.isSafeInteger(idx) || idx < 1) return { success: false, error: '剧集信息无效' };
+    if (downloadTasks.some(task => String(task.hongguoInfo?.series_id) === sid && Number(task.hongguoInfo?.vid_index) === idx && task.nasDestination))
+      return { success: true, count: 0, freed: 0, skipped: true };
+    if (downloadTasks.some(task => String(task.hongguoInfo?.series_id) === sid && Number(task.hongguoInfo?.vid_index) === idx && task.nasWarning))
+      return { success: false, error: '本集尚未完成 NAS 整理，本地视频已保留；请再次点击「下载到 NAS」重试' };
     const matches = entry => entry && String(entry.seriesId) === sid && Number(entry.vidIndex) === idx;
     const compatFiles = ['auto', '720p', '1080p'].map(quality => compatPathFor(sid, idx, quality));
     if ([...onlineSessions.values()].some(session => matches(session.entry || session)) || compatFiles.some(file => compatPreparing.has(file))) {
@@ -4634,6 +4719,13 @@ ipcMain.handle('get-queue-status', async () => ({
 ipcMain.handle('open-folder', async (event, taskId) => {
   const task = downloadTasks.find((t) => t.id === taskId);
   if (!task) return { success: false, error: '任务不存在' };
+
+  const nasDirectory = task.nasDestination?.directory || task.nasTargets?.at(-1)?.directory;
+  if (nasDirectory) {
+    if (!fs.existsSync(nasDirectory)) return { success: false, error: 'NAS 保存目录不可用，请重新挂载后再打开' };
+    const error = await shell.openPath(nasDirectory);
+    return error ? { success: false, error } : { success: true };
+  }
 
   if (task.customDir && fs.existsSync(task.customDir)) {
     await shell.openPath(task.customDir);

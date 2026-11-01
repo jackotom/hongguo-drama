@@ -3,7 +3,8 @@
 .community-heading, .community-review-heading { justify-content: space-between; flex-wrap: wrap; }
 .community-heading h3 { font-size: 17px; font-weight: 650; }
 .community-heading p, .community-date, .community-note { color: var(--text-secondary); font-size: 12px; line-height: 1.7; margin-top: 6px; }
-.community-actions { flex-wrap: wrap; gap: 8px; }
+.community-actions { align-items: flex-start; flex-wrap: wrap; gap: 8px; }
+.community-action-trailing { display: flex; align-items: flex-start; min-width: 0; }
 .community-favorited { background: var(--accent-soft); border-color: var(--accent-border); color: var(--accent-text); }
 .community-content { margin-top: 20px; }
 .community-metrics { display: flex; flex-wrap: wrap; gap: 20px 36px; }

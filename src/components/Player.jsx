@@ -9,6 +9,7 @@ import { useDanmakuSource, writeDanmakuSource } from './danmakuSource.mjs';
 import { SHORTCUT_ACTIONS, formatShortcut, ignoresPlaybackShortcut, readShortcuts, shortcutKey, subscribeShortcuts } from '../shortcuts';
 import CommunityPanel from './CommunityPanel';
 import SequelFinder from './SequelFinder';
+import NasDownload from './NasDownload';
 import VideoEnhancement, { useVideoEnhancement } from './VideoEnhancement';
 import './Player.css';
 import { Play, Film, Download, Check, RefreshCw, Layers, X, Trash2, ChevronDown, Zap } from './icons';
@@ -1950,10 +1951,14 @@ function Player({ target, onNavigate, onSeriesSelected, onFloatingChange, active
 
       <div className="player-footer" hidden={actionsHidden}>
         {/^[0-9]{6,30}$/.test(String(activeSeriesId)) ? (
-          <CommunityPanel seriesId={activeSeriesId} episodeId={current?.vid} title={detail?.series_title || ''} cover={detail?.cover || ''}>
+          <CommunityPanel seriesId={activeSeriesId} episodeId={current?.vid} title={detail?.series_title || ''} cover={detail?.cover || ''}
+            trailingAction={<NasDownload seriesId={activeSeriesId} quality={downloadQuality} disabled={qualityLoading} />}>
             <SequelFinder seriesId={activeSeriesId} active={active && !actionsHidden} />
           </CommunityPanel>
-        ) : <SequelFinder seriesId={activeSeriesId} active={active && !actionsHidden} />}
+        ) : <div className="player-footer-tools">
+          <SequelFinder seriesId={activeSeriesId} active={active && !actionsHidden} />
+          <NasDownload seriesId={activeSeriesId} quality={downloadQuality} disabled={qualityLoading} />
+        </div>}
       </div>
       {toast && <div className="dm-toast dm-toast-success" onClick={() => setToast(null)}>{toast}</div>}
 
