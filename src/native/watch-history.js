@@ -29,7 +29,7 @@ function listHistory(series, playback, showSequels = true) {
       similarSeries: showSequels ? findSimilarSeries(item, [...(Array.isArray(record.similarSeries) ? record.similarSeries : []), ...watched])
         .filter(candidate => !confirmedIds.has(candidate.series_id)) : [],
       hasUpdates: record.unreadEpisodes > 0 || sequels.some(candidate => !seen.has(candidate.series_id)),
-      season, isLatestSeason: !!family && season === latestByFamily.get(family),
+      family, season, isLatestSeason: !!family && season === latestByFamily.get(family),
       hasHigherSeason: !!family && season < latestByFamily.get(family),
       lastCheckedAt: record.lastCheckedAt || 0, lastCheckError: record.lastCheckError || '',
       lastEpisodeCheckError: record.lastEpisodeCheckError || '', lastSequelCheckError: record.lastSequelCheckError || '',

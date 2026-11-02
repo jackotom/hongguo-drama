@@ -1,0 +1,21 @@
+import {test} from 'node:test';
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import vm from 'node:vm';
+import {transformSync} from 'esbuild';
+const code=transformSync(fs.readFileSync(new URL('../CastPanel.jsx',import.meta.url),'utf8'),{loader:'jsx',format:'cjs'}).code;
+const tick=()=>new Promise(resolve=>setImmediate(resolve));
+test('changing episodes while preparing a cast cancels its request and never casts the stale episode',async()=>{
+ let cursor=0, tree, finish, casts=0;const slots=[],effects=[],releases=[];
+ let props={seriesId:'1000001',episode:{vid:'11',vid_index:1},title:'Fixture',videoRef:{current:{pause(){assert.fail('cancelled cast must not pause playback');}}}};
+ const react={createElement:(type,props,...children)=>({type,props:props||{},children:children.flat(Infinity)}),useState(initial){const at=cursor++;if(!(at in slots))slots[at]=initial;return[slots[at],value=>slots[at]=value];},useRef(initial){const at=cursor++;return slots[at]||=( {current:initial} );},useEffect(effect,deps){const at=cursor++,previous=slots[at];if(!previous||deps.some((value,index)=>value!==previous.deps[index])){previous?.cleanup?.();slots[at]={deps};effects.push(()=>slots[at].cleanup=effect());}}};
+ const api={discoverCastDevices:async()=>({success:true,devices:[{id:'tv',name:'Fixture TV'}]}),prepareOnlinePlay:()=>new Promise(resolve=>finish=resolve),releaseOnlinePlay:async payload=>{releases.push(payload);return {success:true};},startCasting:async()=>{casts++;return {success:true};},controlCasting:async()=>({success:true})};
+ const module={exports:{}};vm.runInNewContext(code,{module,exports:module.exports,require:()=>react,window:{electronAPI:api},crypto:{randomUUID:()=> 'request-fixture'}});
+ const render=()=>{cursor=0;tree=module.exports.default(props);while(effects.length)effects.shift()();};
+ const find=label=>{let match;const visit=node=>{if(!node||typeof node!=='object')return;if(node.type==='button'&&node.children.includes(label))match=node;node.children?.forEach(visit);};visit(tree);return match;};
+ render();find('投屏').props.onClick();await tick();render();find('Fixture TV').props.onClick();await tick();
+ props={...props,episode:{vid:'22',vid_index:2}};render();
+ assert.ok(releases.some(payload=>payload.requestId==='request-fixture'));
+ finish({success:true,url:'hongguo-stream://play/fixture',streamId:'fixture'});await tick();
+ assert.equal(casts,0);assert.ok(releases.some(payload=>payload.streamId==='fixture'));
+});

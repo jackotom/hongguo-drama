@@ -40,9 +40,21 @@ function fixture({ wrongVid = false, fallback = 'https://vod.snssdk.com/info', m
     assert.equal(config.responseType, 'text');
     if (config.method === 'POST') {
       assert.match(config.headers['User-Agent'], /^com\.phoenix\.read\/71532 /);
-      for (const header of Object.keys(config.headers)) {
-        assert.doesNotMatch(header.toLowerCase(), /^x-(?:medusa|gorgon|khronos|argus|ladon|helios|ss-stub)$/);
-      }
+      const query = new URL(config.url).searchParams;
+      const timestamp = Number(config.headers['x-khronos']);
+      assert.equal(query.get('ts'), String(timestamp));
+      assert.equal(query.get('_rticket'), config.headers['x-ss-req-ticket']);
+      assert.ok(Buffer.isBuffer(config.data));
+      assert.deepEqual(JSON.parse(config.data).mixed_video_id_map['1004'], ['11']);
+      assert.equal(context.branchOf(config.url, config.data, timestamp), 0);
+      const raw = Buffer.from(config.headers['x-gorgon'], 'hex');
+      assert.equal(raw.length, 26);
+      const random = raw[2] | (raw[3] << 8);
+      assert.equal(config.headers['x-gorgon'], context.xGorgon(new URL(config.url).search.slice(1), config.data, timestamp, random));
+      assert.notEqual(config.headers['x-gorgon'], context.xGorgon(new URL(config.url).search.slice(1), Buffer.from('altered body'), timestamp, random));
+      for (const name of ['x-medusa', 'x-helios', 'x-ladon', 'x-argus']) assert.ok(Buffer.from(config.headers[name], 'base64').length > 0);
+      assert.equal(config.headers.Cookie, undefined);
+      assert.equal(config.headers.Authorization, undefined);
       const model = { video_model: JSON.stringify({ fallback_api: fallback }) };
       return { status: 200, headers: {}, data: JSON.stringify({ code: 0, data: { '999': model, ...(wrongVid ? {} : { '11': model }) } }) };
     }
@@ -91,7 +103,7 @@ const appRows = videoList => fixture({ videoList, encrypted: false }).fetch('11'
 const turn = () => new Promise(resolve => setImmediate(resolve));
 
 const checks = [
-  ['sequential and concurrent unsigned lookups preserve the same valid device identity', async () => {
+  ['sequential and concurrent signed lookups preserve the same valid device identity', async () => {
     const f = fixture();
     await f.fetch('11');
     await f.fetch('11');
@@ -181,7 +193,7 @@ const checks = [
       if (crypto.getHashes().includes('sm3')) assert.equal(sm3(input).toString('hex'), crypto.createHash('sm3').update(input).digest('hex'));
     }
   }],
-  ['unsigned exact-episode model, fallback and compatible media', async () => {
+  ['signed exact-episode model, fallback and compatible media', async () => {
     assert.ok(fs.existsSync(path.join(nativeDir, 'app-source.js')), 'app source missing');
     const { fetch, calls } = fixture();
     const result = await fetch('11');

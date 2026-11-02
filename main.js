@@ -1,5 +1,5 @@
 /**
- * main.js - 红果短剧 5.3 下载器（独立版）主进程
+ * main.js - 红果短剧 5.4 下载器（独立版）主进程
  *
  * 功能：
  *   1. 红果短剧解析（分享链接 / series_id -> 全剧集列表）
@@ -70,6 +70,9 @@ const APP_TITLE = IS_PREVIEW ? '红果短剧预览' : '红果短剧';
 const { createStealthController } = require('./src/native/stealth-window');
 const { createBossKeyController } = require('./src/native/boss-key');
 
+const casting = require('./src/native/casting').createCastingService();
+const castFileRefs = new Map();
+let castBusy = false;
 let mainWindow = null;
 let appUpdateInstaller = null;
 let appUpdater = null;
@@ -78,7 +81,7 @@ let pendingUpdateOperations = 0;
 let quitCleanup = null;
 let quitReady = false;
 let mergeTempCleanup = null;
-const UPDATE_BLOCKED_CHANNELS = new Set(['hongguo-download-batch', 'download-single-episode', 'download-series-to-nas', 'retry-task', 'retry-tasks', 'resume-all', 'merge-series', 'transcode-for-playback', 'prepare-online-play', 'save-settings', 'set-boss-key']);
+const UPDATE_BLOCKED_CHANNELS = new Set(['hongguo-download-batch', 'download-single-episode', 'download-series-to-nas', 'retry-task', 'retry-tasks', 'resume-all', 'merge-series', 'transcode-for-playback', 'prepare-online-play', 'start-casting', 'save-settings', 'set-boss-key']);
 const ipcMain = {
   handle(channel, handler) {
     rawIpcMain.handle(channel, async (event, ...args) => {
@@ -1856,11 +1859,12 @@ ipcMain.handle('remove-series', async (event, seriesId) => {
 });
 
 /** 保留播放与文件索引，仅从可恢复的列表中永久移除。 */
-ipcMain.handle('forget-series', async (_event, seriesId) => {
+ipcMain.handle('forget-series', async (_event, seriesId, options = {}) => {
   try {
     const sid = String(seriesId);
     if (!seriesRegistry.some(entry => String(entry.series_id) === sid)) return { success: false, error: '未找到该剧' };
     const next = seriesRegistry.map(entry => String(entry.series_id) === sid ? { ...entry, dismissed: true, forgotten: true } : entry);
+    if (options.clearCache === true) await clearSeriesPlaybackCache(sid);
     store.saveSeries(next);
     seriesRegistry = next;
     return { success: true };
@@ -3125,6 +3129,70 @@ ipcMain.handle('online-cache-status', async () => {
   return { success: true, count: items.length, bytes: onlineCacheTotal(), items };
 });
 
+async function clearSeriesPlaybackCache(sid) {
+  const belongs = entry => String(entry?.seriesId || '') === sid;
+  const jobs = new Set([...onlineSessions.values()].filter(belongs).map(session => session.job).filter(Boolean));
+  for (const [id, session] of [...onlineSessions]) if (belongs(session)) releaseOnlineSession(id);
+  await Promise.allSettled([...jobs].filter(job => ![...onlineSessions.values()].some(session => session.job === job)).map(job => job.promise));
+  for (const [key, entry] of [...onlineCache]) if (belongs(entry)) deleteOnlineCacheEntry(key);
+  const series = seriesRegistry.find(item => String(item.series_id) === sid);
+  for (const ep of series?.episodes || []) for (const quality of ['auto', '720p', '1080p']) {
+    const file = compatPathFor(sid, ep.vid_index, quality);
+    const job = compatPreparing.get(file);
+    if (job) { job.cancelled = true; job.controller.abort(); await job.promise; }
+    if (!isFileInUse(file)) { try { await fsp.unlink(file); } catch (error) { if (error.code !== 'ENOENT') throw error; } }
+  }
+}
+ipcMain.handle('clear-series-playback-cache', async (_event, seriesId) => {
+  try { await clearSeriesPlaybackCache(String(seriesId)); return { success: true }; }
+  catch { return { success: false, error: '部分播放缓存未能清理，请停止播放后重试' }; }
+});
+
+ipcMain.handle('discover-cast-devices', async () => {
+  try { return { success: true, devices: await casting.discover() }; }
+  catch { return { success: false, error: '搜索电视失败，请检查局域网连接和防火墙' }; }
+});
+ipcMain.handle('start-casting', async (_event, payload = {}) => {
+  if (castBusy) return { success: false, error: '正在连接电视，请稍候' };
+  castBusy = true;
+  let pinned, pinnedFile, released = false;
+  const release = () => {
+    if (released) return;
+    released = true;
+    if (pinnedFile) {
+      const remaining = (castFileRefs.get(pinnedFile) || 1) - 1;
+      if (remaining) castFileRefs.set(pinnedFile, remaining); else castFileRefs.delete(pinnedFile);
+    }
+    if (pinned?.disk) { pinned.disk.readers--; disposeOnlineDisk(pinned); }
+  };
+  try {
+    const source = String(payload.source || '');
+    const file = mediaAccess.resolveLocal(source);
+    let media;
+    if (file) media = { filePath: file };
+    else {
+      const url = new URL(source);
+      const entry = url.protocol === `${STREAM_SCHEME}:` && url.hostname === 'play' && onlineSessions.get(url.pathname.slice(1))?.entry;
+      if (!entry?.complete) throw new Error('请先完整缓存本集');
+      pinned = entry;
+      if (entry.disk) entry.disk.readers++;
+      media = { buffer: entry.buffer, filePath: entry.filePath };
+    }
+    pinnedFile = media.filePath;
+    if (pinnedFile) castFileRefs.set(pinnedFile, (castFileRefs.get(pinnedFile) || 0) + 1);
+    const result = await casting.start(String(payload.deviceId), { ...media, title: String(payload.title || '').slice(0,150), release });
+    return { success: true, ...result };
+  } catch (error) {
+    release();
+    return { success: false, error: '连接电视失败，请确认电视可用并重试' };
+  } finally { castBusy = false; }
+});
+ipcMain.handle('control-casting', async (_event, action) => {
+  if (castBusy && action !== 'Stop') return { success: false, error: '正在连接电视，请稍候' };
+  try { await casting.control(action); return { success: true }; }
+  catch { return { success: false, error: '电视控制失败，请重新连接' }; }
+});
+
 ipcMain.handle('clear-online-cache', async () => {
   clearOnlineCache();
   return { success: true };
@@ -3785,6 +3853,7 @@ function historyRows() {
 
 let accountService = null;
 let accountWebSession = null;
+let accountCookieCleanup = null;
 function getAccountWebSession() {
   accountWebSession ||= session.fromPartition('hongguo-account-login', { cache: false });
   return accountWebSession;
@@ -3804,7 +3873,7 @@ async function clearAccountCookies() {
 
 function getAccountService() {
   if (!accountService) {
-    clearAccountCookies().catch(error => console.warn('[Account] 清除旧登录 Cookie 失败:', error.message));
+    accountCookieCleanup = clearAccountCookies().catch(error => console.warn('[Account] 清除旧登录 Cookie 失败:', accountSafeMessage(error)));
     accountService = createAccountService({
       filePath: path.join(app.getPath('userData'), 'account-session.bin'), safeStorage,
       webRequest: accountWebRequest,
@@ -3830,7 +3899,7 @@ async function accountWebRequest(url, options = {}) {
 }
 
 async function accountAction(action) {
-  try { return await action(getAccountService()); }
+  try { const service = getAccountService(); await accountCookieCleanup; return await action(service); }
   catch (error) {
     const message = accountSafeMessage(error);
     console.warn('[Account]', message);
@@ -4105,8 +4174,46 @@ ipcMain.handle('acknowledge-watch-updates', async (_event, seriesId, snapshot) =
   } catch (error) { return { success: false, error: error.message }; }
 });
 
+let accountLoginWindow = null;
+ipcMain.handle('open-account-web-login', async () => {
+  if (accountLoginWindow && !accountLoginWindow.isDestroyed()) { accountLoginWindow.focus(); return { success: true }; }
+  getAccountService();
+  await accountCookieCleanup;
+  if (accountLoginWindow && !accountLoginWindow.isDestroyed()) { accountLoginWindow.focus(); return { success: true }; }
+  getAccountService().cancelLogin();
+  const win = new BrowserWindow({ width: 1000, height: 760, title: '红果官网登录', webPreferences: {
+    session: getAccountWebSession(), contextIsolation: true, nodeIntegration: false, sandbox: true,
+  } });
+  accountLoginWindow = win;
+  const official = value => { try { const url = new URL(value); return url.protocol === 'https:' && (url.hostname === 'hongguoduanju.com' || url.hostname.endsWith('.hongguoduanju.com')); } catch { return false; } };
+  for (const name of ['will-navigate', 'will-redirect']) win.webContents.on(name, (event, url) => { if (!official(url)) event.preventDefault(); });
+  win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
+  const observer = require('./src/native/account-web-login').createWebLoginObserver({
+    readCookies: () => getAccountWebSession().cookies.get({ url: 'https://hongguoduanju.com/' }),
+    complete: cookie => accountAction(service => service.completeWebLogin(cookie)),
+    cancel: () => getAccountService().cancelLogin(),
+    onSignedIn: () => {
+      sendToRenderer('account-updated', { signedIn: true });
+      if (!win.isDestroyed()) win.close();
+    },
+    onError: error => console.warn('[Account]', accountSafeMessage(error)),
+  });
+  const changed = () => { void observer.inspect(); };
+  getAccountWebSession().cookies.on('changed', changed);
+  win.on('closed', () => {
+    observer.close();
+    getAccountWebSession().cookies.removeListener('changed', changed);
+    if (accountLoginWindow === win) accountLoginWindow = null;
+  });
+  win.webContents.on('did-finish-load', changed);
+  await win.loadURL('https://hongguoduanju.com/');
+  return { success: true };
+});
+
 ipcMain.handle('get-account-status', async () => accountAction(service => service.status()));
 ipcMain.handle('start-account-login', async () => {
+  if (accountLoginWindow && !accountLoginWindow.isDestroyed()) accountLoginWindow.close();
+  getAccountService().cancelLogin();
   await clearAccountCookies();
   return accountAction(service => service.startLogin());
 });
@@ -4122,6 +4229,7 @@ ipcMain.handle('cancel-account-login', async (_event, loginId) => {
   return result;
 });
 ipcMain.handle('logout-account', async () => {
+  if (accountLoginWindow && !accountLoginWindow.isDestroyed()) accountLoginWindow.close();
   const result = await accountAction(service => service.logout());
   if (result.success) {
     await clearAccountCookies();
@@ -4382,7 +4490,7 @@ function isTaskInFlight(task) {
 }
 
 function isFileInUse(file) {
-  return runningDownloadPaths.has(file) || downloadTasks.some(task => task.savePath === file && isTaskInFlight(task));
+  return castFileRefs.has(file) || runningDownloadPaths.has(file) || downloadTasks.some(task => task.savePath === file && isTaskInFlight(task));
 }
 
 function removeFinishedRecords(seriesId, saveChanges = false) {
@@ -5208,6 +5316,7 @@ app.on('window-all-closed', () => {
 });
 
 app.on('before-quit', event => {
+  casting.close();
   if (quitCleanup) { event.preventDefault(); return; }
   const jobs = [...compatPreparing.values()];
   const onlineJobs = [...onlineWork, ...onlinePreparing.values()];

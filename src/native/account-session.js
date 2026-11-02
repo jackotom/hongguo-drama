@@ -202,6 +202,7 @@ function createAccountService({
   let restorePromise = null;
   let generation = 0;
   let login = null;
+  let loginGeneration = 0;
 
   const publicAccount = extra => ({
     success: true, signedIn: !!profile, account: profile ? { ...profile } : null, ...extra,
@@ -303,9 +304,29 @@ function createAccountService({
       return restored.signedIn ? publicAccount() : restored;
     },
 
+    async completeWebLogin(cookie) {
+      const attempt = ++loginGeneration;
+      login = null;
+      const token = generation;
+      const [identity, nextProfile] = await Promise.all([
+        withTimeout(identityRequest(accountRequest), 10000, '账号设备初始化超时，请重试'),
+        withTimeout(verify({ cookie }), 15000, '账号资料验证超时，请重试'),
+      ]);
+      if (attempt !== loginGeneration || token !== generation) return { success: true, status: 'cancelled' };
+      const nextCredentials = { cookie, deviceId: identity.device_id, installId: identity.iid, cdid: identity.cdid };
+      let storageWarning = '';
+      try { sessionStore.save({ ...nextCredentials, profile: nextProfile }); } catch (error) { storageWarning = safeMessage(error); }
+      credentials = nextCredentials; profile = nextProfile; history = []; historyLoaded = false;
+      generation++; restorePromise = Promise.resolve(publicAccount());
+      return publicAccount({ status: 'signed-in', storageWarning });
+    },
+
     async startLogin() {
+      const attempt = ++loginGeneration;
+      login = null;
       const jar = new CookieJar();
       const payload = await webJson('/passport/web/get_qrcode/', { next: `${WEB_BASE}/` }, jar);
+      if (attempt !== loginGeneration) throw new Error('扫码已取消，请重新获取二维码');
       const qr = parseQr(payload);
       login = { id: randomUUID(), token: qr.token, jar, expiresAt: now() + qr.expiresIn * 1000 };
       return { success: true, loginId: login.id, image: qr.image, expiresIn: qr.expiresIn };
@@ -317,9 +338,13 @@ function createAccountService({
         login = null;
         return { success: true, status: 'expired' };
       }
+      const currentLogin = login;
+      const attempt = loginGeneration;
+      const stillCurrent = () => login === currentLogin && attempt === loginGeneration;
       const data = responseData(await webJson('/passport/web/check_qrconnect/', {
         next: `${WEB_BASE}/`, token: login.token,
       }, login.jar));
+      if (!stillCurrent()) return { success: true, status: 'cancelled' };
       console.log('[Account] QR status:', String(data.status || ''), data.redirect_url ? 'redirect' : 'no-redirect');
       if (['5', 'expired'].includes(String(data.status))) {
         login = null;
@@ -327,6 +352,7 @@ function createAccountService({
       }
       if (!['3', 'confirmed'].includes(String(data.status))) return { success: true, status: 'pending' };
       if (data.redirect_url) await finishRedirect(String(data.redirect_url), login.jar);
+      if (!stillCurrent()) return { success: true, status: 'cancelled' };
       console.log('[Account] Login session cookie:', login.jar.hasSession() ? 'present' : 'missing');
       if (!login.jar.hasSession()) return { success: true, status: 'pending' };
 
@@ -336,6 +362,7 @@ function createAccountService({
         withTimeout(identityRequest(accountRequest), 10000, '账号设备初始化超时，请重试'),
         withTimeout(verify({ cookie }), 15000, '账号资料验证超时，请重试'),
       ]);
+      if (!stillCurrent()) return { success: true, status: 'cancelled' };
       console.log('[Account] Device identity and profile verify: done');
       const nextCredentials = {
         cookie, deviceId: identity.device_id, installId: identity.iid, cdid: identity.cdid,
@@ -354,12 +381,14 @@ function createAccountService({
     },
 
     cancelLogin(loginId) {
-      if (!login || (loginId && login.id !== loginId)) return { success: true };
+      if (loginId && login && login.id !== loginId) return { success: true };
+      loginGeneration++;
       login = null;
       return { success: true };
     },
 
     async logout() {
+      loginGeneration++;
       generation++;
       credentials = null;
       profile = null;

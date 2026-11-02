@@ -10,6 +10,7 @@ import { SHORTCUT_ACTIONS, formatShortcut, ignoresPlaybackShortcut, readShortcut
 import CommunityPanel from './CommunityPanel';
 import SequelFinder from './SequelFinder';
 import NasDownload from './NasDownload';
+import CastPanel from './CastPanel';
 import VideoEnhancement, { useVideoEnhancement } from './VideoEnhancement';
 import './Player.css';
 import { Play, Film, Download, Check, RefreshCw, Layers, X, Trash2, ChevronDown, Zap } from './icons';
@@ -1236,7 +1237,7 @@ function Player({ target, onNavigate, onSeriesSelected, onFloatingChange, active
 
   // 从列表移除一部短剧（只取消登记，不删本地文件）
   const removeSeries = async (sid, title) => {
-    const res = await window.electronAPI.forgetSeries(sid).catch(error => ({ success: false, error: error.message }));
+    const res = await window.electronAPI.forgetSeries(sid, { clearCache: true }).catch(error => ({ success: false, error: error.message }));
     if (!res || !res.success) {
       showToast((res && res.error) || '移除失败');
       return;
@@ -1580,7 +1581,7 @@ function Player({ target, onNavigate, onSeriesSelected, onFloatingChange, active
                             aria-label={`永久移除 ${s.series_title} 的剧库记录`}
                             onClick={(e) => {
                               e.stopPropagation();
-                              setConfirmAsk({ title: '永久移除剧库记录', message: `将永久移除《${s.series_title}》的剧库记录，不能通过恢复列表找回。本地视频文件不会删除；以后可重新搜索添加。`, okText: '永久移除', danger: true, onOk: () => removeSeries(s.series_id, s.series_title) });
+                              setConfirmAsk({ title: '永久移除剧库记录', message: `将永久移除《${s.series_title}》的剧库记录，不能通过恢复列表找回。同时清理本剧播放缓存。本地下载视频文件不会删除；以后可重新搜索添加。`, okText: '永久移除', danger: true, onOk: () => removeSeries(s.series_id, s.series_title) });
                             }}
                           >
                             <X size={15} />
@@ -1732,7 +1733,7 @@ function Player({ target, onNavigate, onSeriesSelected, onFloatingChange, active
               <><Film size={34} /><p role="alert">{playbackError}</p><div className="player-placeholder-actions">
                 <button className="btn btn-primary" onClick={retryPlayback}>{current?.status === 'completed' ? '重试本集' : '重试本集（在线播放）'}</button>
                 {current?.vid && <button className="btn btn-outline" onClick={() => startOnlinePlay(currentIndex, undefined, true)}>重新连接片源</button>}
-                {current?.vid && !current.locked && !fallbackRef.current?.submitting && <button className="btn btn-outline" onClick={() => startCompatPlay(currentIndex, true)}>转码后播放</button>}
+                {current?.vid && !current.locked && (decodeFailed || current?.status === 'completed') && !fallbackRef.current?.submitting && <button className="btn btn-outline" onClick={() => startCompatPlay(currentIndex, true)}>转码后播放</button>}
               </div></>
             ) : onlineProgress && onlineProgress.vid && (!current || current.vid === onlineProgress.vid) ? (
               <>
@@ -1950,6 +1951,7 @@ function Player({ target, onNavigate, onSeriesSelected, onFloatingChange, active
       </div>
 
       <div className="player-footer" hidden={actionsHidden}>
+        <CastPanel seriesId={activeSeriesId} episode={current} title={detail?.series_title} videoRef={videoRef} />
         {/^[0-9]{6,30}$/.test(String(activeSeriesId)) ? (
           <CommunityPanel seriesId={activeSeriesId} episodeId={current?.vid} title={detail?.series_title || ''} cover={detail?.cover || ''}
             trailingAction={<NasDownload seriesId={activeSeriesId} quality={downloadQuality} disabled={qualityLoading} />}>

@@ -164,3 +164,16 @@ test('website QR flow verifies account, loads APP history and keeps credentials 
     assert.equal(maxActiveVerificationCalls, 2);
   } finally { fs.rmSync(root, { recursive: true, force: true }); }
 });
+
+for (const action of ['cancelLogin', 'logout']) test(`${action} prevents a pending confirmation from saving credentials`, async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(),'hg-login-cancel-'));
+  let release, entered;
+  const gate = new Promise(resolve=>release=resolve), waiting=new Promise(resolve=>entered=resolve);
+  const filePath=path.join(root,'session.bin');
+  const service=createAccountService({filePath,safeStorage:fakeEncryption(),identityRequest:async()=>({device_id:'1',iid:'2',cdid:'fixture'}),webRequest:async url=>{
+    if(url.includes('get_qrcode'))return webPayload({token:'fixture',qrcode:'fixture',expire_time:180});
+    if(url.includes('check_qrconnect'))return {...webPayload({status:'3'}),headers:{'set-cookie':['sessionid=fixture; Path=/']}};
+    entered();await gate;return webPayload({user_id_str:'42',name:'Fixture'});
+  }});
+  try {const qr=await service.startLogin();const pending=service.pollLogin(qr.loginId);await waiting;await service[action](qr.loginId);release();assert.equal((await pending).status,'cancelled');assert.equal((await service.status()).signedIn,false);assert.equal(fs.existsSync(filePath),false);}finally{release();fs.rmSync(root,{recursive:true,force:true});}
+});

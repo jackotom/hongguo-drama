@@ -9,7 +9,7 @@ const sourcePath = path.resolve(__dirname, '../src/native/app-source.js');
 const source = fs.readFileSync(sourcePath, 'utf8');
 const vid = '7700946421087751193';
 
-function load(axios, { realDevice = false, getPlaybackDevice } = {}) {
+function load(axios, { realDevice = false, getPlaybackDevice, now } = {}) {
   const module = { exports: {} };
   const context = vm.createContext({
     module,
@@ -23,6 +23,7 @@ function load(axios, { realDevice = false, getPlaybackDevice } = {}) {
       if (name === 'axios') return axios;
       return require(name);
     },
+    Date: class extends Date { static now() { return now ? now() : Date.now(); } },
     Buffer,
     URL,
     AbortSignal,
@@ -120,12 +121,30 @@ function row(definition, width, height, suffix) {
   let cooldownCalls = 0;
   await assert.rejects(load(async () => { cooldownCalls++; return { status: 200, headers: {}, data: '' }; },
     { getPlaybackDevice: async () => identities[0] }).fetchAppPlayUrl(vid), error => error.code === 'EMPTY_RESPONSE');
-  assert.equal(cooldownCalls, 1, 'cooldown must not repeat the same rejected request');
+  assert.equal(cooldownCalls, 2, 'cooldown permits one alternate route without registering another device');
+  let clock = Date.now(), slowCalls = 0;
+  const slowRegistration = load(async config => {
+    slowCalls++;
+    assert.ok(config.timeout > 11000, 'slow initial registration must not consume the model budget');
+    return inlineResponse([plain]);
+  }, { now: () => clock, getPlaybackDevice: async () => { clock += 7900; return identities[0]; } });
+  assert.equal((await slowRegistration.fetchAppPlayUrl(vid)).url, plain.main_url);
+  assert.equal(slowCalls, 1);
+  const hosts = [];
+  const alternate = load(async config => {
+    hosts.push(new URL(config.url).hostname);
+    if (hosts.length === 1) return { status: 200, headers: {}, data: '' };
+    assert.equal(config.headers.Connection, 'close');
+    return inlineResponse([plain]);
+  }, { getPlaybackDevice: async () => identities[0] });
+  assert.equal((await alternate.fetchAppPlayUrl(vid)).url, plain.main_url);
+  assert.deepEqual(hosts, ['api5-normal-sinfonlineb.fqnovel.com', 'api5-normal-hl.fqnovel.com']);
   let inlineCalls = 0;
   const direct = load(async config => {
     inlineCalls++;
     assert.equal(new URL(config.url).searchParams.get('device_id'), '1000000000000001');
-    assert.equal(config.headers['x-medusa'], undefined);
+    assert.ok(config.headers['x-medusa']);
+    assert.ok(config.headers['x-gorgon']);
     assert.equal(config.headers.Cookie, undefined);
     return inlineResponse([plain]);
   });

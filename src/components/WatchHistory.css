@@ -37,3 +37,7 @@
 .history-empty h2 { margin: 16px 0 8px; color: var(--text-primary); }
 .history-empty .btn { margin-top: 20px; }
 @media (max-width: 900px) { .history-header { align-items: flex-start; flex-wrap: wrap; } .history-filter-bar { align-items: flex-start; flex-direction: column; } .history-resume { gap: 12px; } .history-sequels { padding-left: 8px; } .history-main { align-items: flex-start; } .history-row-actions { flex-direction: column; } }
+
+.history-child { margin-left: 32px; border-left: 2px solid var(--border); padding-left: 16px; }
+.history-completed { color: var(--accent); font-size: 12px; }
+.history-row-actions { flex-wrap: wrap; max-width: 360px; }

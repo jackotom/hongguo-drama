@@ -73,6 +73,7 @@ export default function AccountManagement({ active = true }) {
           loadHistory();
           return;
         }
+        if (result.status === 'cancelled') { setBusy(false); setQr(null); setStatus('扫码已取消'); return; }
         if (result.status === 'expired') {
           setBusy(false); setQr(null); setError('二维码已过期，请重新获取。');
           return;
@@ -152,6 +153,7 @@ export default function AccountManagement({ active = true }) {
       <User size={22} />
       <div><h2>红果账号</h2><p>网页扫码登录红果账号，读取 APP 观看记录。</p></div>
     </div>
+    {!account && <div><button className="btn btn-outline" disabled={busy} onClick={async () => { try { const result = await window.electronAPI.openAccountWebLogin(); if (!result?.success) throw new Error(result?.error || '打开官网登录失败'); } catch(e) { setError(e.message); } }}>使用官网登录</button><p>手机提示二维码无效时，可打开官网并使用官网当前提供的登录方式。</p></div>}
     <section className="account-card" aria-label="红果账号状态">
       {account ? <>
         <div className="account-identity">
