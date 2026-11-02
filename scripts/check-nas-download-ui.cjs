@@ -115,6 +115,20 @@ function mountNas(overrides = {}) {
   };
 }
 
+test('NAS folder creation defaults on and can be disabled for an existing series directory', async () => {
+  const options = [];
+  const ui = mountNas({ api: { downloadSeriesToNas: async (_id, _quality, value) => {
+    options.push(value); return { success: true, directory: '/nas/show', warnings: [] };
+  } } });
+  await ui.button().props.onClick(); await ui.flush();
+  assert.equal(options[0].createFolder, true);
+  ui.nodes().find(node => node.type === 'input' && node.props.type === 'checkbox').props.onChange({ target: { checked: false } });
+  ui.render();
+  await ui.button().props.onClick(); await ui.flush();
+  assert.equal(options[1].createFolder, false);
+  ui.unmount();
+});
+
 test('NAS download UI calls the bridge, reports results, and isolates series changes', async () => {
   const first = deferred();
   const ui = mountNas({ api: { downloadSeriesToNas: async (seriesId, quality) => {
@@ -130,8 +144,8 @@ test('NAS download UI calls the bridge, reports results, and isolates series cha
   const description = ui.nodes().find(node => node.props.id === 'nas-description');
   assert.ok(description, 'button description must be addressable by id');
   const descriptionText = description.children.map(node => typeof node === 'string' ? node : node.children || '').flat(Infinity).join('');
-  assert.match(descriptionText, /一并保存封面与剧情简介/);
-  assert.match(descriptionText, /先将 NAS 共享文件夹挂载到电脑/);
+  assert.match(descriptionText, /保存整剧封面、简介和 tvshow\.nfo/);
+  assert.match(descriptionText, /先挂载 NAS/);
   assert.doesNotMatch(ui.text(), /飞牛/);
 
   const oldClick = button.props.onClick();

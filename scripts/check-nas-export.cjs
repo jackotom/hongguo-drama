@@ -52,6 +52,8 @@ test('NAS copies with season/episode numbering, reuses identical files and prese
   assert.match(result.path, /S02E001\.mp4$/);
   assert.equal(path.dirname(result.path), root, 'video and metadata must share the selected directory');
   assert.equal(fs.statSync(result.path).size, 120000);
+  assert.equal(fs.existsSync(result.path.replace(/\.mp4$/, '.nfo')), false, 'new exports must not create per-episode NFO');
+  assert.ok(fs.existsSync(path.join(root, '.hongguo-nas.json')), 'new exports must record identity in the hidden index');
   assert.equal((await nas.inspectNasEpisode(destination, ep)).status, 'existing');
   assert.equal((await nas.copyNasEpisode(task, destination)).copied, false);
   fs.writeFileSync(result.path, Buffer.alloc(120000, 9));
@@ -59,8 +61,19 @@ test('NAS copies with season/episode numbering, reuses identical files and prese
   assert.equal(fs.readFileSync(result.path)[0], 9);
   fs.unlinkSync(source);
   assert.ok(fs.existsSync(result.path), 'NAS copy survives local deletion');
-  fs.unlinkSync(result.path.replace(/\.mp4$/, '.nfo'));
+  fs.unlinkSync(path.join(root, '.hongguo-nas.json'));
   assert.equal((await nas.inspectNasEpisode(destination, ep)).status, 'conflict');
+});
+
+test('NAS refuses an orphan NFO that belongs to another episode', async t => {
+  const root = temp(t), { destination } = await prepare(root), ep = series.episodes[0];
+  const source = path.join(root, 'source.mp4'); fs.writeFileSync(source, Buffer.alloc(120000, 7));
+  const nfo = path.join(root, '示例剧-identity S02E001.nfo');
+  fs.writeFileSync(nfo, `<episodedetails><uniqueid type="hongguo" default="true">${series.episodes[1].vid}</uniqueid></episodedetails>`);
+  assert.equal((await nas.inspectNasEpisode(destination, ep)).status, 'conflict');
+  await assert.rejects(() => nas.copyNasEpisode({ savePath: source, hongguoInfo: { ...ep, series_id: seriesId } }, destination), /身份冲突/);
+  assert.equal(fs.existsSync(path.join(root, '示例剧-identity S02E001.mp4')), false);
+  assert.match(fs.readFileSync(nfo, 'utf8'), new RegExp(series.episodes[1].vid));
 });
 
 test('NAS rejects detached roots, unsafe folder names, symlinks and fake posters', async t => {
@@ -80,7 +93,7 @@ test('NAS rejects detached roots, unsafe folder names, symlinks and fake posters
   });
   assert.ok(result.warnings.some(message => /简介/.test(message)));
   assert.ok(result.warnings.some(message => /封面/.test(message)));
-  assert.equal(fs.existsSync(path.join(result.destination.directory, 'tvshow.nfo')), false);
+  assert.match(fs.readFileSync(path.join(result.destination.directory, 'tvshow.nfo'), 'utf8'), new RegExp(seriesId));
 });
 
 function fixture(t, { cancel = false, failSave = false } = {}) {
@@ -148,9 +161,10 @@ test('NAS reuses completed local tasks and does not restart video transfer for m
   assert.equal(result.success, true); assert.equal(result.count, 0); assert.equal(h.run('downloadTasks.length'), count);
   const local = h.run('downloadTasks.find(task => task.id === "old")');
   const exported = await nas.inspectNasEpisode(local.nasDestination, local.hongguoInfo);
-  fs.unlinkSync(exported.path.replace(/\.mp4$/, '.nfo'));
+  const index = path.join(h.target, '.hongguo-nas.json');
+  fs.unlinkSync(index);
   assert.equal((await h.handlers['download-series-to-nas']({}, seriesId, 'auto')).success, true);
-  assert.ok(fs.existsSync(exported.path.replace(/\.mp4$/, '.nfo')), 'missing episode metadata is restored only after matching the local video');
+  assert.ok(fs.existsSync(index), 'missing identity index is restored only after matching the local video');
   h.run('for (const task of downloadTasks) { task.nasDestination.device = -1; task.nasWarning = "offline"; }');
   assert.equal((await h.handlers['download-series-to-nas']({}, seriesId, 'auto')).success, true);
   assert.notEqual(h.run('downloadTasks[0].nasDestination.device'), -1, 'reselecting a remounted share refreshes its identity');
@@ -192,15 +206,16 @@ test('detached NAS fails in place without recreating a mount or falling back to 
   assert.ok(fs.existsSync(task.savePath));
 });
 
-test('preload NAS bridge forwards only identity/quality and removes its subscription', async () => {
+test('preload NAS bridge forwards identity/quality/folder option and removes its subscription', async () => {
   let api;
   const emitter = new EventEmitter(), calls = [];
   emitter.invoke = (...args) => { calls.push(args); };
   vm.runInNewContext(fs.readFileSync(path.resolve(__dirname, '../preload.js'), 'utf8'), {
     require: () => ({ contextBridge: { exposeInMainWorld: (_key, value) => { api = value; } }, ipcRenderer: emitter }),
   });
-  api.downloadSeriesToNas(seriesId, 'auto');
-  assert.deepEqual(calls[0], ['download-series-to-nas', seriesId, 'auto']);
+  const options = { createFolder: true };
+  api.downloadSeriesToNas(seriesId, 'auto', options);
+  assert.deepEqual(calls[0], ['download-series-to-nas', seriesId, 'auto', options]);
   let count = 0; const off = api.onNasExportDone(() => { count++; });
   emitter.emit('nas-export-done', {}, {}); off(); emitter.emit('nas-export-done', {}, {});
   assert.equal(count, 1);
@@ -245,4 +260,29 @@ test('an existing NAS video is adopted without another download and another seri
   const task = h.run('downloadTasks.find(task => task.status === "completed")');
   assert.equal(task.savePath, copied.path); assert.equal(task.customDir, h.target);
   assert.equal(h.run('downloadQueue.length'), 1);
+});
+
+test('NAS IPC can create a series folder while older callers retain the selected-directory behavior', async t => {
+  const h = fixture(t);
+  const result = await h.handlers['download-series-to-nas']({}, seriesId, 'auto', { createFolder: true });
+  assert.equal(result.success, true, result.error);
+  assert.equal(path.dirname(result.directory), h.target);
+  assert.notEqual(result.directory, h.target);
+  assert.ok(fs.existsSync(path.join(result.directory, 'tvshow.nfo')));
+  assert.equal(h.run('downloadTasks[0].nasDestination.directory'), result.directory);
+});
+
+test('ordinary downloads optionally save series metadata without retargeting videos or writing episode NFO', async t => {
+  const h = fixture(t);
+  h.context.getCurrentSettings = () => ({ root: h.root, download_metadata: true });
+  assert.equal(h.run('applyEditableSettings({}, {download_metadata:true}).download_metadata'), true);
+  const result = await h.handlers['hongguo-download-batch']({}, { seriesId, seriesTitle: series.series_title,
+    cover: series.cover, episodes: series.episodes, quality: 'auto' });
+  assert.equal(result.success, true, result.error);
+  const task = h.run('downloadTasks[0]');
+  assert.equal(task.nasDestination, undefined);
+  assert.ok(fs.existsSync(path.join(task.customDir, 'tvshow.nfo')));
+  assert.ok(fs.existsSync(path.join(task.customDir, 'poster.jpg')));
+  assert.ok(fs.existsSync(path.join(task.customDir, '简介.txt')));
+  assert.deepEqual(fs.readdirSync(task.customDir).filter(name => name.endsWith('.nfo')), ['tvshow.nfo']);
 });

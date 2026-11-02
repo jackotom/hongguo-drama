@@ -1,4 +1,4 @@
-// 红果短剧 5.4：桌面桥接入口，发行说明见 docs/release-5.4.md。
+// 红果短剧 5.5：桌面桥接入口，发行说明见 docs/release-5.5.md。
 const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('electronAPI', {
@@ -58,7 +58,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // 红果解析与下载
   hongguoResolve: (input) => ipcRenderer.invoke('hongguo-resolve', input),
   hongguoDownloadBatch: (payload) => ipcRenderer.invoke('hongguo-download-batch', payload),
-  downloadSeriesToNas: (seriesId, quality) => ipcRenderer.invoke('download-series-to-nas', seriesId, quality),
+  downloadSeriesToNas: (seriesId, quality, options) => ipcRenderer.invoke('download-series-to-nas', seriesId, quality, options),
   onNasExportDone: cb => {
     const listener = (_event, data) => cb(data);
     ipcRenderer.on('nas-export-done', listener);

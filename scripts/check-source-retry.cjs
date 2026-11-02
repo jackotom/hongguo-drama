@@ -244,6 +244,19 @@ const checks = [
       assert.equal(restarted.live().length, 0, 'paused tasks stay paused on restart');
     }
   }],
+  ['pause and stop preserve a durable retry plan when saving fails', async () => {
+    for (const action of ['pause-all', 'stop-download']) {
+      const h = fixture();
+      await h.download();
+      const retryAt = h.task().retryAt;
+      h.state.saveError = Object.assign(new Error('ENOSPC'), { code: 'ENOSPC' });
+      await assert.rejects(h.handlers[action]({}, 't1'));
+      assert.equal(h.task().status, 'failed', action);
+      assert.equal(h.task().retryAt, retryAt, action);
+      assert.equal(h.saved()[0].retryAt, retryAt, action);
+      assert.equal(h.live().length, 1, action + ' must retain its original timer');
+    }
+  }],
   ['timer persistence failure is contained and leaves manual retry available', async () => {
     const h = fixture();
     await h.download();

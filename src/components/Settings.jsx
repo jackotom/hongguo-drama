@@ -157,7 +157,7 @@ function SettingsPage({ active = true, preview = false, appInfo = null }) {
     setSaveError('');
     try {
       // Submit only edited fields; the main process merges newer playback options.
-      const editable = ['root', 'name_format', 'download_quality', 'cache_next_episode', 'compat_mode', 'auto_delete_watched', 'show_danmaku_controls', 'max_concurrent', 'proxy_enabled', 'proxy_mode', 'proxy_host', 'proxy_port', 'proxy_username', 'proxy_password', 'watch_updates_enabled', 'watch_sequels_enabled', 'watch_notifications_enabled', 'search_app_enabled', 'app_updates_enabled'];
+      const editable = ['root', 'name_format', 'download_quality', 'download_metadata', 'cache_next_episode', 'compat_mode', 'auto_delete_watched', 'show_danmaku_controls', 'max_concurrent', 'proxy_enabled', 'proxy_mode', 'proxy_host', 'proxy_port', 'proxy_username', 'proxy_password', 'watch_updates_enabled', 'watch_sequels_enabled', 'watch_notifications_enabled', 'search_app_enabled', 'app_updates_enabled'];
       const submitted = {};
       for (const key of editable) {
         if (Object.hasOwn(next, key) && (editedKeys.current.has(key) || isProxy && key.startsWith('proxy_'))) submitted[key] = next[key];
@@ -311,6 +311,8 @@ function SettingsPage({ active = true, preview = false, appInfo = null }) {
             </button>
           </div>
           <p className="settings-hint">文件将保存到 <code>下载目录/红果短剧/剧名/</code> 下</p>
+          <label className="proxy-switch-row"><input type="checkbox" aria-label="普通下载保存整剧资料" checked={settings.download_metadata === true}
+            onChange={event => update('download_metadata', event.target.checked)} /><span className="proxy-switch-text">普通下载保存整剧资料<em>自动随视频保存封面、简介和 tvshow.nfo，不生成分集 NFO。可将下载目录设为已挂载的 NAS，程序会自动建剧名文件夹，无需再使用“下载到 NAS”。普通下载仍遵循看完自动删除设置。</em></span></label>
         </div>
 
         <div className="settings-group">
@@ -395,6 +397,8 @@ function SettingsPage({ active = true, preview = false, appInfo = null }) {
 
         <div className="settings-group">
           <span className="settings-label">配置文件位置</span>
+          {settings.proxy_password_warning && <p className="alert alert-error" role="alert">{settings.proxy_password_warning}</p>}
+          <p className="settings-hint">代理密码由本机系统安全存储加密；更换电脑后可能需要重新输入。</p>
           <p className="settings-hint settings-path"><code>{appInfo?.dataDir || '系统配置目录'}</code></p>
           {appInfo?.configNote
             ? <p className="settings-hint" role="status">{appInfo.configNote}</p>

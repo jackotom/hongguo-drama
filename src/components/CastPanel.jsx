@@ -8,6 +8,7 @@ export default function CastPanel({ seriesId, episode, title, videoRef }) {
     pending.cancelled = true;
     if (pending.requestId) void window.electronAPI.releaseOnlinePlay({ requestId: pending.requestId }).catch(() => {});
     if (pending.connecting) void window.electronAPI.controlCasting('Stop').catch(() => {});
+    if (pending.scanning) { operation.current = null; setBusy(false); }
   };
   useEffect(() => () => { if (operation.current?.requestId) cancel(); }, [seriesId, episode?.vid]);
   useEffect(() => () => { cancel(); void window.electronAPI.controlCasting('Stop').catch(() => {}); }, []);
@@ -22,7 +23,7 @@ export default function CastPanel({ seriesId, episode, title, videoRef }) {
   };
   const check=result=>{if(!result?.success)throw new Error(result?.error || '投屏失败');return result;};
   const syncStatus=result=>{if(typeof result?.active==='boolean')setTarget(result.active ? result.name || '' : '');};
-  const scan=()=>run(async pending=>{ const result = check(await window.electronAPI.discoverCastDevices()); if (!pending.cancelled) setDevices(result.devices); });
+  const scan=()=>run(async pending=>{ pending.scanning = true; const result = check(await window.electronAPI.discoverCastDevices()); if (!pending.cancelled) setDevices(result.devices); });
   const start=id=>run(async pending=>{
     if (!episode || episode.locked) return;
     pending.requestId = crypto.randomUUID();

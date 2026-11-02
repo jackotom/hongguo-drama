@@ -96,7 +96,7 @@ async function runMerge({ task, ordered, outDir, ffmpegPath, ffprobePath, probe,
     task.codecWarning = plan.videoMode === 'encode' ? '分集编码不一致，按各自原分辨率统一为 H.264；原文件保留' : '';
     task.targetBitrate = plan.videoMode === 'encode' ? plan.videoBitrate : null;
     const estimate = plan.videoMode === 'encode' ? plan.estimatedBytes : task.totalBytes * 1.1;
-    const required = estimate * (normalize ? 2.2 : 1.1);
+    const required = estimate * (normalize ? 3.2 : 2.2);
     try {
       const st = fs.statfsSync(outDir), free = st.bavail * st.bsize;
       if (free < required) throw new Error(`磁盘空间不足：需要约 ${(required / 1073741824).toFixed(1)} GB，可用 ${(free / 1073741824).toFixed(1)} GB`);

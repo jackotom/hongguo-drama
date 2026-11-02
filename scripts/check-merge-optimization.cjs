@@ -32,6 +32,37 @@ function checkPublish() {
     console.log('PASS publish: hard-link, unsupported-filesystem fallback, no overwrite, failed-copy/source preservation');
   } finally { fs.linkSync = link; fs.copyFileSync = copy; fs.rmSync(root, { recursive: true, force: true }); }
 }
+async function checkSpacePreflight() {
+  const childProcess = require('node:child_process');
+  const runnerPath = require.resolve('../src/native/merge-runner');
+  const root = fs.mkdtempSync(path.join(require('node:os').tmpdir(), 'merge-space-'));
+  const statfs = fs.statfsSync, spawn = childProcess.spawn;
+  let bavail = 0, statfsCalls = 0, spawnCalls = 0;
+  try {
+    fs.statfsSync = () => { statfsCalls++; return { bsize: 1, bavail }; };
+    childProcess.spawn = () => { spawnCalls++; throw new Error('spawn must not run'); };
+    delete require.cache[runnerPath];
+    const { runMerge } = require(runnerPath);
+    const run = async precheckedInfos => runMerge({
+      task: { startTime: Date.now(), totalBytes: 100 },
+      ordered: [{ path: 'episode-1.mp4' }, { path: 'episode-2.mp4' }],
+      outDir: root, ffmpegPath: 'mock-ffmpeg', ffprobePath: 'mock-ffprobe',
+      probe: () => { throw new Error('probe must not run'); },
+      precheckedInfos, pickEncoder: () => { throw new Error('encoder must not run'); }, update: () => {},
+    });
+    bavail = 241;
+    await assert.rejects(run([info(), info()]), /磁盘空间不足/);
+    bavail = 300;
+    await assert.rejects(run([info(), info({ time_base: '1/90000' })]), /磁盘空间不足/);
+    assert.equal(statfsCalls, 2);
+    assert.equal(spawnCalls, 0, 'space preflight must reject before spawning FFmpeg');
+    assert.deepEqual(fs.readdirSync(root), [], 'space preflight must reject before creating merge files');
+    console.log('PASS space preflight: copy and normalized peaks reject before spawn');
+  } finally {
+    fs.statfsSync = statfs; childProcess.spawn = spawn; delete require.cache[runnerPath];
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+}
 if (process.argv.includes('--publish-only')) { checkPublish(); process.exit(0); }
 const modulePath = path.resolve(__dirname, '../src/native/merge-plan.js');
 assert.ok(fs.existsSync(modulePath), '缺少智能合并计划：兼容 H.264 仍会全量转码，固定 6 Mbps 会放大低码率源文件');
@@ -91,6 +122,9 @@ const sortingSource = uiSource.slice(uiSource.indexOf('const STATUS_ORDER'), uiS
 const sortTasks = require('node:vm').runInNewContext(sortingSource + '; sortTasks');
 const sorted = sortTasks([72, 70, 71].map((index, i) => ({ id: String(index), status: i === 1 ? 'pending' : 'completed', endTime: index * 100, hongguoInfo: { series_id: 'same', vid_index: index } })));
 assert.deepEqual(Array.from(sorted, task => task.hongguoInfo.vid_index), [70, 71, 72], 'episodes in the same series must stay in natural order across completion events');
-checkPublish();
-checkHardware();
-console.log('PASS merge planning: dynamic H.264 copy, lossless HEVC TS remux, mixed-codec encode, audio repair, source bitrate and duration');
+(async () => {
+  await checkSpacePreflight();
+  checkPublish();
+  checkHardware();
+  console.log('PASS merge planning: dynamic H.264 copy, lossless HEVC TS remux, mixed-codec encode, audio repair, source bitrate and duration');
+})().catch(error => { console.error('FAIL ' + error.message); process.exitCode = 1; });

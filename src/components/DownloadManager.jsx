@@ -371,23 +371,37 @@ function DownloadManager({ onNavigate, active = true }) {
 
   const openMergedFile = async (path) => {
     if (!path) return;
-    await window.electronAPI.showInFolder(path);
+    try {
+      const result = await window.electronAPI.showInFolder(path);
+      if (!result?.success) throw new Error(result?.error || '无法打开文件夹');
+    } catch (error) { showToast(error.message || '无法打开文件夹', 'error'); }
+  };
+
+  const openTaskFolder = async (id) => {
+    try {
+      const result = await window.electronAPI.openFolder(id);
+      if (!result?.success) throw new Error(result?.error || '无法打开文件夹');
+    } catch (error) { showToast(error.message || '无法打开文件夹', 'error'); }
   };
 
   // 一键暂停：取消进行中的 + 清空等待队列
   const pauseAll = async () => {
-    const res = await window.electronAPI.pauseAll();
-    await refresh();
-    await loadQueue();
-    showToast(res && res.success ? `已暂停 ${res.count} 个任务` : '暂停失败', res && res.success ? 'success' : 'error');
+    try {
+      const res = await window.electronAPI.pauseAll();
+      await refresh();
+      await loadQueue();
+      showToast(res?.success ? `已暂停 ${res.count} 个任务` : (res?.error || '暂停失败'), res?.success ? 'success' : 'error');
+    } catch (error) { showToast(error.message || '暂停失败', 'error'); }
   };
 
   // 一键启动：把所有已停止/失败/等待中的任务重新排队开跑
   const resumeAll = async () => {
-    const res = await window.electronAPI.resumeAll();
-    await refresh();
-    await loadQueue();
-    showToast(res && res.success ? `已启动 ${res.count} 个任务` : '启动失败', res && res.success ? 'success' : 'error');
+    try {
+      const res = await window.electronAPI.resumeAll();
+      await refresh();
+      await loadQueue();
+      showToast(res?.success ? `已启动 ${res.count} 个任务` : (res?.error || '启动失败'), res?.success ? 'success' : 'error');
+    } catch (error) { showToast(error.message || '启动失败', 'error'); }
   };
 
   // 重试失败/已停止的任务
@@ -717,6 +731,7 @@ function DownloadManager({ onNavigate, active = true }) {
                   </div>
                   {['downloading', 'completed'].includes(task.status) && task.qualityNotice && <div className="dm-quality-notice">{task.qualityNotice}</div>}
                   {task.nasWarning && <div className="dm-error">{task.nasWarning}</div>}
+                  {task.metadataWarning && <div className="dm-error">{task.metadataWarning}</div>}
                   {(task.status === 'downloading' || task.status === 'pending') && (
                     <div className="dm-progress">
                       <div className="dm-progress-bar">
@@ -748,7 +763,7 @@ function DownloadManager({ onNavigate, active = true }) {
                       <RefreshCw size={16} />
                     </button>
                   )}
-                  <button className="icon-btn" title="打开文件夹" onClick={() => window.electronAPI.openFolder(task.id)}>
+                  <button className="icon-btn" title="打开文件夹" onClick={() => openTaskFolder(task.id)}>
                     <Folder size={16} />
                   </button>
                   <button

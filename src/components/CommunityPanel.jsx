@@ -24,6 +24,9 @@ export default function CommunityPanel({ seriesId, episodeId, title, cover, chil
   const requestKey = `${id}:${episodeId || ''}:${retry}`;
   const detail = result?.key === requestKey ? result.data : null;
   const favorite = library.items.some(item => item.id === id && item.favorite);
+  const currentEpisodeId = String(episodeId || '');
+  const likedEpisodeIds = library.items.find(item => item.id === id)?.liked_episode_ids || [];
+  const episodeLiked = !!currentEpisodeId && likedEpisodeIds.includes(currentEpisodeId);
 
   useEffect(() => subscribeLocalLibrary(setLibrary), []);
   useEffect(() => { setScope('series'); }, [id]);
@@ -54,6 +57,12 @@ export default function CommunityPanel({ seriesId, episodeId, title, cover, chil
   const reviews = episodeScope ? detail?.episode_reviews : detail?.reviews;
   const items = Array.isArray(reviews?.items) ? reviews.items.filter(item => item && typeof item.content === 'string') : [];
   const publishedDate = publicDateKey(detail?.published_at);
+  const emptyText = episodeScope
+    ? reviews ? '本次未返回公开评论。' : '当前来源暂未提供单集评论。'
+    : reviews ? '本次未返回公开评论。' : '当前来源暂未提供整剧剧评。';
+  const partialText = reviews?.total != null && reviews.total > items.length
+    ? `本次展示 ${items.length} 条公开评论，公开总数 ${count(reviews.total)}；更多评论可在红果 App 查看。`
+    : `本次展示 ${items.length} 条公开评论；更多评论可在红果 App 查看。`;
 
   return <section className="community-panel" aria-label="公开剧评与本机收藏">
     <div className="community-heading">
@@ -67,7 +76,19 @@ export default function CommunityPanel({ seriesId, episodeId, title, cover, chil
           } catch { setShareStatus('复制失败，请重试'); }
         }}>复制分享链接</button>
         <button type="button" className={`btn ${favorite ? 'community-favorited' : 'btn-outline'}`} aria-pressed={favorite} onClick={() => setLibrary(saveLocalSeries({ id, title, cover, favorite: !favorite }))}>{favorite ? '已收藏到本机' : '收藏到本机'}</button>
-        <button type="button" className="btn btn-outline" aria-expanded={opened} aria-controls={panelId} onClick={() => setOpenedSeries(opened ? '' : id)}>{opened ? '收起剧评' : '查看公开剧评'}</button>
+        <button type="button" className={`btn community-episode-like ${episodeLiked ? 'community-favorited' : 'btn-outline'}`} aria-pressed={episodeLiked} disabled={!episodeId} onClick={() => {
+          if (!currentEpisodeId) return;
+          const next = episodeLiked ? likedEpisodeIds.filter(value => value !== currentEpisodeId) : [...likedEpisodeIds, currentEpisodeId];
+          setLibrary(saveLocalSeries({ id, title, cover, liked_episode_ids: next }));
+        }}><span className="community-heart" aria-hidden="true">{episodeLiked ? '♥' : '♡'}</span>{episodeLiked ? '已点小红心（本机）' : '本集小红心（本机）'}</button>
+        {episodeId && <button type="button" className="btn btn-outline community-episode-button" aria-expanded={opened && episodeScope} aria-controls={panelId} onClick={() => {
+          if (opened && episodeScope) setOpenedSeries('');
+          else { setScope('episode'); setOpenedSeries(id); }
+        }}>{opened && episodeScope ? '收起当前集评论' : '当前集评论'}</button>}
+        <button type="button" className="btn btn-outline" aria-expanded={opened && !episodeScope} aria-controls={panelId} onClick={() => {
+          if (opened && !episodeScope) setOpenedSeries('');
+          else { setScope('series'); setOpenedSeries(id); }
+        }}>{opened && !episodeScope ? '收起剧评' : '查看公开剧评'}</button>
         {trailingAction && <div className="community-action-trailing">{trailingAction}</div>}
       </div>
     </div>
@@ -95,8 +116,8 @@ export default function CommunityPanel({ seriesId, episodeId, title, cover, chil
           <div className="community-review-meta"><strong>{typeof review.author === 'string' && review.author.trim() ? review.author : '公开用户'}</strong><span>{reviewDate(review.created_at)}</span></div>
           <p>{review.content}</p>
           <div className="community-review-foot">{review.rating != null && <span>评分 {count(review.rating)}</span>}{review.likes != null && <span>公开点赞 {count(review.likes)}</span>}</div>
-        </li>)}</ul> : <p className="community-status">{episodeScope && !reviews ? '当前片源未提供单集评论。' : '本次未返回公开评论。'}</p>}
-        <p className="community-note">展示服务返回的公开内容，可能仅含部分评论；不代表完整评论列表。</p>
+        </li>)}</ul> : <p className="community-status">{emptyText}</p>}
+        {items.length > 0 && <p className="community-note">{partialText}</p>}
       </>}
     </div>}
   </section>;

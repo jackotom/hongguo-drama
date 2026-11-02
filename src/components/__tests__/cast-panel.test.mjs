@@ -31,3 +31,33 @@ test('failed replacement applies the authoritative inactive status',async()=>{
  assert.equal(slots[4],'TV');find('TV').props.onClick();await tick();render();
  assert.equal(slots[4],'');assert.equal(slots[3],'replacement failed');
 });
+test('canceling a device scan releases the UI and stale results cannot replace a new scan',async()=>{
+ let cursor=0, tree;const slots=[],effects=[],scans=[];
+ const props={seriesId:'1000001',episode:{vid:'11',vid_index:1},title:'Fixture',videoRef:{current:{pause(){}}}};
+ const react={createElement:(type,props,...children)=>({type,props:props||{},children:children.flat(Infinity)}),useState(initial){const at=cursor++;if(!(at in slots))slots[at]=initial;return[slots[at],value=>slots[at]=value];},useRef(initial){const at=cursor++;return slots[at]||=( {current:initial} );},useEffect(effect,deps){const at=cursor++,previous=slots[at];if(!previous||deps.some((value,index)=>value!==previous.deps[index])){previous?.cleanup?.();slots[at]={deps};effects.push(()=>slots[at].cleanup=effect());}}};
+ const api={discoverCastDevices:()=>new Promise((resolve,reject)=>scans.push({resolve,reject})),controlCasting:async()=>({success:true})};
+ const module={exports:{}};vm.runInNewContext(code,{module,exports:module.exports,require:()=>react,window:{electronAPI:api},crypto:{randomUUID:()=> 'request-fixture'}});
+ const render=()=>{cursor=0;tree=module.exports.default(props);while(effects.length)effects.shift()();};
+ const find=label=>{let match;const visit=node=>{if(!node||typeof node!=='object')return;if(node.type==='button'&&node.children.includes(label))match=node;node.children?.forEach(visit);};visit(tree);return match;};
+ render();find('投屏').props.onClick();await tick();render();
+ assert.equal(scans.length,1);find('取消本次操作').props.onClick();render();
+ assert.equal(find('正在处理…'),undefined);find('重新搜索电视').props.onClick();await tick();render();
+ assert.equal(scans.length,2);
+ scans[0].resolve({success:true,devices:[{id:'old',name:'Stale TV'}]});await tick();render();
+ assert.equal(find('Stale TV'),undefined);assert.ok(find('正在处理…'));
+ scans[1].resolve({success:true,devices:[{id:'new',name:'New TV'}]});await tick();render();
+ assert.ok(find('New TV'));assert.equal(find('正在处理…'),undefined);
+});
+test('canceling a connecting cast keeps releasing its request and sends Stop',async()=>{
+ let cursor=0, tree, finish;const slots=[],effects=[],controls=[],releases=[];
+ const props={seriesId:'1000001',episode:{vid:'11',vid_index:1,fileUrl:'hongguo-local://f/fixture'},title:'Fixture',videoRef:{current:{pause(){}}}};
+ const react={createElement:(type,props,...children)=>({type,props:props||{},children:children.flat(Infinity)}),useState(initial){const at=cursor++;if(!(at in slots))slots[at]=initial;return[slots[at],value=>slots[at]=value];},useRef(initial){const at=cursor++;return slots[at]||=( {current:initial} );},useEffect(effect,deps){const at=cursor++,previous=slots[at];if(!previous||deps.some((value,index)=>value!==previous.deps[index])){previous?.cleanup?.();slots[at]={deps};effects.push(()=>slots[at].cleanup=effect());}}};
+ const api={discoverCastDevices:async()=>({success:true,devices:[{id:'tv',name:'TV'}]}),startCasting:()=>new Promise(resolve=>finish=resolve),releaseOnlinePlay:async payload=>{releases.push(payload);return {success:true};},controlCasting:async action=>{controls.push(action);return {success:true};}};
+ const module={exports:{}};vm.runInNewContext(code,{module,exports:module.exports,require:()=>react,window:{electronAPI:api},crypto:{randomUUID:()=> 'request-fixture'}});
+ const render=()=>{cursor=0;tree=module.exports.default(props);while(effects.length)effects.shift()();};
+ const find=label=>{let match;const visit=node=>{if(!node||typeof node!=='object')return;if(node.type==='button'&&node.children.includes(label))match=node;node.children?.forEach(visit);};visit(tree);return match;};
+ render();find('投屏').props.onClick();await tick();render();find('TV').props.onClick();await tick();render();
+ find('取消本次操作').props.onClick();await tick();
+ assert.ok(releases.some(payload=>payload.requestId==='request-fixture'));assert.ok(controls.includes('Stop'));
+ finish({success:false,error:'cancelled',active:false});await tick();
+});
