@@ -72,6 +72,7 @@ const { createBossKeyController } = require('./src/native/boss-key');
 
 const casting = require('./src/native/casting').createCastingService();
 const castFileRefs = new Map();
+const localFileReaders = new Map();
 let castBusy = false;
 let mainWindow = null;
 let appUpdateInstaller = null;
@@ -1863,8 +1864,8 @@ ipcMain.handle('forget-series', async (_event, seriesId, options = {}) => {
   try {
     const sid = String(seriesId);
     if (!seriesRegistry.some(entry => String(entry.series_id) === sid)) return { success: false, error: '未找到该剧' };
-    const next = seriesRegistry.map(entry => String(entry.series_id) === sid ? { ...entry, dismissed: true, forgotten: true } : entry);
     if (options.clearCache === true) await clearSeriesPlaybackCache(sid);
+    const next = seriesRegistry.map(entry => String(entry.series_id) === sid ? { ...entry, dismissed: true, forgotten: true } : entry);
     store.saveSeries(next);
     seriesRegistry = next;
     return { success: true };
@@ -2885,6 +2886,16 @@ function localPlayUrl(filePath) {
  * 「Not allowed to load local resource」拒绝 file:// 请求（表现为播放器黑屏、进度 0:00）。
  * 走自定义协议后开发/打包两种模式行为一致，并且支持 Range 拖动进度。
  */
+function localMediaBody(file, options) {
+  const stream = fs.createReadStream(file, options);
+  localFileReaders.set(file, (localFileReaders.get(file) || 0) + 1);
+  stream.once('close', () => {
+    const remaining = localFileReaders.get(file) - 1;
+    if (remaining) localFileReaders.set(file, remaining); else localFileReaders.delete(file);
+  });
+  return Readable.toWeb(stream);
+}
+
 function registerLocalProtocol() {
   protocol.handle(LOCAL_SCHEME, mediaWithCors(async (request) => {
     try {
@@ -2910,7 +2921,7 @@ function registerLocalProtocol() {
       if (range === false) return new Response(null, { status: 416, headers: { 'Content-Range': `bytes */${size}` } });
       if (range) {
         const { start, end } = range;
-        return new Response(request.method === 'HEAD' ? null : Readable.toWeb(fs.createReadStream(filePath, { start, end })), {
+        return new Response(request.method === 'HEAD' ? null : localMediaBody(filePath, { start, end }), {
           status: 206,
           headers: {
             'Content-Type': 'video/mp4',
@@ -2921,7 +2932,7 @@ function registerLocalProtocol() {
         });
       }
 
-      return new Response(request.method === 'HEAD' ? null : Readable.toWeb(fs.createReadStream(filePath)), {
+      return new Response(request.method === 'HEAD' ? null : localMediaBody(filePath), {
         status: 200,
         headers: {
           'Content-Type': 'video/mp4',
@@ -3135,12 +3146,45 @@ async function clearSeriesPlaybackCache(sid) {
   for (const [id, session] of [...onlineSessions]) if (belongs(session)) releaseOnlineSession(id);
   await Promise.allSettled([...jobs].filter(job => ![...onlineSessions.values()].some(session => session.job === job)).map(job => job.promise));
   for (const [key, entry] of [...onlineCache]) if (belongs(entry)) deleteOnlineCacheEntry(key);
-  const series = seriesRegistry.find(item => String(item.series_id) === sid);
-  for (const ep of series?.episodes || []) for (const quality of ['auto', '720p', '1080p']) {
-    const file = compatPathFor(sid, ep.vid_index, quality);
-    const job = compatPreparing.get(file);
-    if (job) { job.cancelled = true; job.controller.abort(); await job.promise; }
-    if (!isFileInUse(file)) { try { await fsp.unlink(file); } catch (error) { if (error.code !== 'ENOENT') throw error; } }
+
+  const cacheDir = path.resolve(getCompatDir());
+  const base = sanitizeFolderName(sid);
+  if (!base || seriesRegistry.some(item => String(item.series_id) !== sid && sanitizeFolderName(String(item.series_id)) === base)) {
+    throw new Error('兼容缓存文件名与其他剧冲突，已停止清理');
+  }
+  const escaped = base.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const namePattern = new RegExp(`^${escaped}_(\\d{3,})(?:_(?:720p|1080p))?\\.mp4(?:\\.part)?$`);
+  const ownsName = name => {
+    const match = namePattern.exec(name);
+    const index = match ? Number(match[1]) : 0;
+    return !!match && Number.isSafeInteger(index) && index > 0 && match[1] === String(index).padStart(3, '0');
+  };
+  const outputForName = name => path.join(cacheDir, name.replace(/\.part$/, ''));
+
+  const active = [...compatPreparing].filter(([output]) =>
+    path.dirname(path.resolve(output)) === cacheDir && ownsName(path.basename(output)));
+  for (const [output, job] of active) {
+    job.cancelled = true;
+    job.controller.abort();
+    await job.promise;
+  }
+
+  let entries;
+  try { entries = await fsp.readdir(cacheDir, { withFileTypes: true }); }
+  catch (error) { if (error.code === 'ENOENT') return; throw error; }
+  for (const entry of entries) {
+    if (!entry.isFile() || !ownsName(entry.name)) continue;
+    const file = path.join(cacheDir, entry.name);
+    const output = outputForName(entry.name);
+    const job = compatPreparing.get(output);
+    if (job) {
+      job.cancelled = true;
+      job.controller.abort();
+      await job.promise;
+      continue;
+    }
+    if (isFileInUse(file)) continue;
+    try { await fsp.unlink(file); } catch (error) { if (error.code !== 'ENOENT') throw error; }
   }
 }
 ipcMain.handle('clear-series-playback-cache', async (_event, seriesId) => {
@@ -3153,7 +3197,7 @@ ipcMain.handle('discover-cast-devices', async () => {
   catch { return { success: false, error: '搜索电视失败，请检查局域网连接和防火墙' }; }
 });
 ipcMain.handle('start-casting', async (_event, payload = {}) => {
-  if (castBusy) return { success: false, error: '正在连接电视，请稍候' };
+  if (castBusy) return { success: false, error: '正在连接电视，请稍候', ...casting.status() };
   castBusy = true;
   let pinned, pinnedFile, released = false;
   const release = () => {
@@ -3181,16 +3225,16 @@ ipcMain.handle('start-casting', async (_event, payload = {}) => {
     pinnedFile = media.filePath;
     if (pinnedFile) castFileRefs.set(pinnedFile, (castFileRefs.get(pinnedFile) || 0) + 1);
     const result = await casting.start(String(payload.deviceId), { ...media, title: String(payload.title || '').slice(0,150), release });
-    return { success: true, ...result };
+    return { success: true, ...result, ...casting.status() };
   } catch (error) {
     release();
-    return { success: false, error: '连接电视失败，请确认电视可用并重试' };
+    return { success: false, error: '连接电视失败，请确认电视可用并重试', ...casting.status() };
   } finally { castBusy = false; }
 });
 ipcMain.handle('control-casting', async (_event, action) => {
-  if (castBusy && action !== 'Stop') return { success: false, error: '正在连接电视，请稍候' };
-  try { await casting.control(action); return { success: true }; }
-  catch { return { success: false, error: '电视控制失败，请重新连接' }; }
+  if (castBusy && action !== 'Stop') return { success: false, error: '正在连接电视，请稍候', ...casting.status() };
+  try { await casting.control(action); return { success: true, ...casting.status() }; }
+  catch { return { success: false, error: '电视控制失败，请重新连接', ...casting.status() }; }
 });
 
 ipcMain.handle('clear-online-cache', async () => {
@@ -4490,7 +4534,7 @@ function isTaskInFlight(task) {
 }
 
 function isFileInUse(file) {
-  return castFileRefs.has(file) || runningDownloadPaths.has(file) || downloadTasks.some(task => task.savePath === file && isTaskInFlight(task));
+  return castFileRefs.has(file) || localFileReaders.has(file) || runningDownloadPaths.has(file) || downloadTasks.some(task => task.savePath === file && isTaskInFlight(task));
 }
 
 function removeFinishedRecords(seriesId, saveChanges = false) {

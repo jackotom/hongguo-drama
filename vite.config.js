@@ -1,4 +1,4 @@
-// 红果短剧 5.3：前端构建配置，运行版本由 package.json 提供。
+// 红果短剧 5.4：前端构建配置，运行版本由 package.json 提供。
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 

@@ -69,7 +69,7 @@ function rangeFor(value, size) {
   return Number.isSafeInteger(start) && Number.isSafeInteger(end) && start >= 0 && start <= end && start < size ? {start,end,partial:true} : null;
 }
 function createCastingService({ discoverDevices = discover, sendAction = soap } = {}) {
-  let devices = new Map(), current = null, scanning = null, startController = null, controlling = false;
+  let devices = new Map(), current = null, scanning = null, startController = null, controlJob = null;
   const dispose = context => {
     if (!context || context.disposed) return;
     context.disposed = true;
@@ -90,7 +90,7 @@ function createCastingService({ discoverDevices = discover, sendAction = soap } 
       return scanning;
     },
     async start(id, media) {
-      if (startController || controlling) throw new Error('投屏操作正在进行，请稍候');
+      if (startController || controlJob) throw new Error('投屏操作正在进行，请稍候');
       const controller = new AbortController();
       startController = controller;
       let context;
@@ -102,8 +102,9 @@ function createCastingService({ discoverDevices = discover, sendAction = soap } 
       if (!size) throw new Error('视频文件为空');
       const previous = current;
       if (previous) {
-        try { await sendAction(previous.device, 'Stop', {}, controller.signal); }
-        finally { if (current === previous) current = null; dispose(previous); }
+        await sendAction(previous.device, 'Stop', {}, controller.signal);
+        if (current === previous) current = null;
+        dispose(previous);
       }
       ensureActive();
       const token = randomUUID(), streams = new Set();
@@ -146,15 +147,19 @@ function createCastingService({ discoverDevices = discover, sendAction = soap } 
     },
     async control(action) {
       if (!['Play', 'Pause', 'Stop'].includes(action)) throw new Error('投屏操作无效');
-      if (controlling || (startController && action !== 'Stop')) throw new Error('投屏操作正在进行，请稍候');
+      if (action !== 'Stop' && (controlJob || startController)) throw new Error('投屏操作正在进行，请稍候');
       const context = current;
       if (!context && !startController) { if (action === 'Stop') return; throw new Error('当前没有投屏'); }
-      controlling = true;
+      const job = {};
+      controlJob = job;
       try {
         if (action === 'Stop') close();
         if (context) await sendAction(context.device, action, action === 'Play' ? { Speed: '1' } : {}, action === 'Stop' ? undefined : context.controller.signal);
-      } finally { controlling = false; }
+      } finally {
+        if (controlJob === job) controlJob = null;
+      }
     },
+    status: () => current ? { active: true, name: current.device.name } : { active: false, name: '' },
     close,
   };
 }

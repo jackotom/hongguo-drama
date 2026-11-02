@@ -1,6 +1,6 @@
 {
-  "id": "release-5.3-20261101-01",
-  "title": "红果短剧 5.3 已更新",
-  "body": "新增「下载到 NAS」：先挂载共享目录，再为每部剧选择独立文件夹。视频与封面、简介、NFO 同层保存，规范分集命名，已有视频复用、缺失资料补齐；下载管理可直接打开所选目录。\n\n资料以来源实际提供为准，独立保存而非内嵌 MP4；实体 NAS 和媒体库识别尚未实测。\n\n完整说明和三端下载：https://github.com/jackotom/hongguo-drama/releases/tag/v5.3",
+  "id": "release-5.4-20261102-01",
+  "title": "红果短剧 5.4 已更新",
+  "body": "恢复播放取源请求签名，改善播放与下载失败。增加官网登录备用入口、按剧清理播放缓存、观看记录分组与 DLNA 单集投屏。\n\n官网提供的登录方式、电视格式支持以实际设备为准；上游间歇取源失败仍可重试本集。\n\n说明和三端下载：https://github.com/jackotom/hongguo-drama/releases/tag/v5.4",
   "active": true
 }

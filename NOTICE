@@ -1,7 +1,7 @@
 NOTICE —— 来源与修改说明
 =========================
 
-发行标识：5.3（已正式发布；实际下载与验证状态见 GitHub 发行页）。
+发行标识：5.4（发行候选；实际下载与验证状态见 GitHub 发行页）。
 
 本软件（红果短剧下载器 / hongguo-downloader）是基于他人开源项目的**修改版本**。
 依照 GNU General Public License v3.0 第 5(a) 条，特此声明如下。
@@ -68,7 +68,7 @@ Mac 分支源码仓库：
 
 版本 1.1.1 增加原生 arm64 应用和 DMG 构建、Mac FFmpeg/FFprobe 定位、
 VideoToolbox 编码器、Mac 菜单与 Dock 窗口生命周期支持。
-Electron 更新至 44.6.0，electron-builder 更新至 26.15.3。
+Electron 更新至 44.6.0，electron-builder 更新至 26.15.4。
 保留 Windows 构建、原上游版权、修改声明与 GPL-3.0 授权。
 
 Mac 内置 FFmpeg 为 GPLv3-or-later 的独立 arm64 构建，详见

@@ -43,6 +43,42 @@ test('invalid replacement preserves the active session and its pin',async()=>{
   try { await service.discover();await service.start('tv',{buffer:Buffer.from('protocol fixture'),release:()=>releases++});await assert.rejects(service.start('missing',{buffer:Buffer.from('protocol fixture')}));assert.equal(releases,0);await service.control('Pause');}finally{service.close();}
   assert.equal(releases,1);
 });
+test('failed replacement keeps the active session when the old television will not stop',async()=>{
+  let url,releases=0;
+  const get=target=>new Promise((resolve,reject)=>http.get(target,res=>{res.resume();resolve(res.statusCode)}).on('error',reject));
+  const service=createCastingService({discoverDevices:async()=>[
+    {id:'old',name:'Old',host:'127.0.0.1',localAddress:'127.0.0.1'},
+    {id:'new',name:'New',host:'127.0.0.1',localAddress:'127.0.0.1'},
+  ],sendAction:async(device,action,args)=>{
+    if(device.id==='old'&&action==='Stop')throw new Error('stop failed');
+    if(action==='SetAVTransportURI')url=args.CurrentURI;
+  }});
+  try {
+    await service.discover();await service.start('old',{buffer:Buffer.from('old'),release:()=>releases++});
+    await assert.rejects(service.start('new',{buffer:Buffer.from('new')}),/stop failed/);
+    assert.deepEqual(service.status(),{active:true,name:'Old'});
+    assert.equal(await get(url),200);assert.equal(releases,0);
+  } finally {service.close();}
+  assert.equal(releases,1);
+});
+test('Stop preempts an in-flight control request and revokes the capability',async()=>{
+  let url,entered,releases=0;const actions=[];
+  const waiting=new Promise(resolve=>entered=resolve);
+  const service=createCastingService({discoverDevices:async()=>[{id:'tv',name:'TV',host:'127.0.0.1',localAddress:'127.0.0.1'}],sendAction:(_device,action,args,signal)=>{
+    actions.push(action);if(action==='SetAVTransportURI')url=args.CurrentURI;
+    if(action==='Pause'){
+      entered();
+      return new Promise((_resolve,reject)=>signal.addEventListener('abort',()=>reject(new Error('pause aborted')),{once:true}));
+    }
+  }});
+  try {
+    await service.discover();await service.start('tv',{buffer:Buffer.from('x'),release:()=>releases++});
+    const pause=service.control('Pause');await waiting;await service.control('Stop');
+    await assert.rejects(pause,/pause aborted/);
+    assert.equal(actions.at(-1),'Stop');assert.deepEqual(service.status(),{active:false,name:''});assert.equal(releases,1);
+    await assert.rejects(new Promise((resolve,reject)=>http.get(url,resolve).on('error',reject)));
+  } finally {service.close();}
+});
 test('device URLBase and namespace-qualified services resolve without leaving the device',()=>{
   const xml='<root><URLBase>http://192.168.1.2:1234/base/</URLBase><s:service><s:serviceType>urn:schemas-upnp-org:service:AVTransport:1</s:serviceType><s:controlURL>control</s:controlURL></s:service></root>';
   assert.equal(parseDevice(xml,'http://192.168.1.2/desc','192.168.1.3').controlUrl,'http://192.168.1.2:1234/base/control');

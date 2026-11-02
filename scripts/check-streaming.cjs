@@ -366,6 +366,21 @@ function load(fetchPlayUrlSingle, overrides = {}) {
       assert.equal(response.status, 416, range); assert.equal(response.headers.get('content-range'), 'bytes */10');
     }
   });
+  await check('recovery: local readers protect files until completion or cancellation', async () => {
+    const h = hload(async () => ({})), file = path.join(root, 'local-reader.mp4');
+    fs.writeFileSync(file, Buffer.alloc(1024 * 1024));
+    const url = h.context.localPlayUrl(file);
+    const head = await h.protocols['hongguo-local'](new Request(url, { method: 'HEAD' }));
+    assert.equal(head.status, 200); assert.equal(h.context.isFileInUse(file), false);
+    const first = await h.protocols['hongguo-local'](new Request(url));
+    const second = await h.protocols['hongguo-local'](new Request(url));
+    assert.equal(h.context.isFileInUse(file), true);
+    await first.body.cancel();
+    assert.equal(h.context.isFileInUse(file), true, 'another reader still protects this file');
+    await second.arrayBuffer();
+    await sleep(20);
+    assert.equal(h.context.isFileInUse(file), false);
+  });
   await check('recovery: cancelling local reads during seek never closes an already closed stream', async () => {
     const h = hload(async () => ({})), file = path.join(root, 'local-cancel.mp4');
     fs.writeFileSync(file, Buffer.alloc(1024 * 1024));

@@ -4,7 +4,7 @@ const start=source.indexOf("ipcMain.handle('start-casting'");
 const end=source.indexOf("ipcMain.handle('control-casting'",start);
 let handler,release;
 const refs=new Map([['existing.mp4',1]]);
-const context={castBusy:false,castFileRefs:refs,mediaAccess:{resolveLocal(source){if(source==='invalid')throw new Error('invalid');return source;}},casting:{start:async(_id,media)=>{release=media.release;if(media.filePath==='existing.mp4')throw new Error('unavailable device');return {name:'Fixture'};}},ipcMain:{handle:(_channel,callback)=>handler=callback},disposeOnlineDisk:()=>{},URL};
+const context={castBusy:false,castFileRefs:refs,mediaAccess:{resolveLocal(source){if(source==='invalid')throw new Error('invalid');return source;}},casting:{status:()=>({active:true,name:'Fixture'}),start:async(_id,media)=>{release=media.release;if(media.filePath==='existing.mp4')throw new Error('unavailable device');return {name:'Fixture'};}},ipcMain:{handle:(_channel,callback)=>handler=callback},disposeOnlineDisk:()=>{},URL};
 vm.createContext(context);vm.runInContext(source.slice(start,end),context);
 (async()=>{
  assert.equal((await handler({}, {source:'invalid'})).success,false);assert.equal(refs.get('existing.mp4'),1);

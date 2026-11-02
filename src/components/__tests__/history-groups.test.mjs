@@ -11,3 +11,10 @@ test('missing manual targets fall back to exact families; stored decisions canno
  assert.deepEqual(groupHistory(rows,{'1':'removed'}).map(g=>g.map(r=>r.series_id)),[['2','1'],['hema:3']]);
  assert.equal(groupHistory(rows,{'hema:3':'2'}).length,2);
 });
+test('automatic and manual groups stay within each provider',()=>{
+ for (const kind of ['xifan','custom']) {
+  const rows=[{series_id:`${kind}:a:1`,family:'same',season:1},{series_id:`${kind}:b:2`,family:'same',season:2}];
+  assert.equal(groupHistory(rows).length,2);
+  assert.equal(groupHistory(rows,{[rows[0].series_id]:rows[1].series_id}).length,2);
+ }
+});

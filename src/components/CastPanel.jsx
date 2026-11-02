@@ -21,6 +21,7 @@ export default function CastPanel({ seriesId, episode, title, videoRef }) {
     finally { if (operation.current === pending) { operation.current = null; setBusy(false); } }
   };
   const check=result=>{if(!result?.success)throw new Error(result?.error || '投屏失败');return result;};
+  const syncStatus=result=>{if(typeof result?.active==='boolean')setTarget(result.active ? result.name || '' : '');};
   const scan=()=>run(async pending=>{ const result = check(await window.electronAPI.discoverCastDevices()); if (!pending.cancelled) setDevices(result.devices); });
   const start=id=>run(async pending=>{
     if (!episode || episode.locked) return;
@@ -30,12 +31,13 @@ export default function CastPanel({ seriesId, episode, title, videoRef }) {
       if (!episode.fileUrl) prepared=check(await window.electronAPI.prepareOnlinePlay({seriesId,vid:episode.vid,vidIndex:episode.vid_index,requestId:pending.requestId,prefetch:true}));
       if (pending.cancelled) return;
       pending.connecting = true;
-      const result=check(await window.electronAPI.startCasting({deviceId:id,source:episode.fileUrl || prepared.url,title:`${title} 第${episode.vid_index}集`}));
-      if (pending.cancelled) { await window.electronAPI.controlCasting('Stop'); return; }
-      setTarget(result.name);videoRef.current?.pause();
+      const result=await window.electronAPI.startCasting({deviceId:id,source:episode.fileUrl || prepared.url,title:`${title} 第${episode.vid_index}集`});
+      syncStatus(result);check(result);
+      if (pending.cancelled) { const stopped=await window.electronAPI.controlCasting('Stop');syncStatus(stopped);return; }
+      videoRef.current?.pause();
     } finally {if(prepared?.streamId)await window.electronAPI.releaseOnlinePlay({streamId:prepared.streamId}).catch(() => {});}
   });
-  const control=action=>run(async()=>{check(await window.electronAPI.controlCasting(action));if(action==='Stop')setTarget('');});
+  const control=action=>run(async()=>{const result=await window.electronAPI.controlCasting(action);syncStatus(result);check(result);});
   return <div className="cast-panel">
     <button className="btn btn-outline btn-sm" disabled={!episode || episode.locked} onClick={()=>{setOpen(!open);if(!open)scan();}}>投屏{target ? ` · ${target}` : ''}</button>
     {open && <section aria-label="电视投屏" style={{padding:12,border:'1px solid var(--border)',borderRadius:8}}>

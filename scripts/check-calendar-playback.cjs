@@ -201,7 +201,7 @@ function mountHistoryNavigation() {
   const props = { active: true }; let cursor = 0, tree;
   const react = {
     createElement: (type, props, ...children) => ({ type, props: props || {}, children: children.flat(Infinity) }),
-    useState: initial => { const i = cursor++; if (!(i in slots)) slots[i] = initial; return [slots[i], value => { slots[i] = typeof value === 'function' ? value(slots[i]) : value; }]; },
+    useState: initial => { const i = cursor++; if (!(i in slots)) slots[i] = typeof initial === 'function' ? initial() : initial; return [slots[i], value => { slots[i] = typeof value === 'function' ? value(slots[i]) : value; }]; },
     useRef: initial => { const i = cursor++; return slots[i] ||= { current: initial }; },
     useEffect: (fn, deps) => { const i = cursor++; if (!slots[i] || deps.some((v, j) => !Object.is(v, slots[i][j]))) { slots[i] = deps; effects.push(() => { cleanups[i]?.(); cleanups[i] = fn(); }); } },
   };
@@ -218,7 +218,7 @@ function mountHistoryNavigation() {
     acknowledgeWatchUpdates: async () => { calls.push(['ack']); return { success: true }; },
   };
   const module = { exports: {} };
-  vm.runInNewContext(source, { module, exports: module.exports, require: name => name === 'react' ? react : {}, window: { electronAPI: api } });
+  vm.runInNewContext(source, { module, exports: module.exports, require: name => name === './historyGroups.mjs' ? require('../src/components/historyGroups.mjs') : name === 'react' ? react : {}, window: { electronAPI: api } });
   const render = (runPassive = true) => {
     cursor = 0; tree = module.exports.default(props);
     layoutEffects.splice(0).forEach(fn => fn());

@@ -1,7 +1,7 @@
 // Display-only relationships: manual decisions never affect update checks or notifications.
 export function groupHistory(rows, decisions = {}) {
   const parent = new Map(rows.map(row => [row.series_id, row.series_id]));
-  const source = id => /^\d+$/.test(id) ? 'hongguo' : String(id).split(':')[0];
+  const source = id => /^\d+$/.test(id) ? 'hongguo' : String(id).split(':').slice(0, /^(xifan|custom):/.test(id) ? 2 : 1).join(':');
   const validTarget = id => typeof decisions[id] === 'string' && parent.has(decisions[id]) && source(id) === source(decisions[id]) && decisions[decisions[id]] !== null;
   const root = id => {
     const path = [];
@@ -14,8 +14,9 @@ export function groupHistory(rows, decisions = {}) {
   for (const row of rows) {
     if (decisions[row.series_id] === null || validTarget(row.series_id)) continue;
     if (row.family) {
-      if (families.has(row.family)) join(row.series_id, families.get(row.family));
-      else families.set(row.family, row.series_id);
+      const family = `${source(row.series_id)}\0${row.family}`;
+      if (families.has(family)) join(row.series_id, families.get(family));
+      else families.set(family, row.series_id);
     }
   }
   for (const [id, target] of Object.entries(decisions)) if (validTarget(id)) join(id, target);

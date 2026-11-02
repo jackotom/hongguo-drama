@@ -195,7 +195,7 @@ if (require.main === module) (async () => {
     assert.equal(ui.prepares.length, 2, 'reconnect must remain bounded');
     assert.equal(ui.transcodes.length, 0, 'unavailable source is not proof of codec failure');
     assert.ok(!ui.find(n => n.type === 'p' && n.children.includes('当前片源无法正常解码')));
-    assert.ok(ui.button('重新连接片源')); assert.ok(ui.button('转码后播放'), 'manual fallback remains available');
+    assert.ok(ui.button('重新连接片源')); assert.ok(!ui.button('转码后播放'), 'unavailable sources must not offer a decoder-only repair');
     ui.unmount();
   });
   await test('saved online episode resumes after metadata', async () => {
