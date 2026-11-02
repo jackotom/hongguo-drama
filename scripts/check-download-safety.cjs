@@ -51,6 +51,35 @@ async function check(name, run) { try { await run(); console.log('PASS ' + name)
       assert.equal(h.run('downloadTasks.length'), 1, channel + ' must retain its task');
     }
   });
+  await check('ordinary download records retain directory identity and reject replacement mounts', async () => {
+    const queued = load(); queued.set('seriesRegistry', series());
+    const submitted = await queued.handlers['hongguo-download-batch']({}, { seriesId:'S', seriesTitle:'Short', episodes:series()[0].episodes, quality:'auto' });
+    assert.equal(submitted.success, true);
+    const recorded = queued.run('downloadTasks[0].directoryIdentity');
+    assert.equal(fs.realpathSync(recorded.directory), recorded.directory);
+    assert.equal(recorded.device, fs.statSync(recorded.directory).dev);
+    for (const channel of ['delete-task', 'delete-tasks', 'delete-series-files', 'delete-all-downloaded', 'delete-episode-file']) {
+      const h = load(); h.set('seriesRegistry', series());
+      const one = task('one', h.dir); file(one.savePath);
+      one.directoryIdentity = { directory:fs.realpathSync(h.dir), device:fs.statSync(h.dir).dev+1 };
+      h.set('downloadTasks',[one]);
+      const args = channel === 'delete-task' ? ['one',{deleteFiles:true}] : channel === 'delete-tasks' ? [['one'],{deleteFiles:true}]
+        : channel === 'delete-episode-file' ? ['S',1] : ['S'];
+      const result = await h.handlers[channel]({},...args);
+      assert.equal(result.success,false,channel);
+      assert.equal(fs.existsSync(one.savePath),true,channel);
+      assert.equal(h.run('downloadTasks.length'),1,channel);
+    }
+  });
+  await check('queued ordinary downloads refuse a changed directory before resolving media', async () => {
+    let lookedUp = 0;
+    const h = load({}, {'./src/native/hongguo':{fetchPlayUrlSingle:async()=>{lookedUp++;throw Error('unexpected source lookup');}}});
+    const one = task('one',h.dir,'pending');
+    one.directoryIdentity={directory:fs.realpathSync(h.dir),device:fs.statSync(h.dir).dev+1};
+    h.set('downloadTasks',[one]);
+    await h.context.executeHongguoDownload(one);
+    assert.equal(one.status,'failed');assert.equal(lookedUp,0);assert.equal(fs.existsSync(one.savePath),false);
+  });
   await check('deleting downloads preserves active online sessions and cached episodes', async () => {
     for (const channel of ['delete-series-files', 'delete-all-downloaded']) {
       const h = load(); h.set('seriesRegistry', series());

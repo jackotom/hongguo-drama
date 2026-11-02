@@ -33,4 +33,21 @@ const { mount } = require('./check-player-resume.cjs');
   } finally {
     ui.unmount();
   }
+  for (const paused of [true, false]) {
+    let fileUrl = 'file:///before-nas.mp4';
+    const moved = mount({local:true,apiOverrides:{getSeriesEpisodes:async()=>({success:true,data:{series_id:'A',series_title:'Fixture',total:1,
+      episodes:[{vid:'v1',vid_index:1,status:'completed',fileUrl,savePath:fileUrl.slice(7)}]}})}});
+    try {
+      await moved.flush(); moved.metadata();
+      moved.media.currentTime = 34;
+      moved.media.paused = paused;
+      fileUrl = 'file:///after-nas.mp4';
+      moved.historyUpdated({});
+      for (const timer of [...moved.timers.values()]) if(timer.delay===2000)await timer.fn();
+      await moved.flush(); moved.metadata();
+      assert.equal(moved.media.currentTime,34,'NAS relocation must retain playback position');
+      assert.equal(moved.media.paused,paused,'NAS relocation must retain pause state');
+    } finally { moved.unmount(); }
+  }
+  console.log('PASS NAS relocation preserves the current episode position and pause/play intent');
 })().catch(error => { console.error(error.message); process.exitCode = 1; });

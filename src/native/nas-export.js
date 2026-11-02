@@ -11,6 +11,7 @@ const { publishMergedOutput } = require('./merge-runner');
 const NAS_INDEX = '.hongguo-nas.json';
 const NAS_IDENTITY_LIMIT = 256 * 1024;
 const nasIndexWrites = new Map();
+const prepareQueues = new Map();
 
 const xml = value => String(value ?? '').replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/g, '')
   .replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&apos;' }[char]));
@@ -70,6 +71,24 @@ async function writeMissing(target, data) {
     const stat = await fsp.lstat(target);
     if (!stat.isFile() || stat.isSymbolicLink() || !stat.size) throw new Error('NAS 中已有无效的同名资料文件，请检查后重试');
   }
+}
+
+async function writeTvshowIdentity(directory, seriesId, data) {
+  const file = path.join(directory, 'tvshow.nfo');
+  try { await publishFile(file, data); }
+  catch (error) { if (error.code !== 'EEXIST') throw error; }
+  const identity = await readTvshowIdentity(directory, seriesId);
+  if (!identity.exists || !identity.matches)
+    throw new Error('所选目录已有其他或无法确认归属的剧集资料，请为本剧选择单独的文件夹');
+}
+
+function serializePrepare(directory, action) {
+  const previous = prepareQueues.get(directory) || Promise.resolve();
+  const current = previous.catch(() => {}).then(action);
+  prepareQueues.set(directory, current);
+  const clean = () => { if (prepareQueues.get(directory) === current) prepareQueues.delete(directory); };
+  current.then(clean, clean);
+  return current;
 }
 
 function readNasIndex(file, seriesId) {
@@ -195,18 +214,8 @@ async function fetchPoster(value) {
   return Buffer.from(response.data);
 }
 
-async function prepareNasExport({ root, folderName, series, createFolder = false }, { metadataFetcher = fetchPublicDetails, posterFetcher = fetchPoster } = {}) {
-  if (typeof root !== 'string' || !path.isAbsolute(root) || !folderName || path.basename(folderName) !== folderName ||
-      folderName.length > 255 || folderName === '.' || folderName === '..' || /[\u0000-\u001f\u007f]/.test(folderName) ||
-      typeof createFolder !== 'boolean') throw new Error('NAS 目录或文件夹名称无效');
-  root = await fsp.realpath(root);
-  const parsed = seasonTitle(series.series_title);
-  const rootStat = await fsp.stat(root);
-  if (!rootStat.isDirectory()) throw new Error('NAS 目录不可用，请重新挂载共享文件夹后重试');
-  const seriesId = nasIdentity(series.series_id, '剧号');
-  const destination = { root, device: rootStat.dev, directory: createFolder ? path.join(root, folderName) : root, flat: true,
-    seriesId, title: folderName.replace(/-[a-f0-9]{12}$/, ''), season: parsed.invalid ? 1 : parsed.season };
-  const directory = await directoryAt(destination), warnings = [];
+async function prepareOnce(destination, series, { metadataFetcher, posterFetcher }) {
+  const directory = destination.directory, warnings = [];
   const tvshow = await readTvshowIdentity(directory, destination.seriesId);
   if (tvshow.exists && !tvshow.matches)
     throw new Error('所选目录已有其他或无法确认归属的剧集资料，请为本剧选择单独的文件夹');
@@ -217,12 +226,12 @@ async function prepareNasExport({ root, folderName, series, createFolder = false
     catch (_) { /* Missing source fields are reported below without blocking videos. */ }
   }
   const description = typeof metadata.description === 'string' ? metadata.description.trim() : '';
+  const plot = description ? `\n  <plot>${xml(description)}</plot>` : '';
+  const nfo = `<?xml version="1.0" encoding="UTF-8"?>\n<tvshow>\n  <title>${xml(series.series_title)}</title>${plot}\n  <uniqueid type="hongguo" default="true">${xml(destination.seriesId)}</uniqueid>\n</tvshow>\n`;
+  await writeTvshowIdentity(directory, destination.seriesId, nfo);
   if (description) {
     await writeMissing(path.join(directory, '简介.txt'), `${series.series_title}\n\n${description}\n`);
   } else warnings.push('来源暂未提供剧情简介，可再次点击补齐简介与剧集资料');
-  const plot = description ? `\n  <plot>${xml(description)}</plot>` : '';
-  const nfo = `<?xml version="1.0" encoding="UTF-8"?>\n<tvshow>\n  <title>${xml(series.series_title)}</title>${plot}\n  <uniqueid type="hongguo" default="true">${xml(destination.seriesId)}</uniqueid>\n</tvshow>\n`;
-  await writeMissing(path.join(directory, 'tvshow.nfo'), nfo);
   try {
     const existing = await Promise.all(['jpg', 'png', 'webp'].map(ext => fsp.lstat(path.join(directory, `poster.${ext}`)).then(stat => stat.isFile() && !stat.isSymbolicLink() && stat.size > 0).catch(error => {
       if (error.code === 'ENOENT') return false;
@@ -236,6 +245,23 @@ async function prepareNasExport({ root, folderName, series, createFolder = false
       await writeMissing(path.join(directory, `poster.${extension}`), image);
     }
   } catch (_) { warnings.push('封面未能保存，可再次点击补齐'); }
+  return warnings;
+}
+
+async function prepareNasExport({ root, folderName, series, createFolder = false }, { metadataFetcher = fetchPublicDetails, posterFetcher = fetchPoster } = {}) {
+  if (typeof root !== 'string' || !path.isAbsolute(root) || !folderName || path.basename(folderName) !== folderName ||
+      folderName.length > 255 || folderName === '.' || folderName === '..' || /[\u0000-\u001f\u007f]/.test(folderName) ||
+      typeof createFolder !== 'boolean') throw new Error('NAS 目录或文件夹名称无效');
+  root = await fsp.realpath(root);
+  const parsed = seasonTitle(series.series_title);
+  const rootStat = await fsp.stat(root);
+  if (!rootStat.isDirectory()) throw new Error('NAS 目录不可用，请重新挂载共享文件夹后重试');
+  const seriesId = nasIdentity(series.series_id, '剧号');
+  const destination = { root, device: rootStat.dev, directory: createFolder ? path.join(root, folderName) : root, flat: true,
+    seriesId, title: folderName.replace(/-[a-f0-9]{12}$/, ''), season: parsed.invalid ? 1 : parsed.season };
+  destination.directory = await fsp.realpath(await directoryAt(destination));
+  const warnings = await serializePrepare(destination.directory, () =>
+    prepareOnce(destination, series, { metadataFetcher, posterFetcher }));
   return { destination, warnings };
 }
 

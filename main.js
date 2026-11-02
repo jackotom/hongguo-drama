@@ -983,13 +983,21 @@ async function executeHongguoDownload(task) {
     };
     const root = String(settings.root || '').trim() || app.getPath('downloads');
     const downloadDir = task.customDir || seriesDownloadDir(root, hongguoInfo?.series_id, series_title);
+    const finalPath = task.savePath || path.join(downloadDir, filename);
+    task.savePath = finalPath;
+    task.customDir ||= downloadDir;
     if (task.nasDestination) {
       if (task.pathConflict) throw new Error('NAS 文件路径与其他分集冲突，请检查所选文件夹后重试');
       await checkNasDirectory(task.nasDestination);
     }
-    else fs.mkdirSync(downloadDir, { recursive: true });
-    const finalPath = task.savePath || path.join(downloadDir, filename);
-    task.savePath = finalPath;
+    else {
+      if (task.directoryIdentity) validateDirectoryIdentity(task.directoryIdentity, task.savePath || path.join(downloadDir, filename));
+      fs.mkdirSync(downloadDir, { recursive: true });
+      if (!task.directoryIdentity) {
+        task.directoryIdentity = readDirectoryIdentity(downloadDir);
+        if (downloadTasks.includes(task)) saveDownloadTasks();
+      }
+    }
     // Recheck source access before reusing an existing third-party file or URL.
     const checkedPlayInfo = /^(xifan|hema|custom):/.test(String(vid))
       ? await hongguo.fetchPlayUrlSingle(vid, hongguoInfo?.series_id, { quality }) : null;
@@ -1910,6 +1918,7 @@ function rescanDownloadsFromDisk() {
         batchId: 'rescanned',
         savePath: f.path,
         customDir: scanned.dir,
+        directoryIdentity: readDirectoryIdentity(path.dirname(f.path)),
         filename: f.filename,
         title: `《${s.series_title}》第${String(f.vid_index).padStart(3, '0')}集`,
         platform: 'hongguo',
@@ -2080,6 +2089,22 @@ function pathInside(root, target) {
   return rel === '' || (rel !== '..' && !rel.startsWith(`..${path.sep}`) && !path.isAbsolute(rel));
 }
 
+function readDirectoryIdentity(directory) {
+  directory = fs.realpathSync(directory);
+  const stat = fs.statSync(directory);
+  if (!stat.isDirectory()) throw new Error('下载目录不可用');
+  return { directory, device: stat.dev };
+}
+
+function validateDirectoryIdentity(identity, file) {
+  try {
+    const stat = fs.lstatSync(identity.directory);
+    if (!stat.isDirectory() || stat.isSymbolicLink() || stat.dev !== identity.device
+      || fs.realpathSync(identity.directory) !== identity.directory
+      || fs.realpathSync(path.dirname(file)) !== identity.directory) throw new Error();
+  } catch (_) { throw new Error('下载目录不可用或挂载已变化，已保留文件和任务记录；请确认原目录后重试'); }
+}
+
 function mediaRoots() {
   const roots = [];
   try {
@@ -2177,6 +2202,7 @@ function repairTaskDestination(task) {
   const suffix = createHash('sha256').update(String(info.vid)).digest('hex').slice(0, 8);
   task.filename = filename.replace(/\.mp4$/, `-${suffix}.mp4`);
   task.savePath = path.join(task.customDir, task.filename);
+  if (task.directoryIdentity && path.resolve(task.customDir) !== path.resolve(task.directoryIdentity.directory)) delete task.directoryIdentity;
   task.pathConflict = false;
 }
 
@@ -3674,7 +3700,8 @@ async function enqueueEpisodes({ seriesId, seriesTitle, episodes, cover, quality
   const root = (settings.root && String(settings.root).trim()) ? String(settings.root).trim() : app.getPath('downloads');
   const cleanSeriesTitle = sanitizeFolderName(seriesTitle) || '红果短剧';
   const downloadDir = nasDestination ? nasDestination.directory : seriesDownloadDir(root, seriesId, cleanSeriesTitle);
-  if (!nasDestination) { try { fs.mkdirSync(downloadDir, { recursive: true }); } catch (_) {} }
+  if (!nasDestination) fs.mkdirSync(downloadDir, { recursive: true });
+  const directoryIdentity = nasDestination ? null : readDirectoryIdentity(downloadDir);
   let metadataWarning = '';
   if (!nasDestination && settings.download_metadata === true) {
     try {
@@ -3685,6 +3712,7 @@ async function enqueueEpisodes({ seriesId, seriesTitle, episodes, cover, quality
     } catch (_) { metadataWarning = '整剧封面或简介未能保存，视频下载不受影响；检查目录后可重新提交补齐'; }
   }
 
+  if (directoryIdentity) validateDirectoryIdentity(directoryIdentity, path.join(downloadDir, 'directory-check'));
   const batchId = 'hongguobatch_' + randomUUID();
   const firstCover = cover || (episodes[0] && episodes[0].cover) || '';
 
@@ -3712,6 +3740,8 @@ async function enqueueEpisodes({ seriesId, seriesTitle, episodes, cover, quality
     if (dup) {
       changedTasks.push({ task: dup, previous: { ...dup } });
       if (!nasDestination) dup.metadataWarning = metadataWarning;
+      if (!nasDestination && !dup.nasDestination && !dup.directoryIdentity && typeof dup.savePath === 'string' && fs.existsSync(path.dirname(dup.savePath)))
+        dup.directoryIdentity = readDirectoryIdentity(path.dirname(dup.savePath));
       if (nasDestination) {
         Object.assign(dup, { savePath: finalPath, customDir: downloadDir, filename, nasDestination, downloadQuality, nasWarning: '', pathConflict: false });
         delete dup.nasTargets;
@@ -3751,6 +3781,7 @@ async function enqueueEpisodes({ seriesId, seriesTitle, episodes, cover, quality
       downloadQuality,
       ...(metadataWarning ? { metadataWarning } : {}),
       ...(nasDestination ? { nasDestination } : {}),
+      ...(directoryIdentity ? { directoryIdentity } : {}),
       status: nasReady.has(String(ep.vid)) ? 'completed' : 'pending',
       progress: nasReady.has(String(ep.vid)) ? 100 : 0,
       receivedBytes: 0,
@@ -4498,8 +4529,9 @@ ipcMain.handle('get-download-tasks', () => {
 
 /** 单任务与单集共用：文件及其临时产物必须归目标记录独占。 */
 async function validateNasDeletion(tasks) {
-  const expected = tasks.map(task => ({ task, savePath: task.savePath, destination: task.nasDestination }));
-  for (const { savePath, destination } of expected) {
+  const expected = tasks.map(task => ({ task, savePath: task.savePath, destination: task.nasDestination, directoryIdentity: task.directoryIdentity }));
+  for (const { savePath, destination, directoryIdentity } of expected) {
+    if (!destination && directoryIdentity) validateDirectoryIdentity(directoryIdentity, savePath);
     if (!destination) continue;
     const stat = await fsp.lstat(destination.directory);
     if (!stat.isDirectory() || stat.isSymbolicLink() || stat.dev !== destination.device) throw new Error('NAS 目录不可用或挂载已变化，已保留文件和任务记录');
@@ -4507,8 +4539,8 @@ async function validateNasDeletion(tasks) {
     if (!pathInside(directory, savePath)) throw new Error('NAS 文件已不在登记目录中，已保留文件和任务记录');
   }
   return () => {
-    if (expected.some(({ task, savePath, destination }) => !downloadTasks.includes(task)
-      || task.savePath !== savePath || task.nasDestination !== destination)) {
+    if (expected.some(({ task, savePath, destination, directoryIdentity }) => !downloadTasks.includes(task)
+      || task.savePath !== savePath || task.nasDestination !== destination || task.directoryIdentity !== directoryIdentity)) {
       throw new Error('任务保存位置已变化，已保留文件和记录，请重试');
     }
   };

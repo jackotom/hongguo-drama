@@ -592,7 +592,16 @@ function Player({ target, onNavigate, onSeriesSelected, onFloatingChange, active
   const canPlay = !!(playbackRequested && !playbackError && !onlineProgress && !needsCompat && current && !current.locked && (compatUrl || usableLocal(current, String(activeSeriesId)) || isOnlinePlaying));
   const playableSource = compatUrl || (isOnlinePlaying ? onlineUrl : current?.fileUrl) || '';
   // 原生全屏依附于 video 节点。准备下一集时保留结束帧，换源不换节点。
-  if (canPlay) lastVideoSrcRef.current = playableSource;
+  if (canPlay) {
+    const media = loadedMediaRef.current;
+    if (lastVideoSrcRef.current !== playableSource && media?.version === mediaVersion.current
+      && media.seriesId === activeSeriesId && media.vidIndex === currentIndex) {
+      pendingSeekRef.current = Number.isFinite(media.element.currentTime) ? media.element.currentTime : 0;
+      pendingAutoplayRef.current = !media.element.paused;
+      loadedMediaRef.current = null;
+    }
+    lastVideoSrcRef.current = playableSource;
+  }
   const videoSrc = !playbackRequested || compatProgress ? '' : lastVideoSrcRef.current;
   const danmakuSource = useDanmakuSource();
   const visualActive = canPlay && (active || floatingPlayer.floating);

@@ -38,6 +38,66 @@ test('new exports keep basic TV identity, omit episode NFO and create an optiona
   assert.equal((await inspectNasEpisode(destination, episodes[0])).status, 'existing');
 });
 
+test('concurrent prepares for different series sharing a directory reject the loser without mixing metadata', async t => {
+  const root = rootFor(t);
+  const otherId = '7691228619774905370';
+  const otherSeries = { ...series, series_id: otherId, series_title: '另一部剧' };
+  const pending = new Map();
+  let release = false;
+  const metadataFetcher = id => {
+    const metadata = { success: true, description: `简介 ${id}`, cover: `poster-${id}.jpg` };
+    if (release) return metadata;
+    return new Promise(resolve => pending.set(id, () => resolve(metadata)));
+  };
+  const posterFetcher = async cover => Buffer.from([0xff, 0xd8, 0xff, cover === `poster-${seriesId}.jpg` ? 1 : 2]);
+  const hooks = { metadataFetcher, posterFetcher };
+
+  const first = prepareNasExport({ root, folderName: '第一部', series }, hooks);
+  while (pending.size === 0) await new Promise(setImmediate);
+  const second = prepareNasExport({ root, folderName: '第二部', series: otherSeries }, hooks);
+  await new Promise(setImmediate);
+  release = true;
+  for (const resolve of pending.values()) resolve();
+
+  const results = await Promise.allSettled([first, second]);
+  assert.equal(results[0].status, 'fulfilled');
+  assert.equal(results[1].status, 'rejected');
+  assert.match(results[1].reason.message, /其他|归属/);
+  assert.match(fs.readFileSync(path.join(root, 'tvshow.nfo'), 'utf8'), new RegExp(seriesId));
+  assert.doesNotMatch(fs.readFileSync(path.join(root, 'tvshow.nfo'), 'utf8'), new RegExp(otherId));
+  assert.match(fs.readFileSync(path.join(root, '简介.txt'), 'utf8'), new RegExp(`简介 ${seriesId}`));
+  assert.doesNotMatch(fs.readFileSync(path.join(root, '简介.txt'), 'utf8'), new RegExp(otherId));
+  assert.deepEqual([...fs.readFileSync(path.join(root, 'poster.jpg')).subarray(0, 3)], [0xff, 0xd8, 0xff]);
+  assert.equal(fs.readFileSync(path.join(root, 'poster.jpg'))[3], 1);
+});
+
+test('a foreign tvshow added while metadata is pending rejects without writing this series metadata', async t => {
+  const root = rootFor(t);
+  const otherId = '7691228619774905370';
+  let releaseMetadata;
+  let metadataStarted;
+  const started = new Promise(resolve => { metadataStarted = resolve; });
+  const metadataFetcher = () => {
+    metadataStarted();
+    return new Promise(resolve => {
+      releaseMetadata = () => resolve({ success: true, description: '不应写入', cover: 'poster.jpg' });
+    });
+  };
+  const pending = prepareNasExport({ root, folderName: '测试剧', series }, {
+    metadataFetcher, posterFetcher: async () => Buffer.from([0xff, 0xd8, 0xff, 1]),
+  });
+  await started;
+
+  const foreignNfo = `<tvshow><uniqueid type="hongguo" default="true">${otherId}</uniqueid></tvshow>\n`;
+  fs.writeFileSync(path.join(root, 'tvshow.nfo'), foreignNfo);
+  releaseMetadata();
+
+  await assert.rejects(pending, /其他|归属/);
+  assert.equal(fs.readFileSync(path.join(root, 'tvshow.nfo'), 'utf8'), foreignNfo);
+  assert.equal(fs.existsSync(path.join(root, '简介.txt')), false);
+  assert.equal(fs.existsSync(path.join(root, 'poster.jpg')), false);
+});
+
 test('wrong orphan NFO blocks the video and legacy matching NFO stays readable and untouched', async t => {
   const root = rootFor(t);
   const { destination } = await prepareNasExport({ root, folderName: '测试剧', series }, options);

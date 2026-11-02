@@ -286,3 +286,23 @@ test('ordinary downloads optionally save series metadata without retargeting vid
   assert.ok(fs.existsSync(path.join(task.customDir, '简介.txt')));
   assert.deepEqual(fs.readdirSync(task.customDir).filter(name => name.endsWith('.nfo')), ['tvshow.nfo']);
 });
+
+test('a copied video recovers its identity after index writing fails, without manual deletion', async t => {
+  const h=fixture(t), prepared=await nas.prepareNasExport({root:h.target,folderName:series.series_title,series},{metadataFetcher,posterFetcher});
+  const source=path.join(h.root,'recover-source.mp4');fs.writeFileSync(source,Buffer.alloc(120000,8));
+  const task={id:'recover',type:'hongguo',status:'completed',savePath:source,customDir:h.root,downloadQuality:'auto',
+    hongguoInfo:{...series.episodes[0],series_id:seriesId,series_title:series.series_title}};
+  h.context.recoverTask=task;h.run('downloadTasks=[recoverTask]');
+  const rename=fs.renameSync;
+  try {
+    fs.renameSync=(from,to)=>{if(path.basename(to)==='.hongguo-nas.json')throw Object.assign(Error('index write failure'),{code:'ENOSPC'});return rename(from,to);};
+    await assert.rejects(nas.copyNasEpisode(task,prepared.destination),/index write failure/);
+  } finally {fs.renameSync=rename;}
+  const target=path.join(h.target,nas.nasEpisodeFilename(prepared.destination,series.episodes[0]));
+  assert.equal(fs.existsSync(target),true);
+  assert.equal((await nas.inspectNasEpisode(prepared.destination,series.episodes[0])).status,'conflict');
+  const result=await h.handlers['download-series-to-nas']({},seriesId,'auto');
+  assert.equal(result.success,true,result.error);assert.equal(result.copied,1);
+  assert.equal((await nas.inspectNasEpisode(prepared.destination,series.episodes[0])).status,'existing');
+  assert.equal(fs.existsSync(source),true);
+});
