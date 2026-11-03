@@ -361,8 +361,7 @@ async function requestJson(url, options, deadline, signal) {
 }
 
 async function fetchAppPlayUrl(vid, options = {}) {
-    const requestedQuality = normalizeDownloadQuality(options.quality);
-    const allowLowerQuality = options.allowLowerQuality === true && requestedQuality !== 'auto';
+    normalizeDownloadQuality(options.quality); // Validate before registration or network I/O.
     vid = String(vid || '');
     if (!/^\d{1,30}$/.test(vid)) throw new Error('分集编号无效');
     const payload = JSON.stringify({
@@ -396,16 +395,37 @@ async function fetchAppPlayUrl(vid, options = {}) {
     const model = typeof entry?.video_model === 'string' ? jsonBody(entry.video_model) : entry?.video_model;
     if (!model) throw Object.assign(new Error('App 接口未返回所选分集，已停止取址'), { code: entry?.video_model ? 'INVALID_RESPONSE' : 'MISSING_MODEL' });
     const inline = Array.isArray(model.video_list) && model.video_list.length > 0;
-    let info = model;
-    if (!inline) {
+    const readFallback = async () => {
         const fallback = parseFallback(model.fallback_api);
         if (!fallback) throw Object.assign(new Error('App 接口未返回本集片源地址'), { code: 'MISSING_MODEL' });
         const outer = await requestJson(fallback, { headers: { 'User-Agent': VIDEO_UA } }, deadline, signal);
         if ([outer, outer.video_info].some(value => Number(value?.Code || value?.code || 0) !== 0)) {
             throw Object.assign(new Error('App 接口暂未提供本集播放信息'), { code: 'BUSINESS_REJECTED' });
         }
-        info = outer?.video_info?.data;
+        return outer?.video_info?.data;
+    };
+    if (!inline) return parseAppPlayModel(await readFallback(), vid, options, false);
+    try {
+        return parseAppPlayModel(model, vid, options, true);
+    } catch (error) {
+        // Only absent encryption metadata enables this recovery path; the fallback
+        // must independently pass identity, duration, encryption and URL validation.
+        const duration = Number(model.video_duration);
+        if (!error.incompleteEncryptionMetadata || typeof model.video_id !== 'string' || !model.video_id.trim() || !Number.isFinite(duration) || duration <= 0
+            || !error.minimumPixels || !model.fallback_api) throw error;
+        const info = await readFallback();
+        const fallbackDuration = Number(info?.video_duration);
+        if (info?.video_id !== model.video_id || !Number.isFinite(fallbackDuration) || fallbackDuration <= 0
+            || Math.abs(fallbackDuration - duration) > 0.5) {
+            throw Object.assign(new Error('备用片源编号或完整时长无法确认，已停止取址'), { code: 'INVALID_RESPONSE' });
+        }
+        return parseAppPlayModel(info, vid, options, false, true, error.minimumPixels);
     }
+}
+
+function parseAppPlayModel(info, vid, options, inline, requireEncryptionMetadata = inline, minimumPixels = 0) {
+    const requestedQuality = normalizeDownloadQuality(options.quality);
+    const allowLowerQuality = options.allowLowerQuality === true && requestedQuality !== 'auto';
     if (!info) throw Object.assign(new Error('App 接口未返回本集片源模型'), { code: 'MISSING_MODEL' });
     const compatibleRows = Object.values(info?.video_list || {}).filter(item => item && (item.main_url || item.backup_url || Array.isArray(item.backup_url_list))).map(item => {
         const codec = str(item.codec_type || item.video_meta?.codec_type).toLowerCase();
@@ -416,7 +436,7 @@ async function fetchAppPlayUrl(vid, options = {}) {
             .map(pair => pair.map(Number)).find(pair => pair.every(value => Number.isFinite(value) && value > 0)) || [0, 0];
         const pixels = width && height ? Math.min(width, height) : Number(quality.match(/\d+/)?.[0] || 0);
         return { item, codec, codecRank, quality, pixels, width, height };
-    }).filter(row => row.codecRank < 2);
+    }).filter(row => row.codecRank < 2 && (!minimumPixels || Math.min(row.width, row.height) >= minimumPixels));
     const rows = compatibleRows.filter(row => allowLowerQuality || meetsDownloadQuality(row, requestedQuality)).sort((a, b) => {
         if (requestedQuality === 'auto') return a.codecRank - b.codecRank || b.pixels - a.pixels;
         const aMeets = meetsDownloadQuality(a, requestedQuality), bMeets = meetsDownloadQuality(b, requestedQuality);
@@ -434,6 +454,7 @@ async function fetchAppPlayUrl(vid, options = {}) {
         });
     }
     let lastError;
+    let incompleteEncryptionMetadata = false;
     const variants = [];
     const seen = new Set();
     // Auto means "best available". Keep every compatible encoding at the same
@@ -445,7 +466,8 @@ async function fetchAppPlayUrl(vid, options = {}) {
     for (const selected of selectedRows) {
         try {
             const spade = selected.item.spade_a || selected.item.encrypt_info?.spade_a;
-            if (inline && !spade && ![false, 0, '0', 'false'].includes(selected.item.encrypt_info?.encrypt)) {
+            if (requireEncryptionMetadata && !spade && ![false, 0, '0', 'false'].includes(selected.item.encrypt_info?.encrypt)) {
+                if (selected.item.encrypt_info?.encrypt == null) incompleteEncryptionMetadata = true;
                 throw Object.assign(new Error('本集片源缺少有效解密信息'), { code: 'INVALID_RESPONSE' });
             }
             const key = spade ? deriveContentKey(spade) : null;
@@ -469,7 +491,13 @@ async function fetchAppPlayUrl(vid, options = {}) {
     }
     if (variants.length) return { ...variants[0], variants };
     throw lastError?.code === 'SECURITY_BLOCKED' ? lastError
-        : Object.assign(new Error('本集片源地址或密钥无法解析'), { code: 'INVALID_RESPONSE' });
+        : Object.assign(new Error('本集片源地址或密钥无法解析'), {
+            code: 'INVALID_RESPONSE',
+            ...(incompleteEncryptionMetadata ? {
+                incompleteEncryptionMetadata: true,
+                minimumPixels: Math.min(rows[0].width, rows[0].height),
+            } : {}),
+        });
 }
 
 module.exports = { fetchAppPlayUrl, signedSearchRequest, signedMetadataRequest, signedAccountRequest, parseSearchInteger, preserveLargeJsonIntegers, requestJson, SEARCH_API, SEARCH_UA };
