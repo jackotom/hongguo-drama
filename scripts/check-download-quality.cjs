@@ -7,7 +7,7 @@ const playbackDevice = Object.freeze({ device_id: '7000000000000000001', iid: '7
 const mediaUrl = name => `https://v3-reading.qznovelvod.com/${name}.mp4`;
 const stream = (name, width, height, codec_type = 'h264') => ({ main_url: mediaUrl(name), width, height, codec_type, definition: '1080p' });
 function load(name, dependencies) {
-  dependencies = { './playback-device': { getPlaybackDevice: async () => playbackDevice }, ...dependencies };
+  dependencies = { './playback-device': { registerPlaybackDevice: async () => playbackDevice }, ...dependencies };
   const context = { Buffer, URL, URLSearchParams, AbortSignal, process: { env: {} }, module: { exports: {} },
     require: name => Object.hasOwn(dependencies, name) ? dependencies[name] : require(name.startsWith('.') ? path.join(nativeDir, name) : name) };
   vm.runInNewContext(fs.readFileSync(path.join(nativeDir, name), 'utf8'), context);

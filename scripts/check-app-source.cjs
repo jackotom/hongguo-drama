@@ -67,7 +67,7 @@ function fixture({ wrongVid = false, fallback = 'https://vod.snssdk.com/info', m
   const context = { Buffer, URL, URLSearchParams, AbortSignal, module: { exports: {} },
     require: name => {
       if (name === 'axios') return axios;
-      if (name === './playback-device') return { getPlaybackDevice: async requestJson => {
+      if (name === './playback-device') return { registerPlaybackDevice: async requestJson => {
         assert.equal(typeof requestJson, 'function');
         return playbackDevice;
       } };

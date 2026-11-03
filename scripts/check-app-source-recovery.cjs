@@ -9,7 +9,7 @@ const sourcePath = path.resolve(__dirname, '../src/native/app-source.js');
 const source = fs.readFileSync(sourcePath, 'utf8');
 const vid = '7700946421087751193';
 
-function load(axios, { realDevice = false, getPlaybackDevice, now } = {}) {
+function load(axios, { realDevice = false, getPlaybackDevice, registerPlaybackDevice = getPlaybackDevice, now } = {}) {
   const module = { exports: {} };
   const context = vm.createContext({
     module,
@@ -18,8 +18,14 @@ function load(axios, { realDevice = false, getPlaybackDevice, now } = {}) {
       if (name === 'node:crypto') return crypto;
       if (name === './sm3') return require('../src/native/sm3');
       if (name === './download-quality') return require('../src/native/download-quality');
-      if (name === './playback-device') return getPlaybackDevice ? { getPlaybackDevice } : realDevice ? require('../src/native/playback-device')
-        : { getPlaybackDevice: async () => ({ device_id: '1000000000000001', iid: '1000000000000002', cdid: 'fixture' }) };
+      if (name === './playback-device') return getPlaybackDevice || registerPlaybackDevice ? {
+        getPlaybackDevice: getPlaybackDevice || (async () => ({ device_id: '1000000000000001', iid: '1000000000000002', cdid: 'fixture' })),
+        registerPlaybackDevice: registerPlaybackDevice || (async () => ({ device_id: '1000000000000001', iid: '1000000000000002', cdid: 'fixture' })),
+      } : realDevice ? require('../src/native/playback-device')
+        : {
+          getPlaybackDevice: async () => ({ device_id: '1000000000000001', iid: '1000000000000002', cdid: 'fixture' }),
+          registerPlaybackDevice: async () => ({ device_id: '1000000000000001', iid: '1000000000000002', cdid: 'fixture' }),
+        };
       if (name === 'axios') return axios;
       return require(name);
     },
@@ -98,30 +104,31 @@ function row(definition, width, height, suffix) {
     data: { [id]: { video_model: { video_list: rows, fallback_api: 'https://vod.snssdk.com/must-not-fetch' } } } }) });
   const plain = { ...row('1080p', 1080, 1920, 'inline'), encrypt_info: { encrypt: false } };
   const identities = [{ device_id: '11', iid: '12', cdid: 'fixture' }, { device_id: '21', iid: '22', cdid: 'fixture' }];
-  let recoverCalls = 0, renewals = 0;
+  let recoverCalls = 0, renewals = 0, recoveryRegistrations = 0;
   const recovery = load(async config => {
     recoverCalls++;
     if (new URL(config.url).searchParams.get('device_id') === '11') return { status: 200, headers: {}, data: '' };
     return inlineResponse([plain]);
-  }, { getPlaybackDevice: async (_request, rejected) => {
-    if (rejected) { assert.equal(rejected, identities[0]); renewals++; }
-    return identities[rejected ? 1 : 0];
+  }, { registerPlaybackDevice: async () => {
+    recoveryRegistrations++;
+    if (recoveryRegistrations > 1) renewals++;
+    return identities[recoveryRegistrations - 1];
   } });
   assert.equal((await recovery.fetchAppPlayUrl(vid)).url, plain.main_url, 'empty model response renews the device and recovers');
   assert.equal(recoverCalls, 2);
   assert.equal(renewals, 1);
   for (const status of [200, 403, 404]) {
-    let calls = 0, refreshed = 0;
+    let calls = 0, registrations = 0;
     const unavailable = load(async () => { calls++; return { status, headers: {}, data: '' }; },
-      { getPlaybackDevice: async (_request, rejected) => { if (rejected) refreshed++; return identities[rejected ? 1 : 0]; } });
+      { registerPlaybackDevice: async () => identities[registrations++] });
     await assert.rejects(unavailable.fetchAppPlayUrl(vid), error => status === 200 ? error.code === 'EMPTY_RESPONSE' : error.status === status);
-    assert.equal(calls, status === 200 ? 2 : 1, 'one recovery only; HTTP rejection must not rotate devices');
-    assert.equal(refreshed, status === 200 ? 1 : 0);
+    assert.equal(calls, status === 200 ? 2 : 1, 'one recovery only; HTTP rejection must not retry the model request');
+    assert.equal(registrations, status === 200 ? 2 : 1);
   }
   let cooldownCalls = 0;
   await assert.rejects(load(async () => { cooldownCalls++; return { status: 200, headers: {}, data: '' }; },
     { getPlaybackDevice: async () => identities[0] }).fetchAppPlayUrl(vid), error => error.code === 'EMPTY_RESPONSE');
-  assert.equal(cooldownCalls, 2, 'cooldown permits one alternate route without registering another device');
+  assert.equal(cooldownCalls, 2, 'empty response permits one fresh-device alternate route');
   let clock = Date.now(), slowCalls = 0;
   const slowRegistration = load(async config => {
     slowCalls++;
@@ -152,6 +159,15 @@ function row(definition, width, height, suffix) {
   assert.equal(inlineCalls, 1, 'inline model must not fetch the obsolete fallback endpoint');
   assert.equal((await direct.fetchAppPlayUrl(vid, { quality: '1080p' })).width, 1080);
 
+  let registrations = 0;
+  const oneUseDevice = load(async config => inlineResponse([plain]), {
+    getPlaybackDevice: async () => assert.fail('playback model must not reuse the cached device'),
+    registerPlaybackDevice: async () => ({ device_id: String(++registrations), iid: '2', cdid: 'fixture' }),
+  });
+  await oneUseDevice.fetchAppPlayUrl(vid);
+  await oneUseDevice.fetchAppPlayUrl(vid);
+  assert.equal(registrations, 2, 'each model request registers a device because the upstream may allow one request per identity');
+
   // Encode a synthetic Spade key, so the real decoder is exercised without captured credentials.
   const keyHex = '0123456789abcdef0123456789abcdef';
   const raw = Buffer.alloc(34), previous = [246, 85], keyPlain = Buffer.from(`0${keyHex}`);
@@ -171,7 +187,8 @@ function row(definition, width, height, suffix) {
     error => error.code === 'MISSING_MODEL');
   await assert.rejects(load(async () => inlineResponse([{ ...plain, main_url: 'https://127.0.0.1/private', backup_url: '' }])).fetchAppPlayUrl(vid),
     error => error.code === 'SECURITY_BLOCKED');
-  let registrations = 0, modelCalls = 0;
+  registrations = 0;
+  let modelCalls = 0;
   const registered = load(async config => {
     if (new URL(config.url).pathname === '/service/2/device_register/') {
       registrations++;
@@ -188,7 +205,7 @@ function row(definition, width, height, suffix) {
     return inlineResponse([plain]);
   }, { realDevice: true });
   const simultaneous = await Promise.all([registered.fetchAppPlayUrl(vid), registered.fetchAppPlayUrl(vid)]);
-  assert.equal(registrations, 1, 'real device module and transport must share registration');
+  assert.equal(registrations, 2, 'each model request uses a separately registered device');
   assert.equal(modelCalls, 2);
   assert.ok(simultaneous.every(result => result.url === plain.main_url));
   assert.doesNotMatch(JSON.stringify(simultaneous), /synthetic-unused-token/);

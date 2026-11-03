@@ -11,7 +11,7 @@ const webPage = (vid = '11', sid = '1', extra = {}) => `<script>window._ROUTER_D
     publicVideoSeo: { available: true, itemId: vid, seriesId: sid }, ...extra },
 } })}</script><script type="application/ld+json">${JSON.stringify({ '@type': 'VideoObject', url: `https://hongguoduanju.com/player/${sid}/${vid}`, contentUrl: media('web') })}</script>`;
 function load(file, dependencies) {
-  dependencies = { './playback-device': { getPlaybackDevice: async () => playbackDevice }, ...dependencies };
+  dependencies = { './playback-device': { registerPlaybackDevice: async () => playbackDevice }, ...dependencies };
   const context = { Buffer, URL, URLSearchParams, AbortSignal, AbortController, process: { env: {} }, module: { exports: {} },
     console: { warn() {} }, setTimeout: (fn, ms) => ms === 600 ? setTimeout(fn, 0) : fn(),
     require: name => Object.hasOwn(dependencies, name) ? dependencies[name] : require(name.startsWith('.') ? path.join(nativeDir, name) : name) };
@@ -87,13 +87,13 @@ const checks = [
       [{ code: 'secret' }, 'DEVICE_REGISTRATION_FAILED', '10 秒后重试'],
     ]) {
       const device = load('playback-device.js', {});
-      const getPlaybackDevice = async request => device.getPlaybackDevice(async (...args) => {
+      const registerPlaybackDevice = async request => device.registerPlaybackDevice(async (...args) => {
         if (['EMPTY_RESPONSE', 'INVALID_RESPONSE', 'BUSINESS_REJECTED', 'SECURITY_BLOCKED'].includes(failure.code)) {
           throw Object.assign(new Error('secret'), failure);
         }
         return request(...args);
       });
-      const routedApp = load('app-source.js', { './playback-device': { getPlaybackDevice }, axios: async config => {
+      const routedApp = load('app-source.js', { './playback-device': { registerPlaybackDevice }, axios: async config => {
         if (failure.status) return { status: failure.status, headers: {}, data: 'secret' };
         throw Object.assign(new Error('secret https://signed.invalid/?token=private'), failure);
       } });

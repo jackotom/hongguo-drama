@@ -7,6 +7,10 @@ on:
         description: Skip player playback when the required acceptance footage is unavailable
         type: boolean
         default: false
+      build_only:
+        description: Build release assets without running unit, platform, installer, or upgrade acceptance checks
+        type: boolean
+        default: false
   push:
     branches: ['windows/**']
 permissions:
@@ -54,8 +58,10 @@ jobs:
         shell: pwsh
         run: Copy-Item media/bin/* build/ffmpeg/ -Force
       - name: Run unit and platform checks
+        if: ${{ !inputs.build_only }}
         run: npm test
       - name: Check Windows FFmpeg discovery
+        if: ${{ !inputs.build_only }}
         run: node scripts/check-ffmpeg-resolution.cjs
       - uses: actions/cache/restore@v4
         id: app-cache
@@ -85,6 +91,7 @@ jobs:
             dist/*.blockmap
           key: ${{ steps.app-cache.outputs.cache-primary-key }}
       - name: Verify portable, fresh NSIS install, reinstall and real 1.80 upgrade
+        if: ${{ !inputs.build_only }}
         env:
           HONGGUO_SKIP_PLAYBACK: ${{ inputs.skip_playback || false }}
         shell: pwsh
@@ -97,6 +104,9 @@ jobs:
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
           node scripts/check-windows-installer.cjs
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
+      - name: Assemble Windows release assets
+        shell: pwsh
+        run: |
           New-Item -ItemType Directory -Force dist/windows-release | Out-Null
           $version = (Get-Content package.json | ConvertFrom-Json).version -replace '^(\d+\.\d+)\.0$', '$1'
           Copy-Item "dist/红果短剧-$version-便携版.exe" "dist/windows-release/hongguo-downloader-$version-win-x64.exe"
@@ -112,7 +122,7 @@ jobs:
           name: windows-release-candidate
           path: dist/windows-release/
       - uses: actions/upload-artifact@v4
-        if: always()
+        if: ${{ always() && !inputs.build_only }}
         with:
           name: windows-verification
           path: dist/windows-verification/
