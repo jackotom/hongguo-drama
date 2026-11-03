@@ -25,19 +25,19 @@
 
 
 
-**当前正式版：5.4**（内部 `5.4.0`）。恢复播放取源签名，新增官网登录备用入口、按剧清缓存、观看记录分组与 DLNA 单集投屏。双Mac已签名、公证和装订；Windows EXE未签名。详见 [5.4说明](docs/release-5.4.md)。
+**当前正式版：5.5**（内部 `5.5.0`）。修复播放身份复用及缺失解密信息的备用取源，完善 NAS 下载安全、整剧资料和单集评论、本机小红心。双 Mac 已签名、公证和装订；Windows EXE 未签名。本轮按用户要求未重跑功能测试，详见 [5.5说明](docs/release-5.5.md)。
 
-| 设备 | 下载 5.4 | 安装方式 |
+| 设备 | 下载 5.5 | 安装方式 |
 |---|---|---|
-| Apple 芯片 Mac（M 系列），macOS 13+ | [下载 DMG](https://github.com/jackotom/hongguo-drama/releases/download/v5.4/Hongguo-5.4-mac-arm64.dmg) | 打开 DMG，拖入「应用程序」后启动；后续支持应用内更新 |
-| Intel Mac，macOS 13+ | [下载 DMG](https://github.com/jackotom/hongguo-drama/releases/download/v5.4/Hongguo-5.4-mac-x64.dmg) | 打开 DMG，拖入「应用程序」后启动；后续支持应用内更新 |
-| Windows x64（推荐安装版） | [下载安装版 EXE](https://github.com/jackotom/hongguo-drama/releases/download/v5.4/hongguo-downloader-5.4-win-x64-setup.exe) | 按向导安装，后续支持应用内更新 |
-| Windows x64（便携版） | [下载便携 EXE](https://github.com/jackotom/hongguo-drama/releases/download/v5.4/hongguo-downloader-5.4-win-x64.exe) · [下载便携 ZIP](https://github.com/jackotom/hongguo-drama/releases/download/v5.4/hongguo-downloader-5.4-win-x64.zip) | 直接运行 EXE；ZIP 解压后运行同一程序，后续仍需手动替换 |
+| Apple 芯片 Mac（M 系列），macOS 13+ | [下载 DMG](https://github.com/jackotom/hongguo-drama/releases/download/v5.5/Hongguo-5.5-mac-arm64.dmg) | 打开 DMG，拖入「应用程序」后启动；后续支持应用内更新 |
+| Intel Mac，macOS 13+ | [下载 DMG](https://github.com/jackotom/hongguo-drama/releases/download/v5.5/Hongguo-5.5-mac-x64.dmg) | 打开 DMG，拖入「应用程序」后启动；后续支持应用内更新 |
+| Windows x64（推荐安装版） | [下载安装版 EXE](https://github.com/jackotom/hongguo-drama/releases/download/v5.5/hongguo-downloader-5.5-win-x64-setup.exe) | 按向导安装，后续支持应用内更新 |
+| Windows x64（便携版） | [下载便携 EXE](https://github.com/jackotom/hongguo-drama/releases/download/v5.5/hongguo-downloader-5.5-win-x64.exe) · [下载便携 ZIP](https://github.com/jackotom/hongguo-drama/releases/download/v5.5/hongguo-downloader-5.5-win-x64.zip) | 直接运行 EXE；ZIP 解压后运行同一程序，后续仍需手动替换 |
 
-[查看最新正式版](https://github.com/jackotom/hongguo-drama/releases/latest) · [5.4 更新说明与源码](https://github.com/jackotom/hongguo-drama/releases/tag/v5.4) · [SHA256 校验文件](https://github.com/jackotom/hongguo-drama/releases/download/v5.4/SHA256SUMS.txt)
+[查看最新正式版](https://github.com/jackotom/hongguo-drama/releases/latest) · [5.5 更新说明与源码](https://github.com/jackotom/hongguo-drama/releases/tag/v5.5) · [SHA256 校验文件](https://github.com/jackotom/hongguo-drama/releases/download/v5.5/SHA256SUMS.txt)
 
 
-- **升级到 5.4**：5.3 安装版可使用应用内更新；也可退出旧程序后替换 Mac 应用或运行 Windows 安装包。便携版保留同目录的 `data` 后手动替换；1.75 及更早版本需要手动安装。
+- **升级到 5.5**：5.4 安装版可使用应用内更新；也可退出旧程序后替换 Mac 应用或运行 Windows 安装包。便携版保留同目录的 `data` 后手动替换；1.75 及更早版本需要手动安装。
 - **后续更新**：Mac 与 Windows 安装版可在应用内下载新版，下载完成后由你点击重启安装，不强制升级。Windows 便携版继续通过发行页下载并手动替换。
 - **Mac**：正式包完成 Developer ID 签名、Apple 公证 Accepted 和票据装订。无需全局关闭 Gatekeeper；公证不等于 App Store 审核或内容授权。
 - **Windows**：安装版和便携版 EXE 尚未签名，可能出现系统安全提示。请核对官方下载来源；便携版首次启动会展开临时运行文件。安装版沿用原用户资料目录；3.4 起便携版把设置和下载记录放在程序目录的 `data` 文件夹，移动程序时请连同该文件夹一起保留。安装版与便携版不能同时运行（同一应用只允许一个实例）；更换版本前请先退出正在运行的窗口。
@@ -70,12 +70,13 @@
 3. 打开详情点「立即播放」，也可选择集数与清晰度加入下载队列。
 4. 下次从「我的剧库」或「观看记录」接着看；下载进度、失败重试和整剧合并在「下载管理」。
 
-## 5.5 发行候选（尚未发布）
+## 5.5 播放恢复与下载整理
 
+- 播放取源独立注册匿名身份，修复连续切集和批量下载复用失效身份的问题。内联片源缺少解密信息时，仅有界尝试经身份、完整时长、实际画质、加密和地址校验的备用接口。
 - 修复 NAS 挂载变化下的删除安全、分集资料冲突、暂停保存失败与合并磁盘空间预检。代理密码改用本机系统安全存储。
 - 不再新建分集 NFO，保留整剧封面、简介和 tvshow.nfo；NAS 可自动创建剧名文件夹，普通下载可在设置中开启整剧资料。
 - 新增直接查看当前集公开评论和本机分集小红心，收藏与小红心明确只保存在本机。来源未提供的评论不补造，平台公开点赞数保持来源原值。
-- 构建与验证完成后统一发行；当前正式下载仍为 5.4。详见 [5.5说明](docs/release-5.5.md)。
+- 5.5 已正式发布。完成三端构建与文件完整性核对、双 Mac 签名/公证/装订；按用户要求未重跑功能、单元、集成、桌面及硬件测试。详见 [5.5说明](docs/release-5.5.md)。
 
 ## 5.4 恢复播放与下载
 
