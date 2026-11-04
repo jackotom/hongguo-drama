@@ -1,6 +1,6 @@
 {
-  "id": "release-5.6-20261104-01",
-  "title": "红果短剧 5.6 已更新",
-  "body": "新增双击视频全屏、控制条下一集、长按快进键临时2倍速。登录确认不再依赖匿名设备注册；注册失败遵守冷却。部分漫剧只提供ByteVC2编码，目前仍无法播放，已明确提示。真实手机授权及百集下载限流仍待验证。\n\n完整说明与三端下载：https://github.com/jackotom/hongguo-drama/releases/tag/v5.6",
+  "id": "release-5.7-20261104-01",
+  "title": "红果短剧 5.7 已更新",
+  "body": "新增ByteVC2兼容转换，修复观看记录分组与重复提示，音量和常用倍速可跨视频及重启记忆。批量下载后的上游失效与恢复时间仍待验证。完整说明与三端下载：https://github.com/jackotom/hongguo-drama/releases/tag/v5.7",
   "active": true
 }
