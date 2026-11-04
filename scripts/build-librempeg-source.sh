@@ -35,10 +35,12 @@ export PKG_CONFIG_PATH=
 export PKG_CONFIG_LIBDIR="$ROOT/prefix/lib/pkgconfig"
 unset CPATH C_INCLUDE_PATH CPLUS_INCLUDE_PATH LIBRARY_PATH DYLD_LIBRARY_PATH LDFLAGS CFLAGS CPPFLAGS || true
 if [[ "$TARGET" == win-x64 ]]; then
+  THREAD_ARGS=(--enable-w32threads --disable-pthreads)
   X264_ARGS=(--host=x86_64-w64-mingw32 --cross-prefix=x86_64-w64-mingw32- --disable-asm --extra-ldflags=-static)
   MEDIA_ARGS=(--arch=x86_64 --target-os=mingw32 --enable-cross-compile --cross-prefix=x86_64-w64-mingw32- --disable-asm --extra-cflags=-I../prefix/include --extra-ldflags='-static -L../prefix/lib')
   SUFFIX=.exe
 else
+  THREAD_ARGS=(--enable-pthreads)
   export PATH=/usr/bin:/bin:/usr/sbin:/sbin
   export CC=/usr/bin/clang
   export SDKROOT
@@ -62,7 +64,7 @@ make install-lib-static > "$ROOT/logs/x264-install.log" 2>&1
 cd "$ROOT/build-librempeg"
 "../sources/librempeg-$LIBREMPEG_COMMIT/configure" --prefix=../prefix "${MEDIA_ARGS[@]}" \
   --disable-everything --disable-autodetect --disable-shared --enable-static --disable-doc --disable-debug \
-  --disable-ffplay --disable-network --enable-ffmpeg --enable-ffprobe --enable-pthreads \
+  --disable-ffplay --disable-network --enable-ffmpeg --enable-ffprobe "${THREAD_ARGS[@]}" \
   --enable-protocol=file,pipe --enable-demuxer=mov --enable-muxer=mp4,null \
   --enable-decoder=bvc2,vvc,aac --enable-parser=aac --enable-encoder=libx264,aac \
   --enable-filter=scale,format,aformat,null,anull \
