@@ -1,6 +1,6 @@
 # 红果短剧 5.7
 
-状态：5.7（内部5.7.0）源码／发行目标，尚未正式发布。此前正式版为5.6；三端成品与对应源码齐备、Mac签名／Apple公证Accepted／装订核对通过后统一发布。
+状态：5.7 已于 2026-11-04 20:56（Asia/Shanghai）正式发布，GitHub 标签 `v5.7`，并设为 Latest。冻结源码 `8bbb352fc17acfd183fd72b116f028b99c14bd9f`。三端19附件远端大小与SHA256一致；双Mac App／DMG四份Apple公证Accepted、Developer ID签名与装订、只读挂载及最终更新ZIP核对通过。源码CI `41824523371` 与Windows CI `41824531981` 通过；Windows便携真实素材静音播放、新安装、同版本重装及真实1.80升级资料保留通过，EXE未签名。最终arm64包随机真实下载两集1080P HEVC／AAC，分别在10.5／10.6秒暂停；x64签名组件在Rosetta下完整转换真实136.997秒ByteVC2为1080P H.264，耗时约60.7秒。未替换本机正式安装。
 
 ## 改动
 
@@ -13,7 +13,7 @@
 
 ByteVC2在本机arm64开发版真实完整转换、在线播放、直接下载和取消清理已有证据，见 `bytevc2-playback.md`。#96–#98的三项定向回归、前端构建、隔离资料中的分组流程和两集真实素材静音播放／重启偏好已检查，见 `local-issues-96-98.md`。这些不是本轮最终发行包或其他架构的验收回执。
 
-本轮构建与成品验证证据保存在 `.planning/release-5.7/`，发布后补记实际结果。
+本轮构建、成品和远端验证证据保存在 `.planning/release-5.7/`。Mac与Windows包内68项源码、4项前端及42项运行依赖核对通过，Windows源码／HTML只做CRLF归一化。Windows新ByteVC2组件实际启动并确认bvc2解码器；Rosetta验证不等于实体Intel或Windows的ByteVC2长时播放。
 
 ## 边界
 
@@ -22,3 +22,5 @@ ByteVC2在本机arm64开发版真实完整转换、在线播放、直接下载�
 Windows EXE仍未配置代码签名。未替换本机正式安装或触碰正式账号／下载资料。
 
 随发行提供应用精确源码、原FFmpeg/x264对应源码，以及本轮三平台Librempeg/x264精确对应源码。辅助组件的AGPLv3+及上游归属见 `build/ffmpeg/LIBREMPEG-NOTICE.txt` 和随包许可正文。
+
+正式下载：[5.7发行页](https://github.com/jackotom/hongguo-drama/releases/tag/v5.7)。
