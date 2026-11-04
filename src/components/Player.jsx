@@ -21,6 +21,16 @@ const PREFETCH_RETRY_MS = 15 * 1000;
 // 播放期间最多预取后续两集；跳到更远时再按新位置补齐。
 const PREFETCH_AHEAD = 2;
 const AUTO_ONLINE_QUALITIES = ['1080p', '720p', 'auto'];
+const PLAYBACK_PREFERENCES_KEY = 'hongguo:playback-preferences';
+const readPlaybackPreferences = () => {
+  let saved;
+  try { saved = JSON.parse(window.localStorage.getItem(PLAYBACK_PREFERENCES_KEY)); } catch {}
+  return {
+    rate: Number.isFinite(saved?.rate) && saved.rate >= 0.25 && saved.rate <= 4 ? saved.rate : 1,
+    volume: Number.isFinite(saved?.volume) && saved.volume >= 0 && saved.volume <= 1 ? saved.volume : 0.5,
+    muted: saved?.muted === true,
+  };
+};
 
 const prefetchKey = (seriesId, vid, quality) => JSON.stringify([String(seriesId || ''), String(vid || ''), quality || 'auto']);
 
@@ -67,7 +77,8 @@ function Player({ target, onNavigate, onSeriesSelected, onFloatingChange, active
   const [autoNext, setAutoNext] = useState(true);
   const [autoAdvancing, setAutoAdvancing] = useState(false);
   const [cacheNext, setCacheNext] = useState(true);
-  const [playbackRate, setPlaybackRate] = useState(1);
+  const [playbackPreferences] = useState(readPlaybackPreferences);
+  const [playbackRate, setPlaybackRate] = useState(playbackPreferences.rate);
   const [downloadQuality, setDownloadQuality] = useState('auto');
   const [onlineQualityChoice, setOnlineQualityChoice] = useState(() => {
     try { const value = window.localStorage.getItem('hongguo:online-quality'); return ['720p', '1080p', 'compat'].includes(value) ? value : 'auto'; }
@@ -114,7 +125,10 @@ function Player({ target, onNavigate, onSeriesSelected, onFloatingChange, active
   const stageRef = useRef(null);
   const downloadToolsRef = useRef(null);
   const fullscreenScrollRef = useRef(null);
-  const playbackRateRef = useRef(1);
+  const playbackRateRef = useRef(playbackPreferences.rate);
+  const preferredRateRef = useRef(playbackPreferences.rate);
+  const volumeRef = useRef(playbackPreferences.volume);
+  const mutedRef = useRef(playbackPreferences.muted);
   const videoClickTimer = useRef(null);
   const fastForwardRef = useRef(null);
   const toastTimer = useRef(null);
@@ -277,11 +291,21 @@ function Player({ target, onNavigate, onSeriesSelected, onFloatingChange, active
     toastTimer.current = setTimeout(() => setToast(null), 3000);
   }, []);
 
-  const changePlaybackRate = useCallback((value, notify = true) => {
+  const savePlaybackPreferences = useCallback(() => {
+    try { window.localStorage.setItem(PLAYBACK_PREFERENCES_KEY, JSON.stringify({ rate: preferredRateRef.current, volume: volumeRef.current, muted: mutedRef.current })); }
+    catch { showToast('播放偏好已生效，但未能保存；下次打开可能恢复默认'); }
+  }, [showToast]);
+
+  const changePlaybackRate = useCallback((value, notify = true, persist = true) => {
     const rate = Number(value);
     if (!Number.isFinite(rate)) return;
     const next = Math.max(0.25, Math.min(4, rate));
     playbackRateRef.current = next;
+    if (persist) {
+      preferredRateRef.current = next;
+      if (fastForwardRef.current) fastForwardRef.current.rate = next;
+      savePlaybackPreferences();
+    }
     setPlaybackRate(next);
     const v = videoRef.current;
     if (v) {
@@ -293,7 +317,7 @@ function Player({ target, onNavigate, onSeriesSelected, onFloatingChange, active
       clearTimeout(rateNoticeTimer.current);
       rateNoticeTimer.current = setTimeout(() => setRateNotice(null), 1800);
     }
-  }, []);
+  }, [savePlaybackPreferences]);
 
   // 载入已登记的剧集列表
   const loadSeriesList = useCallback(async () => {
@@ -614,7 +638,10 @@ function Player({ target, onNavigate, onSeriesSelected, onFloatingChange, active
 
   useEffect(() => {
     const v = videoRef.current;
-    if (loading || !canPlay || !v) return;
+    if (!v) return;
+    v.volume = volumeRef.current;
+    v.muted = mutedRef.current;
+    if (loading || !canPlay) return;
     const previous = lastLoadRef.current;
     lastLoadRef.current = { source: videoSrc, version: playbackVersion };
     v.defaultPlaybackRate = playbackRateRef.current;
@@ -1135,7 +1162,7 @@ function Player({ target, onNavigate, onSeriesSelected, onFloatingChange, active
       if (!press) return;
       fastForwardRef.current = null;
       clearTimeout(press.timer);
-      if (press.active) changePlaybackRate(press.rate, false);
+      if (press.active) changePlaybackRate(press.rate, false, false);
       else if (seek && videoRef.current) {
         const video = videoRef.current;
         const limit = Number.isFinite(video.duration) && video.duration > 0 ? video.duration : Infinity;
@@ -1155,7 +1182,7 @@ function Player({ target, onNavigate, onSeriesSelected, onFloatingChange, active
         if (!fastForwardRef.current && !event.repeat) {
           const press = { key: event.code || event.key, rate: playbackRateRef.current, active: false };
           fastForwardRef.current = press;
-          press.timer = setTimeout(() => { press.active = true; changePlaybackRate(2); }, 300);
+          press.timer = setTimeout(() => { press.active = true; changePlaybackRate(2, true, false); }, 300);
         }
         return;
       }
@@ -1714,6 +1741,14 @@ function Player({ target, onNavigate, onSeriesSelected, onFloatingChange, active
               if (!canPlay || v !== videoRef.current || v.readyState === 0 || loadedMediaRef.current?.version !== mediaVersion.current) return;
               if (v.currentSrc && v.currentSrc !== videoSrc) return;
               if (v.playbackRate !== playbackRateRef.current) changePlaybackRate(v.playbackRate);
+            }}
+            onVolumeChange={(event) => {
+              const v = event.currentTarget;
+              if (v !== videoRef.current || !Number.isFinite(v.volume) || v.volume < 0 || v.volume > 1) return;
+              if (v.volume === volumeRef.current && v.muted === mutedRef.current) return;
+              volumeRef.current = v.volume;
+              mutedRef.current = v.muted;
+              savePlaybackPreferences();
             }}
             onEnded={() => { if (activeRef.current && canPlay && playbackVersion === mediaVersion.current && (!videoRef.current || loadedMediaRef.current?.version === mediaVersion.current)) handleEnded(); }}
             onPause={() => persistPosition(true)}
