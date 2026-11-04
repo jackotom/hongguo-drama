@@ -209,9 +209,12 @@ function createAccountService({
   });
 
   async function accountJson(targetCredentials, apiPath, params = {}) {
-    const signed = signedAccountRequest(apiPath, params, {
+    // Website authentication does not depend on anonymous App device availability.
+    const identity = targetCredentials.deviceId && targetCredentials.installId && targetCredentials.cdid ? {
       device_id: targetCredentials.deviceId, iid: targetCredentials.installId, cdid: targetCredentials.cdid,
-    });
+    } : await withTimeout(identityRequest(accountRequest), 10000, '账号设备初始化超时，请重试');
+    if (targetCredentials !== credentials) throw new Error('账号已退出，请重新登录');
+    const signed = signedAccountRequest(apiPath, params, identity);
     const deadline = Date.now() + 12000;
     return accountRequest(signed.url, {
       method: 'GET', headers: { ...signed.headers, Cookie: targetCredentials.cookie },
@@ -308,12 +311,9 @@ function createAccountService({
       const attempt = ++loginGeneration;
       login = null;
       const token = generation;
-      const [identity, nextProfile] = await Promise.all([
-        withTimeout(identityRequest(accountRequest), 10000, '账号设备初始化超时，请重试'),
-        withTimeout(verify({ cookie }), 15000, '账号资料验证超时，请重试'),
-      ]);
+      const nextProfile = await withTimeout(verify({ cookie }), 15000, '账号资料验证超时，请重试');
       if (attempt !== loginGeneration || token !== generation) return { success: true, status: 'cancelled' };
-      const nextCredentials = { cookie, deviceId: identity.device_id, installId: identity.iid, cdid: identity.cdid };
+      const nextCredentials = { cookie };
       let storageWarning = '';
       try { sessionStore.save({ ...nextCredentials, profile: nextProfile }); } catch (error) { storageWarning = safeMessage(error); }
       credentials = nextCredentials; profile = nextProfile; history = []; historyLoaded = false;
@@ -357,16 +357,11 @@ function createAccountService({
       if (!login.jar.hasSession()) return { success: true, status: 'pending' };
 
       const cookie = login.jar.header();
-      console.log('[Account] Device identity and profile verify: start');
-      const [identity, nextProfile] = await Promise.all([
-        withTimeout(identityRequest(accountRequest), 10000, '账号设备初始化超时，请重试'),
-        withTimeout(verify({ cookie }), 15000, '账号资料验证超时，请重试'),
-      ]);
+      console.log('[Account] Profile verify: start');
+      const nextProfile = await withTimeout(verify({ cookie }), 15000, '账号资料验证超时，请重试');
       if (!stillCurrent()) return { success: true, status: 'cancelled' };
-      console.log('[Account] Device identity and profile verify: done');
-      const nextCredentials = {
-        cookie, deviceId: identity.device_id, installId: identity.iid, cdid: identity.cdid,
-      };
+      console.log('[Account] Profile verify: done');
+      const nextCredentials = { cookie };
       let storageWarning = '';
       try { sessionStore.save({ ...nextCredentials, profile: nextProfile }); }
       catch (error) { storageWarning = safeMessage(error); }

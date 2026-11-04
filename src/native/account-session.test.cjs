@@ -161,8 +161,58 @@ test('website QR flow verifies account, loads APP history and keeps credentials 
     assert.ok(fs.existsSync(file));
     assert.ok(webCalls.some(call => call.cookie.includes('passport_csrf_token=csrf-fixture')));
     assert.ok(webCalls.some(call => call.url.includes('/passport/account/info/v2/') && call.cookie.includes('sessionid=private-session')));
-    assert.equal(maxActiveVerificationCalls, 2);
+    assert.equal(maxActiveVerificationCalls, 1);
   } finally { fs.rmSync(root, { recursive: true, force: true }); }
+});
+
+test('verified website login does not require an anonymous playback device', async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'hg-web-login-'));
+  let registrations = 0;
+  try {
+    const service = createAccountService({
+      filePath: path.join(root, 'session.bin'), safeStorage: fakeEncryption(),
+      webRequest: async () => webPayload({ user_id_str: '42', name: '测试账号' }),
+      identityRequest: async () => { registrations++; throw new Error('device unavailable'); },
+    });
+    assert.equal((await service.completeWebLogin('sessionid=fixture')).status, 'signed-in');
+    assert.equal((await service.status()).signedIn, true);
+    assert.equal(registrations, 0);
+    await assert.rejects(service.history({ refresh: true }), /device unavailable/);
+    assert.equal((await service.status()).signedIn, true);
+  } finally { fs.rmSync(root, { recursive: true, force: true }); }
+});
+
+test('confirmed QR login does not require an anonymous playback device', async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'hg-qr-login-'));
+  try {
+    const service = createAccountService({
+      filePath: path.join(root, 'session.bin'), safeStorage: fakeEncryption(),
+      identityRequest: async () => assert.fail('login must not register a device'),
+      webRequest: async url => url.includes('get_qrcode') ? webPayload({ token: 'fixture', qrcode: 'fixture', expire_time: 180 })
+        : url.includes('check_qrconnect') ? { ...webPayload({ status: '3' }), headers: { 'set-cookie': ['sessionid=fixture; Path=/'] } }
+        : webPayload({ user_id_str: '42', name: '测试账号' }),
+    });
+    const started = await service.startLogin();
+    assert.equal((await service.pollLogin(started.loginId)).status, 'signed-in');
+  } finally { fs.rmSync(root, { recursive: true, force: true }); }
+});
+
+test('logout during lazy device registration cannot send the old account cookie', async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'hg-history-logout-'));
+  let release, entered;
+  const gate = new Promise(resolve => { release = resolve; });
+  const waiting = new Promise(resolve => { entered = resolve; });
+  try {
+    const service = createAccountService({ filePath: path.join(root, 'session.bin'), safeStorage: fakeEncryption(),
+      webRequest: async () => webPayload({ user_id_str: '42', name: '测试账号' }),
+      identityRequest: async () => { entered(); await gate; return { device_id: '1', iid: '2', cdid: '00000000-0000-4000-8000-000000000003' }; },
+      accountRequest: async () => assert.fail('logged-out account must not send cookies'),
+    });
+    await service.completeWebLogin('sessionid=fixture');
+    const pending = service.history({ refresh: true });
+    await waiting; await service.logout(); release();
+    await assert.rejects(pending, /账号已退出/);
+  } finally { release?.(); fs.rmSync(root, { recursive: true, force: true }); }
 });
 
 for (const action of ['cancelLogin', 'logout']) test(`${action} prevents a pending confirmation from saving credentials`, async () => {

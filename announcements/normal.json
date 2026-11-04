@@ -1,6 +1,6 @@
 {
-  "id": "release-5.5-20261103-01",
-  "title": "红果短剧 5.5 已更新",
-  "body": "修复连续切集和批量下载的设备身份复用，补齐经严格校验的备用取源。修复 NAS 删除和资料冲突、暂停保存失败、合并空间及代理密码存储。普通下载可附带封面/简介/tvshow.nfo，NAS 可自动建剧名目录，不再新建分集 NFO。新增单集公开评论入口和本机分集小红心。\n\n完整说明与三端下载：https://github.com/jackotom/hongguo-drama/releases/tag/v5.5",
-  "active": true
+  "id": "release-5.6-20261104-01",
+  "title": "红果短剧 5.6 更新说明",
+  "body": "新增双击视频全屏、控制条下一集、长按快进键临时2倍速。登录确认不再依赖匿名设备注册；注册失败遵守冷却。部分漫剧只提供ByteVC2编码，目前仍无法播放，已明确提示。真实手机授权及百集下载限流仍待验证。\n\n完整说明与三端下载：https://github.com/jackotom/hongguo-drama/releases/tag/v5.6",
+  "active": false
 }

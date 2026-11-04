@@ -16,3 +16,13 @@ test('multiple cookie events share verification and closed windows receive no su
   observer.close(); gate.resolve(); await first;
   assert.equal(maximum, 1); assert.equal(success, 0);
 });
+
+test('a rejected verification reaches the login error handler', async () => {
+  let message;
+  const observer = createWebLoginObserver({ readCookies: async () => [{ name: 'sessionid', value: 'fixture' }],
+    complete: async () => ({ success: false, error: '账号资料验证失败' }), cancel() {}, onSignedIn: () => assert.fail('not signed in'),
+    onError: error => { message = error.message; } });
+  await observer.inspect();
+  assert.equal(message, '账号资料验证失败');
+  observer.close();
+});

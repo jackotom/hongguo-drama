@@ -1,5 +1,5 @@
 /**
- * main.js - 红果短剧 5.5 下载器（独立版）主进程
+ * main.js - 红果短剧 5.6 下载器（独立版）主进程
  *
  * 功能：
  *   1. 红果短剧解析（分享链接 / series_id -> 全剧集列表）
@@ -4271,7 +4271,11 @@ ipcMain.handle('open-account-web-login', async () => {
       sendToRenderer('account-updated', { signedIn: true });
       if (!win.isDestroyed()) win.close();
     },
-    onError: error => console.warn('[Account]', accountSafeMessage(error)),
+    onError: error => {
+      const message = accountSafeMessage(error);
+      console.warn('[Account]', message);
+      sendToRenderer('account-updated', { error: message });
+    },
   });
   const changed = () => { void observer.inspect(); };
   getAccountWebSession().cookies.on('changed', changed);

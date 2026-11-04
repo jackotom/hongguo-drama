@@ -56,6 +56,12 @@ test('complete inline metadata does not request fallback', async () => {
     assert.equal(f.calls.length, 1);
 });
 
+test('ByteVC2-only episodes report the unsupported encoding without treating it as HEVC', async () => {
+    const f = fixture(model({ video_list: [{ ...row(1080, { encrypt: false }), codec_type: 'bytevc2' }] }), null);
+    await assert.rejects(f.fetch(), error => error.code === 'NO_COMPATIBLE_SOURCE' && /ByteVC2/.test(error.message));
+    assert.equal(f.calls.length, 1);
+});
+
 test('verified fallback decodes key_seed URLs and preserves validated backups', async () => {
     const seed = Buffer.alloc(16, 7);
     const constants = Buffer.from('4dd4c2e6b83162090e52b3c7a6733ba41cb2462b829ab58a196b39db57177524f49baf7f08e8d68d26a72e37c1a95a2f1f05a51892aef2949732b62a38aadd58', 'hex');

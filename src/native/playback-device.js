@@ -12,6 +12,8 @@ const KDF_SALT = Buffer.from('4dd4c2e6b83162090e52b3c7a6733ba41cb2462b829ab58a19
 let registration;
 let refreshAfter = 0;
 let retryAfter = 0;
+let registrationRetryAfter = 0;
+let lastRegistrationFailure;
 
 function responseId(response, name) {
     const preferred = response?.[`${name}_str`];
@@ -21,6 +23,9 @@ function responseId(response, name) {
 }
 
 async function registerPlaybackDevice(requestJson) {
+    if (Date.now() < registrationRetryAfter) throw Object.assign(new Error('匿名播放设备注册失败，请检查网络，10 秒后重试'), {
+        code: 'DEVICE_REGISTRATION_FAILED', registrationFailure: lastRegistrationFailure,
+    });
     try {
             const now = Date.now();
             const cdid = crypto.randomUUID();
@@ -65,6 +70,7 @@ async function registerPlaybackDevice(requestJson) {
             const iid = responseId(response, 'install_id');
             if (Number(response?.code ?? response?.Code ?? 0) !== 0) throw Object.assign(new Error('Registration rejected'), { code: 'BUSINESS_REJECTED' });
             if (!device_id || !iid) throw Object.assign(new Error('Invalid registration'), { code: 'INVALID_RESPONSE' });
+        registrationRetryAfter = 0;
         return Object.freeze({ device_id, iid, cdid });
     } catch (error) {
         const status = Number(error?.status);
@@ -72,6 +78,8 @@ async function registerPlaybackDevice(requestJson) {
             : ['ECONNABORTED', 'ETIMEDOUT'].includes(error?.code) ? 'TIMEOUT'
             : ['ENOTFOUND', 'EAI_AGAIN', 'ECONNRESET', 'ECONNREFUSED', 'EHOSTUNREACH', 'ENETUNREACH', 'EPIPE', 'ERR_NETWORK', 'ERR_CANCELED'].includes(error?.code) ? 'NETWORK_ERROR'
             : ['EMPTY_RESPONSE', 'INVALID_RESPONSE', 'BUSINESS_REJECTED', 'SECURITY_BLOCKED'].includes(error?.code) ? error.code : 'UNKNOWN';
+        registrationRetryAfter = Date.now() + 10000;
+        lastRegistrationFailure = registrationFailure;
         throw Object.assign(new Error('匿名播放设备注册失败，请检查网络，10 秒后重试'), {
             code: 'DEVICE_REGISTRATION_FAILED', registrationFailure,
         });

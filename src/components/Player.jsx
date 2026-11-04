@@ -115,6 +115,8 @@ function Player({ target, onNavigate, onSeriesSelected, onFloatingChange, active
   const downloadToolsRef = useRef(null);
   const fullscreenScrollRef = useRef(null);
   const playbackRateRef = useRef(1);
+  const videoClickTimer = useRef(null);
+  const fastForwardRef = useRef(null);
   const toastTimer = useRef(null);
   const rateNoticeTimer = useRef(null);
   const mergeRequestRef = useRef(false);
@@ -1121,11 +1123,26 @@ function Player({ target, onNavigate, onSeriesSelected, onFloatingChange, active
     } catch { restoreFullscreenScroll(); showToast('无法进入或退出全屏，请重试'); }
   }, [portrait, floatingPlayer.floating, showToast, restoreFullscreenScroll]);
 
+  useEffect(() => () => clearTimeout(videoClickTimer.current), [videoSrc]);
+
   // Capture handled keys before media controls; cancel keyup too so focused buttons cannot toggle twice.
   useEffect(() => {
     if ((!active && !floatingPlayer.floating) || confirmAsk || mergeAsk || pickerOpen) return;
     const keyboardWindow = stageRef.current?.ownerDocument?.defaultView || window;
     const held = new Set();
+    const finishForward = (seek = false) => {
+      const press = fastForwardRef.current;
+      if (!press) return;
+      fastForwardRef.current = null;
+      clearTimeout(press.timer);
+      if (press.active) changePlaybackRate(press.rate, false);
+      else if (seek && videoRef.current) {
+        const video = videoRef.current;
+        const limit = Number.isFinite(video.duration) && video.duration > 0 ? video.duration : Infinity;
+        try { video.currentTime = Math.min(limit, video.currentTime + 5); }
+        catch { showToast('暂时无法跳转，请稍后重试'); }
+      }
+    };
     const onKey = (event) => {
       const video = videoRef.current;
       if (!video || event.defaultPrevented || ignoresPlaybackShortcut(event.target, event.key)) return;
@@ -1134,6 +1151,14 @@ function Player({ target, onNavigate, onSeriesSelected, onFloatingChange, active
       if (!action) return;
       event.preventDefault(); event.stopPropagation?.();
       held.add(event.code || event.key);
+      if (action.id === 'forward') {
+        if (!fastForwardRef.current && !event.repeat) {
+          const press = { key: event.code || event.key, rate: playbackRateRef.current, active: false };
+          fastForwardRef.current = press;
+          press.timer = setTimeout(() => { press.active = true; changePlaybackRate(2); }, 300);
+        }
+        return;
+      }
       if (event.repeat && !action.repeat) return;
       const { currentIndex: index, autoNext: nextEnabled } = stateRef.current;
       if (action.id === 'play') {
@@ -1154,8 +1179,9 @@ function Player({ target, onNavigate, onSeriesSelected, onFloatingChange, active
     const onKeyUp = event => {
       if (!held.delete(event.code || event.key)) return;
       event.preventDefault(); event.stopPropagation?.();
+      if (fastForwardRef.current?.key === (event.code || event.key)) finishForward(true);
     };
-    const onBlur = () => held.clear();
+    const onBlur = () => { held.clear(); finishForward(); };
     keyboardWindow.addEventListener('keydown', onKey, true);
     keyboardWindow.addEventListener('keyup', onKeyUp, true);
     keyboardWindow.addEventListener('blur', onBlur);
@@ -1163,6 +1189,7 @@ function Player({ target, onNavigate, onSeriesSelected, onFloatingChange, active
       keyboardWindow.removeEventListener('keydown', onKey, true);
       keyboardWindow.removeEventListener('keyup', onKeyUp, true);
       keyboardWindow.removeEventListener('blur', onBlur);
+      finishForward();
     };
   }, [active, floatingPlayer.floating, confirmAsk, mergeAsk, pickerOpen, findNext, findPrev, goToEpisode, changePlaybackRate, showToast, shortcuts, toggleFullscreen]);
 
@@ -1662,13 +1689,17 @@ function Player({ target, onNavigate, onSeriesSelected, onFloatingChange, active
             aria-busy={!canPlay || mediaBuffering}
             tabIndex={0}
             aria-label={`视频画面，${formatShortcut(shortcuts.play)}播放或暂停`}
-            onClick={() => {
+            onClick={(event) => {
               const video = videoRef.current;
-              if (!canPlay || !video) return;
+              if (!canPlay || !video || event.detail > 1) return;
               video.focus({ preventScroll: true });
-              if (video.paused) video.play().catch(() => showToast('暂时无法播放，请重试本集'));
-              else video.pause();
+              clearTimeout(videoClickTimer.current);
+              videoClickTimer.current = setTimeout(() => {
+                if (video.paused) video.play().catch(() => showToast('暂时无法播放，请重试本集'));
+                else video.pause();
+              }, 300);
             }}
+            onDoubleClick={() => { clearTimeout(videoClickTimer.current); if (canPlay) return toggleFullscreen(); }}
             onLoadedMetadata={handleMetadata}
             onTimeUpdate={prepareNextEpisode}
             onPlay={(event) => {

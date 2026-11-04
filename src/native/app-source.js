@@ -449,7 +449,9 @@ function parseAppPlayModel(info, vid, options, inline, requireEncryptionMetadata
         const strictQuality = compatibleRows.length > 0 && requestedQuality !== 'auto' && !allowLowerQuality;
         throw Object.assign(new Error(strictQuality
             ? `本集暂无尺寸可确认且满足 ${requestedQuality} 的 H.264/HEVC 片源，未降级`
-            : '本集暂未提供兼容的 H.264/HEVC 片源'), {
+            : Object.values(info.video_list || {}).some(item => str(item?.codec_type || item?.video_meta?.codec_type).toLowerCase() === 'bytevc2')
+                ? '本集仅提供播放器不支持的 ByteVC2 编码，当前无法播放或下载，请在官方 App 观看'
+                : '本集暂未提供兼容的 H.264/HEVC 片源'), {
             code: strictQuality ? 'QUALITY_UNAVAILABLE' : 'NO_COMPATIBLE_SOURCE',
             ...(strictQuality ? { quality: requestedQuality } : {}),
         });

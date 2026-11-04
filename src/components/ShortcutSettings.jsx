@@ -44,7 +44,7 @@ export default function ShortcutSettings({ active = true }) {
       <h2 id="shortcut-settings-title">播放快捷键</h2>
       <button type="button" className="btn btn-outline" onClick={() => save({ ...DEFAULT_SHORTCUTS })}>恢复默认</button>
     </div>
-    <p className="settings-hint" id="shortcut-settings-help">播放操作点击按键后录入，支持单键或 Shift 组合；Esc 取消。仅在播放页生效，输入文字时不响应。老板键使用全局组合键，单独启用。</p>
+    <p className="settings-hint" id="shortcut-settings-help">播放操作点击按键后录入，支持单键或 Shift 组合；Esc 取消。短按快进键前进 5 秒，长按临时 2 倍速，松开恢复。仅在播放页生效，输入文字时不响应。老板键使用全局组合键，单独启用。</p>
     <div className="shortcut-settings-list">
       {SHORTCUT_ACTIONS.map(action => <div className="shortcut-settings-row" key={action.id}>
         <span id={`shortcut-label-${action.id}`}>{action.label}</span>

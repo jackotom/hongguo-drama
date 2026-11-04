@@ -115,6 +115,11 @@ const source = transformSync(fs.readFileSync(path.join(__dirname, '../src/compon
   props.onlineQuality = 'auto'; props.supportsOnlineQuality = true;
   props.onQualityChange = quality => { props.onlineQuality = quality; };
   media.videoWidth = 640; media.videoHeight = 360; listeners.get('loadedmetadata')(); render();
+  assert.equal(find('下一集').props.disabled, false);
+  find('下一集').props.onClick(); render();
+  assert.equal(props.currentIndex, 2);
+  assert.equal(find('下一集').props.disabled, true, 'locked episodes cannot be selected by next');
+  props.currentIndex = 1; render();
   const nodeText = node => typeof node === 'string' || typeof node === 'number' ? String(node) : node?.children?.map(nodeText).join('') || '';
   assert.match(nodeText(find('当前播放信息')), /测试剧.*第 1 集/, 'fullscreen title includes series and episode');
   assert.match(nodeText(find('当前播放信息')), /当前画面 360P（640 × 360）/, 'fullscreen title shows the actual picture size');

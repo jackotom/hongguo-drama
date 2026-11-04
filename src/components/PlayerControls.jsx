@@ -36,6 +36,7 @@ export default function PlayerControls({ danmaku, enhancement, shortcuts = DEFAU
   const pointerRef = useRef(null);
   const idleDeadlineRef = useRef(0);
   const expanded = fullscreen || windowFill;
+  const nextEpisode = episodes.find(episode => episode.vid_index > currentIndex && !episode.locked);
 
   useEffect(() => {
     if (!menuOpen) return;
@@ -295,6 +296,9 @@ export default function PlayerControls({ danmaku, enhancement, shortcuts = DEFAU
       <input className="player-controls-seek" type="range" aria-label="播放进度" aria-valuetext={`${formatTime(media.time)} / ${formatTime(media.duration)}`} min="0" max={media.duration || 0} step="0.1" value={Math.min(media.time, media.duration)} disabled={!available || !media.duration} onChange={seek} />
       <div className="player-controls-row">
         <button type="button" data-player-control aria-label={media.paused ? '播放' : '暂停'} title={`播放/暂停（${formatShortcut(shortcuts.play)}）`} disabled={!available} onClick={togglePlay}>{media.paused ? <Play size={18} /> : <Pause size={18} />}</button>
+        <button type="button" data-player-control aria-label="下一集" title={`下一集（${formatShortcut(shortcuts.next)}）`} disabled={!nextEpisode} onClick={() => nextEpisode && onEpisodeChange(nextEpisode.vid_index)}>
+          <Icon><path d="m5 4 11 8-11 8V4Zm14 0v16" /></Icon>
+        </button>
         <span className="player-controls-time">{formatTime(media.time)} / {formatTime(media.duration)}</span>
         {danmaku && <div className="player-controls-danmaku">
           <button type="button" data-player-menu className={`danmaku-icon-button ${danmaku.enabled ? 'danmaku-enabled' : ''}`} aria-label={`${danmaku.enabled ? '关闭' : '开启'}${danmaku.sourceKind === 'official' ? '时间轴弹幕' : '本集评论'}`} aria-pressed={danmaku.enabled}

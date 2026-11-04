@@ -140,7 +140,11 @@ export default function AccountManagement({ active = true }) {
     if (active) load();
     return () => { request.current++; historyRequest.current++; };
   }, [active]);
-  useEffect(() => window.electronAPI.onAccountUpdated?.(() => { if (active) load(); }), [active]);
+  useEffect(() => window.electronAPI.onAccountUpdated?.(result => {
+    if (!active) return;
+    if (result?.error) setError(result.error);
+    else load();
+  }), [active]);
   useEffect(() => () => {
     generation.current++;
     clearTimeout(pollTimer.current);

@@ -11,7 +11,7 @@ const vm = require('node:vm');
 const source = fs.readFileSync(path.join(__dirname, 'playback-device.js'), 'utf8');
 const endpoint = 'https://log5-applog-lf.fqnovel.com/service/2/device_register/?tt_data=a&cronet_version=8d40f833_2026-03-03&ttnet_version=4.2.243.31-douyin&use_store_region_cookie=1';
 const failureMessage = '匿名播放设备注册失败，请检查网络，10 秒后重试';
-function load(clock = Date) {
+function load(clock = Date, fresh = false) {
     const module = { exports: {} };
     vm.runInNewContext(source, {
         module, Buffer, AbortSignal, Date: clock,
@@ -21,8 +21,22 @@ function load(clock = Date) {
         },
         console: { log() { assert.fail('no logging'); }, warn() { assert.fail('no logging'); }, error() { assert.fail('no logging'); } },
     }, { filename: 'playback-device.js' });
-    return module.exports.getPlaybackDevice;
+    return fresh ? module.exports.registerPlaybackDevice : module.exports.getPlaybackDevice;
 }
+
+test('fresh playback registrations honor the failure cooldown without reusing a successful device', async () => {
+    let now = Date.now(), calls = 0;
+    const register = load({ now: () => now }, true);
+    const rejected = async () => { calls++; return { device_id: 0, install_id: 0 }; };
+    await assert.rejects(register(rejected), error => error.registrationFailure === 'INVALID_RESPONSE');
+    await assert.rejects(register(rejected), error => error.registrationFailure === 'INVALID_RESPONSE');
+    assert.equal(calls, 1);
+    now += 10001;
+    const request = async () => ({ device_id: String(++calls), install_id: String(calls + 100) });
+    const first = await register(request), second = await register(request);
+    assert.notEqual(first.device_id, second.device_id);
+    assert.equal(calls, 3);
+});
 
 test('lazy registration shares one promise and one exact identity across concurrent and later playback', async () => {
     const get = load();

@@ -9,6 +9,7 @@ function createWebLoginObserver({ readCookies, complete, cancel, onSignedIn, onE
       const cookies = await readCookies();
       if (closed || !cookies.some(item => ['sessionid', 'sessionid_ss'].includes(item.name) && item.value)) return;
       const result = await complete(cookies.map(item => `${item.name}=${item.value}`).join('; '));
+      if (!closed && result.success === false) throw new Error(result.error || '账号验证失败，请重试');
       if (!closed && result.status === 'signed-in') { closed = true; onSignedIn(); }
     } catch (error) { if (!closed) onError(error); }
     finally {
