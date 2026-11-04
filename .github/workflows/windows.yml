@@ -25,25 +25,34 @@ jobs:
         id: media-cache
         with:
           path: ${{ runner.temp }}/media/artifacts
-          key: windows-media-${{ hashFiles('scripts/build-ffmpeg-source-win.sh', 'scripts/build-librempeg-source.sh') }}
-      - if: steps.media-cache.outputs.cache-hit != 'true'
+          key: windows-media-${{ hashFiles('scripts/build-ffmpeg-source-win.sh') }}
+      - uses: actions/cache@v4
+        id: librempeg-cache
+        with:
+          path: ${{ runner.temp }}/librempeg/artifacts
+          key: windows-librempeg-${{ hashFiles('scripts/build-librempeg-source.sh') }}
+      - if: steps.media-cache.outputs.cache-hit != 'true' || steps.librempeg-cache.outputs.cache-hit != 'true'
         run: sudo apt-get update -qq && sudo apt-get install -y -qq gcc-mingw-w64-x86-64 make pkg-config
       - if: steps.media-cache.outputs.cache-hit != 'true'
         run: bash scripts/build-ffmpeg-source-win.sh "$RUNNER_TEMP/media" 4
-      - if: steps.media-cache.outputs.cache-hit != 'true'
+      - if: steps.librempeg-cache.outputs.cache-hit != 'true'
+        run: bash scripts/build-librempeg-source.sh "$RUNNER_TEMP/librempeg" win-x64 4
+      - name: Combine unchanged FFmpeg and matching ByteVC2 helper artifacts
         run: |
-          bash scripts/build-librempeg-source.sh "$RUNNER_TEMP/librempeg" win-x64 4
-          cp "$RUNNER_TEMP/librempeg/artifacts/bin/"* "$RUNNER_TEMP/media/artifacts/bin/"
-          cp "$RUNNER_TEMP/librempeg/artifacts/"*corresponding-source.tar.gz "$RUNNER_TEMP/media/artifacts/"
+          mkdir -p "$RUNNER_TEMP/media-combined"
+          cp -R "$RUNNER_TEMP/media/artifacts/." "$RUNNER_TEMP/media-combined/"
+          cp -R "$RUNNER_TEMP/librempeg/artifacts/." "$RUNNER_TEMP/media-combined/"
       - uses: actions/upload-artifact@v4
         with:
           name: windows-media
-          path: ${{ runner.temp }}/media/artifacts/
+          path: ${{ runner.temp }}/media-combined/
       - uses: actions/upload-artifact@v4
         if: failure()
         with:
           name: windows-media-errors
-          path: ${{ runner.temp }}/media/logs/
+          path: |
+            ${{ runner.temp }}/media/logs/
+            ${{ runner.temp }}/librempeg/logs/
   windows:
     needs: media
     runs-on: windows-2022
@@ -62,6 +71,12 @@ jobs:
       - name: Prepare bundled FFmpeg before tests
         shell: pwsh
         run: Copy-Item media/bin/* build/ffmpeg/ -Force
+      - name: Verify the new ByteVC2 helper starts and contains its decoder
+        shell: pwsh
+        run: |
+          $decoders = (& build/ffmpeg/librempeg.exe -hide_banner -decoders 2>&1 | Out-String)
+          if ($LASTEXITCODE -or $decoders -notmatch '(?m)^\s*V\S*\s+bvc2\s') { throw 'ByteVC2 helper decoder verification failed' }
+          Write-Output 'PASS Windows x64 ByteVC2 helper starts and exposes bvc2 decoder'
       - name: Run unit and platform checks
         if: ${{ !inputs.build_only }}
         run: npm test

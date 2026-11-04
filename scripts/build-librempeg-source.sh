@@ -36,7 +36,7 @@ export PKG_CONFIG_LIBDIR="$ROOT/prefix/lib/pkgconfig"
 unset CPATH C_INCLUDE_PATH CPLUS_INCLUDE_PATH LIBRARY_PATH DYLD_LIBRARY_PATH LDFLAGS CFLAGS CPPFLAGS || true
 if [[ "$TARGET" == win-x64 ]]; then
   X264_ARGS=(--host=x86_64-w64-mingw32 --cross-prefix=x86_64-w64-mingw32- --disable-asm --extra-ldflags=-static)
-  MEDIA_ARGS=(--arch=x86_64 --target-os=mingw32 --enable-cross-compile --cross-prefix=x86_64-w64-mingw32- --disable-x86asm --extra-cflags=-I../prefix/include --extra-ldflags='-static -L../prefix/lib')
+  MEDIA_ARGS=(--arch=x86_64 --target-os=mingw32 --enable-cross-compile --cross-prefix=x86_64-w64-mingw32- --disable-asm --extra-cflags=-I../prefix/include --extra-ldflags='-static -L../prefix/lib')
   SUFFIX=.exe
 else
   export PATH=/usr/bin:/bin:/usr/sbin:/sbin
@@ -49,7 +49,8 @@ else
   X264_ARGS=(--host="$HOST-apple-darwin" --extra-cflags="-arch $ARCH -mmacosx-version-min=13.0" --extra-ldflags="-arch $ARCH -mmacosx-version-min=13.0")
   [[ "$TARGET" != x64 ]] || X264_ARGS+=(--disable-asm)
   MEDIA_ARGS=(--arch="$HOST" --target-os=darwin --cc=/usr/bin/clang --extra-cflags="-arch $ARCH -mmacosx-version-min=13.0 -I../prefix/include" --extra-ldflags="-arch $ARCH -mmacosx-version-min=13.0 -L../prefix/lib")
-  [[ "$TARGET" != x64 ]] || MEDIA_ARGS+=(--disable-x86asm)
+  # Librempeg's x86 init objects require standalone assembly; use its complete C fallback without NASM.
+  [[ "$TARGET" != x64 ]] || MEDIA_ARGS+=(--disable-asm)
   SUFFIX=
 fi
 cd "$ROOT/build-x264"

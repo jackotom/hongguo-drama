@@ -11,8 +11,8 @@ const source = path.resolve(__dirname, '../main.js');
 const req = createRequire(source);
 const dirs = [];
 const unavailable = (sources) => ({ url: null, code: 'SOURCE_UNAVAILABLE', sources,
-  error: '本集取源失败：网页：请求失败（HTTP 404）；App：接口暂时拒绝本次请求；旧接口：片源数据无法解析。请重试或在官方 App 确认可播情况。' });
-const webGone = [{ source: 'web', code: 'HTTP_404' }, { source: 'app', code: 'BUSINESS_REJECTED' }, { source: 'api', code: 'INVALID_RESPONSE' }];
+  error: '本集取源失败：网页：请求失败（HTTP 404）；App：暂未提供本集片源模型；旧接口：片源数据无法解析。请重试或在官方 App 确认可播情况。' });
+const webGone = [{ source: 'web', code: 'HTTP_404' }, { source: 'app', code: 'MISSING_MODEL' }, { source: 'api', code: 'INVALID_RESPONSE' }];
 function fixture(initialTasks) {
   const now = Date.now();
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'hongguo-source-retry-'));
@@ -135,7 +135,7 @@ const checks = [
       assert.equal(h.live().length, 0, JSON.stringify(failure));
     }
   }],
-  ['web 404 plus App rejection schedules bounded delayed retries', async () => {
+  ['web 404 plus missing App model schedules bounded delayed retries', async () => {
     const h = fixture();
     for (const [index, minutes] of [3, 8, 15].entries()) {
       await h.download();
@@ -156,7 +156,7 @@ const checks = [
     assert.equal(h.live().length, 0);
   }],
   ['App refusal, security and third-party failures are not deferred', async () => {
-    for (const [sources, vid] of [[[{ source: 'app', code: 'BUSINESS_REJECTED' }]], [[{ source: 'app', code: 'HTTP_403' }]], [[{ source: 'web', code: 'SECURITY_BLOCKED' }]], [[{ source: 'app', code: 'TIMEOUT' }, { source: 'web', code: 'SECURITY_BLOCKED' }]], [webGone, 'custom:a:1']]) {
+    for (const [sources, vid] of [[[{ source: 'app', code: 'BUSINESS_REJECTED' }]], [[{ source: 'app', code: 'HTTP_403' }]], [[{ source: 'web', code: 'HTTP_404' }, { source: 'app', code: 'BUSINESS_REJECTED' }]], [[{ source: 'web', code: 'TIMEOUT' }, { source: 'app', code: 'DEVICE_REGISTRATION_FAILED' }]], [[{ source: 'web', code: 'SECURITY_BLOCKED' }]], [[{ source: 'app', code: 'TIMEOUT' }, { source: 'web', code: 'SECURITY_BLOCKED' }]], [webGone, 'custom:a:1']]) {
       const h = fixture();
       h.state.result = unavailable(sources);
       if (vid) h.run(`downloadTasks[0].hongguoInfo.vid = ${JSON.stringify(vid)}`);
