@@ -17,7 +17,9 @@
 .history-list { list-style: none; padding: 0; margin: 0; }
 .history-row { border-bottom: 1px solid var(--border); padding: 16px 0; }
 .history-main { display: flex; align-items: center; gap: 12px; }
-.history-row-actions { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+.history-row-actions { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; flex-shrink: 0; max-width: 280px; }
+.history-group-actions, .history-maintenance-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
+.history-group-state { font-size: 12px; color: var(--text-secondary); }
 .history-remove { flex-shrink: 0; }
 .history-resume { min-width: 0; display: flex; align-items: center; gap: 20px; width: 100%; padding: 8px; border: 0; border-radius: 9px; text-align: left; background: transparent; color: var(--text-primary); }
 .history-resume:hover { background: var(--bg-inset); }
@@ -40,4 +42,4 @@
 
 .history-child { margin-left: 32px; border-left: 2px solid var(--border); padding-left: 16px; }
 .history-completed { color: var(--accent); font-size: 12px; }
-.history-row-actions { flex-wrap: wrap; max-width: 360px; }
+@media (max-width: 600px) { .history-main { flex-wrap: wrap; } .history-row-actions { width: 100%; max-width: 100%; align-items: flex-start; } .history-group-actions, .history-maintenance-actions { justify-content: flex-start; } }

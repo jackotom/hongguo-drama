@@ -20,6 +20,11 @@ export default function WatchHistory({ active = true, onNavigate }) {
   });
   const decide = (id, target) => {
     const next = { ...decisions };
+    if (target === null) {
+      const remaining = groupHistory(rows, decisions).find(items => items.some(row => row.series_id === id))?.filter(row => row.series_id !== id) || [];
+      // Keep the new anchor manual so its automatic family cannot absorb other rows.
+      for (const row of remaining) if (next[row.series_id] === id) next[row.series_id] = remaining[0].series_id;
+    }
     if (target === undefined) delete next[id]; else next[id] = target;
     try { localStorage.setItem('hongguo:history-groups', JSON.stringify(next)); setDecisions(next); }
     catch { setError('分组未能保存，请检查本地存储后重试'); }
@@ -191,36 +196,46 @@ export default function WatchHistory({ active = true, onNavigate }) {
     </div> : !visibleRows.length ? <div className="history-empty" role="status">
       <Clock size={30} /><h2>{emptyTitle}</h2>
       <button type="button" className="btn btn-outline" onClick={() => setFilter('all')}>查看全部</button>
-    </div> : <ul className="history-list">{visibleRows.map(row => <li className={`history-row ${groupById.get(row.series_id)?.[0] !== row ? 'history-child' : ''}`} key={row.series_id}>
+    </div> : <ul className="history-list">{visibleRows.map(row => {
+      const group = groupById.get(row.series_id);
+      const outsideGroup = candidate => groupById.get(candidate.series_id) !== group;
+      const sequels = (row.sequels || []).filter(outsideGroup);
+      const similar = (row.similarSeries || []).filter(outsideGroup);
+      return <li className={`history-row ${group[0] !== row ? 'history-child' : ''}`} key={row.series_id}>
       <div className="history-main">
       <button className="history-resume" onClick={() => resume(row)} disabled={!active || !!opening || !!removing} aria-label={`继续观看 ${row.series_title} 第${row.vid_index}集${row.hasUpdates ? `，有更新${row.unreadEpisodes ? `，新增${row.unreadEpisodes}集` : '，发现疑似续作'}` : ''}`}>
         {row.cover ? <img className="history-cover" src={row.cover} alt="" loading="lazy" /> : <span className="history-cover history-cover-empty"><Play size={20} /></span>}
         <span className="history-copy">
-          <span className="history-name">{row.completed && <span className="history-completed">已看完 · </span>}{row.hasUpdates && <span className="history-dot" role="img" aria-label="有更新" />}{row.series_title}</span>
+          <span className="history-name">{row.hasUpdates && <span className="history-dot" role="img" aria-label="有更新" />}{row.series_title}</span>
           <span className="history-progress">看到第 {row.vid_index} 集 / 共 {row.total} 集 · {Math.floor((row.currentTime || 0) / 60)}:{String(Math.floor((row.currentTime || 0) % 60)).padStart(2, '0')}</span>
-          <span className="history-time">最近观看 {new Date(row.updatedAt).toLocaleString('zh-CN', { month:'numeric', day:'numeric', hour:'2-digit', minute:'2-digit' })}</span>
+          <span className="history-time">最近观看 {new Date(row.updatedAt).toLocaleString('zh-CN', { month:'numeric', day:'numeric', hour:'2-digit', minute:'2-digit' })}{row.completed && <span className="history-completed"> · 已看完</span>}</span>
+          {decisions[row.series_id] === null ? <span className="history-group-state">独立显示 · 手动</span> : group.length > 1 && group.some(item => Object.hasOwn(decisions, item.series_id)) && <span className="history-group-state">手动分组</span>}
           {row.unreadEpisodes > 0 && <span className="history-update">新增 {row.unreadEpisodes} 集</span>}
         </span>
         <span className="history-action"><Play size={15} />{opening === row.series_id ? '打开中…' : '继续观看'}</span>
       </button>
       <div className="history-row-actions">
-        {groupById.get(row.series_id)?.length > 1 && groupById.get(row.series_id)[0] === row && <button className="btn btn-outline btn-sm" aria-expanded={!hideLowSeasons || !!expanded[row.series_id]} onClick={() => { if (!hideLowSeasons) savePreferences({ ...preferences, hideLowSeasons: true }); setExpanded(value => ({ ...value, [row.series_id]: hideLowSeasons ? !value[row.series_id] : false })); }}>{!hideLowSeasons || expanded[row.series_id] ? '折叠' : '展开'} {groupById.get(row.series_id).length} 季</button>}
-        {groupById.get(row.series_id)?.length > 1 && <button className="btn btn-outline btn-sm" onClick={() => decide(row.series_id, null)}>移出分组</button>}
+        <div className="history-group-actions">
+        {group.length > 1 && group[0] === row && <button className="btn btn-outline btn-sm" aria-expanded={!hideLowSeasons || !!expanded[row.series_id]} onClick={() => { if (!hideLowSeasons) savePreferences({ ...preferences, hideLowSeasons: true }); setExpanded(value => ({ ...value, [row.series_id]: hideLowSeasons ? !value[row.series_id] : false })); }}>{!hideLowSeasons || expanded[row.series_id] ? '折叠组' : '展开组'}</button>}
+        {group.length > 1 && <button className="btn btn-outline btn-sm" onClick={() => decide(row.series_id, null)}>独立显示</button>}
         {Object.hasOwn(decisions, row.series_id) && <button className="btn btn-outline btn-sm" onClick={() => decide(row.series_id, undefined)}>恢复自动分组</button>}
+        </div>
+        <div className="history-maintenance-actions">
         <button type="button" className="btn btn-outline btn-sm history-check" disabled={checking || !!checkingRow || !!removing || !!opening} aria-label={`检测《${row.series_title}》的更新`} title="只检测这一条观看记录" onClick={() => checkRow(row)}>
           <RefreshCw size={14} className={checkingRow === row.series_id ? 'spin' : ''} />{checkingRow === row.series_id ? '检测中…' : '检测'}
         </button>
         <button type="button" className="btn btn-outline btn-sm history-remove" disabled={!!removing || !!opening || !!checkingRow} aria-label={`移除观看记录《${row.series_title}》`} title="仅移除观看记录，不删除视频文件" onClick={() => remove(row)}>{removing === row.series_id ? '移除中…' : '移除'}</button>
+        </div>
       </div>
       </div>
-      {!!row.sequels?.length && <div className="history-sequels"><span>疑似续作</span>{row.sequels.map(sequel => <button key={sequel.series_id} className="btn btn-outline btn-sm" disabled={!active || !!opening || !!removing} onClick={() => resume(row, sequel)}>{sequel.series_title}</button>)}</div>}
-      {!!row.similarSeries?.length && <div className="history-sequels" title="名称相近，仅供核对；不会用于隐藏低季或批量归组">
-        <span>疑似同剧（仅提示）</span>{row.similarSeries.map(candidate => <button key={candidate.series_id} className="btn btn-outline btn-sm" disabled={!active || !!opening || !!removing} onClick={() => resume(row, candidate)}>{candidate.series_title}</button>)}
-        {row.similarSeries.filter(candidate => rows.some(item => item.series_id === candidate.series_id)).map(candidate => <button key={`group:${candidate.series_id}`} className="btn btn-outline btn-sm" onClick={() => decide(candidate.series_id, row.series_id)}>确认《{candidate.series_title}》为同剧</button>)}
+      {!!sequels.length && <div className="history-sequels"><span>疑似续作</span>{sequels.map(sequel => <button key={sequel.series_id} className="btn btn-outline btn-sm" disabled={!active || !!opening || !!removing} onClick={() => resume(row, sequel)}>{sequel.series_title}</button>)}</div>}
+      {!!similar.length && <div className="history-sequels" title="名称相近，仅供核对；不会用于隐藏低季或批量归组">
+        <span>疑似同剧（仅提示）</span>{similar.map(candidate => <button key={candidate.series_id} className="btn btn-outline btn-sm" disabled={!active || !!opening || !!removing} onClick={() => resume(row, candidate)}>{candidate.series_title}</button>)}
+        {similar.filter(candidate => rows.some(item => item.series_id === candidate.series_id)).map(candidate => <button key={`group:${candidate.series_id}`} className="btn btn-outline btn-sm" onClick={() => decide(candidate.series_id, row.series_id)}>确认《{candidate.series_title}》为同剧</button>)}
       </div>}
       {row.lastEpisodeCheckError && <p className="history-check-error">分集更新检查未完成：{row.lastEpisodeCheckError}</p>}
       {row.lastSequelCheckError && <p className="history-check-error">续作检查未完成：{row.lastSequelCheckError}</p>}
       {!row.lastEpisodeCheckError && !row.lastSequelCheckError && row.lastCheckError && <p className="history-check-error">更新检查未完成：{row.lastCheckError}</p>}
-    </li>)}</ul>}
+    </li>; })}</ul>}
   </section>;
 }

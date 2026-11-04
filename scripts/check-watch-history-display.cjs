@@ -79,14 +79,13 @@ function mount(rows, storage = new Map()) {
     onWatchHistoryProgress: () => () => {},
   };
   const module = { exports: {} };
+  const localStorage = { getItem: key => storage.get(key) ?? null, setItem: (key, value) => storage.set(key, value) };
   vm.runInNewContext(source, {
     module,
     exports: module.exports,
     require: name => name === './historyGroups.mjs' ? require('../src/components/historyGroups.mjs') : name === 'react' ? react : name === './icons' ? { Play: Icon, RefreshCw: Icon, Clock: Icon } : {},
-    window: { electronAPI: api, localStorage: {
-      getItem: key => storage.get(key) ?? null,
-      setItem: (key, value) => storage.set(key, value),
-    } },
+    localStorage,
+    window: { electronAPI: api, localStorage },
   });
   const render = () => {
     cursor = 0;
@@ -237,6 +236,32 @@ const button = (ui, label) => ui.find(node => node.type === 'button' && text(nod
   await similarUi.flush();
   assert.deepEqual(similarUi.plays, [{ seriesId: '1000092', vidIndex: 1 }]);
   assert.deepEqual(similarUi.acknowledgements, [], 'opening an unconfirmed match must not acknowledge the original series');
+
+  button(similarUi, '确认《AAA2BBB》为同剧').props.onClick();
+  await similarUi.flush();
+  assert.ok(!button(similarUi, '确认《AAA2BBB》为同剧'), 'confirmed group members must not retain confirmation buttons');
+  assert.ok(!similarUi.find(node => node.type === 'span' && text(node) === '疑似同剧（仅提示）'), 'confirmed group members must not retain suspected-match labels');
+  assert.ok(button(similarUi, '展开组'));
+  assert.ok(!similarUi.find(node => node.type === 'button' && /[展开折叠]+ \d+ 季/.test(text(node))));
+
+  const groupStorage = new Map([['hongguo:history-groups', JSON.stringify({ '1': '3', '2': '3' })]]);
+  const groupRows = [1, 2, 3].map(id => ({ series_id: String(id), series_title: `手动剧${id}`, family: `family${id}`, season: id, updatedAt: id, total: 1, vid_index: 1, completed: true }));
+  groupRows.push({ series_id: '4', series_title: '原本不在手动组内', family: 'family2', season: 1, updatedAt: 4 });
+  const groupedUi = mount(() => groupRows, groupStorage);
+  await groupedUi.flush();
+  const groupHead = groupedUi.find(node => node.type === 'li' && text(node).includes('手动剧3'));
+  const findIn = (node, predicate) => predicate(node) ? node : node?.children?.map(child => findIn(child, predicate)).find(Boolean);
+  assert.ok(findIn(groupHead, node => node?.props?.className === 'history-time' && text(node).includes('已看完')), 'completion belongs beside the recent-watch time');
+  assert.ok(!findIn(groupHead, node => node?.props?.className === 'history-name' && text(node).includes('已看完')));
+  findIn(groupHead, node => node?.type === 'button' && text(node) === '独立显示').props.onClick();
+  await groupedUi.flush();
+  const { groupHistory } = require('../src/components/historyGroups.mjs');
+  const regrouped = groupHistory(groupRows, JSON.parse(groupStorage.get('hongguo:history-groups')));
+  assert.deepEqual(regrouped.map(items => items.map(row => row.series_id)), [['2', '1'], ['3'], ['4']], 'remaining manual members stay grouped without pulling in automatic-family outsiders');
+  const restartedGroup = mount(() => groupRows, groupStorage);
+  await restartedGroup.flush();
+  assert.ok(button(restartedGroup, '恢复自动分组'), 'an independent row can restore automatic grouping after restart');
+  assert.ok(restartedGroup.find(node => node.type === 'span' && text(node) === '独立显示 · 手动'));
 
   const promoted = { series_id: '1000093', series_title: 'AAA1BBB第二季' };
   const promotedRows = listHistory([similarSeries[0]], { '1000091': {
