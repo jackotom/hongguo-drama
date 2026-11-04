@@ -46,6 +46,7 @@ const { randomUUID, createHash } = require('node:crypto');
 const hongguo = require('./src/native/hongguo');
 const { normalizeDownloadQuality, meetsDownloadQuality } = require('./src/native/download-quality');
 const { decryptInWorker } = require('./src/native/decrypt-worker.cjs');
+const { convertBytevc2 } = require('./src/native/bytevc2');
 const store = require('./src/store');
 const watchHistory = require('./src/native/watch-history');
 const { createAccountService, safeMessage: accountSafeMessage } = require('./src/native/account-session');
@@ -1067,10 +1068,22 @@ async function executeHongguoDownload(task) {
       await pipeline(response.data, writer);
       source.token.throwIfRequested();
       if (!received || (totalLength && received !== totalLength)) throw mediaTransferError('视频下载不完整，请重试');
-      if (playInfo.contentKey) {
+      if (playInfo.contentKey || playInfo.codec === 'bytevc2') {
         const decodedPath = tmpPath + '.decoded';
         try {
-          await decryptContentKeyFile(tmpPath, decodedPath, playInfo.contentKey, { cancelToken: source.token });
+          if (playInfo.codec === 'bytevc2') {
+            const notice = task.qualityNotice;
+            const progress = seconds => {
+              task.progress = Math.min(99, Math.floor(seconds / playInfo.duration * 100));
+              task.qualityNotice = '正在转换为可播放格式';
+              sendToRenderer('download-progress', { id, progress: task.progress, qualityNotice: task.qualityNotice });
+            };
+            progress(0);
+            try {
+              await convertBytevc2({ executable: resolveFfmpeg('librempeg'), input: tmpPath, output: decodedPath,
+                contentKey: playInfo.contentKey, duration: playInfo.duration, cancelToken: source.token, onProgress: progress });
+            } finally { task.qualityNotice = notice || ''; }
+          } else await decryptContentKeyFile(tmpPath, decodedPath, playInfo.contentKey, { cancelToken: source.token });
           task.actualQuality = await verifyReceived(decodedPath);
           source.token.throwIfRequested();
           publishDownloadFile(decodedPath, finalPath);
@@ -3025,7 +3038,7 @@ async function fetchDecryptedEpisodeOnce(vid, onProgress, seriesId, playInfo, si
   if (total > maxBytes) { response.data.destroy(); throw tooLarge(); }
   const chunks = [];
   let received = 0, lastProgress = 0;
-  if (playInfo.contentKey) {
+  if (playInfo.contentKey || playInfo.codec === 'bytevc2') {
     let temporary;
     try {
       temporary = await fsp.mkdtemp(path.join(app.getPath('temp'), 'hongguo-decrypt-'));
@@ -3039,8 +3052,15 @@ async function fetchDecryptedEpisodeOnce(vid, onProgress, seriesId, playInfo, si
       });
       await pipeline(response.data, fs.createWriteStream(input, { mode: 0o600 }), { signal });
       if (!received || (total && received !== total)) throw mediaTransferError('视频下载不完整，请重试');
-      if (onProgress) onProgress(received, received, 'decrypting');
-      await decryptContentKeyFile(input, output, playInfo.contentKey, { signal });
+      if (playInfo.codec === 'bytevc2') {
+        onProgress?.(0, received, 'transcoding');
+        await convertBytevc2({ executable: resolveFfmpeg('librempeg'), input, output,
+          contentKey: playInfo.contentKey, duration: playInfo.duration, signal, maxBytes,
+          onProgress: seconds => onProgress?.(Math.floor(received * Math.min(1, seconds / playInfo.duration)), received, 'transcoding') });
+      } else {
+        if (onProgress) onProgress(received, received, 'decrypting');
+        await decryptContentKeyFile(input, output, playInfo.contentKey, { signal });
+      }
       if ((await fsp.stat(output)).size > maxBytes) throw tooLarge();
       return await fsp.readFile(output);
     } finally {
@@ -3107,9 +3127,9 @@ ipcMain.handle('prepare-online-play', async (event, payload) => {
             }
           };
           const prepared = await withMediaRecovery(sourceVid,seriesId,{playInfo:checkedPlayInfo,quality,force,signal:controller.signal},async playInfo => {
-            const entry = {quality,codec:playInfo.codec || '',size:0,lastUsed:Date.now(),seriesId:String(seriesId||''),vidIndex:Number(vidIndex)||0};
+            const entry = {quality,codec:playInfo.codec === 'bytevc2' ? 'h264' : playInfo.codec || '',size:0,lastUsed:Date.now(),seriesId:String(seriesId||''),vidIndex:Number(vidIndex)||0};
             if (playInfo.format === 'hls') await prepareHlsEntry(playInfo,entry,controller.signal,received => progress(received,0));
-            else if (!prefetch && !playInfo.spadeA && !playInfo.contentKey) return {...entry,playInfo};
+            else if (!prefetch && !playInfo.spadeA && !playInfo.contentKey && playInfo.codec !== 'bytevc2') return {...entry,playInfo};
             else {
               entry.buffer = await fetchDecryptedEpisodeOnce(sourceVid,progress,seriesId,playInfo,controller.signal);
               entry.size = entry.buffer.length;

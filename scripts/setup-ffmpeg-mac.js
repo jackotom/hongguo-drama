@@ -7,6 +7,7 @@ const assert = require('node:assert/strict');
 const root = path.resolve(__dirname, '..', 'build', 'ffmpeg');
 const source = 'ffmpeg-9.0.2+x264-b35605ace3ddf7c1a5d67a2eb553f034aef41d55';
 const names = ['ffmpeg', 'ffprobe'];
+const helperSource = 'librempeg-cb1f8f3eef84999e61b27e2d44664858179bc240+x264-b35605a';
 const sha256 = file => createHash('sha256').update(fs.readFileSync(file)).digest('hex');
 try {
   assert(process.platform === 'darwin', '需要 macOS');
@@ -37,5 +38,27 @@ try {
       assert(dependencies.length && dependencies.every(line => /^\s+\/(usr\/lib|System\/Library)\//.test(line)), '工具含非系统动态库');
       console.log(name + ': 源码构建校验、' + arch + ' 与系统库依赖通过');
     }
+    const helperScript = path.resolve(__dirname, 'build-librempeg-source.sh');
+    const helper = path.join(dest, 'librempeg');
+    const helperManifest = path.join(dest, 'librempeg-manifest.json');
+    let helperSaved;
+    try { helperSaved = JSON.parse(fs.readFileSync(helperManifest, 'utf8')); } catch {}
+    if (helperSaved?.source !== helperSource || helperSaved?.script_sha256 !== sha256(helperScript)
+        || !fs.existsSync(helper) || sha256(helper) !== helperSaved?.sha256) {
+      const helperRoot = path.join(root, `.librempeg-build-${arch}`);
+      console.log('从固定源码构建 ByteVC2 解码组件，通常需要数分钟。');
+      execFileSync('/bin/bash', [helperScript, helperRoot, arch], { stdio: 'inherit' });
+      fs.copyFileSync(path.join(helperRoot, 'artifacts/bin/librempeg'), helper);
+      for (const name of fs.readdirSync(path.join(helperRoot, 'artifacts/bin')).filter(name => name.startsWith('LIBREMPEG-'))) {
+        fs.copyFileSync(path.join(helperRoot, 'artifacts/bin', name), path.join(root, name));
+      }
+      fs.writeFileSync(helperManifest, JSON.stringify({ source: helperSource, script_sha256: sha256(helperScript), sha256: sha256(helper) }, null, 2) + '\n');
+    }
+    fs.chmodSync(helper, 0o755);
+    execFileSync('/usr/bin/lipo', [helper, '-verify_arch', arch === 'x64' ? 'x86_64' : 'arm64']);
+    const helperDependencies = execFileSync('/usr/bin/otool', ['-L', helper], { encoding: 'utf8' }).trim().split('\n').slice(1);
+    assert(helperDependencies.length && helperDependencies.every(line => /^\s+\/(usr\/lib|System\/Library)\//.test(line)), 'ByteVC2组件含非系统动态库');
+    const decoders = execFileSync(helper, ['-hide_banner', '-decoders'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
+    assert(/^\s*V\S*\s+bvc2\s/m.test(decoders), 'ByteVC2组件未包含所需解码器');
   }
 } catch (error) { console.error('Mac FFmpeg 准备失败：' + error.message); process.exitCode = 1; }

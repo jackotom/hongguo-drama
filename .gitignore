@@ -14,6 +14,7 @@ build/ffmpeg/*
 !build/ffmpeg/*.txt
 !build/ffmpeg/COPYING.*
 !build/ffmpeg/LICENSE.md
+!build/ffmpeg/LIBREMPEG-*
 
 # 构建与打包输出
 release/

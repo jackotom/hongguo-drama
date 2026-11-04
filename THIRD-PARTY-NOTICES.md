@@ -9,6 +9,8 @@
 
 ## 运行时依赖
 
+开发分支新增独立 ByteVC2 解码组件 Librempeg，固定提交 `cb1f8f3eef84999e61b27e2d44664858179bc240`。其命令行程序启用 AGPLv3+；许可证、x264 许可及准确对应源码要求见 `build/ffmpeg/LIBREMPEG-NOTICE.txt`。普通编码继续使用原 FFmpeg；本地构建不代表已发行。
+
 | 组件 | 版本 | 许可证 | 项目地址 |
 |---|---|---|---|
 | Electron | 44.9.1 | MIT | https://github.com/electron/electron |

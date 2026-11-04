@@ -77,6 +77,8 @@
           "filter": [
             "ffmpeg.exe",
             "ffprobe.exe",
+            "librempeg.exe",
+            "LIBREMPEG-*",
             "WINDOWS-*.txt",
             "COPYING.*",
             "LICENSE.md"
@@ -139,7 +141,8 @@
           "to": "bin",
           "filter": [
             "ffmpeg",
-            "ffprobe"
+            "ffprobe",
+            "librempeg"
           ]
         },
         {
@@ -148,7 +151,8 @@
           "filter": [
             "COPYING.*",
             "LICENSE.md",
-            "MACOS-*.txt"
+            "MACOS-*.txt",
+            "LIBREMPEG-*"
           ]
         },
         {
@@ -170,7 +174,8 @@
       ],
       "binaries": [
         "Contents/Resources/bin/ffmpeg",
-        "Contents/Resources/bin/ffprobe"
+        "Contents/Resources/bin/ffprobe",
+        "Contents/Resources/bin/librempeg"
       ]
     },
     "publish": {

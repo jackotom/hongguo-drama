@@ -1,0 +1,22 @@
+ByteVC2 compatibility helper
+
+Upstream: https://github.com/librempeg/librempeg
+Commit: cb1f8f3eef84999e61b27e2d44664858179bc240
+Source archive SHA256: fd965e6ef9f745af96142cf118d7c2aa0dce906225c9d3cd2ef19e0221723813
+
+This separate executable is named librempeg (librempeg.exe on Windows).
+It is used only to decode ByteVC2 into H.264. Existing FFmpeg helpers continue
+to handle normal codecs. Network protocols are disabled in this helper.
+
+The upstream command-line program requires --enable-agpl. This build is
+AGPL version 3 or later; see LIBREMPEG-COPYING.AGPLv3 and LIBREMPEG-LICENSE.md.
+The static x264 dependency uses commit b35605ace3ddf7c1a5d67a2eb553f034aef41d55;
+see LIBREMPEG-X264-LICENSE.txt. Upstream attribution is retained in the source.
+
+Build: bash scripts/build-librempeg-source.sh BUILD_DIRECTORY TARGET JOBS
+TARGET is arm64, x64 (macOS), or win-x64 (Linux with mingw-w64).
+Distributions containing this executable must include the generated exact
+librempeg-cb1f8f3-x264-b35605a-TARGET-corresponding-source.tar.gz archive,
+which contains both pinned upstream archives and the complete build script.
+
+This source change is not itself a signed or published release.
