@@ -109,7 +109,7 @@ const checks = [
         throw Object.assign(new Error('secret'), { code: 'DEVICE_REGISTRATION_FAILED', registrationFailure });
       } } });
       const result = await f.fetchPlayUrlSingle('11', '1', { quality: '720p' });
-      assert.equal(result.sources[0].message, '匿名播放设备注册失败，请检查网络，10 秒后重试');
+      assert.equal(result.sources[0].message, '匿名播放设备注册失败；本机冷却 10 秒后可手动重试，上游何时恢复暂无法确认');
       assert.doesNotMatch(JSON.stringify(result), /secret|function|\[object/);
     }
   }],

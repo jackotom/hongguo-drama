@@ -744,6 +744,8 @@ const sourceRetryTimers = new Map();
 
 function sourceFailureIsTransient(error) {
   const sources = Array.isArray(error?.sources) ? error.sources : [];
+  // A timeout on another route cannot repair an explicit App/device rejection.
+  if (sources.some(item => item.source === 'app' && /^(?:DEVICE_REGISTRATION_FAILED|HTTP_(?:403|429)|BUSINESS_REJECTED|SECURITY_BLOCKED)$/.test(item.code))) return false;
   return sources.some(item =>
     (item.source === 'web' && /^HTTP_(?:404|410)$/.test(item.code))
     || /^(?:TIMEOUT|NETWORK_ERROR|HTTP_(?:408|5\d\d))$/.test(item.code));

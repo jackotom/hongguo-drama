@@ -650,8 +650,9 @@ function sourceFailure(source, error) {
       INVALID_RESPONSE: '上游未返回有效设备编号', BUSINESS_REJECTED: '上游拒绝注册', SECURITY_BLOCKED: '注册请求被安全校验阻止' };
     const detail = Object.hasOwn(descriptions, reason) ? descriptions[reason]
       : /^HTTP_[3-5]\d{2}$/.test(reason) ? `HTTP ${reason.slice(5)}` : '';
+    const transient = /^(?:TIMEOUT|NETWORK_ERROR|HTTP_(?:408|5\d\d))$/.test(reason);
     return { source, code: /^(?:TIMEOUT|NETWORK_ERROR|HTTP_[3-5]\d{2})$/.test(reason) ? reason : code,
-      message: `匿名播放设备注册失败${detail ? `（${detail}）` : ''}，请检查网络，10 秒后重试` };
+      message: `匿名播放设备注册失败${detail ? `（${detail}）` : ''}${transient ? '，请检查网络，10 秒后重试' : '；本机冷却 10 秒后可手动重试，上游何时恢复暂无法确认'}` };
   }
   const status = Number(error?.status || error?.response?.status || message.match(/HTTP\s+(\d{3})/)?.[1]);
   if (status >= 300 && status <= 599) return { source, code: `HTTP_${status}`, message: `请求失败（HTTP ${status}）` };
