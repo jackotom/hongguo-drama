@@ -56,6 +56,24 @@ test('complete inline metadata does not request fallback', async () => {
     assert.equal(f.calls.length, 1);
 });
 
+for (const encrypt of [false, 0, '0', 'false']) {
+    test(`verified fallback accepts its top-level unencrypted flag: ${JSON.stringify(encrypt)}`, async () => {
+        const f = fixture(model(), model({ video_list: [{ ...row(), encrypt, spade_a: '' }] }));
+        const result = await f.fetch();
+        assert.equal(result.url, 'https://qznovelvod.com/fixture.mp4');
+        assert.equal(result.contentKey, null);
+        assert.equal(f.calls.length, 2);
+    });
+}
+
+for (const encrypt of [true, 1, '1', 'true', undefined]) {
+    test(`verified fallback still rejects missing keys without a plaintext flag: ${JSON.stringify(encrypt)}`, async () => {
+        const f = fixture(model(), model({ video_list: [{ ...row(), encrypt, spade_a: '' }] }));
+        await assert.rejects(f.fetch(), error => error.code === 'INVALID_RESPONSE');
+        assert.equal(f.calls.length, 2);
+    });
+}
+
 test('ByteVC2-only episodes retain the codec and validated dimensions for conversion', async () => {
     const f = fixture(model({ video_list: [{ ...row(1080, { encrypt: false }), codec_type: 'bytevc2' }] }), null);
     const result = await f.fetch();

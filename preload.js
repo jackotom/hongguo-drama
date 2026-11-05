@@ -1,4 +1,4 @@
-// 红果短剧 5.7：桌面桥接入口，发行说明见 docs/release-5.7.md。
+// 红果短剧 5.8：桌面桥接入口，发行说明见 docs/release-5.8.md。
 const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('electronAPI', {
@@ -237,6 +237,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   retryTasks: (taskIds) => ipcRenderer.invoke('retry-tasks', taskIds),
   openFolder: (taskId) => ipcRenderer.invoke('open-folder', taskId),
   showInFolder: (filePath) => ipcRenderer.invoke('show-in-folder', filePath),
+  openEpisodeExternal: (seriesId, vidIndex) => ipcRenderer.invoke('open-episode-external', seriesId, vidIndex),
 
   // 一键启动 / 一键暂停 / 队列状态
   pauseAll: () => ipcRenderer.invoke('pause-all'),

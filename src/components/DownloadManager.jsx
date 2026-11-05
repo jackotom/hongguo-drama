@@ -727,7 +727,7 @@ function DownloadManager({ onNavigate, active = true }) {
                     {task.status === 'downloading' && task.totalBytes > 0 && (
                       <span className="dm-size">{fmtBytes(task.receivedBytes)} / {fmtBytes(task.totalBytes)}</span>
                     )}
-                    {task.status === 'failed' && task.error && <span className="dm-error">{task.error}</span>}
+                    {['failed', 'stopped'].includes(task.status) && task.error && <span className="dm-error">{task.error}</span>}
                   </div>
                   {['downloading', 'completed'].includes(task.status) && task.qualityNotice && <div className="dm-quality-notice">{task.qualityNotice}</div>}
                   {task.nasWarning && <div className="dm-error">{task.nasWarning}</div>}

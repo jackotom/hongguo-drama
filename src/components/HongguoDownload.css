@@ -10,16 +10,28 @@
 .card-header-title svg { color: var(--text-secondary); }
 .input-group { display: flex; gap: 10px; align-items: center; }
 .input-group .btn { min-height: 40px; padding-left: 20px; padding-right: 20px; }
-.series-header { display: flex; flex-wrap: wrap; gap: 22px; justify-content: space-between; align-items: center; padding-bottom: 24px; margin-bottom: 22px; border-bottom: 1px solid var(--border); }
-.series-info { display: flex; align-items: center; gap: 16px; min-width: 0; }
-.series-cover, .series-cover-placeholder { width: 66px; height: 88px; border-radius: 8px; object-fit: cover; background: var(--bg-inset); flex-shrink: 0; }
+.episode-section { container-type: inline-size; }
+.series-header { display: flex; flex-wrap: wrap; gap: 22px; justify-content: space-between; align-items: flex-start; padding-bottom: 24px; margin-bottom: 22px; border-bottom: 1px solid var(--border); }
+.series-info { display: flex; flex: 1 1 100%; align-items: flex-start; gap: 22px; min-width: 0; }
+.series-cover, .series-cover-placeholder { width: 150px; height: 200px; border-radius: 8px; object-fit: contain; background: var(--bg-inset); flex-shrink: 0; }
 .series-cover-placeholder { display: flex; align-items: center; justify-content: center; color: var(--text-tertiary); }
-.series-title { font-size: 19px; letter-spacing: -.02em; margin-bottom: 8px; }
+.series-meta { flex: 1; min-width: 0; }
+.series-title { font-size: 19px; letter-spacing: -.02em; margin-bottom: 8px; overflow-wrap: anywhere; }
 .series-tags { display: flex; flex-wrap: wrap; gap: 14px; }
+.series-description { margin-top: 18px; max-width: 70ch; }
+.series-description h4 { margin: 0 0 6px; font-size: 13px; font-weight: 600; }
+.series-description p { margin: 0; font-size: 13px; line-height: 1.8; color: var(--text-secondary); white-space: pre-wrap; overflow-wrap: anywhere; }
+.series-description .btn-chip { margin-top: 8px; min-height: 32px; }
 .badge { font-size: 12px; color: var(--text-secondary); }
 .badge-new { font-size: 11px; line-height: 1.5; color: var(--success); background: var(--success-bg); border: 1px solid var(--success-border); border-radius: 5px; padding: 1px 5px; white-space: nowrap; }
-.batch-action-bar { display: flex; flex-direction: column; align-items: flex-end; gap: 10px; }
-.batch-action-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+.batch-action-bar { display: flex; flex-basis: 100%; min-width: 0; flex-direction: column; align-items: flex-start; gap: 10px; }
+.batch-action-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: flex-start; max-width: 100%; }
+.batch-action-row .btn { white-space: normal; overflow-wrap: anywhere; max-width: 100%; }
+@container (max-width: 480px) {
+  .series-info { flex-direction: column; gap: 16px; }
+  .series-cover, .series-cover-placeholder { width: 120px; height: 160px; }
+  .series-meta { width: 100%; }
+}
 .controls-row { display: flex; flex-wrap: wrap; gap: 16px; justify-content: space-between; align-items: center; margin-bottom: 20px; }
 .select-buttons, .range-filter { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .divider { height: 16px; width: 1px; margin: 0 5px; background: var(--border); }

@@ -66,6 +66,68 @@ async function ready() {
     assert.equal(ui.mediaCalls.play - before.play, 1);
   });
 
+  await test('holding Space plays at temporary 2x, restores the preferred speed and never toggles on release', async ui => {
+    const focused = target('video');
+    const key = (type, extra = {}) => ui.dispatchKey(type, { key: ' ', code: 'Space', target: focused, ...extra });
+    const controls = () => ui.find(node => node.props.videoRef && node.props.onRateChange);
+    const hold = () => {
+      const entry = [...ui.timers].find(([, timer]) => timer.delay === 300);
+      assert.ok(entry, 'the shared Space key must wait to distinguish tap from hold');
+      ui.timers.delete(entry[0]); entry[1].fn(); ui.render();
+    };
+    controls().props.onRateChange(1.75); ui.render();
+    const position = ui.media.currentTime;
+    const before = { ...ui.mediaCalls };
+    key('keydown');
+    assert.equal(ui.media.paused, false, 'keydown must not pause before a hold can be recognised');
+    hold(); key('keydown', { repeat: true });
+    assert.equal(ui.media.playbackRate, 2);
+    assert.equal(ui.mediaCalls.pause, before.pause);
+    ui.media.volume = 0.2;
+    ui.find(node => node.type === 'video').props.onVolumeChange({ currentTarget: ui.media });
+    key('keyup'); ui.render();
+    assert.equal(ui.media.playbackRate, 1.75);
+    assert.equal(ui.media.paused, false);
+    assert.equal(ui.media.currentTime, position, 'holding Space must not seek');
+    key('keydown'); hold(); ui.events.get('blur')(); ui.render(); key('keyup');
+    assert.equal(ui.media.playbackRate, 1.75, 'losing focus must restore the preferred speed');
+    assert.equal(ui.media.paused, false, 'late keyup after blur must not pause');
+    key('keydown'); ui.events.get('blur')(); key('keyup');
+    assert.equal(ui.media.paused, false, 'losing focus before the threshold must cancel the tap');
+    ui.media.pause(); key('keydown'); hold();
+    assert.equal(ui.media.paused, false, 'holding the speed key must start a paused video');
+    key('keyup'); ui.render();
+    assert.equal(ui.media.playbackRate, 1.75);
+    ui.episode(2); await ui.flush(); ui.metadata(); ui.render();
+    assert.equal(ui.media.playbackRate, 1.75, 'temporary speed must not overwrite the shared preference');
+  });
+
+  await test('independently configured play, hold-speed and fullscreen keys take effect and persist', async () => {
+    const storageKey = 'hongguo:preview:playback-shortcuts:v1';
+    const bindings = { play: 'j', holdSpeed: 'shift+k', fullscreen: 'g', backward: 'arrowleft', forward: 'arrowright',
+      previous: 'arrowup', next: 'arrowdown', autoNext: 'a', slower: 's', faster: 'd' };
+    const storage = new Map([[storageKey, JSON.stringify(bindings)]]);
+    for (let instance = 0; instance < 2; instance++) {
+      const custom = mount({ local: true, storage });
+      try {
+        await custom.flush(); custom.metadata(); custom.render();
+        const focused = target('video');
+        press(custom, 'j', focused); assert.equal(custom.media.paused, true);
+        press(custom, 'j', focused); assert.equal(custom.media.paused, false);
+        custom.dispatchKey('keydown', { key: 'K', code: 'KeyK', shiftKey: true, target: focused });
+        const [id, timer] = [...custom.timers].find(([, timer]) => timer.delay === 300) || [];
+        assert.ok(timer, 'the configured hold key must arm temporary speed');
+        custom.timers.delete(id); timer.fn(); custom.render();
+        assert.equal(custom.media.playbackRate, 2);
+        custom.dispatchKey('keyup', { key: 'k', code: 'KeyK', shiftKey: false, target: focused }); custom.render();
+        assert.equal(custom.media.playbackRate, 1, 'releasing Shift first must still restore speed');
+        press(custom, 'g', focused); assert.equal(custom.document.fullscreenElement, custom.stage);
+        press(custom, 'g', focused); assert.equal(custom.document.fullscreenElement, null);
+        press(custom, ' ', focused); assert.equal(custom.media.paused, false, 'the old Space binding must no longer act');
+      } finally { custom.unmount(); }
+    }
+  });
+
   await test('episode-button focus keeps Space and episode arrows usable without button activation', async ui => {
     ui.episode(2); await ui.flush(); ui.metadata(); ui.render();
     const focused = target('button');

@@ -1,6 +1,6 @@
 {
-  "id": "release-5.7-20261104-01",
-  "title": "红果短剧 5.7 已更新",
-  "body": "新增ByteVC2兼容转换，修复观看记录分组与重复提示，音量和常用倍速可跨视频及重启记忆。批量下载后的上游失效与恢复时间仍待验证。完整说明与三端下载：https://github.com/jackotom/hongguo-drama/releases/tag/v5.7",
+  "id": "release-5.8-20261105-01",
+  "title": "红果短剧 5.8 已更新",
+  "body": "修复部分剧集取源与批量队列保护，优化切集画面、双击全屏及可配置长按快捷键，增加详情大海报和折叠简介、系统播放器入口。上游百集限制与恢复时间仍待验证。完整说明与三端下载：https://github.com/jackotom/hongguo-drama/releases/tag/v5.8",
   "active": true
 }

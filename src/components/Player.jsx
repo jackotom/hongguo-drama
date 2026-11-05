@@ -99,6 +99,7 @@ function Player({ target, onNavigate, onSeriesSelected, onFloatingChange, active
   const [onlineVid, setOnlineVid] = useState(null);
   const [onlineUrl, setOnlineUrl] = useState('');
   const [mediaBuffering, setMediaBuffering] = useState(false);
+  const [holdingFrame, setHoldingFrame] = useState(false);
   const [onlineProgress, setOnlineProgress] = useState(null); // {percent, phase}
   const [cacheInfo, setCacheInfo] = useState({ count: 0, bytes: 0 });
   const [downloadedRevision, setDownloadedRevision] = useState(0);
@@ -122,6 +123,7 @@ function Player({ target, onNavigate, onSeriesSelected, onFloatingChange, active
   const [mergeError, setMergeError] = useState('');
 
   const videoRef = useRef(null);
+  const transitionFrameRef = useRef(null);
   const stageRef = useRef(null);
   const downloadToolsRef = useRef(null);
   const fullscreenScrollRef = useRef(null);
@@ -172,6 +174,22 @@ function Player({ target, onNavigate, onSeriesSelected, onFloatingChange, active
   const fallbackRef = useRef(null);
   const fallbackAttemptRef = useRef(null);
   const rejectedLocalRef = useRef(null);
+
+  const holdVideoFrame = useCallback(() => {
+    const media = loadedMediaRef.current;
+    const video = videoRef.current;
+    const canvas = transitionFrameRef.current;
+    if (!media || media.seriesId !== selectedSeriesRef.current || media.version !== mediaVersion.current
+      || !canvas || !video || video.readyState < 2 || !video.videoWidth || !video.videoHeight) return;
+    try {
+      const context = canvas.getContext('2d');
+      if (!context) return;
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      context.drawImage(video, 0, 0);
+      setHoldingFrame(true);
+    } catch { setHoldingFrame(false); }
+  }, []);
 
   // 只有收到当前片源的 metadata 后才保存，避免旧元素的 pause 覆盖新集断点。
   const persistPosition = useCallback((force = false, ended = false) => {
@@ -243,6 +261,7 @@ function Player({ target, onNavigate, onSeriesSelected, onFloatingChange, active
     pendingAutoplayRef.current = autoplay && activeRef.current && !bossHiddenRef.current;
     setAutoAdvancing(false);
     persistPosition(true);
+    holdVideoFrame();
     const previous = loadedMediaRef.current;
     loadedMediaRef.current = null;
     previous?.element.pause();
@@ -262,7 +281,7 @@ function Player({ target, onNavigate, onSeriesSelected, onFloatingChange, active
     setCompatError('');
     setPlaybackError('');
     lastSavedRef.current = 0;
-  }, [persistPosition, releaseOnline, cancelCompat, releasePrefetch]);
+  }, [persistPosition, holdVideoFrame, releaseOnline, cancelCompat, releasePrefetch]);
 
   const stopPlayback = (message = '播放已停止，可重试本集继续观看') => {
     const seekTo = currentPosition();
@@ -650,6 +669,29 @@ function Player({ target, onNavigate, onSeriesSelected, onFloatingChange, active
     v.playbackRate = playbackRateRef.current;
   }, [loading, canPlay, videoSrc, playbackVersion]);
 
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!holdingFrame || !video || loading || !canPlay) return;
+    const version = playbackVersion;
+    const reveal = () => {
+      if (version !== mediaVersion.current || loadedMediaRef.current?.version !== version
+        || video.currentSrc !== videoSrc || video.readyState < 2 || !video.videoWidth || !video.videoHeight) return;
+      setHoldingFrame(false);
+    };
+    // metadata/playing precedes presentation; keep the cover until Chromium submits the new frame.
+    if (video.requestVideoFrameCallback) {
+      const frame = video.requestVideoFrameCallback(reveal);
+      return () => video.cancelVideoFrameCallback(frame);
+    }
+    video.addEventListener('loadeddata', reveal);
+    video.addEventListener('seeked', reveal);
+    reveal();
+    return () => {
+      video.removeEventListener('loadeddata', reveal);
+      video.removeEventListener('seeked', reveal);
+    };
+  }, [holdingFrame, loading, canPlay, videoSrc, playbackVersion]);
+
   const playableCount = episodes.filter((e) => e.status === 'completed').length;
 
   /** 转码当前集为 H.264 后播放（解决本机无法解码 HEVC 的黑屏问题） */
@@ -667,6 +709,7 @@ function Player({ target, onNavigate, onSeriesSelected, onFloatingChange, active
       setWaitingFor(null);
       setPlaybackError('');
       persistPosition(true);
+      holdVideoFrame();
       videoRef.current?.pause();
       loadedMediaRef.current = null;
       // Windows must release the failed cache before FFmpeg replaces it. Keep the fullscreen node.
@@ -725,7 +768,7 @@ function Player({ target, onNavigate, onSeriesSelected, onFloatingChange, active
         showToast('转码异常: ' + e.message);
       }
     },
-    [episodes, activeSeriesId, onlineQuality, autoCompat, reconnectOnce, showToast, currentPosition, persistPosition, recoverOnlineFailure]
+    [episodes, activeSeriesId, onlineQuality, autoCompat, reconnectOnce, showToast, currentPosition, persistPosition, holdVideoFrame, recoverOnlineFailure]
   );
 
   const tryAutoCompat = useCallback((vidIndex) => {
@@ -1029,6 +1072,7 @@ function Player({ target, onNavigate, onSeriesSelected, onFloatingChange, active
     persistPosition(true, true);
     const released = autoDelete && sid ? releaseOnline() : null;
     if (autoDelete && sid) {
+      if (next) holdVideoFrame();
       loadedMediaRef.current = null;
       videoRef.current?.pause();
       videoRef.current?.removeAttribute('src');
@@ -1058,7 +1102,7 @@ function Player({ target, onNavigate, onSeriesSelected, onFloatingChange, active
         if (cache?.success) setCompatCache({ files: cache.files, bytes: cache.bytes });
       }).catch(error => showToast(`第 ${ci} 集自动清理失败：${error.message}`));
     }
-  }, [findNext, goToEpisode, showToast, autoDelete, episodes, refreshCacheInfo, loadDetail, persistPosition, resetPlayback, releaseOnline]);
+  }, [findNext, goToEpisode, showToast, autoDelete, episodes, refreshCacheInfo, loadDetail, persistPosition, holdVideoFrame, resetPlayback, releaseOnline]);
 
   // 离开页面、暂停和关闭窗口强制保存最后一秒。
   useEffect(() => {
@@ -1157,13 +1201,20 @@ function Player({ target, onNavigate, onSeriesSelected, onFloatingChange, active
     if ((!active && !floatingPlayer.floating) || confirmAsk || mergeAsk || pickerOpen) return;
     const keyboardWindow = stageRef.current?.ownerDocument?.defaultView || window;
     const held = new Set();
-    const finishForward = (seek = false) => {
+    const togglePlay = () => {
+      const video = videoRef.current;
+      if (!video) return;
+      if (video.paused) video.play().catch(() => showToast('暂时无法播放，请重试本集'));
+      else video.pause();
+    };
+    const finishForward = (activate = false) => {
       const press = fastForwardRef.current;
       if (!press) return;
       fastForwardRef.current = null;
       clearTimeout(press.timer);
       if (press.active) changePlaybackRate(press.rate, false, false);
-      else if (seek && videoRef.current) {
+      else if (activate && press.action === 'play') togglePlay();
+      else if (activate && press.action === 'forward' && videoRef.current) {
         const video = videoRef.current;
         const limit = Number.isFinite(video.duration) && video.duration > 0 ? video.duration : Infinity;
         try { video.currentTime = Math.min(limit, video.currentTime + 5); }
@@ -1178,19 +1229,22 @@ function Player({ target, onNavigate, onSeriesSelected, onFloatingChange, active
       if (!action) return;
       event.preventDefault(); event.stopPropagation?.();
       held.add(event.code || event.key);
-      if (action.id === 'forward') {
+      if (action.id === 'forward' || action.id === 'holdSpeed' || (action.id === 'play' && shortcuts.holdSpeed === key)) {
         if (!fastForwardRef.current && !event.repeat) {
-          const press = { key: event.code || event.key, rate: playbackRateRef.current, active: false };
+          const press = { key: event.code || event.key, action: action.id, rate: playbackRateRef.current, active: false };
           fastForwardRef.current = press;
-          press.timer = setTimeout(() => { press.active = true; changePlaybackRate(2, true, false); }, 300);
+          press.timer = setTimeout(() => {
+            press.active = true;
+            changePlaybackRate(2, true, false);
+            if (press.action !== 'forward' && videoRef.current?.paused) togglePlay();
+          }, 300);
         }
         return;
       }
       if (event.repeat && !action.repeat) return;
       const { currentIndex: index, autoNext: nextEnabled } = stateRef.current;
       if (action.id === 'play') {
-        if (video.paused) video.play().catch(() => showToast('暂时无法播放，请重试本集'));
-        else video.pause();
+        togglePlay();
       } else if (action.id === 'forward' || action.id === 'backward') {
         const limit = Number.isFinite(video.duration) && video.duration > 0 ? video.duration : Infinity;
         try { video.currentTime = Math.max(0, Math.min(limit, video.currentTime + (action.id === 'forward' ? 5 : -5))); }
@@ -1231,6 +1285,7 @@ function Player({ target, onNavigate, onSeriesSelected, onFloatingChange, active
     reconnectAttemptRef.current = null;
     onlineSourceRef.current = null;
     resetPlayback(autoplay);
+    setHoldingFrame(false);
     setPlaybackRequested(autoplay);
     setCompatMap({});
     mergeDialogGenerationRef.current += 1;
@@ -1507,6 +1562,15 @@ function Player({ target, onNavigate, onSeriesSelected, onFloatingChange, active
 
       <div className="player-header" hidden={actionsHidden}>
         <div className="player-header-right">
+          <button className="btn btn-outline" disabled={current?.status !== 'completed'}
+            title="用系统为 MP4 设置的默认播放器打开已下载本集；可在系统中设为 VLC、IINA 等播放器"
+            onClick={async () => {
+              videoRef.current?.pause();
+              try {
+                const result = await window.electronAPI.openEpisodeExternal(activeSeriesId, currentIndex);
+                if (!result?.success) showToast(result?.error || '无法打开系统播放器');
+              } catch { showToast('无法打开系统播放器，请稍后重试'); }
+            }}>系统播放器</button>
           <button aria-pressed={cacheNext} className={`btn btn-outline ${cacheNext ? 'btn-autonext-on' : ''}`}
             disabled={qualityLoading || playbackSettingSaving}
             onClick={() => savePlaybackSetting('cache_next_episode', !cacheNext, setCacheNext)}
@@ -1706,7 +1770,12 @@ function Player({ target, onNavigate, onSeriesSelected, onFloatingChange, active
         </div>}
       </div>
       {createPortal(
-      <div className={`player-stage ${windowFill ? 'player-window-fill' : ''}`} data-picture-mode={pictureMode} ref={stageRef}>
+      <div className={`player-stage ${windowFill ? 'player-window-fill' : ''}`} data-picture-mode={pictureMode} ref={stageRef}
+        onDoubleClick={(event) => {
+          if (event.target.closest('.player-controls, button, input, select, textarea, a, [role="dialog"]')) return;
+          clearTimeout(videoClickTimer.current);
+          if (canPlay) return toggleFullscreen();
+        }}>
           {rateNotice !== null && <div className="player-rate-notice" role="status" aria-live="polite">{rateNotice}×</div>}
           <video
             ref={videoRef}
@@ -1726,7 +1795,6 @@ function Player({ target, onNavigate, onSeriesSelected, onFloatingChange, active
                 else video.pause();
               }, 300);
             }}
-            onDoubleClick={() => { clearTimeout(videoClickTimer.current); if (canPlay) return toggleFullscreen(); }}
             onLoadedMetadata={handleMetadata}
             onTimeUpdate={prepareNextEpisode}
             onPlay={(event) => {
@@ -1780,6 +1848,8 @@ function Player({ target, onNavigate, onSeriesSelected, onFloatingChange, active
               if (failedDecode && !unavailableOnline) tryAutoCompat(currentIndex);
             }}
           />
+        <canvas ref={transitionFrameRef} className="player-transition-frame" aria-hidden="true"
+          style={{ visibility: holdingFrame ? 'visible' : 'hidden' }} />
         <VideoEnhancement videoRef={videoRef} source={videoSrc} available={visualActive} enhancement={enhancement} />
         {danmakuSource === 'official'
           ? <OfficialDanmaku videoRef={videoRef} source={videoSrc} available={visualActive} danmaku={danmaku} />
@@ -1803,7 +1873,7 @@ function Player({ target, onNavigate, onSeriesSelected, onFloatingChange, active
           onlineQuality={onlineQuality} supportsOnlineQuality={supportsOnlineQuality} onQualityChange={changeOnlineQuality}
           pictureMode={pictureMode} onPictureModeChange={changePictureMode} rate={playbackRate} onRateChange={changePlaybackRate} onError={showToast} />
         {!canPlay && (
-          <div className="player-placeholder" style={{ position: 'absolute', inset: 0 }}>
+          <div className={`player-placeholder${holdingFrame && !playbackError ? ' player-placeholder-over-frame' : ''}`} style={{ position: 'absolute', inset: 0, zIndex: 3 }}>
             {playbackError ? (
               <><Film size={34} /><p role="alert">{playbackError}</p><div className="player-placeholder-actions">
                 <button className="btn btn-primary" onClick={retryPlayback}>{current?.status === 'completed' ? '重试本集' : '重试本集（在线播放）'}</button>

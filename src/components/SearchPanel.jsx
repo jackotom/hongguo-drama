@@ -223,7 +223,12 @@ function SearchPanel({ onSelectSeries, onSwitchToInput, active = true }) {
       const res = await window.electronAPI.searchResolve(item.series_id);
       if (request !== requestVersion.current) return;
       if (res && res.success && res.data) {
-        onSelectSeries(res.data);
+        onSelectSeries({
+          ...res.data,
+          cover: res.data.cover || item.cover || '',
+          description: [res.data.description, res.data.intro, res.data.series_intro, item.description, item.intro, item.series_intro]
+            .find(value => typeof value === 'string' && value.trim())?.trim() || '',
+        });
       } else {
         setError((res && res.error) || '拉取分集失败');
       }

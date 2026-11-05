@@ -471,8 +471,9 @@ function parseAppPlayModel(info, vid, options, inline, requireEncryptionMetadata
     for (const selected of selectedRows) {
         try {
             const spade = selected.item.spade_a || selected.item.encrypt_info?.spade_a;
-            if (requireEncryptionMetadata && !spade && ![false, 0, '0', 'false'].includes(selected.item.encrypt_info?.encrypt)) {
-                if (selected.item.encrypt_info?.encrypt == null) incompleteEncryptionMetadata = true;
+            const encrypt = selected.item.encrypt_info?.encrypt ?? selected.item.encrypt;
+            if (requireEncryptionMetadata && !spade && ![false, 0, '0', 'false'].includes(encrypt)) {
+                if (encrypt == null) incompleteEncryptionMetadata = true;
                 throw Object.assign(new Error('本集片源缺少有效解密信息'), { code: 'INVALID_RESPONSE' });
             }
             const key = spade ? deriveContentKey(spade) : null;

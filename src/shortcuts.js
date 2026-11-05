@@ -2,6 +2,7 @@ export const SHORTCUT_STORAGE_KEY = 'hongguo:preview:playback-shortcuts:v1';
 export const SHORTCUT_EVENT = 'hongguo:playback-shortcuts-changed';
 export const SHORTCUT_ACTIONS = [
   { id: 'play', label: '播放 / 暂停', key: 'space' },
+  { id: 'holdSpeed', label: '长按临时 2 倍速', key: 'space' },
   { id: 'backward', label: '快退 5 秒', key: 'arrowleft', repeat: true },
   { id: 'forward', label: '快进 5 秒', key: 'arrowright', repeat: true },
   { id: 'previous', label: '上一集', key: 'arrowup' },
@@ -34,8 +35,9 @@ export function validateShortcuts(bindings) {
   for (const action of SHORTCUT_ACTIONS) {
     const key = bindings?.[action.id];
     if (typeof key !== 'string' || !KEY_PATTERN.test(key) || key === 'shift+space') return `${action.label}的按键不可用`;
-    if (seen.has(key)) return `与「${seen.get(key)}」冲突，请换一个按键`;
-    seen.set(key, action.label);
+    const previous = seen.get(key);
+    if (previous && !(previous.id === 'play' && action.id === 'holdSpeed')) return `与「${previous.label}」冲突，请换一个按键`;
+    seen.set(key, action);
   }
   return '';
 }
@@ -43,6 +45,7 @@ export function validateShortcuts(bindings) {
 export function readShortcuts() {
   try {
     const stored = JSON.parse(window.localStorage.getItem(SHORTCUT_STORAGE_KEY));
+    if (stored && typeof stored === 'object' && stored.holdSpeed === undefined) stored.holdSpeed = stored.play;
     if (!validateShortcuts(stored)) return Object.fromEntries(SHORTCUT_ACTIONS.map(({ id }) => [id, stored[id]]));
   } catch { /* Missing or damaged preferences use the complete default map. */ }
   return { ...DEFAULT_SHORTCUTS };

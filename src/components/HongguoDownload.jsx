@@ -17,6 +17,11 @@ function HongguoDownload({ onNavigate, active = true }) {
 
   // 短剧解析结果
   const [seriesData, setSeriesData] = useState(null); // { series_id, series_title, cover, total, episodes: [...] }
+  const [publicIntro, setPublicIntro] = useState(null);
+  const [introExpanded, setIntroExpanded] = useState(false);
+  const seriesDescription = [seriesData?.description, seriesData?.intro, seriesData?.series_intro]
+    .find(value => typeof value === 'string' && value.trim())?.trim() || '';
+  const description = seriesDescription || (publicIntro?.seriesId === seriesData?.series_id ? publicIntro?.description : '') || '';
   const [selectedVids, setSelectedVids] = useState(new Set());
   const [rangeInput, setRangeInput] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -37,6 +42,23 @@ function HongguoDownload({ onNavigate, active = true }) {
   const resolveRequest = useRef(0);
   const pendingResolve = useRef(null);
   const searchVersion = resolveRequest.current;
+
+  useEffect(() => {
+    setIntroExpanded(false);
+    setPublicIntro(null);
+    if (!seriesData || seriesDescription || !/^\d{6,30}$/.test(String(seriesData.series_id))) return;
+    let cancelled = false;
+    const seriesId = seriesData.series_id;
+    setPublicIntro({ seriesId, loading: true });
+    Promise.resolve().then(() => window.electronAPI.getPublicDetails(seriesId)).then(data => {
+      if (cancelled) return;
+      const intro = data?.success && String(data.series_id) === String(seriesId) && typeof data.description === 'string' ? data.description.trim() : '';
+      setPublicIntro({ seriesId, description: intro, loading: false, failed: !data?.success });
+    }).catch(() => {
+      if (!cancelled) setPublicIntro({ seriesId, loading: false, failed: true });
+    });
+    return () => { cancelled = true; };
+  }, [seriesData, seriesDescription]);
 
   useEffect(() => () => { resolveRequest.current++; }, []);
   useEffect(() => {
@@ -390,6 +412,17 @@ function HongguoDownload({ onNavigate, active = true }) {
                   <span className="badge">{mediaSourceLabel(seriesData.series_id, mediaSources)}</span>
                   <span className="badge">共 {seriesData.total} 集</span>
                   <span className="badge badge-secondary">已选 {selectedVids.size} 集</span>
+                </div>
+                <div className="series-description">
+                  <h4>剧情简介</h4>
+                  {description ? <>
+                    <p id="series-description-text">{introExpanded || description.length <= 120 ? description : `${description.slice(0, 120).trimEnd()}…`}</p>
+                    {description.length > 120 && <button type="button" className="btn-chip" aria-expanded={introExpanded}
+                      aria-controls="series-description-text" onClick={() => setIntroExpanded(value => !value)}>
+                      {introExpanded ? '收起简介' : '展开简介'}
+                    </button>}
+                  </> : <p role="status">{publicIntro?.seriesId === seriesData.series_id && publicIntro.loading ? '简介加载中…'
+                    : publicIntro?.seriesId === seriesData.series_id && publicIntro.failed ? '简介暂未获取，请稍后重新打开剧集。' : '当前来源暂无剧情简介'}</p>}
                 </div>
               </div>
             </div>

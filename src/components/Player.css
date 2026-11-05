@@ -393,6 +393,9 @@
   background: #000;
 }
 
+.player-transition-frame { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; background: #000; pointer-events: none; z-index: 2; }
+.player-placeholder.player-placeholder-over-frame { background: rgba(0, 0, 0, .25); }
+
 .player-placeholder {
   width: 100%;
   height: 100%;
@@ -679,8 +682,10 @@
 
 /* Width mode follows the available width; only the stage clips the picture. */
 .player-stage[data-picture-mode] .player-video { object-fit: contain; }
-.player-stage[data-picture-mode="width"] .player-video {
+.player-stage[data-picture-mode="width"] .player-video,
+.player-stage[data-picture-mode="width"] .player-transition-frame {
   position: absolute;
+  inset: auto;
   top: 50%;
   left: 0;
   width: 100%;

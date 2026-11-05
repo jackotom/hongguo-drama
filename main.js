@@ -1,5 +1,5 @@
 /**
- * main.js - 红果短剧 5.7 下载器（独立版）主进程
+ * main.js - 红果短剧 5.8 下载器（独立版）主进程
  *
  * 功能：
  *   1. 红果短剧解析（分享链接 / series_id -> 全剧集列表）
@@ -742,6 +742,27 @@ const SOURCE_RETRY_DELAYS = [3, 8, 15].map(minutes => minutes * 60000);
 const TRANSFER_RETRY_DELAYS = [10, 30, 60].map(seconds => seconds * 1000);
 const sourceRetryTimers = new Map();
 
+function isDownloadSourceRejection(error) {
+  return error?.code === 'DEVICE_REGISTRATION_FAILED' || error?.code === 'SOURCE_UNAVAILABLE'
+    && Array.isArray(error.sources) && error.sources.some(item => item.source === 'app'
+      && /^(?:DEVICE_REGISTRATION_FAILED|HTTP_(?:403|429))$/.test(item.code));
+}
+
+function pausePendingHongguoTasks() {
+  const paused = [];
+  for (const task of downloadTasks) {
+    if (task.type !== 'hongguo' || !/^\d{1,30}$/.test(String(task.hongguoInfo?.vid || ''))
+      || runningDownloads.has(task.id) || !(task.status === 'pending'
+        || task.status === 'failed' && (task.retryAt || sourceRetryTimers.has(task.id)))) continue;
+    delete task.retryAt; delete task.sourceRetries;
+    task.status = 'stopped'; task.cancelled = true; task.endTime = Date.now();
+    task.error = '匿名设备注册失败或 App 取源被拒绝，已暂停后续下载；请手动重试，上游恢复时间无法确认';
+    paused.push(task);
+  }
+  downloadQueue = downloadQueue.filter(task => task.status === 'pending');
+  return paused;
+}
+
 function sourceFailureIsTransient(error) {
   const sources = Array.isArray(error?.sources) ? error.sources : [];
   // A timeout on another route cannot repair an explicit App/device rejection.
@@ -1118,6 +1139,7 @@ async function executeHongguoDownload(task) {
   } catch (error) {
     if (writer && !writer.destroyed) writer.destroy();
     if (tmpPath) { try { fs.unlinkSync(tmpPath); } catch (_) {} }
+    let paused = [];
     task.qualityNotice = '';
     // A retry may already be queued; the cancelled old run must not overwrite it.
     if (source.token.reason || axios.isCancel(error) || task.cancelled) {
@@ -1128,7 +1150,8 @@ async function executeHongguoDownload(task) {
     } else {
       const retries = task.sourceRetries || 0;
       task.status = 'failed'; task.error = error.message; task.endTime = Date.now();
-      if (retries < SOURCE_RETRY_DELAYS.length && isDeferrableSourceError(task, error)) {
+      if (/^\d{1,30}$/.test(String(vid)) && isDownloadSourceRejection(error)) paused = pausePendingHongguoTasks();
+      else if (retries < SOURCE_RETRY_DELAYS.length && isDeferrableSourceError(task, error)) {
         const delays = error.code === 'SOURCE_UNAVAILABLE' || [404, 410].includes(error.mediaStatus)
           ? SOURCE_RETRY_DELAYS : TRANSFER_RETRY_DELAYS;
         const delay = delays[retries];
@@ -1140,6 +1163,7 @@ async function executeHongguoDownload(task) {
       sendToRenderer('download-failed', { id, error: task.error, retryAt: task.retryAt || null, sourceRetries: task.sourceRetries || 0, qualityNotice: '' });
     }
     saveDownloadTasks();
+    for (const task of paused) clearSourceRetry(task);
   } finally {
     if (task.cancelSource === source) delete task.cancelSource;
     if (task.writer === writer) delete task.writer;
@@ -2171,6 +2195,22 @@ ipcMain.handle('show-in-folder', async (event, filePath) => {
   }
 });
 
+ipcMain.handle('open-episode-external', async (_event, seriesId, vidIndex) => {
+  try {
+    const task = downloadTasks.find(item => item.status === 'completed'
+      && String(item.hongguoInfo?.series_id) === String(seriesId)
+      && Number(item.hongguoInfo?.vid_index) === Number(vidIndex) && hasCompleteTaskFile(item));
+    if (!task || !/\.mp4$/i.test(task.savePath)
+      || !isRecordedMediaFile(task.savePath, { seriesId, vidIndex, vid: task.hongguoInfo.vid })) {
+      return { success: false, error: '请先完整下载本集，再使用系统播放器打开' };
+    }
+    const error = await shell.openPath(task.savePath);
+    return error ? { success: false, error: '无法打开系统播放器，请检查 MP4 的默认打开方式' } : { success: true };
+  } catch {
+    return { success: false, error: '无法打开系统播放器，请检查文件和默认打开方式' };
+  }
+});
+
 ipcMain.handle('get-merge-tasks', async () => mergeTasks.map(({ child, ...rest }) => rest));
 
 function seriesDownloadDir(root, seriesId, seriesTitle) {
@@ -2717,7 +2757,7 @@ async function withMediaRecovery(vid, seriesId, options, consume) {
     options.cancelToken?.throwIfRequested();
     if (options.signal?.aborted || controller.signal.aborted) throw Object.assign(new Error('已取消媒体请求'), { code: 'ERR_CANCELED' });
   };
-  const recoverable = error => error?.code === 'SOURCE_UNAVAILABLE'
+  const recoverable = error => isDownloadSourceRejection(error) ? false : error?.code === 'SOURCE_UNAVAILABLE'
     ? sourceFailureIsTransient(error)
     : error?.mediaRetryable || error?.code === 'MEDIA_DECODE_ERROR'
       || ['ECONNRESET', 'ECONNABORTED', 'ETIMEDOUT', 'EPIPE', 'ERR_BAD_RESPONSE', 'ERR_STREAM_PREMATURE_CLOSE', 'EAI_AGAIN'].includes(error?.code);
@@ -2761,6 +2801,7 @@ async function withMediaRecovery(vid, seriesId, options, consume) {
           return value;
         } catch (error) {
           cancelled();
+          if (isDownloadSourceRejection(error)) throw error;
           // Local storage/security failures cannot be repaired by trying a lower-quality video.
           const terminal = error?.path || error?.dest
             || /^(?:EACCES|EPERM|ENOSPC|EDQUOT|EROFS|EIO|ENOENT|EEXIST|ENOTDIR|EISDIR|EMFILE|ENFILE|EBUSY|ENAMETOOLONG|EMLINK|EFBIG|LOCAL_MEDIA_TOOL_ERROR|SECURITY_BLOCKED|ERR_WEB_MEDIA_ADDRESS)$/.test(error?.code);
