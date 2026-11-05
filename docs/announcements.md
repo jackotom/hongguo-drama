@@ -1,6 +1,6 @@
 # 远程公告维护
 
-6.0 更新摘要已准备，`announcements/normal.json` 保持 `active: false`，未启用普通公告广播。
+6.0已正式发布，更新摘要已同步；`announcements/normal.json` 保持 `active: false`，未启用普通公告广播。
 
 5.9已正式发布；`announcements/normal.json`的标题和正文已同步正式修复摘要，仍保持 `active: false`，本轮未启用普通公告广播。已有用户的关闭偏好不变。
 
