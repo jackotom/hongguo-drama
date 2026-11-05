@@ -109,12 +109,12 @@ function mountHistory({ missing = false, playError = '', resolveError = '', lock
   error: () => find(node => node.props.role === 'alert')?.children[0]?.children[0] };
 }
 
-test('local sequel starts from the first playable episode without network or saved-position resume', async () => {
+test('local sequel starts from the first playable episode and preserves the origin episode updates', async () => {
  const ui = mountHistory({ resolveError: 'offline' }); await ui.open();
  assert.deepEqual(ui.calls, [['play', { seriesId: 'B', vidIndex: 1 }]]);
- assert.deepEqual(ui.acknowledgements, [['A', { total: 9, sequelIds: ['B'] }]]);
+ assert.deepEqual(ui.acknowledgements, [['A', { total: 0, sequelIds: ['B'] }]]);
  assert.equal(ui.error(), undefined);
- assert.equal(ui.find(node => node.props['aria-label'] === '有更新'), undefined);
+ assert.ok(ui.find(node => node.props['aria-label'] === '有更新'));
 });
 
 test('missing sequel archive resolves once and starts the first unlocked episode', async () => {

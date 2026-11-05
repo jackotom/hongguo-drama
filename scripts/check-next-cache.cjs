@@ -32,11 +32,23 @@ const tick = (ui, time) => {
   cancel.props.active = false; await cancel.flush();
   changedSettings.cache_next_episode = false; cancel.props.active = true; await cancel.flush();
   assert.ok(cancel.releases.some(r => r.requestId === cancel.prepares[1].requestId)); cancel.unmount();
-  const failed = mount({ prepare: p => p.prefetch ? { success: false, error: 'offline' } : { success: true, url: 'hongguo-stream://normal' } });
-  await failed.flush(); failed.metadata(); tick(failed, 90); await failed.flush(); tick(failed, 91); await failed.flush();
-  assert.equal(failed.prepares.length, 2, 'failed prefetch must not loop');
+  let now = Date.now();
+  const failed = mount({ now: () => now, prepare: p => p.prefetch ? { success: false, error: 'offline' } : { success: true, url: 'hongguo-stream://normal' } });
+  await failed.flush(); failed.metadata(); await failed.flush();
+  const attempts = failed.prepares.filter(p => p.prefetch);
+  assert.deepEqual(attempts.map(p => p.quality), ['1080p', '720p', 'auto'], 'failed automatic prefetch must try exactly three qualities');
+  assert.equal(new Set(attempts.map(p => p.requestId)).size, 1, 'all quality attempts must belong to the same cancellable request');
+  tick(failed, 90); tick(failed, 91); await failed.flush();
+  now += 14000; tick(failed, 92); await failed.flush();
+  assert.equal(failed.prepares.length, 4, 'failed prefetch must not loop within the cooldown');
   failed.episode(2); await failed.flush();
-  assert.equal(failed.prepares.length, 3, 'playback retries normally after prefetch failure'); failed.unmount();
+  assert.equal(failed.prepares.length, 5, 'manual playback must submit only one fresh request after prefetch failure');
+  assert.equal(failed.prepares.at(-1).vidIndex, 2);
+  assert.equal(failed.prepares.at(-1).quality, '1080p');
+  assert.equal(failed.prepares.at(-1).prefetch, undefined, 'manual playback must leave the failed background request behind');
+  failed.metadata(); await failed.flush();
+  assert.equal(failed.find(n => n.type === 'video').props.src, 'hongguo-stream://normal');
+  assert.equal(failed.media.paused, false, 'manual playback must resume normally'); failed.unmount();
   const chain = mount({ episodeCount: 3 });
   await chain.flush(); chain.metadata(); await chain.flush();
   assert.deepEqual(chain.prepares.filter(p => p.prefetch).map(p => p.vidIndex), [2, 3],

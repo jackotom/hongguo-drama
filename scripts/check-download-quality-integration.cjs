@@ -7,7 +7,7 @@ const vm = require('node:vm');
 const { EventEmitter } = require('node:events');
 const { createRequire } = require('node:module');
 const { Readable } = require('node:stream');
-const { execFileSync } = require('node:child_process');
+const { spawnSync } = require('node:child_process');
 const source = path.resolve(__dirname, '../main.js');
 const req = createRequire(source);
 const dirs = [];
@@ -29,7 +29,8 @@ function fixture({ width = 1080, height = 1920, quality = 'auto', realMedia = fa
   vm.runInContext(fs.readFileSync(source, 'utf8'), context, { filename: source });
   require('./fixtures/trusted-ipc.cjs')(context, handlers);
   const run = text => vm.runInContext(text, context);
-  run(`globalThis.originalProbeVideoInfo = probeVideoInfo; sendToRenderer = (channel, data) => testEvents.push({channel, data: {...data}}); pumpQueue = () => {};
+  run(`globalThis.originalProbeVideoInfo = probeVideoInfo; globalThis.originalRequestMedia = requestMedia;
+    sendToRenderer = (channel, data) => testEvents.push({channel, data: {...data}}); pumpQueue = () => {};
     requestMedia = async () => ({headers: {'content-length': '200000'}, data: testReadStream()});
     seriesRegistry = [{series_id:'1',series_title:'测试剧',episodes:[{vid:'11',vid_index:1},{vid:'12',vid_index:2}]}];`);
   // Synthetic transfers mock validation; realMedia keeps the production probe, decoder and tool discovery.
@@ -39,15 +40,92 @@ function fixture({ width = 1080, height = 1920, quality = 'auto', realMedia = fa
     setQuality: value => { settings.download_quality = value; } };
 }
 const payload = quality => ({ seriesId: '1', seriesTitle: '测试剧', episodes: [{vid:'11',vid_index:1}], ...(quality ? {quality} : {}) });
+async function realFootageCatalog(browseList) {
+  let catalog = await browseList({ category: 'hot-real-drama' });
+  if (!catalog.success && catalog.code === 'APP_TIMEOUT') {
+    console.log('RETRY real Hongguo catalog once (APP_TIMEOUT)');
+    catalog = await browseList({ category: 'hot-real-drama', forceRefresh: true });
+  }
+  if (!catalog.success) throw Object.assign(new Error('Real Hongguo catalog unavailable'), {
+    code: /^APP_[A-Z_]+$/.test(catalog.code || '') ? catalog.code : 'APP_SCHEMA',
+  });
+  assert(Array.isArray(catalog.results) && catalog.results.length);
+  return catalog;
+}
 const checks = [
+  ['real footage catalog retries one timeout and preserves terminal failures', async () => {
+    for (const codes of [['APP_TIMEOUT', null], ['APP_TIMEOUT', 'APP_TIMEOUT'], ['APP_SCHEMA'], ['APP_BUSINESS'], ['APP_NETWORK']]) {
+      const calls = [];
+      const result = realFootageCatalog(async options => {
+        calls.push(options);
+        assert(calls.length <= codes.length, 'catalog retries must stay bounded');
+        const code = codes[calls.length - 1];
+        return code ? { success: false, code } : { success: true, results: [{ series_id: '1' }] };
+      });
+      if (codes.at(-1)) await assert.rejects(result, error => error.code === codes.at(-1));
+      else assert.equal((await result).results.length, 1);
+      assert.equal(calls.length, codes.length);
+      assert(calls.every(options => options.category === 'hot-real-drama'));
+      if (calls.length === 2) assert.equal(calls[1].forceRefresh, true);
+    }
+  }],
   ['real decoder recovers corrupt Web through healthy App and rejects probeable corrupt App once', async () => {
     const h = fixture({ realMedia: true });
     const ffmpeg = h.context.resolveFfmpeg('ffmpeg');
     assert.ok(ffmpeg && h.context.resolveFfmpeg('ffprobe'), 'local FFmpeg and ffprobe are required');
     const valid = path.join(h.root, 'valid.mp4'), broken = path.join(h.root, 'broken.mp4');
-    execFileSync(ffmpeg, ['-v', 'error', '-nostdin', '-f', 'lavfi', '-i', 'testsrc2=s=640x360:r=24:d=1',
-      '-c:v', 'libx264', '-preset', 'ultrafast', '-qp', '0', '-pix_fmt', 'yuv420p', valid],
-      { stdio: ['ignore', 'pipe', 'pipe'], timeout: 15000 });
+    // Load real native modules outside the VM's mocked source lookup.
+    const native = require('../src/native/hongguo');
+    Object.assign(h.run('hongguo'), { UA: native.UA, WEB_UA: native.WEB_UA,
+      VIDEO_REFERER: native.VIDEO_REFERER, WEB_REFERER: native.WEB_REFERER });
+    const original = path.join(h.root, 'original.mp4');
+    let info, stage = 'catalog lookup';
+    try {
+      const catalog = await realFootageCatalog(require('../src/native/hongguo-app-catalog').browseList);
+      const drama = catalog.results[Math.floor(Math.random() * catalog.results.length)];
+      stage = 'episode lookup';
+      const series = await native.fetchEpisodeList(drama.series_id);
+      const episodes = series.episodes.filter(episode => episode.vid && episode.web_available !== false);
+      assert(episodes.length);
+      const episode = episodes[Math.floor(Math.random() * episodes.length)];
+      console.log('REAL Hongguo source ' + JSON.stringify({ seriesId: series.series_id,
+        title: series.series_title, vid: episode.vid, episode: episode.vid_index }));
+      stage = 'media lookup';
+      info = await native.fetchPlayUrlSingle(episode.vid, series.series_id, { force: true });
+      assert(info.url);
+      assert.equal(String(info.vid), String(episode.vid));
+      stage = 'media download';
+      const response = await h.context.originalRequestMedia(info, {
+        responseType: 'arraybuffer', maxContentLength: 128 * 1024 * 1024,
+      });
+      assert(response.data.byteLength > 0);
+      const expectedLength = Number(response.headers['content-length']);
+      assert(!expectedLength || response.data.byteLength === expectedLength);
+      fs.writeFileSync(original, response.data);
+      stage = 'media decode';
+      const key = info.contentKey;
+      assert(!key || /^[a-f\d]{32}$/i.test(key));
+      let input = original;
+      if (!key && info.spadeA) {
+        const derived = native.deriveKey(info.spadeA);
+        assert(derived);
+        input = path.join(h.root, 'decrypted.mp4');
+        native.decryptMp4File(original, input, derived);
+      }
+      const decoder = info.codec === 'bytevc2' ? h.context.resolveFfmpeg('librempeg') : ffmpeg;
+      assert(decoder, 'source codec requires the matching bundled decoder');
+      const decoded = spawnSync(decoder, ['-v', 'error', '-nostdin', ...(key ? ['-decryption_key', key] : []),
+        '-i', input, '-t', '1', '-map', '0:v:0', '-an', '-vf', 'scale=640:360', '-r', '24',
+        '-c:v', 'libx264', '-preset', 'ultrafast', '-qp', '0', '-pix_fmt', 'yuv420p', valid],
+        { stdio: ['ignore', 'pipe', 'pipe'], timeout: 60000, windowsHide: true });
+      assert.equal(decoded.status, 0);
+      fs.unlinkSync(original);
+    } catch (error) {
+      const status = Number(error.response?.status);
+      const reason = status >= 100 && status <= 599 ? `HTTP ${status}`
+        : /^[A-Z][A-Z0-9_]{0,63}$/.test(error.code || '') ? error.code : 'unavailable';
+      throw new Error(`Real Hongguo ${stage} failed (${reason}); no substitute footage or sensitive details logged`);
+    }
     const bytes = fs.readFileSync(valid), damaged = Buffer.from(bytes);
     const mdat = damaged.indexOf(Buffer.from('mdat'));
     assert.ok(mdat >= 4, 'fixture must contain an MP4 media-data box');

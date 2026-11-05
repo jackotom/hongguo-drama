@@ -1,4 +1,5 @@
 const assert = require('node:assert/strict');
+const fs = require('node:fs'), path = require('node:path'), vm = require('node:vm');
 const { mount } = require('./check-player-resume.cjs');
 
 const openEpisode = async (options = {}) => {
@@ -39,6 +40,153 @@ const flushWithoutBuffering = async ui => {
     try { await fn(); console.log('PASS ' + name); }
     catch (error) { failures++; console.error('FAIL ' + name + ': ' + (error.stack || error.message)); }
   };
+
+  await test('every prefetch quality attempt carries only cloneable IPC fields', async () => {
+    const payloads = [], cloneErrors = [];
+    const ui = await openEpisode({ apiOverrides: { prepareOnlinePlay: async payload => {
+      let copy;
+      try { copy = structuredClone(payload); }
+      catch (error) { cloneErrors.push(error.name); throw error; }
+      payloads.push(copy);
+      return !copy.prefetch || copy.quality === '720p' ? { success: true, url: `hongguo-stream://${copy.vidIndex}-${copy.quality}` }
+        : { success: false, error: '1080 unavailable' };
+    } } });
+    try {
+      assert.deepEqual(cloneErrors, [], 'fallback IPC must never carry the request Promise');
+      const queued = payloads.filter(item => item.prefetch);
+      assert.deepEqual(queued.map(item => item.quality), ['1080p', '720p']);
+      for (const item of queued) assert.deepEqual(Object.keys(item).sort(),
+        ['requestId', 'vid', 'seriesId', 'vidIndex', 'quality', 'prefetch'].sort());
+    } finally { ui.unmount(); }
+  });
+
+  await test('App rejection stays blocked past cooldown and automatic reconnect, until manual retry', async () => {
+    const failures = [
+      ...['DEVICE_REGISTRATION_FAILED', 'BUSINESS_REJECTED', 'SECURITY_BLOCKED'].map(code => ({ code })),
+      ...['DEVICE_REGISTRATION_FAILED', 'HTTP_403', 'HTTP_429', 'BUSINESS_REJECTED', 'SECURITY_BLOCKED']
+        .map(code => ({ code: 'SOURCE_UNAVAILABLE', sources: [{ source: 'app', code }] })),
+    ];
+    for (const failure of failures) {
+      let now = Date.now();
+      const ui = await openEpisode({ now: () => now,
+        prepare: async payload => payload.prefetch ? { success: false, ...failure }
+          : { success: true, url: `hongguo-stream://${payload.vidIndex}-${payload.quality}` } });
+      try {
+        assert.equal(prefetches(ui).length, 1, JSON.stringify(failure));
+        for (const elapsed of [16000, 60000]) {
+          now += elapsed; tick(ui, 1); await ui.flush();
+          assert.equal(prefetches(ui).length, 1, 'explicit rejection must not restart after the cooldown');
+        }
+        ui.error(2); await ui.flush(); ui.metadata(); await ui.flush();
+        assert.equal(prefetches(ui).length, 1, 'automatic source recovery must not unlock rejected prefetch');
+        ui.episode(1); await ui.flush(); ui.metadata(); await ui.flush();
+        assert.equal(prefetches(ui).length, 2, 'manual episode retry must allow one new prefetch attempt');
+        assert.equal(prefetches(ui).at(-1).quality, '1080p');
+        // A second immediate manual retry must also work, without waiting 15 seconds.
+        ui.episode(1); await ui.flush(); ui.metadata(); await ui.flush();
+        assert.equal(prefetches(ui).length, 3, 'a new explicit retry must not inherit a rejection cooldown');
+      } finally { ui.unmount(); }
+    }
+  });
+
+  await test('one App refusal blocks lower-quality work on both queued targets until the episode changes', async () => {
+    let now = Date.now();
+    const ui = await openEpisode({ episodeCount: 3, now: () => now, prepare: async payload => !payload.prefetch
+      ? { success: true, url: `hongguo-stream://${payload.vidIndex}` }
+      : payload.vidIndex === 2 ? { success: false, code: 'SOURCE_UNAVAILABLE', sources: [{ source: 'app', code: 'HTTP_429' }] }
+        : { success: false, error: 'network' } });
+    try {
+      assert.deepEqual(prefetches(ui).map(item => [item.vidIndex, item.quality]), [[2, '1080p'], [3, '1080p']]);
+      now += 60000; tick(ui, 1); await ui.flush();
+      assert.equal(prefetches(ui).length, 2, 'all targets must remain paused for the current playback source');
+      ui.episode(2); await ui.flush(); ui.metadata(); await ui.flush();
+      assert.deepEqual(prefetches(ui).filter(item => item.vidIndex === 3).map(item => item.quality),
+        ['1080p', '1080p', '720p', 'auto'], 'episode change must restore the bounded ladder for following episodes');
+    } finally { ui.unmount(); }
+  });
+
+  await test('a released old episode refusal cannot block the newly selected episode prefetch', async () => {
+    let rejectOld;
+    const ui = await openEpisode({ episodeCount: 4, prepare: payload => payload.prefetch && payload.vidIndex === 2
+      ? new Promise(resolve => { rejectOld = resolve; })
+      : { success: true, url: `hongguo-stream://${payload.vidIndex}` } });
+    try {
+      ui.episode(3); await ui.flush();
+      rejectOld({ success: false, code: 'SOURCE_UNAVAILABLE', sources: [{ source: 'app', code: 'HTTP_403' }] });
+      await ui.flush(); ui.metadata(); await ui.flush();
+      assert(prefetches(ui).some(item => item.vidIndex === 4), 'a stale refusal must not poison the new playback source');
+    } finally { ui.unmount(); }
+  });
+
+  for (const available of ['720p', 'auto']) await test(`automatic prefetch falls back to ${available} and hands off its actual quality`, async () => {
+    const ui = await openEpisode({ episodeCount: 2, prepare: async payload => !payload.prefetch || payload.quality === available
+      ? { success: true, url: `hongguo-stream://${payload.vidIndex}-${payload.quality}` }
+      : { success: false, code: 'SOURCE_UNAVAILABLE', sources: [{ source: 'app', code: 'QUALITY_UNAVAILABLE' }] } });
+    try {
+      const expected = available === '720p' ? ['1080p', '720p'] : ['1080p', '720p', 'auto'];
+      assert.deepEqual(prefetches(ui).map(item => item.quality), expected);
+      assert.equal(new Set(prefetches(ui).map(item => item.requestId)).size, 1, 'fallback must keep one cancellable request');
+      ui.episode(2); await flushWithoutBuffering(ui);
+      assert.equal(ui.find(node => node.type === 'video').props.src, `hongguo-stream://2-${available}`);
+      assert.equal(ui.prepares.filter(item => item.vidIndex === 2).length, expected.length, 'handoff must reuse the lower-quality prefetch');
+      ui.metadata(); await ui.flush();
+      ui.error(2); await ui.flush();
+      const foreground = ui.prepares.filter(item => item.vidIndex === 2 && !item.prefetch);
+      assert.deepEqual(foreground.map(item => item.quality), available === '720p' ? ['auto'] : [],
+        'runtime recovery must continue after the actual prefetched quality, never restart at 1080');
+    } finally { ui.unmount(); }
+  });
+
+  await test('fixed quality, compatible mode and other sources never use the automatic prefetch ladder', async () => {
+    for (const [seriesId, choice, expected] of [['A', '1080p', '1080p'], ['A', '720p', '720p'], ['A', 'compat', 'auto'],
+      ['xifan:A', 'auto', 'auto'], ['hema:A', 'auto', 'auto'], ['custom:A', 'auto', 'auto']]) {
+      const ui = await openEpisode({ seriesId, storage: new Map([['hongguo:online-quality', choice]]),
+        props: { target: { seriesId, vidIndex: 1, ts: 1 } },
+        prepare: async payload => payload.prefetch ? { success: false, error: 'unavailable' }
+          : { success: true, url: 'hongguo-stream://first' } });
+      try { assert.deepEqual(prefetches(ui).map(item => item.quality), [expected]); }
+      finally { ui.unmount(); }
+    }
+  });
+
+  await test('explicit App rejection and cancellation stop automatic prefetch quality retries', async () => {
+    for (const failure of [{ cancelled: true }, { code: 'ERR_CANCELED' }, ...[
+      'DEVICE_REGISTRATION_FAILED', 'HTTP_403', 'HTTP_429', 'BUSINESS_REJECTED', 'SECURITY_BLOCKED',
+    ].map(code => ({ code: 'SOURCE_UNAVAILABLE', sources: [{ source: 'app', code }] }))]) {
+      const ui = await openEpisode({ prepare: async payload => payload.prefetch ? { success: false, ...failure }
+        : { success: true, url: 'hongguo-stream://first' } });
+      try { assert.deepEqual(prefetches(ui).map(item => item.quality), ['1080p'], JSON.stringify(failure)); }
+      finally { ui.unmount(); }
+    }
+  });
+
+  await test('disabling prefetch during a quality attempt prevents lower-quality work after cancellation', async () => {
+    let fail;
+    const ui = await openEpisode({ prepare: payload => payload.prefetch ? new Promise(resolve => { fail = resolve; })
+      : { success: true, url: 'hongguo-stream://first' } });
+    try {
+      ui.button('缓存后续 2 集').props.onClick(); await ui.flush();
+      fail({ success: false, error: 'late failure' }); await ui.flush();
+      assert.deepEqual(prefetches(ui).map(item => item.quality), ['1080p']);
+      assert(ui.releases.some(item => item.requestId === prefetches(ui)[0].requestId));
+    } finally { ui.unmount(); }
+  });
+
+  await test('switching into an in-flight prefetch retains its bounded fallback and excludes stale episodes', async () => {
+    const pending = [];
+    const ui = await openEpisode({ episodeCount: 4, prepare: payload => payload.prefetch && payload.quality === '1080p'
+      ? new Promise(resolve => { pending.push({ ...payload, resolve }); })
+      : { success: true, url: `hongguo-stream://${payload.vidIndex}-${payload.quality}` } });
+    try {
+      assert.deepEqual(prefetches(ui).map(item => item.vidIndex), [2, 3], 'at most two episodes may prepare concurrently');
+      ui.episode(3); await ui.flush();
+      for (const item of pending) item.resolve({ success: false, error: '1080 unavailable' });
+      await ui.flush();
+      assert.deepEqual(prefetches(ui).filter(item => item.vidIndex === 2).map(item => item.quality), ['1080p']);
+      assert.deepEqual(prefetches(ui).filter(item => item.vidIndex === 3).map(item => item.quality), ['1080p', '720p']);
+      assert.equal(ui.find(node => node.type === 'video').props.src, 'hongguo-stream://3-720p');
+    } finally { ui.unmount(); }
+  });
 
   await test('playback prefetches at most the next two online episodes', async () => {
     const ui = await openEpisode({ episodeCount: 6 });
@@ -159,13 +307,13 @@ const flushWithoutBuffering = async ui => {
       },
     });
     try {
-      assert.equal(targetTwoAttempts, 1);
+      assert.equal(targetTwoAttempts, 3, 'automatic prefetch exhausts the bounded quality ladder');
       assert.equal(prefetches(ui).filter(item => item.vidIndex === 3).length, 1);
       tick(ui, 1); await ui.flush();
-      assert.equal(targetTwoAttempts, 1, 'retry must wait for the cooldown');
+      assert.equal(targetTwoAttempts, 3, 'retry must wait for the cooldown');
       now += 16000;
       tick(ui, 2); await ui.flush();
-      assert.equal(targetTwoAttempts, 2, 'failed target must retry after the cooldown');
+      assert.equal(targetTwoAttempts, 6, 'failed target must retry the bounded ladder after the cooldown');
       assert.equal(prefetches(ui).filter(item => item.vidIndex === 3).length, 1,
         'successful next-next target must not be retried');
     } finally { ui.unmount(); }
@@ -192,6 +340,27 @@ const flushWithoutBuffering = async ui => {
           'queued request ' + request.vidIndex + ' must be released when cache is disabled');
       }
     } finally { ui.unmount(); }
+  });
+
+  await test('prefetch IPC preserves only safe source codes for quality and explicit rejection decisions', async () => {
+    const prefix = fs.readFileSync(path.join(__dirname, 'check-download-quality-integration.cjs'), 'utf8').split('const checks = [')[0];
+    const module = { exports: {} };
+    vm.runInNewContext(prefix + '\nmodule.exports={fixture,dirs};',
+      { module, require, __dirname, console, process, Buffer, URL, Response, Request, Headers, AbortController, setTimeout, clearTimeout });
+    const { fixture, dirs } = module.exports;
+    try {
+      for (const code of ['QUALITY_UNAVAILABLE', 'HTTP_403']) {
+        const h = fixture();
+        h.context.failureCode = code;
+        h.run("hongguo.fetchPlayUrlSingle = async () => ({url:null,error:'取源失败',code:'SOURCE_UNAVAILABLE',sources:[{source:'app',code:failureCode,message:'private diagnostics'}]});");
+        const result = await h.handlers['prepare-online-play']({}, { vid: '11', seriesId: '1', vidIndex: 1, quality: '1080p', prefetch: true });
+        assert.equal(result.success, false);
+        assert(Array.isArray(result.sources), 'prefetch IPC must retain structured source failure codes');
+        assert.deepEqual(JSON.parse(JSON.stringify(result.sources)), [{ source: 'app', code }]);
+        assert.doesNotMatch(JSON.stringify(result), /private diagnostics/);
+        assert.equal(h.run('onlineSessions.size'), 0, 'failed preparations must release their sessions');
+      }
+    } finally { for (const dir of dirs) fs.rmSync(dir, { recursive: true, force: true }); }
   });
 
   if (failures) process.exitCode = 1;

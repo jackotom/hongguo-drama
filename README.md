@@ -25,21 +25,23 @@
 
 
 
-**当前正式版：5.8**（内部 `5.8.0`）。修复部分剧集取源、批量队列保护及切集画面，完善双击和可配置长按快捷键，增加详情大海报／折叠简介和系统播放器入口。双Mac已签名、公证、装订；Windows EXE未签名。上游百集限制及恢复时间仍未证实，详见 [5.8说明](docs/release-5.8.md)。
+**源码／发行目标：5.9**（内部 `5.9.0`），当前为发行候选。修复切集保帧回调丢失、观看记录分组提示与未读提醒，补齐自动画质预缓存降档；三端验证进行中，详见 [5.9候选说明](docs/release-5.9.md)。上一正式版为5.8，其历史验收保留在 [5.8说明](docs/release-5.8.md)。
 
-| 设备 | 下载 5.8 | 安装方式 |
+以下为5.9正式发行后使用的预定下载链接，目前不代表已有可下载成品；已发布版本请查看下方正式发行入口。
+
+| 设备 | 5.9 预定下载（待发布） | 安装方式 |
 |---|---|---|
-| Apple 芯片 Mac（M 系列），macOS 13+ | [下载 DMG](https://github.com/jackotom/hongguo-drama/releases/download/v5.8/Hongguo-5.8-mac-arm64.dmg) | 打开 DMG，拖入「应用程序」后启动；后续支持应用内更新 |
-| Intel Mac，macOS 13+ | [下载 DMG](https://github.com/jackotom/hongguo-drama/releases/download/v5.8/Hongguo-5.8-mac-x64.dmg) | 打开 DMG，拖入「应用程序」后启动；后续支持应用内更新 |
-| Windows x64（推荐安装版） | [下载安装版 EXE](https://github.com/jackotom/hongguo-drama/releases/download/v5.8/hongguo-downloader-5.8-win-x64-setup.exe) | 按向导安装，后续支持应用内更新 |
-| Windows x64（便携版） | [下载便携 EXE](https://github.com/jackotom/hongguo-drama/releases/download/v5.8/hongguo-downloader-5.8-win-x64.exe) · [下载便携 ZIP](https://github.com/jackotom/hongguo-drama/releases/download/v5.8/hongguo-downloader-5.8-win-x64.zip) | 直接运行 EXE；ZIP 解压后运行同一程序，后续仍需手动替换 |
+| Apple 芯片 Mac（M 系列），macOS 13+ | [待发布 DMG](https://github.com/jackotom/hongguo-drama/releases/download/v5.9/Hongguo-5.9-mac-arm64.dmg) | 打开 DMG，拖入「应用程序」后启动；后续支持应用内更新 |
+| Intel Mac，macOS 13+ | [待发布 DMG](https://github.com/jackotom/hongguo-drama/releases/download/v5.9/Hongguo-5.9-mac-x64.dmg) | 打开 DMG，拖入「应用程序」后启动；后续支持应用内更新 |
+| Windows x64（推荐安装版） | [待发布安装版 EXE](https://github.com/jackotom/hongguo-drama/releases/download/v5.9/hongguo-downloader-5.9-win-x64-setup.exe) | 按向导安装，后续支持应用内更新 |
+| Windows x64（便携版） | [待发布便携 EXE](https://github.com/jackotom/hongguo-drama/releases/download/v5.9/hongguo-downloader-5.9-win-x64.exe) · [待发布便携 ZIP](https://github.com/jackotom/hongguo-drama/releases/download/v5.9/hongguo-downloader-5.9-win-x64.zip) | 直接运行 EXE；ZIP 解压后运行同一程序，后续仍需手动替换 |
 
-[查看最新正式版](https://github.com/jackotom/hongguo-drama/releases/latest) · [5.8 更新说明与源码](https://github.com/jackotom/hongguo-drama/releases/tag/v5.8) · [SHA256 校验文件](https://github.com/jackotom/hongguo-drama/releases/download/v5.8/SHA256SUMS.txt)
+[查看已发布正式版](https://github.com/jackotom/hongguo-drama/releases/latest) · [5.9 候选说明](docs/release-5.9.md) · [预定5.9发行页（待发布）](https://github.com/jackotom/hongguo-drama/releases/tag/v5.9) · [SHA256 校验文件（待发布）](https://github.com/jackotom/hongguo-drama/releases/download/v5.9/SHA256SUMS.txt)
 
 
-- **升级到 5.8**：5.7 安装版可使用应用内更新；也可退出旧程序后替换 Mac 应用或运行 Windows 安装包。便携版保留同目录的 `data` 后手动替换；1.75 及更早版本需要手动安装。
+- **升级到 5.9（发布后）**：5.8 安装版保留应用内更新入口，实际跨版本升级验证待本轮验收；也可退出旧程序后替换 Mac 应用或运行 Windows 安装包。便携版保留同目录的 `data` 后手动替换；1.75 及更早版本需要手动安装。
 - **后续更新**：Mac 与 Windows 安装版可在应用内下载新版，下载完成后由你点击重启安装，不强制升级。Windows 便携版继续通过发行页下载并手动替换。
-- **Mac**：正式包完成 Developer ID 签名、Apple 公证 Accepted 和票据装订。无需全局关闭 Gatekeeper；公证不等于 App Store 审核或内容授权。
+- **Mac**：5.9正式包须完成 Developer ID 签名、Apple 公证 Accepted 和票据装订，本轮结果待主控补齐。无需全局关闭 Gatekeeper；公证不等于 App Store 审核或内容授权。
 - **Windows**：安装版和便携版 EXE 尚未签名，可能出现系统安全提示。请核对官方下载来源；便携版首次启动会展开临时运行文件。安装版沿用原用户资料目录；3.4 起便携版把设置和下载记录放在程序目录的 `data` 文件夹，移动程序时请连同该文件夹一起保留。安装版与便携版不能同时运行（同一应用只允许一个实例）；更换版本前请先退出正在运行的窗口。
 - **普通使用只需上表安装文件**：发行页中的 Mac 更新 ZIP、`latest*.yml` 和 `.blockmap` 供更新程序使用；`source` 文件和 GitHub 自动生成的 Source code 是源码，不能直接运行。
 
@@ -69,6 +71,14 @@
 2. 在「发现短剧」浏览，或在「搜索与下载」输入剧名、红果分享链接或剧集 ID。
 3. 打开详情点「立即播放」，也可选择集数与清晰度加入下载队列。
 4. 下次从「我的剧库」或「观看记录」接着看；下载进度、失败重试和整剧合并在「下载管理」。
+
+## 5.9 发行候选
+
+- 统一公开版本5.9、内部版本5.9.0、三端产物命名与当前发行资料，保留历史版本记录。
+- 修复自动切集时旧画面持续遮挡；首帧回调过早到达后继续等待有效新帧。
+- 同组续作提示汇总去重，保留真实新集红点；点击续作不误清原剧的新集提醒。
+- 自动预缓存有界尝试1080P、720P及兼容片源，固定画质不自动降档，明确拒绝后停止重试。
+- 构建、签名、公证及三端验收状态见 [5.9候选说明](docs/release-5.9.md)。
 
 ## 5.8 下载、切集与详情改进
 

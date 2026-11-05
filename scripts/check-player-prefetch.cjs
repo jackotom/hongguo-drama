@@ -49,11 +49,11 @@ const prepareOk = async payload => ({ success: true, url: `hongguo-stream://${pa
       await ui.flush(); ui.metadata(); ui.media.paused = false; ui.media.currentTime = 1;
       ui.find(node => node.type === 'video').props.onTimeUpdate({ currentTarget: ui.media });
       await ui.flush();
-      assert.equal(failed, 1, 'first prefetch must fail once');
+      assert.equal(failed, 3, 'first automatic prefetch must exhaust three qualities');
       clock += 16000;
       ui.find(node => node.type === 'video').props.onTimeUpdate({ currentTarget: ui.media });
       await ui.flush();
-      assert.equal(failed, 2, 'failed prefetch must be retried after the retry window');
+      assert.equal(failed, 6, 'failed automatic prefetch must retry three qualities after the retry window');
       ui.episode(2);
       await ui.flush(); ui.metadata(); ui.media.paused = false; ui.media.currentTime = 1;
       ui.find(node => node.type === 'video').props.onTimeUpdate({ currentTarget: ui.media });

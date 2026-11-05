@@ -65,7 +65,7 @@ function mount({ local = false, localIndexes = [], localQuality, saved = null, t
     getPlaybackPosition: async () => saved,
     savePlaybackPosition: async (...args) => saves.push(args),
     onWatchHistoryUpdated: listener => { historyListeners.add(listener); return () => historyListeners.delete(listener); },
-    prepareOnlinePlay: async p => { prepares.push(p); return prepare ? prepare(p) : { success: true, url: `hongguo-stream://mock-${prepares.length}` }; },
+    prepareOnlinePlay: async p => { structuredClone(p); prepares.push(p); return prepare ? prepare(p) : { success: true, url: `hongguo-stream://mock-${prepares.length}` }; },
     transcodeForPlayback: async p => { transcodes.push(p); return transcode ? transcode(p) : { success: true, url: 'file:///mock-compat.mp4' }; },
     cancelTranscodeForPlayback: async p => cancelled.push(p),
     onTranscodeProgress: fn => { transcodeProgress = fn; return () => { transcodeProgress = null; }; },

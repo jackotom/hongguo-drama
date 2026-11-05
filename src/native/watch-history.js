@@ -19,16 +19,17 @@ function listHistory(series, playback, showSequels = true) {
     const sequels = showSequels && Array.isArray(record.sequels) ? record.sequels : [];
     const confirmedIds = new Set(sequels.map(candidate => String(candidate.series_id)));
     const seen = new Set(record.seenSequelIds || []);
+    const unreadSequelIds = sequels.filter(candidate => !seen.has(candidate.series_id)).map(candidate => candidate.series_id);
     const total = Math.max(totalEpisodes(item), record.knownTotal || 0);
     const family = familyKey(item), season = seasonOf(item);
     return {
       series_id: item.series_id, series_title: item.series_title, cover: item.cover || '',
       total, completed: total > 0 && Number.isInteger(record.completedEpisode) && record.completedEpisode >= total,
       vid_index: record.vid_index, currentTime: record.currentTime, updatedAt: record.updatedAt,
-      unreadEpisodes: record.unreadEpisodes || 0, sequels,
+      unreadEpisodes: record.unreadEpisodes || 0, sequels, unreadSequelIds,
       similarSeries: showSequels ? findSimilarSeries(item, [...(Array.isArray(record.similarSeries) ? record.similarSeries : []), ...watched])
         .filter(candidate => !confirmedIds.has(candidate.series_id)) : [],
-      hasUpdates: record.unreadEpisodes > 0 || sequels.some(candidate => !seen.has(candidate.series_id)),
+      hasUpdates: record.unreadEpisodes > 0 || unreadSequelIds.length > 0,
       family, season, isLatestSeason: !!family && season === latestByFamily.get(family),
       hasHigherSeason: !!family && season < latestByFamily.get(family),
       lastCheckedAt: record.lastCheckedAt || 0, lastCheckError: record.lastCheckError || '',

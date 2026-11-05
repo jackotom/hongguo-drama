@@ -1,5 +1,7 @@
 # 远程公告维护
 
+5.9 候选公告已在 `announcements/normal.json` 预留，使用新 ID，保持 `active: false`；尚未加入未经核实的业务修复说明。主控确认补丁、完成正式发行后，再补正文与正式发行链接、改标题并启用；不要把候选公告作为已发布通知。
+
 公告文件托管于现有公共仓库 `jackotom/hongguo-drama` 的 `main` 分支。客户端只读下列固定 HTTPS 地址，无密钥、账号、设备标识或用户资料参数；不接受公告内指定新地址，不跟随重定向。
 
 - 普通：`https://raw.githubusercontent.com/jackotom/hongguo-drama/main/announcements/normal.json`

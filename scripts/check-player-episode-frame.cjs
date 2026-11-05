@@ -32,6 +32,61 @@ async function fixture(options = {}) {
 }
 
 (async () => {
+  const advancing = await fixture({ storage: new Map([
+    ['hongguo:playback-preferences', JSON.stringify({ rate: 2, volume: 0, muted: true })],
+  ]) });
+  try {
+    for (const episode of [2, 3]) {
+      advancing.ui.media.currentTime = advancing.ui.media.duration;
+      advancing.ui.find(n => n.type === 'video').props.onEnded(); await advancing.ui.flush();
+      assert(advancing.held(), `auto-next to episode ${episode} must retain the ending frame`);
+      const consumeFrame = async () => {
+        const [id, callback] = [...advancing.frames].at(-1) || [];
+        assert(callback, 'a rejected frame callback must keep waiting for the current source');
+        advancing.frames.delete(id);
+        callback(); await advancing.ui.flush();
+      };
+      await consumeFrame();
+      assert(advancing.held(), 'an old queued frame before metadata must not remove the cover');
+      assert.equal(advancing.frames.size, 1, 'early callback must renew its one-shot subscription');
+      advancing.ui.metadata(); await advancing.ui.flush();
+      await consumeFrame();
+      assert(advancing.held(), 'metadata without decoded pixels must keep the cover');
+      assert.equal(advancing.frames.size, 1, 'not-ready callback must wait for another frame');
+      advancing.ui.media.currentSrc = 'file:///obsolete.mp4';
+      advancing.ui.media.readyState = 2;
+      await consumeFrame();
+      assert(advancing.held(), 'a mismatched source must not remove the cover');
+      advancing.ui.media.currentSrc = advancing.ui.media.src;
+      await advancing.present();
+      assert(!advancing.held(), 'a later valid frame must remove the cover without clicking an episode');
+      assert.equal(advancing.ui.media.paused, false, 'frame handoff must preserve autoplay');
+      assert.equal(advancing.ui.media.playbackRate, 2, 'frame handoff must preserve preferred speed');
+      assert.equal(advancing.frames.size, 0, 'successful reveal must stop requesting frames');
+    }
+  } finally { advancing.ui.unmount(); }
+
+  let finishTranscode;
+  const converting = await fixture({ transcode: () => new Promise(resolve => { finishTranscode = resolve; }) });
+  try {
+    converting.ui.episode(2); await converting.ui.flush();
+    converting.ui.metadata(); await converting.ui.flush();
+    converting.ui.media.readyState = 2;
+    const cancelledFrame = [...converting.frames.values()].at(-1);
+    converting.ui.error(3); await converting.ui.flush();
+    assert(converting.held(), 'decoder recovery must retain the picture while transcoding');
+    assert.equal(converting.frames.size, 1, 'the replacement source must own the sole pending callback');
+    const recoveryFrame = [...converting.frames.keys()][0];
+    cancelledFrame(); await converting.ui.flush();
+    assert.deepEqual([...converting.frames.keys()], [recoveryFrame],
+      'a cancelled callback must not renew itself in the same playback version');
+    assert(converting.held(), 'a cancelled callback must not reveal the unloaded source');
+    finishTranscode({ success: true, url: 'file:///mock-compat.mp4' }); await converting.ui.flush();
+    converting.ui.metadata(); await converting.ui.flush();
+    await converting.present();
+    assert(!converting.held(), 'the recovered source must remove the cover on its own frame');
+  } finally { converting.ui.unmount(); }
+
   const local = await fixture();
   try {
     const oldSource = local.ui.media.src;
@@ -117,5 +172,5 @@ async function fixture(options = {}) {
     paused.ui.unmount();
     assert(!paused.ui.mediaEvents.has('loadeddata'), 'unmount must remove first-frame listeners');
   } finally { paused.ui.unmount(); }
-  console.log('PASS episode frame handoff: local, forced DOM reload, online preparation, first-frame timing, rapid switching, series isolation, auto-delete and paused fallback');
+  console.log('PASS episode frame handoff: double-speed auto-next, early/not-ready/stale/cancelled callbacks, decoder recovery, local, forced DOM reload, online preparation, first-frame timing, rapid switching, series isolation, auto-delete and paused fallback');
 })().catch(error => { console.error(error.stack || error); process.exitCode = 1; });

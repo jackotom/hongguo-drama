@@ -1,7 +1,7 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Play, RefreshCw, Clock } from './icons';
 import './WatchHistory.css';
-import { groupHistory } from './historyGroups.mjs';
+import { groupHistory, historyGroupSuggestions } from './historyGroups.mjs';
 
 const PREFERENCES_KEY = 'hongguo:watch-history-preferences';
 
@@ -46,9 +46,11 @@ export default function WatchHistory({ active = true, onNavigate }) {
   const openingRequest = useRef(0);
   const groups = groupHistory(rows, decisions);
   const groupById = new Map(groups.flatMap(items => items.map(row => [row.series_id, items])));
+  const suggestionsByGroup = new Map(groups.map(items => [items, historyGroupSuggestions(items)]));
   const listedRows = groups.flatMap(items => hideLowSeasons && !expanded[items[0].series_id] ? items.slice(0, 1) : items);
   const completedCount = listedRows.filter(row => row.completed === true).length;
   const visibleRows = listedRows.filter(row => filter === 'all' || (row.completed === true) === (filter === 'completed'));
+  const visibleIds = new Set(visibleRows.map(row => row.series_id));
 
   const savePreferences = next => {
     setPreferences(next);
@@ -144,9 +146,22 @@ export default function WatchHistory({ active = true, onNavigate }) {
       }
       // An unconfirmed title match must not clear the original show's update markers.
       if (sequel && row.similarSeries?.some(item => item.series_id === sequel.series_id)) return;
-      const acknowledged = await window.electronAPI.acknowledgeWatchUpdates(row.series_id, { total: row.total, sequelIds: (row.sequels || []).map(item => item.series_id) });
-      if (!acknowledged?.success) throw new Error(acknowledged?.error || '更新标记保存失败');
-      if (version === openingRequest.current) setRows(current => current.map(item => item.series_id === row.series_id ? { ...item, hasUpdates: false, unreadEpisodes: 0 } : item));
+      const group = groupById.get(row.series_id) || [row];
+      const acknowledgedRows = sequel || group.find(item => visibleIds.has(item.series_id)) === row
+        ? group.filter(item => item === row || item.sequels?.some(candidate => !sequel || candidate.series_id === sequel.series_id))
+        : [row];
+      for (const target of acknowledgedRows) {
+        const resumedOriginal = !sequel && target === row;
+        const snapshot = { total: resumedOriginal ? row.total : 0, sequelIds: sequel ? [sequel.series_id] : (target.sequels || []).map(item => item.series_id) };
+        const acknowledged = await window.electronAPI.acknowledgeWatchUpdates(target.series_id, snapshot);
+        if (!acknowledged?.success) throw new Error(acknowledged?.error || '更新标记保存失败');
+        if (version === openingRequest.current) setRows(current => current.map(item => {
+          if (item.series_id !== target.series_id) return item;
+          const unreadEpisodes = resumedOriginal ? 0 : item.unreadEpisodes || 0;
+          const unreadSequelIds = (item.unreadSequelIds || []).filter(id => !snapshot.sequelIds.includes(id));
+          return { ...item, hasUpdates: unreadEpisodes > 0 || unreadSequelIds.length > 0, unreadEpisodes, unreadSequelIds };
+        }));
+      }
     } catch (failure) { if (version === openingRequest.current) setError(failure.message || '打开失败，请重试'); }
     finally { if (version === openingRequest.current) { setOpening(''); openingRef.current = false; } }
   };
@@ -170,7 +185,7 @@ export default function WatchHistory({ active = true, onNavigate }) {
         </button>
       </div>
     </div>
-    <p className="history-hint">运行期间自动检查新集；同一部剧的多个季会共用一次续作搜索，已看完的低季每 24 小时检测一次。不同剧号的新一季标为“疑似续作”。可在设置中关闭检测或开启系统通知。</p>
+    <p className="history-hint">运行期间自动检查新集；同一部剧的多个季会共用一次续作搜索，已看完的低季每 24 小时检测一次。不同剧号的新一季标为“疑似续作”。批量检测范围只决定本次检查哪些记录，不会隐藏记录或清除已有红点。同组续作和疑似同剧汇总到组头，子级红点仅表示新增分集。可在设置中关闭检测或开启系统通知。</p>
     <div className="history-filter-bar">
       <div className="history-filter" role="group" aria-label="观看进度筛选">
         {[
@@ -198,15 +213,16 @@ export default function WatchHistory({ active = true, onNavigate }) {
       <button type="button" className="btn btn-outline" onClick={() => setFilter('all')}>查看全部</button>
     </div> : <ul className="history-list">{visibleRows.map(row => {
       const group = groupById.get(row.series_id);
-      const outsideGroup = candidate => groupById.get(candidate.series_id) !== group;
-      const sequels = (row.sequels || []).filter(outsideGroup);
-      const similar = (row.similarSeries || []).filter(outsideGroup);
-      return <li className={`history-row ${group[0] !== row ? 'history-child' : ''}`} key={row.series_id}>
+      const groupHeadId = group[0].series_id;
+      const isHead = group.find(item => visibleIds.has(item.series_id)) === row;
+      const { sequels, similarSeries: similar, hasUnreadSequels } = suggestionsByGroup.get(group);
+      const hasUpdates = row.unreadEpisodes > 0 || (isHead && hasUnreadSequels);
+      return <li className={`history-row ${!isHead ? 'history-child' : ''}`} key={row.series_id}>
       <div className="history-main">
-      <button className="history-resume" onClick={() => resume(row)} disabled={!active || !!opening || !!removing} aria-label={`继续观看 ${row.series_title} 第${row.vid_index}集${row.hasUpdates ? `，有更新${row.unreadEpisodes ? `，新增${row.unreadEpisodes}集` : '，发现疑似续作'}` : ''}`}>
+      <button className="history-resume" onClick={() => resume(row)} disabled={!active || !!opening || !!removing} aria-label={`继续观看 ${row.series_title} 第${row.vid_index}集${hasUpdates ? `，有更新${row.unreadEpisodes ? `，新增${row.unreadEpisodes}集` : '，发现疑似续作'}` : ''}`}>
         {row.cover ? <img className="history-cover" src={row.cover} alt="" loading="lazy" /> : <span className="history-cover history-cover-empty"><Play size={20} /></span>}
         <span className="history-copy">
-          <span className="history-name">{row.hasUpdates && <span className="history-dot" role="img" aria-label="有更新" />}{row.series_title}</span>
+          <span className="history-name">{hasUpdates && <span className="history-dot" role="img" aria-label="有更新" />}{row.series_title}</span>
           <span className="history-progress">看到第 {row.vid_index} 集 / 共 {row.total} 集 · {Math.floor((row.currentTime || 0) / 60)}:{String(Math.floor((row.currentTime || 0) % 60)).padStart(2, '0')}</span>
           <span className="history-time">最近观看 {new Date(row.updatedAt).toLocaleString('zh-CN', { month:'numeric', day:'numeric', hour:'2-digit', minute:'2-digit' })}{row.completed && <span className="history-completed"> · 已看完</span>}</span>
           {decisions[row.series_id] === null ? <span className="history-group-state">独立显示 · 手动</span> : group.length > 1 && group.some(item => Object.hasOwn(decisions, item.series_id)) && <span className="history-group-state">手动分组</span>}
@@ -216,7 +232,7 @@ export default function WatchHistory({ active = true, onNavigate }) {
       </button>
       <div className="history-row-actions">
         <div className="history-group-actions">
-        {group.length > 1 && group[0] === row && <button className="btn btn-outline btn-sm" aria-expanded={!hideLowSeasons || !!expanded[row.series_id]} onClick={() => { if (!hideLowSeasons) savePreferences({ ...preferences, hideLowSeasons: true }); setExpanded(value => ({ ...value, [row.series_id]: hideLowSeasons ? !value[row.series_id] : false })); }}>{!hideLowSeasons || expanded[row.series_id] ? '折叠组' : '展开组'}</button>}
+        {group.length > 1 && isHead && <button className="btn btn-outline btn-sm" aria-expanded={!hideLowSeasons || !!expanded[groupHeadId]} onClick={() => { if (!hideLowSeasons) savePreferences({ ...preferences, hideLowSeasons: true }); setExpanded(value => ({ ...value, [groupHeadId]: hideLowSeasons ? !value[groupHeadId] : false })); }}>{!hideLowSeasons || expanded[groupHeadId] ? '折叠组' : '展开组'}</button>}
         {group.length > 1 && <button className="btn btn-outline btn-sm" onClick={() => decide(row.series_id, null)}>独立显示</button>}
         {Object.hasOwn(decisions, row.series_id) && <button className="btn btn-outline btn-sm" onClick={() => decide(row.series_id, undefined)}>恢复自动分组</button>}
         </div>
@@ -228,9 +244,9 @@ export default function WatchHistory({ active = true, onNavigate }) {
         </div>
       </div>
       </div>
-      {!!sequels.length && <div className="history-sequels"><span>疑似续作</span>{sequels.map(sequel => <button key={sequel.series_id} className="btn btn-outline btn-sm" disabled={!active || !!opening || !!removing} onClick={() => resume(row, sequel)}>{sequel.series_title}</button>)}</div>}
-      {!!similar.length && <div className="history-sequels" title="名称相近，仅供核对；不会用于隐藏低季或批量归组">
-        <span>疑似同剧（仅提示）</span>{similar.map(candidate => <button key={candidate.series_id} className="btn btn-outline btn-sm" disabled={!active || !!opening || !!removing} onClick={() => resume(row, candidate)}>{candidate.series_title}</button>)}
+      {isHead && !!sequels.length && <div className="history-sequels"><span>疑似续作</span>{sequels.map(sequel => <button key={sequel.series_id} className="btn btn-outline btn-sm" disabled={!active || !!opening || !!removing} onClick={() => resume(sequel.origin, sequel)}>{sequel.series_title}</button>)}</div>}
+      {isHead && !!similar.length && <div className="history-sequels" title="名称相近，仅供核对；不会用于隐藏低季或批量归组">
+        <span>疑似同剧（仅提示）</span>{similar.map(candidate => <button key={candidate.series_id} className="btn btn-outline btn-sm" disabled={!active || !!opening || !!removing} onClick={() => resume(candidate.origin, candidate)}>{candidate.series_title}</button>)}
         {similar.filter(candidate => rows.some(item => item.series_id === candidate.series_id)).map(candidate => <button key={`group:${candidate.series_id}`} className="btn btn-outline btn-sm" onClick={() => decide(candidate.series_id, row.series_id)}>确认《{candidate.series_title}》为同剧</button>)}
       </div>}
       {row.lastEpisodeCheckError && <p className="history-check-error">分集更新检查未完成：{row.lastEpisodeCheckError}</p>}

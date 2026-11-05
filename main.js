@@ -1,5 +1,5 @@
 /**
- * main.js - 红果短剧 5.8 下载器（独立版）主进程
+ * main.js - 红果短剧 5.9 下载器（独立版）主进程
  *
  * 功能：
  *   1. 红果短剧解析（分享链接 / series_id -> 全剧集列表）
@@ -3198,7 +3198,8 @@ ipcMain.handle('prepare-online-play', async (event, payload) => {
       cached, streaming: !!entry.playInfo, codec: entry.codec || '' };
   } catch (error) {
     releaseOnlineSession(streamId);
-    return { success: false, error: error.message, code: error.code };
+    return { success: false, error: error.message, code: error.code,
+      ...(Array.isArray(error.sources) ? { sources: error.sources.map(({ source, code }) => ({ source, code })) } : {}) };
   }
 });
 

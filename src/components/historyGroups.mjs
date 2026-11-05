@@ -28,3 +28,20 @@ export function groupHistory(rows, decisions = {}) {
   }
   return [...groups.values()].map(items => items.sort((a,b) => (b.season || 1) - (a.season || 1) || b.updatedAt - a.updatedAt));
 }
+
+export function historyGroupSuggestions(items) {
+  const members = new Set(items.map(row => row.series_id));
+  const sequels = new Map(), similar = new Map();
+  let hasUnreadSequels = false;
+  for (const row of items) {
+    for (const candidate of row.sequels || []) {
+      if (members.has(candidate.series_id)) continue;
+      if (!sequels.has(candidate.series_id)) sequels.set(candidate.series_id, { ...candidate, origin: row });
+      if (row.unreadSequelIds?.includes(candidate.series_id)) hasUnreadSequels = true;
+    }
+    for (const candidate of row.similarSeries || []) {
+      if (!members.has(candidate.series_id) && !similar.has(candidate.series_id)) similar.set(candidate.series_id, { ...candidate, origin: row });
+    }
+  }
+  return { sequels: [...sequels.values()], similarSeries: [...similar.values()].filter(candidate => !sequels.has(candidate.series_id)), hasUnreadSequels };
+}

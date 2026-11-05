@@ -3,7 +3,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 const { transformSync } = require('esbuild');
-const { listHistory } = require('../src/native/watch-history');
+const { listHistory, acknowledge } = require('../src/native/watch-history');
 
 const source = transformSync(fs.readFileSync(path.join(__dirname, '../src/components/WatchHistory.jsx'), 'utf8'), {
   loader: 'jsx',
@@ -31,7 +31,9 @@ function historyRows(removedId = '') {
 
 function mount(rows, storage = new Map()) {
   let cursor = 0, tree, loadCount = 0, onUpdated, checkedRequests = [], removals = [], plays = [], acknowledgements = [];
+  const acknowledgedSnapshots = [];
   let delayedRemove = false, pendingRemove, removeError = '';
+  let playError = '', failedAcknowledgement = '';
   const slots = [], effects = [], pendingLoads = [];
   let delayedLoads = false;
   const Icon = props => ({ type: 'icon', props, children: [] });
@@ -67,8 +69,11 @@ function mount(rows, storage = new Map()) {
       return { success: true, checked: 1, failed: 0, remaining: 0 };
     },
     checkWatchHistoryItem: async () => ({ success: true, checked: 0 }),
-    playSeries: async payload => { plays.push({ ...payload }); return { success: true }; },
-    acknowledgeWatchUpdates: async id => { acknowledgements.push(id); return { success: true }; },
+    playSeries: async payload => { plays.push({ ...payload }); return playError ? { success: false, error: playError } : { success: true }; },
+    acknowledgeWatchUpdates: async (id, snapshot) => {
+      acknowledgements.push(id); acknowledgedSnapshots.push({ id, snapshot });
+      return id === failedAcknowledgement ? { success: false, error: 'fixture acknowledgement failure' } : { success: true };
+    },
     removeWatchHistory: id => {
       removals.push(id);
       const result = removeError ? { success: false, error: removeError } : { success: true };
@@ -115,12 +120,14 @@ function mount(rows, storage = new Map()) {
     enableDelayedLoads: () => { delayedLoads = true; },
     enableDelayedRemove: () => { delayedRemove = true; },
     failRemove: error => { removeError = error; },
+    failPlay: error => { playError = error; },
+    failAcknowledgement: id => { failedAcknowledgement = id; },
     resolveRemove: result => { pendingRemove(result); pendingRemove = null; },
     pendingLoad: index => pendingLoads[index],
     triggerUpdated: () => onUpdated(),
     checkedRequests,
     removals,
-    plays, acknowledgements,
+    plays, acknowledgements, acknowledgedSnapshots,
     loadCount: () => loadCount,
   };
 }
@@ -275,6 +282,139 @@ const button = (ui, label) => ui.find(node => node.type === 'button' && text(nod
   await promotedUi.flush();
   assert.deepEqual(promotedUi.acknowledgements, ['1000091'], 'opening the promoted confirmed sequel must acknowledge its original series');
 
+  // #97: the origin of an external sequel may have its own unread episodes.
+  const originSequel = { series_id: '1000113', series_title: '春日回声第三季' };
+  const laterSequel = { series_id: '1000114', series_title: '春日回声第四季' };
+  const originSeries = [
+    { series_id: '1000111', series_title: '春日回声', total: 11 },
+    { series_id: '1000112', series_title: '春日回声第二季', total: 10 },
+  ];
+  const originPlayback = {
+    '1000111': { watched: true, vid_index: 10, currentTime: 1, updatedAt: 100, knownTotal: 11, acknowledgedTotal: 10, unreadEpisodes: 1, sequels: [originSequel, laterSequel] },
+    '1000112': { watched: true, vid_index: 1, currentTime: 1, updatedAt: 99, knownTotal: 10, acknowledgedTotal: 10 },
+  };
+  const originUi = mount(() => listHistory(originSeries, originPlayback));
+  await originUi.flush();
+  const originRow = () => originUi.find(node => node.type === 'li' && node.props.key === '1000111');
+  assert.ok(originRow().props.className.includes('history-child'), 'A is the sequel origin while B leads the group');
+  await button(originUi, originSequel.series_title).props.onClick();
+  await originUi.flush();
+  assert.deepEqual(originUi.plays, [{ seriesId: originSequel.series_id, vidIndex: 1 }], 'only C is played, never its origin A');
+  const originSnapshot = originUi.acknowledgedSnapshots.find(item => item.id === '1000111').snapshot;
+  assert.equal(originSnapshot.total, 0, 'playing a sequel must not acknowledge its origin\'s episode total');
+  assert.deepEqual(Array.from(originSnapshot.sequelIds), [originSequel.series_id], 'only the selected sequel ID is acknowledged');
+  const originAfterSequel = acknowledge(originPlayback['1000111'], originSnapshot);
+  assert.equal(originAfterSequel.acknowledgedTotal, 10, 'the persisted origin episode baseline must not advance');
+  assert.equal(originAfterSequel.unreadEpisodes, 1, 'the origin\'s real new episode must remain unread');
+  assert.deepEqual(originAfterSequel.seenSequelIds, [originSequel.series_id]);
+  assert.ok(findIn(originRow(), node => node?.props?.className === 'history-dot'), 'the origin retains its episode dot locally');
+  assert.ok(findIn(originRow(), node => node?.props?.className === 'history-update' && text(node) === '新增 1 集'));
+  await originUi.find(node => node.props['aria-label']?.startsWith('继续观看 春日回声 第')).props.onClick();
+  await originUi.flush();
+  assert.deepEqual(originUi.plays.at(-1), { seriesId: '1000111', vidIndex: 10, resume: true });
+  const resumedOriginSnapshot = originUi.acknowledgedSnapshots.at(-1).snapshot;
+  assert.equal(resumedOriginSnapshot.total, 11, 'actually resuming A acknowledges A\'s visible episode total');
+  assert.equal(acknowledge(originAfterSequel, resumedOriginSnapshot).unreadEpisodes, 0);
+  assert.ok(!findIn(originRow(), node => node?.props?.className === 'history-dot'), 'actually resuming A clears its local episode dot');
+
+  // #97: automatic and manual children can retain external candidates and old sequel-only dots.
+  const groupedSeries = [
+    { series_id: '1000101', series_title: '春风来信', total: 1 },
+    { series_id: '1000102', series_title: '春风来信第二季', total: 1 },
+    { series_id: '1000103', series_title: '春风来信第三季', total: 1 },
+  ];
+  const externalSequel = { series_id: '1000104', series_title: '春风来信第四季' };
+  const fuzzy = { series_id: '1000105', series_title: '春风来信二' };
+  const groupedPlayback = Object.fromEntries(groupedSeries.map((item, index) => [item.series_id, {
+    watched: true, vid_index: 1, currentTime: 1, updatedAt: 100 - index,
+    completedEpisode: 1, knownTotal: 1, acknowledgedTotal: 1,
+    sequels: [...groupedSeries.slice(index + 1), externalSequel],
+    seenSequelIds: [externalSequel.series_id], similarSeries: [fuzzy],
+  }]));
+  let updateRows = listHistory(groupedSeries, groupedPlayback);
+  assert.deepEqual(updateRows.find(row => row.series_id === '1000101').unreadSequelIds, ['1000102', '1000103'], 'IPC rows must distinguish unread internal sequels from seen external ones');
+  const updateStorage = new Map([[preferencesKey, JSON.stringify({ scope: 'skip-completed-low', hideLowSeasons: false })]]);
+  const updateUi = mount(() => updateRows, updateStorage);
+  await updateUi.flush();
+  const historyRow = id => updateUi.find(node => node.type === 'li' && node.props.key === id);
+  const hasDot = row => !!findIn(row, node => node?.props?.className === 'history-dot');
+  const hasHints = row => !!findIn(row, node => node?.props?.className === 'history-sequels');
+  assert.equal(hasDot(historyRow('1000101')), false, 'hidden internal sequel candidates must not leave a child dot');
+  assert.equal(hasDot(historyRow('1000102')), false);
+  assert.equal(hasDot(historyRow('1000103')), false, 'a seen external sequel must not inherit an internal candidate dot');
+  assert.equal(hasHints(historyRow('1000101')), false, 'children must not repeat external sequel or fuzzy suggestions');
+  assert.equal(hasHints(historyRow('1000102')), false);
+  assert.equal(hasHints(historyRow('1000103')), true, 'the group head retains deduplicated external suggestions');
+  assert.ok(findIn(historyRow('1000103'), node => node?.type === 'button' && text(node) === fuzzy.series_title));
+  assert.match(text(updateUi.find(node => node.props.className === 'history-container')), /批量检测范围.*不.*清除.*红点/);
+  assert.deepEqual(updateUi.acknowledgements, [], 'display grouping must never write acknowledgements');
+
+  groupedPlayback['1000101'].seenSequelIds = [];
+  groupedPlayback['1000102'].seenSequelIds = [];
+  groupedPlayback['1000102'].unreadEpisodes = 1;
+  groupedPlayback['1000102'].knownTotal = 2;
+  updateRows = listHistory(groupedSeries, groupedPlayback);
+  updateUi.triggerUpdated();
+  await updateUi.flush();
+  assert.equal(hasDot(historyRow('1000101')), false, 'external sequel updates belong to the group head');
+  assert.equal(hasDot(historyRow('1000102')), true, 'real new episodes must retain the child dot');
+  assert.equal(hasDot(historyRow('1000103')), true, 'an unread external sequel from a child must surface on the head');
+  button(updateUi, '未看完 1').props.onClick();
+  await updateUi.flush();
+  assert.equal(historyRow('1000103'), undefined, 'the progress filter can hide the original group head');
+  assert.equal(hasHints(historyRow('1000102')), true, 'the first visible member must keep the aggregated suggestions');
+  assert.ok(!historyRow('1000102').props.className.includes('history-child'), 'a filtered group still needs a visible head');
+  button(updateUi, '全部 3').props.onClick();
+  await updateUi.flush();
+  await button(updateUi, fuzzy.series_title).props.onClick();
+  await updateUi.flush();
+  assert.deepEqual(updateUi.acknowledgements, [], 'opening an aggregated fuzzy suggestion must not acknowledge updates');
+  await button(updateUi, externalSequel.series_title).props.onClick();
+  await updateUi.flush();
+  assert.deepEqual(updateUi.plays.at(-1), { seriesId: externalSequel.series_id, vidIndex: 1 });
+  assert.deepEqual([...updateUi.acknowledgements].sort(), ['1000101', '1000102', '1000103'], 'opening a group sequel must clear its duplicate unread state in each member');
+  const childSnapshot = updateUi.acknowledgedSnapshots.find(item => item.id === '1000102').snapshot;
+  assert.equal(acknowledge(groupedPlayback['1000102'], childSnapshot).unreadEpisodes, 1, 'the real acknowledgement reducer must preserve other members\' episode updates');
+  assert.equal(hasDot(historyRow('1000103')), false, 'the group dot must clear after opening the sequel');
+  assert.equal(hasDot(historyRow('1000102')), true, 'acknowledging another member\'s sequel must retain its episode update');
+
+  const continuedUi = mount(() => updateRows);
+  await continuedUi.flush();
+  await continuedUi.find(node => node.props['aria-label']?.startsWith('继续观看 春风来信第三季 ')).props.onClick();
+  await continuedUi.flush();
+  assert.deepEqual([...continuedUi.acknowledgements].sort(), ['1000101', '1000102', '1000103'], 'continuing the visible head acknowledges the group sequel hints it displays');
+  const continuedHead = continuedUi.find(node => node.type === 'li' && node.props.key === '1000103');
+  assert.equal(hasDot(continuedHead), false, 'a group dot cannot remain stuck on updates owned by hidden children');
+  const continuedChild = continuedUi.acknowledgedSnapshots.find(item => item.id === '1000102').snapshot;
+  assert.equal(acknowledge(groupedPlayback['1000102'], continuedChild).unreadEpisodes, 1, 'continuing the head does not mark a different season\'s episodes read');
+
+  const failedGroupUi = mount(() => updateRows);
+  await failedGroupUi.flush();
+  failedGroupUi.failPlay('fixture group playback failure');
+  await button(failedGroupUi, externalSequel.series_title).props.onClick();
+  await failedGroupUi.flush();
+  assert.deepEqual(failedGroupUi.acknowledgements, [], 'failed group playback must not acknowledge any member');
+  assert.equal(hasDot(failedGroupUi.find(node => node.type === 'li' && node.props.key === '1000103')), true);
+  failedGroupUi.failPlay('');
+  failedGroupUi.failAcknowledgement('1000101');
+  await button(failedGroupUi, externalSequel.series_title).props.onClick();
+  await failedGroupUi.flush();
+  assert.match(text(failedGroupUi.find(node => node.props.role === 'alert')), /fixture acknowledgement failure/);
+  assert.equal(hasDot(failedGroupUi.find(node => node.type === 'li' && node.props.key === '1000103')), true, 'a partial acknowledgement failure must retain the unacknowledged group dot');
+
+  const manualStorage = new Map([['hongguo:history-groups', JSON.stringify({ '1000101': '1000103', '1000102': '1000103' })]]);
+  const manualUi = mount(() => updateRows.map(row => ({ ...row, family: row.series_id })), manualStorage);
+  await manualUi.flush();
+  assert.ok(!manualUi.find(node => node.type === 'li' && node.props.className.includes('history-child') && hasHints(node)), 'manual children share the same suggestion policy');
+  button(updateUi, '折叠组').props.onClick();
+  await updateUi.flush();
+  assert.equal(historyRow('1000101'), undefined, 'folding still hides lower seasons');
+  button(updateUi, '展开组').props.onClick();
+  await updateUi.flush();
+  assert.equal(hasHints(historyRow('1000101')), false, 'expanding must not bring duplicate hints back');
+  const storedBeforeRestore = JSON.parse(updateStorage.get(preferencesKey));
+  assert.equal(storedBeforeRestore.scope, 'skip-completed-low', 'group actions must preserve the detection scope');
+
   button(ui, '未看完 5').props.onClick();
   await ui.flush();
   assert.equal(names().length, 5, 'progress filter must combine with the season display option');
@@ -362,7 +502,7 @@ const button = (ui, label) => ui.find(node => node.type === 'button' && text(nod
   assert.ok(!reloadFailedUi.find(node => node.props['aria-label'] === '移除观看记录《春日来信第二季》'),
     'a reload error must not resurrect the removed row');
 
-  console.log('PASS watch history display: low-season hiding, combined filters, accessibility, scope isolation, counts, empty state, removal recomputation, and stale-load handling');
+  console.log('PASS watch history display: #97 group hints/dots, filtered heads, acknowledgement and failure safety; low-season hiding, filters, preferences, removal and stale loads');
 })().catch(error => {
   console.error(error);
   process.exitCode = 1;

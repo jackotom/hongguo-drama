@@ -21,6 +21,12 @@ const PREFETCH_RETRY_MS = 15 * 1000;
 // 播放期间最多预取后续两集；跳到更远时再按新位置补齐。
 const PREFETCH_AHEAD = 2;
 const AUTO_ONLINE_QUALITIES = ['1080p', '720p', 'auto'];
+const playbackQualities = (quality, seriesId) => quality === 'auto' && !/^(xifan|hema|custom):/.test(seriesId)
+  ? AUTO_ONLINE_QUALITIES : [quality === 'compat' ? 'auto' : quality];
+const rejectsPlaybackSource = result => /^(?:DEVICE_REGISTRATION_FAILED|BUSINESS_REJECTED|SECURITY_BLOCKED)$/.test(result?.code || '')
+  || Array.isArray(result?.sources) && result.sources.some(item => item.source === 'app'
+    && /^(?:DEVICE_REGISTRATION_FAILED|HTTP_(?:403|429)|BUSINESS_REJECTED|SECURITY_BLOCKED)$/.test(item.code));
+const stopsQualityFallback = result => result?.cancelled === true || result?.code === 'ERR_CANCELED' || rejectsPlaybackSource(result);
 const PLAYBACK_PREFERENCES_KEY = 'hongguo:playback-preferences';
 const readPlaybackPreferences = () => {
   let saved;
@@ -161,6 +167,8 @@ function Player({ target, onNavigate, onSeriesSelected, onFloatingChange, active
   const onlineRequestRef = useRef(null);
   const prefetchRef = useRef([]);
   const prefetchFailureRef = useRef(new Map());
+  // Keep explicit rejection latched through automatic reconnects; navigation and manual retry may clear it.
+  const prefetchRejectedRef = useRef(false);
   const mediaVersion = useRef(0);
   const compatRequestRef = useRef(null);
   const decodeTimer = useRef(null);
@@ -675,13 +683,21 @@ function Player({ target, onNavigate, onSeriesSelected, onFloatingChange, active
     const version = playbackVersion;
     const reveal = () => {
       if (version !== mediaVersion.current || loadedMediaRef.current?.version !== version
-        || video.currentSrc !== videoSrc || video.readyState < 2 || !video.videoWidth || !video.videoHeight) return;
+        || video.currentSrc !== videoSrc || video.readyState < 2 || !video.videoWidth || !video.videoHeight) return false;
       setHoldingFrame(false);
+      return true;
     };
     // metadata/playing precedes presentation; keep the cover until Chromium submits the new frame.
     if (video.requestVideoFrameCallback) {
-      const frame = video.requestVideoFrameCallback(reveal);
-      return () => video.cancelVideoFrameCallback(frame);
+      let cancelled = false;
+      let frame;
+      const onFrame = () => {
+        if (cancelled || version !== mediaVersion.current) return;
+        // A queued old frame can arrive during load; one-shot callbacks must be renewed until reveal succeeds.
+        if (!reveal()) frame = video.requestVideoFrameCallback(onFrame);
+      };
+      frame = video.requestVideoFrameCallback(onFrame);
+      return () => { cancelled = true; video.cancelVideoFrameCallback(frame); };
     }
     video.addEventListener('loadeddata', reveal);
     video.addEventListener('seeked', reveal);
@@ -843,8 +859,7 @@ function Player({ target, onNavigate, onSeriesSelected, onFloatingChange, active
         return;
       }
       const quality = stateRef.current.onlineQuality;
-      const qualities = quality === 'auto' && !/^(xifan|hema|custom):/.test(activeSeriesId)
-        ? AUTO_ONLINE_QUALITIES : [quality === 'compat' ? 'auto' : quality];
+      const qualities = playbackQualities(quality, activeSeriesId);
       onlineSourceRef.current = `${activeSeriesId}:${vidIndex}`;
       const seekTo = resumeAt ?? (vidIndex === stateRef.current.currentIndex ? currentPosition() : 0);
       const prefetched = force === false
@@ -860,9 +875,8 @@ function Player({ target, onNavigate, onSeriesSelected, onFloatingChange, active
       }
       resetPlayback(autoplay, force === false);
       setCompatMap(prev => { const next = { ...prev }; delete next[vidIndex]; return next; });
-      const request = prefetched || { requestId: crypto.randomUUID(), vid: ep.vid };
-      request.qualityIndex = qualityIndex;
-      request.playbackQuality = qualities[qualityIndex];
+      const request = prefetched || { requestId: crypto.randomUUID(), vid: ep.vid,
+        qualityIndex, playbackQuality: qualities[qualityIndex] };
       onlineRequestRef.current = request;
       pendingSeekRef.current = seekTo;
       setCurrentIndex(vidIndex);
@@ -875,7 +889,8 @@ function Player({ target, onNavigate, onSeriesSelected, onFloatingChange, active
       try {
         let res = prefetched ? await prefetched.promise : null;
         if (onlineRequestRef.current !== request) return;
-        for (let index = qualityIndex; !res?.success && index < qualities.length; index++) {
+        const firstQuality = prefetched && qualities.length > 1 ? request.qualityIndex + 1 : qualityIndex;
+        for (let index = firstQuality; !res?.success && !stopsQualityFallback(res) && index < qualities.length; index++) {
           usedPrefetch = false;
           request.qualityIndex = index;
           request.playbackQuality = qualities[index];
@@ -940,6 +955,7 @@ function Player({ target, onNavigate, onSeriesSelected, onFloatingChange, active
     (vidIndex, resumeAt) => {
       const ep = episodes.find((e) => e.vid_index === vidIndex);
       if (!ep || ep.locked) return;
+      prefetchRejectedRef.current = false;
       fallbackAttemptRef.current = null;
       reconnectAttemptRef.current = null;
       if (!usableLocal(ep, String(activeSeriesId))) {
@@ -962,6 +978,7 @@ function Player({ target, onNavigate, onSeriesSelected, onFloatingChange, active
     let data;
     try { data = await loadDetail(activeSeriesId); } catch (_) {}
     if (!activeRef.current || navigation !== navigationVersion.current || version !== mediaVersion.current || selection !== selectionVersion.current) return;
+    prefetchRejectedRef.current = false;
     const latest = data?.episodes.find(ep => ep.vid_index === currentIndex && ep.vid === current?.vid);
     if (usableLocal(latest, String(activeSeriesId))) { resumeLocal(latest, currentPosition()); return; }
     setCompatMap(prev => { const next = { ...prev }; delete next[currentIndex]; return next; });
@@ -974,6 +991,7 @@ function Player({ target, onNavigate, onSeriesSelected, onFloatingChange, active
 
   const changeOnlineQuality = (quality) => {
     if (!['auto', '720p', '1080p', 'compat'].includes(quality) || !supportsOnlineQuality) return;
+    prefetchRejectedRef.current = false;
     const seekTo = currentPosition();
     const autoplay = loadedMediaRef.current ? !loadedMediaRef.current.element.paused : pendingAutoplayRef.current;
     setOnlineQualityChoice(quality);
@@ -1021,7 +1039,7 @@ function Player({ target, onNavigate, onSeriesSelected, onFloatingChange, active
     const media = loadedMediaRef.current;
     // 这里只依赖当前元素和版本；media.played 可能因 playing 事件的 React 状态晚一拍而
     // 还没置位，不能让它永久挡住后续分集预取。
-    if (cacheNext === false || canPlay === false || video.paused || media?.version !== mediaVersion.current || media.element !== video) return;
+    if (cacheNext === false || canPlay === false || prefetchRejectedRef.current || video.paused || media?.version !== mediaVersion.current || media.element !== video) return;
     const targets = prefetchCandidates(currentIndex);
     const desired = new Set(targets.map(episode => prefetchKey(activeSeriesId, episode.vid, onlineQuality)));
     const kept = [];
@@ -1038,10 +1056,26 @@ function Player({ target, onNavigate, onSeriesSelected, onFloatingChange, active
       const request = { requestId: crypto.randomUUID(), vid: episode.vid, seriesId: activeSeriesId,
         vidIndex: episode.vid_index, quality: onlineQuality, ready: false };
       prefetchRef.current = [...prefetchRef.current, request];
-      request.promise = window.electronAPI.prepareOnlinePlay({ ...request,
-        quality: onlineQuality === 'compat' ? 'auto' : onlineQuality === 'auto' && supportsOnlineQuality ? '1080p' : onlineQuality, prefetch: true })
-        .catch(error => ({ success: false, error: error?.message || String(error) }))
-        .then(result => {
+      request.promise = (async () => {
+        const qualities = playbackQualities(onlineQuality, activeSeriesId);
+        let result;
+        for (let index = 0; index < qualities.length; index++) {
+          if (prefetchRejectedRef.current || !prefetchRef.current.includes(request) && onlineRequestRef.current !== request) return { success: false, cancelled: true };
+          request.qualityIndex = index;
+          request.playbackQuality = qualities[index];
+          try {
+            result = await window.electronAPI.prepareOnlinePlay({
+              requestId: request.requestId, vid: request.vid, seriesId: request.seriesId,
+              vidIndex: request.vidIndex, quality: qualities[index], prefetch: true,
+            });
+          } catch (error) { result = { success: false, error: error?.message || String(error), code: error?.code }; }
+          if (rejectsPlaybackSource(result) && (prefetchRef.current.includes(request) || onlineRequestRef.current === request)) {
+            prefetchRejectedRef.current = true;
+          }
+          if (result?.success || stopsQualityFallback(result)) break;
+        }
+        return result;
+      })().then(result => {
           request.ready = result?.success === true;
           if (prefetchRef.current.includes(request)) {
             if (result?.success) {
@@ -1050,7 +1084,8 @@ function Player({ target, onNavigate, onSeriesSelected, onFloatingChange, active
             } else {
               const index = prefetchRef.current.indexOf(request);
               if (index >= 0) prefetchRef.current.splice(index, 1);
-              prefetchFailureRef.current.set(key, Date.now());
+              if (prefetchRejectedRef.current) prefetchFailureRef.current.delete(key);
+              else prefetchFailureRef.current.set(key, Date.now());
               if (result?.streamId) request.streamId = result.streamId;
               releasePrefetchRequest(request);
             }
@@ -1278,6 +1313,7 @@ function Player({ target, onNavigate, onSeriesSelected, onFloatingChange, active
     persistPosition(true);
     const version = ++selectionVersion.current;
     selectedSeriesRef.current = String(sid);
+    prefetchRejectedRef.current = false;
     fallbackAttemptRef.current = null;
     rejectedLocalRef.current = null;
     onSeriesSelected?.(String(sid));
