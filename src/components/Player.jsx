@@ -882,6 +882,7 @@ function Player({ target, onNavigate, onSeriesSelected, onFloatingChange, active
       setCurrentIndex(vidIndex);
       setWaitingFor(null);
       const prefetchedReady = prefetched?.ready === true;
+      if (prefetched && !prefetchedReady) window.electronAPI.promoteOnlinePlay({ requestId: request.requestId }).catch(() => {});
       let usedPrefetch = !!prefetched;
       setOnlineProgress(prefetchedReady ? null : { vid: ep.vid, percent: 0, phase: 'preparing' });
       setOnlineVid(ep.vid);
@@ -1066,7 +1067,7 @@ function Player({ target, onNavigate, onSeriesSelected, onFloatingChange, active
           try {
             result = await window.electronAPI.prepareOnlinePlay({
               requestId: request.requestId, vid: request.vid, seriesId: request.seriesId,
-              vidIndex: request.vidIndex, quality: qualities[index], prefetch: true,
+              vidIndex: request.vidIndex, quality: qualities[index], prefetch: onlineRequestRef.current !== request,
             });
           } catch (error) { result = { success: false, error: error?.message || String(error), code: error?.code }; }
           if (rejectsPlaybackSource(result) && (prefetchRef.current.includes(request) || onlineRequestRef.current === request)) {

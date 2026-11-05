@@ -1,4 +1,4 @@
-// 红果短剧 5.9：桌面桥接入口，发行说明见 docs/release-5.9.md。
+// 红果短剧 6.0：桌面桥接入口，发行说明见 docs/release-6.0.md。
 const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('electronAPI', {
@@ -83,6 +83,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   // 在线播放（内存或临时磁盘缓存 + 自定义流协议）
   prepareOnlinePlay: (payload) => ipcRenderer.invoke('prepare-online-play', payload),
+  promoteOnlinePlay: (payload) => ipcRenderer.invoke('promote-online-play', payload),
   releaseOnlinePlay: (payload) => ipcRenderer.invoke('release-online-play', payload),
   onlineCacheStatus: () => ipcRenderer.invoke('online-cache-status'),
   discoverCastDevices: () => ipcRenderer.invoke('discover-cast-devices'),

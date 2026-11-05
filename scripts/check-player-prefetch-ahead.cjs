@@ -173,17 +173,22 @@ const flushWithoutBuffering = async ui => {
   });
 
   await test('switching into an in-flight prefetch retains its bounded fallback and excludes stale episodes', async () => {
-    const pending = [];
-    const ui = await openEpisode({ episodeCount: 4, prepare: payload => payload.prefetch && payload.quality === '1080p'
+    const pending = [], promotions = [];
+    const ui = await openEpisode({ episodeCount: 4,
+      apiOverrides: { promoteOnlinePlay: async payload => { structuredClone(payload); promotions.push(payload); } },
+      prepare: payload => payload.prefetch && payload.quality === '1080p'
       ? new Promise(resolve => { pending.push({ ...payload, resolve }); })
       : { success: true, url: `hongguo-stream://${payload.vidIndex}-${payload.quality}` } });
     try {
       assert.deepEqual(prefetches(ui).map(item => item.vidIndex), [2, 3], 'at most two episodes may prepare concurrently');
       ui.episode(3); await ui.flush();
+      assert.deepEqual(promotions.map(p => p.requestId), [pending.find(p => p.vidIndex === 3).requestId],
+        'taking over pending prefetch must promote the existing conversion');
       for (const item of pending) item.resolve({ success: false, error: '1080 unavailable' });
       await ui.flush();
       assert.deepEqual(prefetches(ui).filter(item => item.vidIndex === 2).map(item => item.quality), ['1080p']);
-      assert.deepEqual(prefetches(ui).filter(item => item.vidIndex === 3).map(item => item.quality), ['1080p', '720p']);
+      assert.deepEqual(ui.prepares.filter(item => item.vidIndex === 3).map(item => [item.quality, item.prefetch]),
+        [['1080p', true], ['720p', false]], 'fallback after takeover must retain foreground priority');
       assert.equal(ui.find(node => node.type === 'video').props.src, 'hongguo-stream://3-720p');
     } finally { ui.unmount(); }
   });
@@ -360,6 +365,13 @@ const flushWithoutBuffering = async ui => {
         assert.doesNotMatch(JSON.stringify(result), /private diagnostics/);
         assert.equal(h.run('onlineSessions.size'), 0, 'failed preparations must release their sessions');
       }
+      const h = fixture();
+      h.run("onlineSessions.set('selected', {requestId:'chosen',prefetch:true}); onlineSessions.set('later', {requestId:'later',prefetch:true});");
+      await h.handlers['promote-online-play']({}, { requestId: 'chosen' });
+      assert.equal(h.run("onlineSessions.get('selected').prefetch"), false);
+      assert.equal(h.run("onlineSessions.get('later').prefetch"), true);
+      await h.handlers['promote-online-play']({}, {});
+      assert.equal(h.run("onlineSessions.get('later').prefetch"), true, 'empty promotion cannot elevate unrelated requests');
     } finally { for (const dir of dirs) fs.rmSync(dir, { recursive: true, force: true }); }
   });
 

@@ -11,15 +11,16 @@ function fixture(t, { code = 0, seconds = 60, wait = false } = {}) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'hg-bytevc2-'));
   const input = path.join(root, 'input'), output = path.join(root, 'output');
   fs.writeFileSync(input, 'synthetic process fixture, never played');
-  const calls = [], kills = [];
+  const calls = [], kills = [], children = [];
   t.after(() => { mock.restoreAll(); fs.rmSync(root, { recursive: true, force: true }); });
   mock.method(cp, 'spawn', (exe, args, options) => {
     calls.push({ exe, args, options });
     const child = new EventEmitter();
+    children.push(child);
     child.stdout = new PassThrough(); child.stderr = new PassThrough();
     child.kill = signal => { kills.push(signal); queueMicrotask(() => child.emit('close', null)); return true; };
     queueMicrotask(() => {
-      fs.writeFileSync(output, 'process output');
+      fs.writeFileSync(args.at(-1), 'process output');
       child.stderr.write('PRIVATE_KEY_AND_PATH_SENTINEL');
       if (!wait) {
         child.stdout.write(`out_time_us=${seconds * 1000000}\nprogress=end\n`);
@@ -28,7 +29,10 @@ function fixture(t, { code = 0, seconds = 60, wait = false } = {}) {
     });
     return child;
   });
-  return { input, output, calls, kills, run: extra => require('./bytevc2').convertBytevc2({ executable: '/fixture/librempeg', input, output, duration: 60, ...extra }) };
+  return { input, output, calls, kills, children, finish: (index, code = 0) => {
+    children[index].stdout.write('out_time_us=60000000\nprogress=end\n');
+    children[index].emit('close', code);
+  }, run: extra => require('./bytevc2').convertBytevc2({ executable: '/fixture/librempeg', input, output, duration: 60, ...extra }) };
 }
 
 test('ByteVC2 converts to H.264, copies audio and never exposes native diagnostics', async t => {
@@ -42,8 +46,73 @@ test('ByteVC2 converts to H.264, copies audio and never exposes native diagnosti
   assert.equal(args[args.indexOf('-c:a') + 1], 'copy');
   assert.equal(args[args.indexOf('-decryption_key') + 1], '01'.repeat(16));
   assert.equal(args[args.indexOf('-protocol_whitelist') + 1], 'file,pipe');
+  assert.equal(args[args.indexOf('-threads:v') + 1], '2', 'decoder must have a bounded worker count');
+  assert(args.indexOf('-threads:v') < args.indexOf('-i'));
+  assert.equal(args[args.lastIndexOf('-threads:v') + 1], '2', 'encoder must have a bounded worker count');
+  assert(args.lastIndexOf('-threads:v') > args.indexOf('-i'));
+  assert.equal(args[args.indexOf('-x264-params') + 1], 'lookahead_threads=1');
   assert.equal(progress.at(-1), 60);
   assert.equal(f.calls[0].options.shell, undefined);
+});
+
+test('conversion queue serializes helpers and prioritizes playback without restarting work', async t => {
+  const f = fixture(t, { wait: true }), controllers = Array.from({ length: 4 }, () => new AbortController());
+  const work = [];
+  t.after(async () => { controllers.forEach(c => c.abort()); await Promise.allSettled(work); });
+  const start = (index, getPriority = () => 0) => {
+    const promise = f.run({ output: f.output + index, signal: controllers[index].signal, getPriority });
+    work.push(promise); return promise;
+  };
+  start(0);
+  while (!f.calls.length) await new Promise(resolve => setImmediate(resolve));
+  start(1);
+  let promoted = false;
+  start(2, () => promoted ? 2 : 1);
+  start(3, () => 1);
+  for (let i = 0; i < 4; i++) await new Promise(resolve => setImmediate(resolve));
+  assert.equal(f.calls.length, 1, 'downloads and prefetches must not start parallel helpers');
+  promoted = true;
+  f.finish(0); await work[0];
+  while (f.calls.length < 2) await new Promise(resolve => setImmediate(resolve));
+  assert.equal(f.calls[1].args.at(-1), f.output + 2);
+  f.finish(1); await work[2];
+  while (f.calls.length < 3) await new Promise(resolve => setImmediate(resolve));
+  assert.equal(f.calls[2].args.at(-1), f.output + 3);
+  f.finish(2); await work[3];
+  while (f.calls.length < 4) await new Promise(resolve => setImmediate(resolve));
+  assert.equal(f.calls[3].args.at(-1), f.output + 1);
+  f.finish(3); await work[1];
+});
+
+for (const token of [false, true]) test(`queued cancellation removes work before creating output (${token ? 'download token' : 'signal'})`, async t => {
+  const f = fixture(t, { wait: true }), activeController = new AbortController();
+  const active = f.run({ signal: activeController.signal });
+  t.after(async () => { activeController.abort(); await active.catch(() => {}); });
+  while (!f.calls.length) await new Promise(resolve => setImmediate(resolve));
+  const controller = new AbortController(), source = require('axios').CancelToken.source();
+  const queuedOutput = f.output + '-queued';
+  const queued = f.run({ output: queuedOutput, ...(token ? { cancelToken: source.token } : { signal: controller.signal }) });
+  const rejection = assert.rejects(queued, error => error.code === 'ERR_CANCELED');
+  for (let i = 0; i < 4; i++) await new Promise(resolve => setImmediate(resolve));
+  assert.equal(f.calls.length, 1, 'queued work must remain cancellable without spawning');
+  if (token) source.cancel('PRIVATE_REASON'); else controller.abort();
+  await rejection;
+  assert.equal(f.calls.length, 1);
+  assert.equal(fs.existsSync(queuedOutput), false);
+  f.finish(0); await active;
+});
+
+test('failed conversion releases the queue for the next episode', async t => {
+  const f = fixture(t, { wait: true }), controller = new AbortController();
+  const first = f.run({ signal: controller.signal });
+  const failed = assert.rejects(first, error => error.code === 'BYTEVC2_CONVERSION_FAILED');
+  const second = f.run({ output: f.output + '-second', signal: controller.signal });
+  t.after(async () => { controller.abort(); await Promise.allSettled([first, second]); });
+  while (!f.calls.length) await new Promise(resolve => setImmediate(resolve));
+  f.finish(0, 9); await failed;
+  while (f.calls.length < 2) await new Promise(resolve => setImmediate(resolve));
+  f.finish(1); await second;
+  assert.equal(fs.existsSync(f.output), false);
 });
 
 test('missing helper fails before creating output', async t => {

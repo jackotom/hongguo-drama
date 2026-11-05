@@ -1,5 +1,7 @@
 # 远程公告维护
 
+6.0 更新摘要已准备，`announcements/normal.json` 保持 `active: false`，未启用普通公告广播。
+
 5.9已正式发布；`announcements/normal.json`的标题和正文已同步正式修复摘要，仍保持 `active: false`，本轮未启用普通公告广播。已有用户的关闭偏好不变。
 
 公告文件托管于现有公共仓库 `jackotom/hongguo-drama` 的 `main` 分支。客户端只读下列固定 HTTPS 地址，无密钥、账号、设备标识或用户资料参数；不接受公告内指定新地址，不跟随重定向。

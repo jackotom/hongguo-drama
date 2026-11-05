@@ -1,5 +1,5 @@
 /**
- * main.js - 红果短剧 5.9 下载器（独立版）主进程
+ * main.js - 红果短剧 6.0 下载器（独立版）主进程
  *
  * 功能：
  *   1. 红果短剧解析（分享链接 / series_id -> 全剧集列表）
@@ -3099,6 +3099,7 @@ async function fetchDecryptedEpisodeOnce(vid, onProgress, seriesId, playInfo, si
         onProgress?.(0, received, 'transcoding');
         await convertBytevc2({ executable: resolveFfmpeg('librempeg'), input, output,
           contentKey: playInfo.contentKey, duration: playInfo.duration, signal, maxBytes,
+          getPriority: () => [...onlineSessions.values()].some(session => session.vid === String(vid) && !session.prefetch) ? 2 : 1,
           onProgress: seconds => onProgress?.(Math.floor(received * Math.min(1, seconds / playInfo.duration)), received, 'transcoding') });
       } else {
         if (onProgress) onProgress(received, received, 'decrypting');
@@ -3148,7 +3149,7 @@ ipcMain.handle('prepare-online-play', async (event, payload) => {
   let quality;
   try { quality = playbackQuality(payload.quality, vid); } catch (error) { return { success: false, error: error.message }; }
   const sourceVid = String(vid), key = onlineCacheKey(sourceVid, quality), streamId = randomUUID();
-  const session = { vid: sourceVid, seriesId: String(seriesId || ''), vidIndex: Number(vidIndex), cacheKey: key, requestId, requests: new Set(), entry: null };
+  const session = { vid: sourceVid, seriesId: String(seriesId || ''), vidIndex: Number(vidIndex), cacheKey: key, requestId, prefetch, requests: new Set(), entry: null };
   onlineSessions.set(streamId, session);
   try {
     checkCustomAccess(sourceVid);
@@ -3201,6 +3202,13 @@ ipcMain.handle('prepare-online-play', async (event, payload) => {
     return { success: false, error: error.message, code: error.code,
       ...(Array.isArray(error.sources) ? { sources: error.sources.map(({ source, code }) => ({ source, code })) } : {}) };
   }
+});
+
+ipcMain.handle('promote-online-play', (event, payload = {}) => {
+  for (const session of onlineSessions.values()) {
+    if (payload.requestId && session.requestId === payload.requestId) session.prefetch = false;
+  }
+  return { success: true };
 });
 
 ipcMain.handle('release-online-play', async (event, payload = {}) => {

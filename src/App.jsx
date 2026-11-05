@@ -1,4 +1,4 @@
-// 红果短剧 5.9：三端统一发行。
+// 红果短剧 6.0：三端统一发行。
 import React, { useState, useEffect, useLayoutEffect, useRef, useCallback } from 'react';
 import { Film, Download, Settings, Play, Home, Search, Clock, User } from './components/icons';
 import HongguoDownload from './components/HongguoDownload';
