@@ -9,7 +9,7 @@
 <p align="center">
   <a href="https://github.com/jackotom/hongguo-drama/releases/latest"><img alt="最新公开版本" src="https://img.shields.io/github/v/release/jackotom/hongguo-drama?style=flat-square"></a>
   <img alt="macOS 13 或更新版本" src="https://img.shields.io/badge/macOS-13%2B-555555?style=flat-square">
-  <img alt="M 系列 Mac、Intel Mac 与 Windows x64" src="https://img.shields.io/badge/platforms-Mac_arm64_%2F_x64_%C2%B7_Windows_x64-55746b?style=flat-square">
+  <img alt="M 系列 Mac、Intel Mac、Windows 与 Linux x64" src="https://img.shields.io/badge/platforms-Mac_arm64_%2F_x64_%C2%B7_Windows_x64_%C2%B7_Linux_x64-55746b?style=flat-square">
   <a href="LICENSE"><img alt="GPL-3.0 许可证" src="https://img.shields.io/badge/license-GPL--3.0-555555?style=flat-square"></a>
 </p>
 
@@ -25,23 +25,25 @@
 
 
 
-**当前正式版：6.0**（内部 `6.0.0`）。限制 ByteVC2 转换并发与线程，当前播放优先，降低切集和预缓存的 CPU 争抢。三端已发布；Mac已签名、公证和装订，Windows EXE未签名。验证与边界见 [6.0说明](docs/release-6.0.md)。
+**6.1 发行候选**（内部 `6.1.0`，签名与成品验收进行中）。新增从本集至末集下载、内置 CPU 软件解码、Linux x64 AppImage，并修复搜索联想滚动悬留。正式公开前请使用 6.0。Windows EXE未签名。验证与边界见 [6.1说明](docs/release-6.1.md)。
 
 按设备下载一个安装文件即可；其余源码、更新清单和校验文件供对应用途使用。
 
-| 设备 | 下载 6.0 | 安装方式 |
+| 设备 | 下载 6.1 | 安装方式 |
 |---|---|---|
-| Apple 芯片 Mac（M 系列），macOS 13+ | [下载 DMG](https://github.com/jackotom/hongguo-drama/releases/download/v6.0/Hongguo-6.0-mac-arm64.dmg) | 打开 DMG，拖入「应用程序」后启动；后续支持应用内更新 |
-| Intel Mac，macOS 13+ | [下载 DMG](https://github.com/jackotom/hongguo-drama/releases/download/v6.0/Hongguo-6.0-mac-x64.dmg) | 打开 DMG，拖入「应用程序」后启动；后续支持应用内更新 |
-| Windows x64（推荐安装版） | [下载安装版 EXE](https://github.com/jackotom/hongguo-drama/releases/download/v6.0/hongguo-downloader-6.0-win-x64-setup.exe) | 按向导安装，后续支持应用内更新 |
-| Windows x64（便携版） | [下载便携 EXE](https://github.com/jackotom/hongguo-drama/releases/download/v6.0/hongguo-downloader-6.0-win-x64.exe) · [下载便携 ZIP](https://github.com/jackotom/hongguo-drama/releases/download/v6.0/hongguo-downloader-6.0-win-x64.zip) | 直接运行 EXE；ZIP 解压后运行同一程序，后续仍需手动替换 |
+| Apple 芯片 Mac（M 系列），macOS 13+ | [下载 DMG](https://github.com/jackotom/hongguo-drama/releases/download/v6.1/Hongguo-6.1-mac-arm64.dmg) | 打开 DMG，拖入「应用程序」后启动；后续支持应用内更新 |
+| Intel Mac，macOS 13+ | [下载 DMG](https://github.com/jackotom/hongguo-drama/releases/download/v6.1/Hongguo-6.1-mac-x64.dmg) | 打开 DMG，拖入「应用程序」后启动；后续支持应用内更新 |
+| Windows x64（推荐安装版） | [下载安装版 EXE](https://github.com/jackotom/hongguo-drama/releases/download/v6.1/hongguo-downloader-6.1-win-x64-setup.exe) | 按向导安装，后续支持应用内更新 |
+| Windows x64（便携版） | [下载便携 EXE](https://github.com/jackotom/hongguo-drama/releases/download/v6.1/hongguo-downloader-6.1-win-x64.exe) · [下载便携 ZIP](https://github.com/jackotom/hongguo-drama/releases/download/v6.1/hongguo-downloader-6.1-win-x64.zip) | 直接运行 EXE；ZIP 解压后运行同一程序，后续仍需手动替换 |
 
-[查看已发布正式版](https://github.com/jackotom/hongguo-drama/releases/latest) · [6.0发行说明](docs/release-6.0.md) · [6.0发行页](https://github.com/jackotom/hongguo-drama/releases/tag/v6.0) · [SHA256 校验文件](https://github.com/jackotom/hongguo-drama/releases/download/v6.0/SHA256SUMS.txt)
+| Linux x64 | [下载 AppImage](https://github.com/jackotom/hongguo-drama/releases/download/v6.1/hongguo-downloader-6.1-linux-x64.AppImage) | 赋予执行权限后运行；需支持 Chromium 沙箱，后续手动更新 |
+
+[查看已发布正式版](https://github.com/jackotom/hongguo-drama/releases/latest) · [6.1发行说明](docs/release-6.1.md) · [6.1发行页](https://github.com/jackotom/hongguo-drama/releases/tag/v6.1) · [SHA256 校验文件](https://github.com/jackotom/hongguo-drama/releases/download/v6.1/SHA256SUMS.txt)
 
 
-- **升级到 6.0**：安装版保留应用内更新入口；Windows已验证真实1.80覆盖升级及资料保留，完整5.9到6.0应用内更新尚未实测；也可退出旧程序后替换 Mac 应用或运行 Windows 安装包。便携版保留同目录的 `data` 后手动替换；1.75 及更早版本需要手动安装。
+- **升级到 6.1**：安装版保留应用内更新入口；完整6.0到6.1应用内更新尚未实测；也可退出旧程序后替换 Mac 应用或运行 Windows 安装包。便携版保留同目录的 `data` 后手动替换；1.75 及更早版本需要手动安装。
 - **后续更新**：Mac 与 Windows 安装版可在应用内下载新版，下载完成后由你点击重启安装，不强制升级。Windows 便携版继续通过发行页下载并手动替换。
-- **Mac**：6.0双架构正式包已完成 Developer ID 签名、Apple 公证 Accepted 和票据装订。无需全局关闭 Gatekeeper；公证不等于 App Store 审核或内容授权。
+- **Mac**：正式发行前双架构 App 与 DMG 均需完成 Developer ID 签名、Apple 公证 Accepted 和票据装订。无需全局关闭 Gatekeeper；公证不等于 App Store 审核或内容授权。
 - **Windows**：安装版和便携版 EXE 尚未签名，可能出现系统安全提示。请核对官方下载来源；便携版首次启动会展开临时运行文件。安装版沿用原用户资料目录；3.4 起便携版把设置和下载记录放在程序目录的 `data` 文件夹，移动程序时请连同该文件夹一起保留。安装版与便携版不能同时运行（同一应用只允许一个实例）；更换版本前请先退出正在运行的窗口。
 - **普通使用只需上表安装文件**：发行页中的 Mac 更新 ZIP、`latest*.yml` 和 `.blockmap` 供更新程序使用；`source` 文件和 GitHub 自动生成的 Source code 是源码，不能直接运行。
 
@@ -72,11 +74,12 @@
 3. 打开详情点「立即播放」，也可选择集数与清晰度加入下载队列。
 4. 下次从「我的剧库」或「观看记录」接着看；下载进度、失败重试和整剧合并在「下载管理」。
 
-## 6.1 开发候选（未发布）
+## 6.1 发行候选
 
 - 播放器支持「从本集下载至末集」，跳过已完成、已排队和锁定集数。
 - 「解码方式 → 软件解码（CPU）」可在应用内直接软解 H.264/H.265，并记住选择。
-- 新增 Linux x64 AppImage 构建；安装包已生成，原生 Linux GUI 验收尚待完成，暂不作为正式下载。
+- 新增 Linux x64 AppImage；原生 Ubuntu 构建与启动检查通过，实际播放验证边界见发行说明。
+- 修复搜索联想列表随页面滚动悬留。
 - 代码、实际测试和环境限制见 [6.1 说明](docs/release-6.1.md)。
 
 ## 6.0

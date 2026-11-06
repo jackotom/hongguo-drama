@@ -1,3 +1,4 @@
+// 6.1: Search detail fixtures expose browser events used by the native suggestion dismissal.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
