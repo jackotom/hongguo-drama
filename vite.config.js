@@ -1,4 +1,4 @@
-// 红果短剧 6.0：前端构建配置，运行版本由 package.json 提供。
+// 红果短剧 6.1：前端构建配置，运行版本由 package.json 提供。
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 
@@ -7,7 +7,7 @@ export default defineConfig({
     name: 'development-csp',
     apply: 'serve',
     // React Refresh injects an inline preamble only in the development server.
-    transformIndexHtml: html => html.replace("script-src 'self';", "script-src 'self' 'unsafe-inline';")
+    transformIndexHtml: html => html.replace("script-src 'self' blob: 'wasm-unsafe-eval';", "script-src 'self' blob: 'wasm-unsafe-eval' 'unsafe-inline';")
       .replace("connect-src 'self'", "connect-src 'self' ws: wss:"),
   }],
   base: './',

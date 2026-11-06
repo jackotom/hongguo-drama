@@ -743,7 +743,7 @@
 .player-management { scroll-margin-block: 24px; }
 
 /* Separate quality from the equal-sized playback actions. */
-.player-online-quality-row { display: flex; justify-content: flex-end; margin-bottom: 8px; }
+.player-online-quality-row { display: flex; flex-wrap: wrap; gap: 12px; justify-content: flex-end; margin-bottom: 8px; }
 .player-online-quality-row[hidden] { display: none; }
 .player-online-quality-row .player-download-quality { flex-wrap: nowrap; }
 .layout-landscape .player-online-quality-row { margin-block: 12px 24px; }

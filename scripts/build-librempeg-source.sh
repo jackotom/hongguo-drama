@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 # Build the ByteVC2-only helper from pinned upstream source; normal media stays on FFmpeg.
 set -euo pipefail
-ROOT=${1:?Usage: build-librempeg-source.sh BUILD_DIRECTORY arm64|x64|win-x64 [JOBS]}
+ROOT=${1:?Usage: build-librempeg-source.sh BUILD_DIRECTORY arm64|x64|win-x64|linux-x64 [JOBS]}
 TARGET=${2:?Missing target}
 JOBS=${3:-4}
 [[ "$JOBS" =~ ^[1-9][0-9]*$ ]] || exit 1
-case "$TARGET" in arm64|x64) [[ $(uname -s) == Darwin ]] || exit 1;; win-x64) command -v x86_64-w64-mingw32-gcc >/dev/null;; *) exit 1;; esac
+case "$TARGET" in arm64|x64) [[ $(uname -s) == Darwin ]] || exit 1;; win-x64) command -v x86_64-w64-mingw32-gcc >/dev/null;; linux-x64) [[ $(uname -s) == Linux && $(uname -m) == x86_64 ]] || exit 1;; *) exit 1;; esac
 SCRIPT=$(cd "$(dirname "$0")" && pwd)/$(basename "$0")
 LIBREMPEG_COMMIT=cb1f8f3eef84999e61b27e2d44664858179bc240
 LIBREMPEG_SHA256=fd965e6ef9f745af96142cf118d7c2aa0dce906225c9d3cd2ef19e0221723813
@@ -39,6 +39,11 @@ if [[ "$TARGET" == win-x64 ]]; then
   X264_ARGS=(--host=x86_64-w64-mingw32 --cross-prefix=x86_64-w64-mingw32- --disable-asm --extra-ldflags=-static)
   MEDIA_ARGS=(--arch=x86_64 --target-os=mingw32 --enable-cross-compile --cross-prefix=x86_64-w64-mingw32- --disable-asm --extra-cflags=-I../prefix/include --extra-ldflags='-static -L../prefix/lib')
   SUFFIX=.exe
+elif [[ "$TARGET" == linux-x64 ]]; then
+  THREAD_ARGS=(--enable-pthreads)
+  X264_ARGS=(--host=x86_64-linux-gnu)
+  MEDIA_ARGS=(--arch=x86_64 --target-os=linux --extra-cflags=-I../prefix/include --extra-ldflags=-L../prefix/lib)
+  SUFFIX=
 else
   THREAD_ARGS=(--enable-pthreads)
   export PATH=/usr/bin:/bin:/usr/sbin:/sbin
@@ -82,6 +87,10 @@ allowed = {'kernel32.dll','msvcrt.dll','user32.dll','advapi32.dll','bcrypt.dll',
 assert 'pei-x86-64' in s
 assert all(x.lower() in allowed for x in re.findall(r'DLL Name:\s*(\S+)', s))
 PY
+elif [[ "$TARGET" == linux-x64 ]]; then
+  ldd "$TOOL" > "$ROOT/logs/imports.txt"
+  ! grep -q 'not found' "$ROOT/logs/imports.txt"
+  "$TOOL" -hide_banner -decoders 2>/dev/null | awk '$2 == "bvc2" { found=1 } END { exit !found }'
 else
   lipo "$TOOL" -verify_arch "$ARCH"
   otool -L "$TOOL" | tail -n +2 | awk '{print $1}' | while IFS= read -r dep; do

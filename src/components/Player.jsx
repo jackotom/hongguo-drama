@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import useFloatingPlayer from './useFloatingPlayer';
 import useDialogKeyboard from './useDialogKeyboard';
 import PlayerControls from './PlayerControls';
+import SoftwareVideo from './SoftwareVideo';
 import CommentDanmaku, { useCommentDanmaku } from './CommentDanmaku';
 import OfficialDanmaku, { useOfficialDanmaku } from './OfficialDanmaku';
 import { useDanmakuSource, writeDanmakuSource } from './danmakuSource.mjs';
@@ -86,6 +87,8 @@ function Player({ target, onNavigate, onSeriesSelected, onFloatingChange, active
   const [playbackPreferences] = useState(readPlaybackPreferences);
   const [playbackRate, setPlaybackRate] = useState(playbackPreferences.rate);
   const [downloadQuality, setDownloadQuality] = useState('auto');
+  const [followingDownload, setFollowingDownload] = useState(false);
+  const followingDownloadRef = useRef(false);
   const [onlineQualityChoice, setOnlineQualityChoice] = useState(() => {
     try { const value = window.localStorage.getItem('hongguo:online-quality'); return ['720p', '1080p', 'compat'].includes(value) ? value : 'auto'; }
     catch { return 'auto'; }
@@ -117,6 +120,10 @@ function Player({ target, onNavigate, onSeriesSelected, onFloatingChange, active
 
   // 兼容模式：本机解不了 HEVC 时转码为 H.264
   const [autoCompat, setAutoCompat] = useState(true);
+  const [softwareDecode, setSoftwareDecode] = useState(() => {
+    try { return window.localStorage.getItem('hongguo:software-decode') === 'true'; } catch { return false; }
+  });
+  const VideoElement = softwareDecode ? SoftwareVideo : 'video';
   const [compatMap, setCompatMap] = useState({});         // vidIndex -> 转码后 url
   const [compatProgress, setCompatProgress] = useState(null); // {vidIndex, percent}
   const [compatError, setCompatError] = useState('');
@@ -640,7 +647,7 @@ function Player({ target, onNavigate, onSeriesSelected, onFloatingChange, active
 
   const compatUrl = current ? compatMap[current.vid_index] : null;
   const isOnlinePlaying = onlineVid && current && current.vid === onlineVid && onlineUrl;
-  const needsCompat = autoCompat && onlineQuality === 'compat' && isOnlinePlaying && !compatUrl
+  const needsCompat = !softwareDecode && autoCompat && onlineQuality === 'compat' && isOnlinePlaying && !compatUrl
     && /^(hevc|h265|h265_hvc1|hvc1|hev1|bytevc1)$/i.test(onlineRequestRef.current?.codec || '');
   const canPlay = !!(playbackRequested && !playbackError && !onlineProgress && !needsCompat && current && !current.locked && (compatUrl || usableLocal(current, String(activeSeriesId)) || isOnlinePlaying));
   const playableSource = compatUrl || (isOnlinePlaying ? onlineUrl : current?.fileUrl) || '';
@@ -656,6 +663,7 @@ function Player({ target, onNavigate, onSeriesSelected, onFloatingChange, active
     lastVideoSrcRef.current = playableSource;
   }
   const videoSrc = !playbackRequested || compatProgress ? '' : lastVideoSrcRef.current;
+  const mediaSource = `${videoSrc}|${softwareDecode ? 'software' : 'native'}`;
   const danmakuSource = useDanmakuSource();
   const visualActive = canPlay && (active || floatingPlayer.floating);
   const danmakuActive = visualActive && showDanmakuControls;
@@ -675,7 +683,7 @@ function Player({ target, onNavigate, onSeriesSelected, onFloatingChange, active
     // 相同地址的显式重试不会触发 src 变更，用原生 load 重置媒体即可。
     if (previous?.source === videoSrc && previous.version !== playbackVersion) { v.src = videoSrc; v.load(); }
     v.playbackRate = playbackRateRef.current;
-  }, [loading, canPlay, videoSrc, playbackVersion]);
+  }, [loading, canPlay, videoSrc, playbackVersion, softwareDecode]);
 
   useEffect(() => {
     const video = videoRef.current;
@@ -706,7 +714,7 @@ function Player({ target, onNavigate, onSeriesSelected, onFloatingChange, active
       video.removeEventListener('loadeddata', reveal);
       video.removeEventListener('seeked', reveal);
     };
-  }, [holdingFrame, loading, canPlay, videoSrc, playbackVersion]);
+  }, [holdingFrame, loading, canPlay, videoSrc, playbackVersion, softwareDecode]);
 
   const playableCount = episodes.filter((e) => e.status === 'completed').length;
 
@@ -1167,7 +1175,7 @@ function Player({ target, onNavigate, onSeriesSelected, onFloatingChange, active
       video.removeEventListener('enterpictureinpicture', sync);
       video.removeEventListener('leavepictureinpicture', sync);
     };
-  }, [loading, videoSrc, floatingPlayer.floating, onFloatingChange]);
+  }, [loading, videoSrc, floatingPlayer.floating, onFloatingChange, softwareDecode]);
 
   useEffect(() => {
     if (playbackActive) return;
@@ -1443,6 +1451,18 @@ function Player({ target, onNavigate, onSeriesSelected, onFloatingChange, active
     } catch (error) { showToast(error.message || '加入下载失败，请重试'); }
   };
 
+  const downloadFollowing = async () => {
+    if (qualityLoading || !current || followingDownloadRef.current) return;
+    followingDownloadRef.current = true;
+    setFollowingDownload(true);
+    try {
+      const result = await window.electronAPI.downloadFollowingEpisodes(activeSeriesId, current.vid_index, downloadQuality);
+      showToast(result?.success ? result.count > 0 ? `已将 ${result.count} 集加入下载队列` : '本集及后续可下载集数已完成或已在队列中'
+        : result?.error || '提交后续剧集失败');
+    } catch (error) { showToast(error.message || '提交后续剧集失败'); }
+    finally { followingDownloadRef.current = false; setFollowingDownload(false); }
+  };
+
   const downloadMissing = async (nextCount = null) => {
     if (qualityLoading || (nextCount !== null && !current)) return;
     const missing = episodes.filter((e) => !e.locked && e.status !== 'completed'
@@ -1593,6 +1613,27 @@ function Player({ target, onNavigate, onSeriesSelected, onFloatingChange, active
               <option value="compat">老电脑（H.264优先）</option>
               <option value="720p">720P</option>
               <option value="1080p">1080P</option>
+            </select>
+          </label>
+          <label className="player-download-quality">
+            <span>解码方式</span>
+            <select className="input-field" aria-label="解码方式" value={softwareDecode ? 'software' : 'auto'}
+              title="软件解码使用CPU直接播放H.264/H.265，无需等待整集转码；流畅度取决于CPU性能。"
+              onChange={event => {
+                const next = event.target.value === 'software';
+                if (videoRef.current) {
+                  volumeRef.current = videoRef.current.volume; mutedRef.current = videoRef.current.muted;
+                  savePlaybackPreferences();
+                }
+                pendingSeekRef.current = currentPosition();
+                if (loadedMediaRef.current) pendingAutoplayRef.current = !loadedMediaRef.current.element.paused;
+                persistPosition(true); holdVideoFrame(); videoRef.current?.pause(); loadedMediaRef.current = null;
+                setSoftwareDecode(next);
+                try { window.localStorage.setItem('hongguo:software-decode', String(next)); }
+                catch { showToast('解码方式已切换，但未能保存'); }
+              }}>
+              <option value="auto">自动（系统解码）</option>
+              <option value="software">软件解码（CPU）</option>
             </select>
           </label>
       </div>
@@ -1814,8 +1855,8 @@ function Player({ target, onNavigate, onSeriesSelected, onFloatingChange, active
           if (canPlay) return toggleFullscreen();
         }}>
           {rateNotice !== null && <div className="player-rate-notice" role="status" aria-live="polite">{rateNotice}×</div>}
-          <video
-            ref={videoRef}
+          <VideoElement
+            {...(softwareDecode ? { videoRef } : { ref: videoRef })}
             crossOrigin="anonymous"
             src={videoSrc || undefined}
             className="player-video"
@@ -1887,10 +1928,10 @@ function Player({ target, onNavigate, onSeriesSelected, onFloatingChange, active
           />
         <canvas ref={transitionFrameRef} className="player-transition-frame" aria-hidden="true"
           style={{ visibility: holdingFrame ? 'visible' : 'hidden' }} />
-        <VideoEnhancement videoRef={videoRef} source={videoSrc} available={visualActive} enhancement={enhancement} />
+        <VideoEnhancement videoRef={videoRef} source={mediaSource} available={visualActive} enhancement={enhancement} />
         {danmakuSource === 'official'
-          ? <OfficialDanmaku videoRef={videoRef} source={videoSrc} available={visualActive} danmaku={danmaku} />
-          : <CommentDanmaku videoRef={videoRef} source={videoSrc} available={visualActive} danmaku={danmaku} />}
+          ? <OfficialDanmaku videoRef={videoRef} source={mediaSource} available={visualActive} danmaku={danmaku} />
+          : <CommentDanmaku videoRef={videoRef} source={mediaSource} available={visualActive} danmaku={danmaku} />}
       <PlayerControls floating={floatingPlayer.floating || nativePictureInPicture} onToggleFloating={async () => {
           if (document.querySelector('.stealth-mode')) throw new Error('请先退出小窗模式');
           const video = videoRef.current;
@@ -1905,7 +1946,7 @@ function Player({ target, onNavigate, onSeriesSelected, onFloatingChange, active
           const owner = stageRef.current?.ownerDocument || document;
           if (owner.fullscreenElement) await owner.exitFullscreen();
           floatingPlayer.toggle();
-        }} onOpenSettings={onNavigate ? () => onNavigate('settings') : undefined} danmaku={showDanmakuControls ? danmaku : null} enhancement={enhancement} continuing={autoAdvancing && !playbackError && !decodeFailed} autoContinue={autoNext && !!findNext(currentIndex)} shortcuts={shortcuts} onToggleFullscreen={toggleFullscreen} portrait={portrait} windowFill={windowFill} onWindowFill={setWindowFill} videoRef={videoRef} stageRef={stageRef} source={videoSrc} available={canPlay}
+        }} onOpenSettings={onNavigate ? () => onNavigate('settings') : undefined} danmaku={showDanmakuControls ? danmaku : null} enhancement={enhancement} continuing={autoAdvancing && !playbackError && !decodeFailed} autoContinue={autoNext && !!findNext(currentIndex)} shortcuts={shortcuts} onToggleFullscreen={toggleFullscreen} portrait={portrait} windowFill={windowFill} onWindowFill={setWindowFill} videoRef={videoRef} stageRef={stageRef} source={mediaSource} available={canPlay}
           seriesTitle={detail?.series_title} episodes={episodes} currentIndex={currentIndex} onEpisodeChange={goToEpisode}
           onlineQuality={onlineQuality} supportsOnlineQuality={supportsOnlineQuality} onQualityChange={changeOnlineQuality}
           pictureMode={pictureMode} onPictureModeChange={changePictureMode} rate={playbackRate} onRateChange={changePlaybackRate} onError={showToast} />
@@ -2126,6 +2167,11 @@ function Player({ target, onNavigate, onSeriesSelected, onFloatingChange, active
               <Download size={15} />下载后{count}集
             </button>
           ))}
+          <button className="btn btn-outline" onClick={downloadFollowing}
+            disabled={qualityLoading || !current || followingDownload}
+            title="包含当前集，下载至末集；跳过已完成、已排队和锁定集数">
+            <Download size={15} />{followingDownload ? '提交中…' : '从本集下载至末集'}
+          </button>
         </div>
       </div>
 

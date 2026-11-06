@@ -140,3 +140,11 @@ SOFTWARE.
 - 引用范围：分时弹幕请求与签名、分页解析和缓存、时间轴投放模型、弹幕来源切换及相应测试。文件内保留来源说明，复用本项目已有 SM3 实现。
 - 2.9 在本项目现有 2.8 修复之上移植相关模块，并非用该 fork 的旧版本整体覆盖。
 - 来源接口不是官方开放平台，也不代表获得平台授权；接口变动可能使获取失效。
+
+## libmedia CPU software player (6.1)
+
+- @libmedia/avplayer 1.3.1 and its @libmedia modules: LGPL-3.0-or-later.
+- Upstream: https://github.com/zhaohappy/libmedia/tree/152f629d3021fd8013efa464fcb7b55f9fbe7753
+- Local decoder/resampler/stretch-pitch Wasm assets come from that exact revision; their SHA256 values are in scripts/software-player-assets.json. No Wasm encoders are included.
+- The complete LGPL text is bundled at software/LIBMEDIA-LGPL-3.0.txt. The upstream project contains the sources and build instructions; JavaScript/Wasm resources remain replaceable local files in the application source/build.
+- ASS dependencies bundled by upstream (assjs and ass-compiler): MIT. libmedia uses FFmpeg under LGPL 2.1 or later and SoundTouch under LGPL 2.1. See upstream licensing notices and pinned sources.

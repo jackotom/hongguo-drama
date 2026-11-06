@@ -105,7 +105,9 @@ async function check(name, fn) { try { await fn(); } catch (error) { failures.pu
   await check('production CSP denies inline and eval scripts', () => {
     const html = fs.readFileSync(path.join(path.dirname(file), 'index.html'), 'utf8');
     const policy = /script-src ([^;]+)/.exec(html)[1];
-    assert.doesNotMatch(policy, /unsafe-inline|unsafe-eval/);
+    assert.doesNotMatch(policy, /'(?:unsafe-inline|unsafe-eval)'/);
+    assert.match(policy, /'wasm-unsafe-eval'/);
+    assert.match(html, /worker-src 'self' blob:/);
     assert.match(html, /style-src 'self' 'unsafe-inline'/);
   });
   await check('URL trust is exact for files and scoped for development', () => {

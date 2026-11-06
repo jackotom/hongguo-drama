@@ -1,0 +1,42 @@
+name: Linux x64 AppImage candidate
+on:
+  workflow_dispatch:
+  push:
+    branches: ['codex/features-6.1']
+permissions:
+  contents: read
+jobs:
+  linux:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: sudo apt-get update -qq && sudo apt-get install -y -qq build-essential pkg-config nasm curl git python3 xvfb libgtk-3-0 libnss3 libasound2 libgbm1 libfuse2
+      - uses: actions/cache@v4
+        id: media
+        with:
+          path: ${{ runner.temp }}/linux-media
+          key: linux-x64-media-${{ hashFiles('scripts/build-ffmpeg-source-linux.sh', 'scripts/build-librempeg-source.sh') }}
+      - if: steps.media.outputs.cache-hit != 'true'
+        run: |
+          bash scripts/build-ffmpeg-source-linux.sh "$RUNNER_TEMP/linux-media/ffmpeg" 4
+          bash scripts/build-librempeg-source.sh "$RUNNER_TEMP/linux-media/librempeg" linux-x64 4
+      - run: |
+          mkdir -p build/ffmpeg/linux-x64
+          cp "$RUNNER_TEMP/linux-media/ffmpeg/artifacts/bin/"* build/ffmpeg/linux-x64/
+          cp "$RUNNER_TEMP/linux-media/librempeg/artifacts/bin/"* build/ffmpeg/linux-x64/
+      - run: npm ci --no-audit --no-fund
+      - run: npm run build:linux
+      - run: xvfb-run -a node scripts/check-linux-appimage.cjs
+      - run: cp "$RUNNER_TEMP/linux-media/ffmpeg/artifacts/"*source.tar.gz "$RUNNER_TEMP/linux-media/librempeg/artifacts/"*source.tar.gz dist/
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux-appimage-candidate
+          path: |
+            dist/*.AppImage
+            dist/*source.tar.gz
+            dist/linux-verification/*.json

@@ -1,5 +1,5 @@
 /**
- * main.js - 红果短剧 6.0 下载器（独立版）主进程
+ * main.js - 红果短剧 6.1 下载器（独立版）主进程
  *
  * 功能：
  *   1. 红果短剧解析（分享链接 / series_id -> 全剧集列表）
@@ -83,7 +83,7 @@ let pendingUpdateOperations = 0;
 let quitCleanup = null;
 let quitReady = false;
 let mergeTempCleanup = null;
-const UPDATE_BLOCKED_CHANNELS = new Set(['hongguo-download-batch', 'download-single-episode', 'download-series-to-nas', 'retry-task', 'retry-tasks', 'resume-all', 'merge-series', 'transcode-for-playback', 'prepare-online-play', 'start-casting', 'save-settings', 'set-boss-key']);
+const UPDATE_BLOCKED_CHANNELS = new Set(['hongguo-download-batch', 'download-single-episode', 'download-following-episodes', 'download-series-to-nas', 'retry-task', 'retry-tasks', 'resume-all', 'merge-series', 'transcode-for-playback', 'prepare-online-play', 'start-casting', 'save-settings', 'set-boss-key']);
 const ipcMain = {
   handle(channel, handler) {
     rawIpcMain.handle(channel, async (event, ...args) => {
@@ -3890,6 +3890,24 @@ async function enqueueEpisodes({ seriesId, seriesTitle, episodes, cover, quality
   pumpQueue();
   return created;
 }
+
+const followingSubmissions = new Set();
+ipcMain.handle('download-following-episodes', async (_event, seriesId, vidIndex, quality) => {
+  const sid = String(seriesId || '');
+  if (followingSubmissions.has(sid)) return { success: false, error: '本剧正在提交下载，请稍候' };
+  if (!Number.isSafeInteger(vidIndex) || vidIndex < 1) return { success: false, error: '起始集数无效' };
+  const entry = seriesRegistry.find(item => String(item.series_id) === sid);
+  if (!entry?.episodes?.some(ep => ep.vid_index === vidIndex)) return { success: false, error: '未找到起始分集，请重新打开剧集' };
+  followingSubmissions.add(sid);
+  try {
+    const episodes = entry.episodes.filter(ep => ep.vid_index >= vidIndex && !ep.locked && !downloadTasks.some(task =>
+      String(task.hongguoInfo?.series_id) === sid && String(task.hongguoInfo?.vid) === String(ep.vid)
+      && (['pending', 'downloading'].includes(task.status) || task.status === 'completed' && hasCompleteTaskFile(task))));
+    const count = episodes.length ? await enqueueEpisodes({ seriesId: sid, seriesTitle: entry.series_title, episodes, quality }) : 0;
+    return { success: true, count };
+  } catch (error) { return { success: false, error: error.message || '提交后续剧集失败' }; }
+  finally { followingSubmissions.delete(sid); }
+});
 
 const nasSubmissions = new Set();
 ipcMain.handle('download-series-to-nas', async (_event, seriesId, quality, options = {}) => {

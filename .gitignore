@@ -96,3 +96,6 @@ venv/
 __pycache__/
 *.pyc
 backups/
+
+# Recreated and hash-checked by setup:software.
+/public/software/

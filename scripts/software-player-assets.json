@@ -1,0 +1,30 @@
+{
+  "version": "1.3.1",
+  "commit": "152f629d3021fd8013efa464fcb7b55f9fbe7753",
+  "files": {
+    "decode/h264.wasm": "b74abea1d814b89dd66d5072f9e0845db6d6b05102536560ed6141025d602120",
+    "decode/h264-atomic.wasm": "80b713f3a8b311055f3f6b654cee4c6221dfac2e2ccca470c72271af163f1e20",
+    "decode/h264-simd.wasm": "0c7ff22730ef4ee7b4f99e57d60b6b6212eb2a9b75de1e8190b1501d97212295",
+    "decode/hevc.wasm": "76b2093b50690444e0ab43bfa9cd4d88d1abf93ac9875ac187304709b0406fa0",
+    "decode/hevc-atomic.wasm": "9d66829ccfe917892b6c0ae087bb303d77cd240bd2b178d745fcd17fbc32de72",
+    "decode/hevc-simd.wasm": "63576fc0752535da9f7f1374e89ab12c22a0cd4425639f0f8162e589af7faf27",
+    "decode/aac.wasm": "9cbef85899775c7431dfffbd704d30fa185089f1f4280e2ea90be07e40b635c8",
+    "decode/aac-atomic.wasm": "45e90ba204af8295db460adb50e929dd38c3ed8d27422973149737613cc4f584",
+    "decode/aac-simd.wasm": "d261e0f99e83e403e62f88be4368e352eafb25ddc690a0aa10e9130637339b2d",
+    "decode/mp3.wasm": "357bc4c581f5381dc5d815c45965312dda9d2b906b823a79643fad8e4e662313",
+    "decode/mp3-atomic.wasm": "8d8c60cebfbce25f859dd3ed118fc5764f6cee38af033424d4bbc9241392f787",
+    "decode/mp3-simd.wasm": "b675e6ccadac5756b9e3633520699d3acdfc3063a00007e73e7d15db3a8ee5ac",
+    "decode/opus.wasm": "9c0ca5f7d22fe0d2557b6cb075a48dd3c3c1295dd1da0f7ef7dd36f8071d9235",
+    "decode/opus-atomic.wasm": "7e32ba741f83ad8e8c09cfc765dfe25cab900e24b9d606f17cdb4723142ccf86",
+    "decode/opus-simd.wasm": "1bd4eb03441a83c177f465c67a880473b04e25c205bf57838b6ecde10b0da6d8",
+    "decode/pcm.wasm": "ec82fbecf825a34d35b979b727769cb8380bf1e06e61d30bb79a75c517655cc8",
+    "decode/pcm-atomic.wasm": "48dfd69c99678f4f9c899ae914f48c83275fe4fe49cc1ffc05ef1dbf22db677f",
+    "decode/pcm-simd.wasm": "916d998e855824d7aa3b2e940cd7163ce20d08c91385f87bf816e29b3d4b8008",
+    "resample/resample.wasm": "7709e04280d6f9487872cbcfbffa747032aaa5e45a72849a1aaceb05259b347d",
+    "resample/resample-atomic.wasm": "ca93bd83e7eb9d010bba5c2bd0d73cdd7f5fad8580bf60f732f7cb5b87de74eb",
+    "resample/resample-simd.wasm": "e4db620d0878198bcb6b8fb16035a259208b739ace8c54a6507057b4f4c5c9dd",
+    "stretchpitch/stretchpitch.wasm": "9397d474f85fbf3d0bc6b5b78bb500d0329a7a2c4ce212c8531cd56514434a7a",
+    "stretchpitch/stretchpitch-atomic.wasm": "62d52214210a2e7f748cab6e18bbc1d854e76a5bc88df30449109dd6b83c9f91",
+    "stretchpitch/stretchpitch-simd.wasm": "62d52214210a2e7f748cab6e18bbc1d854e76a5bc88df30449109dd6b83c9f91"
+  }
+}
