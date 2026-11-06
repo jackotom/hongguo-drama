@@ -24,6 +24,16 @@ function SearchPanel({ onSelectSeries, onSwitchToInput, active = true }) {
   const [history, setHistory] = useState(readSearchHistory);
   const [historyError, setHistoryError] = useState('');
   const inputRef = useRef(null);
+  useEffect(() => {
+    // Chromium's native datalist can stay at its old screen position after a container scroll.
+    const dismissSuggestions = () => inputRef.current?.blur();
+    window.addEventListener('scroll', dismissSuggestions, true);
+    window.addEventListener('resize', dismissSuggestions);
+    return () => {
+      window.removeEventListener('scroll', dismissSuggestions, true);
+      window.removeEventListener('resize', dismissSuggestions);
+    };
+  }, []);
   const suggestions = getSearchSuggestions(keyword, history);
   const [loading, setLoading] = useState(false);
   const [results, setResults] = useState(null); // null=未搜索, []=无结果

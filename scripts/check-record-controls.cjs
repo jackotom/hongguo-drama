@@ -21,7 +21,7 @@ function fixture() {
   };
   const mount = (file, imports = {}, props = {}) => {
     let cursor = 0, tree;
-    const slots = [], effects = [];
+    const slots = [], effects = [], cleanups = [];
     const react = {
       createElement: (type, props, ...children) => ({ type, props: props || {}, children: children.flat(Infinity) }),
       useState: initial => { const i = cursor++; if (!(i in slots)) slots[i] = typeof initial === 'function' ? initial() : initial; return [slots[i], value => { slots[i] = typeof value === 'function' ? value(slots[i]) : value; }]; },
@@ -31,10 +31,10 @@ function fixture() {
     };
     react.useLayoutEffect = react.useEffect;
     const component = load(file, { ...imports, react }).default;
-    const render = () => { cursor = 0; tree = component(props); effects.splice(0).forEach(fn => fn()); };
+    const render = () => { cursor = 0; tree = component(props); effects.splice(0).forEach(fn => { const cleanup = fn(); if (cleanup) cleanups.push(cleanup); }); };
     const nodes = () => { const result = []; const visit = n => { if (!n || typeof n !== 'object') return; result.push(n); n.children?.forEach(visit); }; visit(tree); return result; };
     render();
-    return { render, nodes, find: fn => nodes().find(fn), flush: async () => { for (let i = 0; i < 8; i++) { await Promise.resolve(); render(); } } };
+    return { render, nodes, find: fn => nodes().find(fn), unmount: () => cleanups.splice(0).forEach(fn => fn()), flush: async () => { for (let i = 0; i < 8; i++) { await Promise.resolve(); render(); } } };
   };
   return { storage, window, load, mount };
 }
@@ -76,6 +76,24 @@ test('search x deletes a term without selecting it or starting a search', async 
   assert.equal(JSON.stringify(search.readSearchHistory()), '["乙"]');
   assert.equal(ui.find(n => n.type === 'input').props.value, '');
   assert.ok(!ui.find(n => n.props['aria-label'] === '删除搜索历史：甲'));
+});
+
+test('search dismisses native suggestions on container scroll and resize without losing the keyword', () => {
+  const h = fixture(), search = h.load('searchHistory.js');
+  const media = { sources: [{ id: 'hongguo', label: '红果' }], revision: 0, loading: false };
+  const ui = h.mount('components/SearchPanel.jsx', { '../searchHistory': search, './useMediaSources': { default: () => media, __esModule: true } });
+  const input = ui.find(n => n.type === 'input');
+  let blurs = 0;
+  input.props.ref.current = { blur: () => blurs++ };
+  input.props.onChange({ target: { value: '测试剧名' } }); ui.render();
+  h.window.dispatchEvent(new Event('scroll'));
+  h.window.dispatchEvent(new Event('resize'));
+  assert.equal(blurs, 2, 'native datalist must close when its anchor moves');
+  assert.equal(ui.find(n => n.type === 'input').props.value, '测试剧名');
+  ui.unmount();
+  h.window.dispatchEvent(new Event('scroll'));
+  h.window.dispatchEvent(new Event('resize'));
+  assert.equal(blurs, 2, 'unmounted search must remove both listeners');
 });
 
 test('watch row removal calls only the removal API and retains row on error', async () => {

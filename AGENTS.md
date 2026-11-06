@@ -121,5 +121,5 @@
 
 - 基于正式6.0，加入从本集至末集下载、Linux x64 AppImage、内置CPU软件解码。
 - 下载仍走原有权限、画质、持久化和上游拒绝保护；软件解码失败不得丢进度或让迟到加载复播。
-- Linux入口不自动禁用沙箱；本机ARM模拟环境未完成Linux GUI验收，需原生CI证据。
+- Linux入口不自动禁用沙箱；本机ARM模拟环境未完成Linux GUI验收；原生Ubuntu CI已通过AppImage启动和软解资源加载，未验Linux实际播放。
 - 状态、验证与限制见 `docs/release-6.1.md`；未发布、未替换正式安装。
