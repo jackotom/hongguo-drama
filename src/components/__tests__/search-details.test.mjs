@@ -44,7 +44,7 @@ function mount(file, props, api) {
       assert.ok(id in modules, `Unexpected import: ${id}`);
       return modules[id];
     },
-    window: { electronAPI: api }, document: { querySelector: () => null }, setTimeout, clearTimeout,
+    window: Object.assign(new EventTarget(), { electronAPI: api }), document: { querySelector: () => null }, setTimeout, clearTimeout,
   });
   const render = () => {
     cursor = 0;
