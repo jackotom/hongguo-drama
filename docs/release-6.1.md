@@ -26,7 +26,7 @@
 
 本机为 ARM Mac。Ubuntu x64 容器可编译、打包和执行媒体工具，但 binfmt 不识别 AppImage 的 AI2 ELF padding，直接执行报 `Exec format error`；显式 QEMU 可提取未改动的原包。提取后 Electron 在模拟环境启动时出现 `qemu: uncaught target signal 5 (Trace/breakpoint trap)`，未得到渲染页。禁用模拟环境 GPU/zygote及单进程诊断仍未通过。前端构建使用已验证的 Mac 产物；Linux x64 模拟环境的 esbuild 服务也异常退出。不能把这些模拟结果视为原生 Linux 通过。
 
-用户已明确授权推送 `codex/features-6.1` 并运行原生 Linux CI，不含发布。源码 `bc877f2137342b43976db9941d8ab7e1b8c756f6` 的 Linux CI `42159566878` 于 2026-11-06 12:03（Asia/Shanghai）通过：Ubuntu 22.04 原生编译媒体工具、从源码构建 AppImage，提取后执行三个随包媒体工具，Xvfb 启动 AppRun 并读取 6.1 版本，本地播放器模块和 HEVC Wasm 加载有效。产物已上传为 Actions 候选附件。测试没有验证直接 FUSE 挂载启动、Linux 实际视频解码或实体 GPU。旧源码回归 CI `42159566770` 在安装 FFmpeg 步骤等待，本轮新增搜索修复将随分支重新验证。
+用户已明确授权推送 `codex/features-6.1` 并运行原生 Linux CI，不含发布。源码 `bc877f2137342b43976db9941d8ab7e1b8c756f6` 的 Linux CI `42159566878` 于 2026-11-06 12:03（Asia/Shanghai）通过：Ubuntu 22.04 原生编译媒体工具、从源码构建 AppImage，提取后执行三个随包媒体工具，Xvfb 启动 AppRun 并读取 6.1 版本，本地播放器模块和 HEVC Wasm 加载有效。产物已上传为 Actions 候选附件。测试没有验证直接 FUSE 挂载启动、Linux 实际视频解码或实体 GPU。旧源码回归 CI `42159566770` 卡在安装 FFmpeg 后超时取消；新任务没有重现。最终代码 `f31260547aa6ee6d0ace92594f8f5a23748cc3ab` 的 Linux CI `42161953901` 与源码 CI `42161953883` 均通过。
 
 ## 复验与记录
 
@@ -37,7 +37,7 @@
 - 原生成品启动：`xvfb-run -a node scripts/check-linux-appimage.cjs`。模拟诊断的 `--emulated-appimage` 仅用于测试，不写入正式启动参数。
 - 本地详细证据：`verification/mac-flow-result.json`、`mac-online-result.json`、`material-selection.json`、`material-probe.json`、`following-real-result.json`、`ui-6.1.log`、`test-6.1.log`，以及 `verification/linux` 中的构建和失败回执。测试目录不随公开源码提交，不记录登录凭据或签名媒体地址。
 
-实体老 Windows 的 CPU 软解性能、原生 Linux/GPU、Linux 沙箱/FUSE 组合、系统原生画中画实机、签名和跨版本安装更新，均未作为本轮通过项。上游百集限制没有宣称解决。
+实体老 Windows 的 CPU 软解性能、Linux 实际播放/GPU、Linux 沙箱/FUSE 组合、系统原生画中画实机、签名和跨版本安装更新，均未作为本轮通过项。上游百集限制没有宣称解决。
 
 ## GitHub 回复
 
@@ -46,5 +46,14 @@
 ## #110 接力修复记录
 
 - `node --test scripts/check-record-controls.cjs`：新增回归先失败（滚动/缩放未触发收起），修复后 8 项通过，包含输入保留及卸载清理。
-- Ego Lite 隔离页面加载实际 SearchPanel：滚动容器从 0 到约 236.5px，修复前输入仍聚焦，修复后失焦且“测试”输入保留；重新聚焦并回车可搜索。未操作正式账号与历史。
+- Ego Lite 隔离页面加载实际 SearchPanel：滚动容器从 0 到约 236.5px，修复前输入仍聚焦，修复后失焦且“测试”输入保留；重新聚焦并回车可搜索，点“测试短剧12”历史项后回车也能搜索，历史仍保留。未操作正式账号与历史。
 - 原生 datalist 弹层未在浏览器截图中捕获，键盘选中候选也未获得证据；本轮不宣称原生弹层截图及候选选择视觉验收完成。
+
+## 最终分支验证与目录恢复
+
+- 最终代码提交：`f31260547aa6ee6d0ace92594f8f5a23748cc3ab`，已推送 `codex/features-6.1`。`2778d9c` 为搜索滚动修复，`f312605` 补齐旧搜索详情测试夹具的 EventTarget 接口。
+- 源码 CI `42161498522` 首次发现旧夹具没有 `window.addEventListener`，未将此失败当作通过。补齐后定向复测通过；最终源码 CI `42161953883` 的 329 个单元测试和 110 项平台检查全部通过。
+- 最终 Linux CI `42161953901` 从同一代码提交构建并通过 AppImage 提取、三个媒体工具运行、界面启动、版本和本地软解资源加载检查。仅候选附件，不是正式 Release。
+- 2026-11-06 接力收尾时，原对话工作目录被外部移除，原因未确认。已从已推送分支通过原生工作区工具恢复独立副本，未修改主目录的 6.0 分支。原目录的忽略文件（真实视频、截图、详细本机回执）不在 Git 中，本副本没有恢复这些文件；上面的本机验收来自已提交记录及本对话实际观察，不能冒称原始附件仍可读取。
+- 已重新获取最终远端完整日志和元数据，放在本地 `verification/source-ci-final.{log,json}` 及 `verification/linux/native-ci-final.{log,json}`。后续仅补文档，不沿用为其他源码变更的验证。
+- 未发布、未签名/公证、未安装替换。Linux 实际播放、实体老 Windows CPU 性能及原生联想弹层的视觉验收仍待补齐。
