@@ -1,59 +1,44 @@
-# 6.1 后续下载、Linux AppImage 与内置软解
+# 红果短剧 6.1
 
-状态：分支开发候选，内部版本 `6.1.0`，基于正式 `v6.0`。尚未发布、签名、公证或替换本机正式安装。Linux x64 安装包已构建，原生 Ubuntu 22.04 的 AppImage 界面启动及随包解码资源加载通过；Linux 实际播放尚未验收。
+6.1 已于 2026-11-06 13:26（Asia/Shanghai）正式发布，内部 `6.1.0`，标签 `v6.1` 并设为 Latest。冻结源码 `a93793dea2f13864e8a56771bb6bea05ea6ddbb6`；后续文档提交不改变冻结标签和安装包。23份附件远端大小与SHA256逐项一致。
 
-## 功能与边界
+## 功能
 
-- #108：在播放器下载工具中加入「从本集下载至末集」。包含当前集，跳过已完成且文件有效、已排队和锁定的分集；丢失文件可重新提交。复用原有来源权限、画质、持久化、重试和上游拒绝保护。不扩大并发或绕过上游限制。前后端均防重复提交，更新安装期间禁止新增下载。
-- #109：新增 Linux x64 AppImage 配置、媒体源码构建和 Linux CI。随包提供 FFmpeg、FFprobe、ByteVC2 辅助工具、软件解码资源及许可证。保留手动更新方式。专用 AppRun 与 desktop 入口不自动添加 `--no-sandbox`；正常启动需要系统支持 Chromium 沙箱。当前未提供 Linux ARM 包。
-- #90：在「我的剧库」的「解码方式」中选择「软件解码（CPU）」。本地 WebAssembly 解码 H.264/H.265，输出到真实 video 元素，复用进度、音量、倍速、键盘、全屏及画中画接口。无需先把整集 HEVC 转成 H.264；ByteVC2 仍沿用原有转换路径。选择持久保存，切换保留进度与暂停状态。
-- 解码器的加载、暂停、拖动、继续操作按会话排序；失败或取消隔离迟到回调。启动等待有界，解码失败先保留当前秒数再释放资源，避免断点归零。更换视频节点后重新绑定控制条、弹幕、画质增强和保帧监听。
-- 软件播放器固定为 libmedia 1.3.1，24 个本地 Wasm 资源按固定提交和 SHA256 校验；运行时不依赖外部解码 CDN。仅允许本地脚本、生成的 Blob 工作线程和 Wasm，仍禁止 JavaScript inline/eval；渲染沙箱、来源权限和媒体路径校验保留。
+- #108：播放器加入「从本集下载至末集」，包含当前集，跳过有效已完成文件、已排队和锁定集，保留权限、画质、持久化与上游拒绝保护。
+- #90：加入内置「软件解码（CPU）」，使用本地WebAssembly播放H.264/H.265，保留进度、暂停、音量、倍速与控制条。ByteVC2仍走兼容转换。失败保留断点、隔离迟到回调，切换解码方式保留状态。
+- #109：新增Linux x64 AppImage与对应媒体工具。手动更新；默认不关闭Chromium沙箱。当前没有Linux ARM包。
+- #110：容器滚动或窗口调整时关闭原生搜索联想弹层，保留输入与原生键盘操作，卸载清理监听。
+- libmedia 1.3.1和24个本地Wasm资源固定提交与SHA256。运行时不依赖外部解码CDN；仍禁止JavaScript inline/eval，保留渲染沙箱与媒体地址校验。
 
-- #110：捕获滚动容器的 scroll 事件及窗口 resize，主动让搜索框失焦、关闭 Chromium 原生联想弹层，避免锚点移动后列表悬留。保留输入内容及原生联想；组件卸载移除监听。
+## 本轮构建与验证
 
-## 已验证
+- 冻结提交源码CI `42164191234`：329单元、110项平台检查通过。#110定向回归先失败后修复；旧搜索详情夹具补齐EventTarget后通过。
+- 双Mac成品核对68后端源码、42运行依赖、61前端资源。Developer ID签名、App和DMG四份公证Accepted、装订、DMG只读挂载与最终更新ZIP恢复核对通过。
+- Windows CI `42164192351`：便携11项、安装/重装及真实1.80升级资料保留9项通过。安装和便携包分别核对68后端/42依赖/61前端；只有源码、HTML及LGPL许可文本的CRLF差异。Windows源码ZIP原始摘要和423文件已核，再按冻结Git内容统一换行归档，EXE未改。EXE未签名。
+- Linux CI `42164191198`：原生Ubuntu22.04从源码构建AppImage，提取后运行三个随包媒体工具，Xvfb启动界面并读取6.1版本、本地播放器及有效HEVC Wasm。这不等于实际视频播放或FUSE/GPU验收。
+- 隐私检查423个受跟踪文件无匹配；普通公告保持关闭。GitHub根目录23项最新提交说明均含6.1，远端DOM与截图核对另记回执。
 
-- 首次全套检查中 326 个单元测试通过；版本目标和 CSP 两项检查发现旧断言，更新后分别复测通过。之后软解代码有调整，最终 6 项适配器回归、下载范围 IPC/UI、版本、渲染安全、Linux 配置和前端构建分别通过；未重复整套检查。
-- 只读独立复核抓到并复现了两项问题：超时后迟到加载可能播放、解码失败后秒数归零。修复后分别复验为不再迟到播放、`37.25 秒 → 错误 → 仍为 37.25 秒且暂停`。
-- 2026-11-06 在红果真人剧实时目录随机选择《迟来的情缘，董事长的暖心妻》（series_id `7692824244719193150`），真实下载前两集；均为 1080×1920 HEVC/AAC，ffprobe 时长约 115.33 秒和 91.58 秒。
-- 使用独立资料和下载目录，进程始终 `--mute-audio`；正式软解流程同时确认 video muted、volume=0。Mac 开发版实际检查了本地软解、拖动、暂停/继续、2 倍速、第一集结束自动到第二集、有效新帧后撤保帧层，以及暂停时切换系统/软件解码并保留秒数和静音。最终第二集已提交 29 帧、保帧层 hidden。后台遮挡会延后帧呈现回调，前置窗口后完成交接；不宣称所有环境秒切。
-- 在线第 3 集通过 `hongguo-stream` 软解，实际提交 48 帧；运行实例确认 hardware=false、webCodecs=false、MSE=false。
-- 真实界面选择第 70 集后点「从本集下载至末集」，只新增 70、71 两集并完整下载，原 1、2 集保留；重复点击提示已完成或在队列中，没有新增重复任务。
-- Linux x64 三个媒体工具从固定源码编译并通过 ELF 架构、可执行和 ByteVC2 解码器检查。AppImage 成品已成功提取，核对了 AppRun、desktop 入口和三个随包工具。
+| 公证对象 | Submission ID | 状态 |
+|---|---|---|
+| Hongguo-6.1-mac-arm64.dmg | `4516de6d-2ba1-4258-8cef-c700b9931c86` | Accepted |
+| Hongguo-6.1-mac-x64.dmg | `040cf0dc-9d17-4323-9802-01d17a70c790` | Accepted |
+| Hongguo-6.1-notary-arm64.zip | `cc99b6cf-f18d-4f2b-aba2-630954edb1f1` | Accepted |
+| Hongguo-6.1-notary-x64.zip | `9b42ffcf-b315-4e67-b726-d3e1dc9a024e` | Accepted |
 
-## Linux 原生 CI 与验收缺口
+## 本轮真实素材
 
-本机为 ARM Mac。Ubuntu x64 容器可编译、打包和执行媒体工具，但 binfmt 不识别 AppImage 的 AI2 ELF padding，直接执行报 `Exec format error`；显式 QEMU 可提取未改动的原包。提取后 Electron 在模拟环境启动时出现 `qemu: uncaught target signal 5 (Trace/breakpoint trap)`，未得到渲染页。禁用模拟环境 GPU/zygote及单进程诊断仍未通过。前端构建使用已验证的 Mac 产物；Linux x64 模拟环境的 esbuild 服务也异常退出。不能把这些模拟结果视为原生 Linux 通过。
+- Mac最终签名包：红果实时真人剧目录随机选择《十八岁太奶奶驾到，重整家族荣耀第五部》，seriesId `7701935931787316286`；真实下载第1集vid `7701937936731737112`、约174.196秒，第2集vid `7701937814501346328`、约103.445秒，均1080×1920 HEVC/AAC。
+- CPU软解第1集10.44秒、264帧，第2集10.04秒、254帧后暂停。进程带 `--mute-audio`，播放前muted=true、volume=0，全程静音，播放时长与素材相符；未人工听音。x64最终包经Rosetta隔离静音启动，报告6.1.0后退出，不是实体Intel验收。
+- Windows随机真实下载《一江春水》，seriesId `7702724487975799832`，第1/2集vid `7702726326347631640`、`7702726300477180952`；FFmpeg生成15秒H.264/AAC片段，实际便携播放器静音播放、暂停、全屏、快捷键切集及自然连播通过。未用彩条或测试图。
+- Mac首次尝试遇预览片源，随后CDN因本机VPN的198.18.* FakeIP被公网校验拒绝。最终仅在独立测试下载进程为选定CDN使用可信HTTPS DNS，保留原公网socket校验与TLS，未改应用或系统网络。
+- 开发阶段另验过在线播放CPU软解、拖动、倍速、连播和第70集至末集下载去重，详见本文件Git历史。原开发目录曾被外部移除；本次发行素材和成品回执均重新准备，不冒称旧附件仍可读取。
 
-用户已明确授权推送 `codex/features-6.1` 并运行原生 Linux CI，不含发布。源码 `bc877f2137342b43976db9941d8ab7e1b8c756f6` 的 Linux CI `42159566878` 于 2026-11-06 12:03（Asia/Shanghai）通过：Ubuntu 22.04 原生编译媒体工具、从源码构建 AppImage，提取后执行三个随包媒体工具，Xvfb 启动 AppRun 并读取 6.1 版本，本地播放器模块和 HEVC Wasm 加载有效。产物已上传为 Actions 候选附件。测试没有验证直接 FUSE 挂载启动、Linux 实际视频解码或实体 GPU。旧源码回归 CI `42159566770` 卡在安装 FFmpeg 后超时取消；新任务没有重现。最终代码 `f31260547aa6ee6d0ace92594f8f5a23748cc3ab` 的 Linux CI `42161953901` 与源码 CI `42161953883` 均通过。
+## 正式附件与回执
 
-## 复验与记录
+[6.1发行页](https://github.com/jackotom/hongguo-drama/releases/tag/v6.1)共23项：双Mac DMG/最终App更新ZIP、Windows安装/便携EXE和便携ZIP、Linux AppImage、Mac/Windows更新清单、Windows blockmap、精确应用与Windows源码ZIP、八份媒体工具对应源码、libmedia固定版本及精确cheap/common子模块源码、SHA256SUMS。远端大小和GitHub服务端SHA256逐项核对；更新清单的文件名/大小/SHA512对应最终成品。匿名下载核对另记回执。
 
-- 软解回归：`node --test src/components/__tests__/software-video.test.mjs`
-- 后续下载：`node scripts/check-download-following.cjs`
-- Linux 配置：`node scripts/check-linux-media.cjs --config`
-- 原生 Linux 媒体工具：`scripts/build-ffmpeg-source-linux.sh`、`scripts/build-librempeg-source.sh` 的 `linux-x64` 目标；资源放入 `build/ffmpeg/linux-x64`，再执行 `npm run build:linux`。
-- 原生成品启动：`xvfb-run -a node scripts/check-linux-appimage.cjs`。模拟诊断的 `--emulated-appimage` 仅用于测试，不写入正式启动参数。
-- 本地详细证据：`verification/mac-flow-result.json`、`mac-online-result.json`、`material-selection.json`、`material-probe.json`、`following-real-result.json`、`ui-6.1.log`、`test-6.1.log`，以及 `verification/linux` 中的构建和失败回执。测试目录不随公开源码提交，不记录登录凭据或签名媒体地址。
+本地证据 `.planning/release-6.1/`：`asset-manifest.json`、`publish-verification.json`、`anonymous-download-verification.json`、三端CI回执、`mac-mount-verification.json`、`windows-packaged-source-verification.json`、`windows-source-normalization.json`、`test-media.json`、`mac-real-result.json`、`x64-startup.json`及根目录浏览器核对。测试资料、视频、账号、凭据和签名媒体地址不上传。
 
-实体老 Windows 的 CPU 软解性能、Linux 实际播放/GPU、Linux 沙箱/FUSE 组合、系统原生画中画实机、签名和跨版本安装更新，均未作为本轮通过项。上游百集限制没有宣称解决。
+## 保留边界
 
-## GitHub 回复
-
-用户于本轮明确授权回复当前 15 条未关闭 Issue。已逐条读取最新讨论、发送并读回确认；未关闭问题。#108/#109/#90 明确标注 6.1 正在开发验收、未发布；其他问题按实际修复及保留边界更新，没有冒称全部根治。
-
-## #110 接力修复记录
-
-- `node --test scripts/check-record-controls.cjs`：新增回归先失败（滚动/缩放未触发收起），修复后 8 项通过，包含输入保留及卸载清理。
-- Ego Lite 隔离页面加载实际 SearchPanel：滚动容器从 0 到约 236.5px，修复前输入仍聚焦，修复后失焦且“测试”输入保留；重新聚焦并回车可搜索，点“测试短剧12”历史项后回车也能搜索，历史仍保留。未操作正式账号与历史。
-- 原生 datalist 弹层未在浏览器截图中捕获，键盘选中候选也未获得证据；本轮不宣称原生弹层截图及候选选择视觉验收完成。
-
-## 最终分支验证与目录恢复
-
-- 最终代码提交：`f31260547aa6ee6d0ace92594f8f5a23748cc3ab`，已推送 `codex/features-6.1`。`2778d9c` 为搜索滚动修复，`f312605` 补齐旧搜索详情测试夹具的 EventTarget 接口。
-- 源码 CI `42161498522` 首次发现旧夹具没有 `window.addEventListener`，未将此失败当作通过。补齐后定向复测通过；最终源码 CI `42161953883` 的 329 个单元测试和 110 项平台检查全部通过。
-- 最终 Linux CI `42161953901` 从同一代码提交构建并通过 AppImage 提取、三个媒体工具运行、界面启动、版本和本地软解资源加载检查。仅候选附件，不是正式 Release。
-- 2026-11-06 接力收尾时，原对话工作目录被外部移除，原因未确认。已从已推送分支通过原生工作区工具恢复独立副本，未修改主目录的 6.0 分支。原目录的忽略文件（真实视频、截图、详细本机回执）不在 Git 中，本副本没有恢复这些文件；上面的本机验收来自已提交记录及本对话实际观察，不能冒称原始附件仍可读取。
-- 已重新获取最终远端完整日志和元数据，放在本地 `verification/source-ci-final.{log,json}` 及 `verification/linux/native-ci-final.{log,json}`。后续仅补文档，不沿用为其他源码变更的验证。
-- 未发布、未签名/公证、未安装替换。Linux 实际播放、实体老 Windows CPU 性能及原生联想弹层的视觉验收仍待补齐。
+未替换本机正式安装。实体老Windows CPU软解性能、Linux实际视频播放/GPU/FUSE/沙箱组合、实体Intel、干净Gatekeeper、长期弱网、原生搜索联想弹层视觉及完整6.0到6.1应用内自动更新未验。Linux首次提供包，当前证据限构建和启动；不承诺解除上游百集限制或确定恢复窗口。
