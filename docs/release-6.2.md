@@ -51,6 +51,6 @@
 | arm64 DMG | `967ffdd0-cfef-4f9a-8bed-946b5cca3e22` | Accepted |
 | x64 DMG | `c7eab368-655c-434e-8fd4-e8b9d844c50b` | Accepted |
 
-23份候选附件已在本地汇总，更新清单的文件名／大小／SHA512、精确Git源码ZIP、对应媒体组件源码及总SHA256校验通过。Draft上传和远端摘要核对状态以本地回执为准，尚未公开，不将上传启动写成全部完成。
+23份候选附件已全部上传到v6.2 Draft；远端附件集合、大小及GitHub服务端SHA256均与本地清单一致，Release target及已推送标签精确绑定冻结源码，更新清单的文件名／大小／SHA512、精确Git源码ZIP及对应媒体源码已核对。回执为`.planning/release-6.2/draft-verification.json`。尚未公开，未更新Latest。
 
 保留限制：未覆盖实体Intel／实体Windows／老GPU、Linux实际视频播放、干净Gatekeeper、长期弱网与完整6.1到6.2应用内跨版本更新。独立安全核查尚未结论，功能、签名和构建来源不能替代反病毒检测。
