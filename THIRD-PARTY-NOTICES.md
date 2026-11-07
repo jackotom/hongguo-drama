@@ -148,3 +148,5 @@ SOFTWARE.
 - Local decoder/resampler/stretch-pitch Wasm assets come from that exact revision; their SHA256 values are in scripts/software-player-assets.json. No Wasm encoders are included.
 - The complete LGPL text is bundled at software/LIBMEDIA-LGPL-3.0.txt. The upstream project contains the sources and build instructions; JavaScript/Wasm resources remain replaceable local files in the application source/build.
 - ASS dependencies bundled by upstream (assjs and ass-compiler): MIT. libmedia uses FFmpeg under LGPL 2.1 or later and SoundTouch under LGPL 2.1. See upstream licensing notices and pinned sources.
+
+6.2沿用6.1固定版本的媒体与软件解码组件；本轮仅修复观看记录更新候选和排序。

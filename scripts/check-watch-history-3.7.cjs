@@ -12,12 +12,12 @@ const source = path.resolve(__dirname, '../main.js');
 const req = createRequire(source);
 const baseTitle = '聚宝仙盆之杂灵根才是真BOSS';
 
-function fixture({ failId = '', now = Date.now(), remoteSeries = [] } = {}) {
+function fixture({ failId = '', now = Date.now(), remoteSeries = [], seasons = [1, 2, 3], notify = false } = {}) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'hongguo-history-37-'));
-  const handlers = {}, queries = [], fetches = [];
-  const seriesList = [1, 2, 3].map(season => ({
+  const handlers = {}, queries = [], fetches = [], notifications = [];
+  const seriesList = seasons.map(season => ({
     series_id: `100000${season}`,
-    series_title: `${baseTitle}${season === 1 ? '' : `第${['', '一', '二', '三'][season]}季`}`,
+    series_title: `${baseTitle}${season === 1 ? '' : `第${season}季`}`,
     total: 10,
     episodes: Array.from({ length: 10 }, (_, index) => ({ vid_index: index + 1, vid: `${season}-${index + 1}` })),
   }));
@@ -29,10 +29,15 @@ function fixture({ failId = '', now = Date.now(), remoteSeries = [] } = {}) {
   const app = new EventEmitter();
   Object.assign(app, { getVersion: () => '3.7.0', getPath: () => dir, commandLine: { appendSwitch() {} },
     requestSingleInstanceLock: () => true, whenReady: () => ({ then() {} }) });
-  const electron = { app, ipcMain: { handle: (name, fn) => { handlers[name] = fn; } },
+  const electron = { app, Notification: class {
+    static isSupported() { return true; }
+    constructor(options) { this.options = options; }
+    on() {}
+    show() { notifications.push(this.options); }
+  }, ipcMain: { handle: (name, fn) => { handlers[name] = fn; } },
     protocol: { registerSchemesAsPrivileged() {} } };
   const store = {
-    getSettings: () => ({ watch_updates_enabled: true, watch_sequels_enabled: true }),
+    getSettings: () => ({ watch_updates_enabled: true, watch_sequels_enabled: true, watch_notifications_enabled: notify }),
     getPlayback: () => structuredClone(playback),
     savePlayback: next => { Object.keys(playback).forEach(key => delete playback[key]); Object.assign(playback, structuredClone(next)); },
     saveSeries() {},
@@ -67,7 +72,7 @@ function fixture({ failId = '', now = Date.now(), remoteSeries = [] } = {}) {
   context.fixture = seriesList;
   vm.runInContext('seriesRegistry = fixture', context);
   return {
-    playback, queries, fetches, handlers,
+    playback, queries, fetches, handlers, notifications,
     refresh: options => handlers['refresh-watch-history']({}, options),
     autoRefresh: () => vm.runInContext('refreshWatchHistory()', context),
     checkOne: id => handlers['check-watch-history-item']({}, id),
@@ -84,10 +89,33 @@ test('3.7 batch checks every season but searches the family sequel once', async 
     assert.deepEqual(h.fetches.sort(), ['1000001', '1000002', '1000003']);
     assert.equal(h.queries.filter(keyword => keyword.toLowerCase() === baseTitle.toLowerCase()).length, 1,
       'the same family must not repeat the base search for every season');
-    assert.equal(h.playback['1000001'].sequels.length, 2, 'low seasons receive matching higher seasons');
-    assert.equal(h.playback['1000002'].sequels.length, 1);
+    assert.equal(h.playback['1000001'].sequels.length, 0, 'already watched seasons are not new sequels');
+    assert.equal(h.playback['1000002'].sequels.length, 0);
     assert.equal(h.playback['1000003'].sequels.length, 0);
   } finally { h.cleanup(); }
+});
+
+test('#97 missing lower seasons are not updates after a higher season was watched', async () => {
+  const missing = { series_id: '1000002', series_title: baseTitle + '第2季' };
+  const future = { series_id: '1000005', series_title: baseTitle + '第5季' };
+  for (const remoteSeries of [[missing], [missing, future]]) {
+    const h = fixture({ seasons: [1, 3, 4], remoteSeries, notify: true });
+    try {
+      h.playback['1000001'].sequels = [missing];
+      const cached = (await h.handlers['get-watch-history']({})).results;
+      assert.ok(cached.every(row => !row.sequels.some(item => item.series_id === missing.series_id)),
+        'old saved candidates must be filtered before another network check');
+      assert.ok(cached.every(row => !row.hasUpdates), 'a missing lower season cannot create an unread dot');
+      await h.refresh({ scope: 'all' });
+      const expected = remoteSeries.includes(future) ? [future.series_id] : [];
+      for (const id of ['1000001', '1000003', '1000004']) {
+        assert.deepEqual(h.playback[id].sequels.map(item => item.series_id), expected,
+          'every record must use the highest watched season, even with gaps');
+      }
+      assert.equal(h.queries.filter(keyword => keyword.toLowerCase() === baseTitle.toLowerCase()).length, 1);
+      assert.equal(h.notifications.length, expected.length, 'only a future season can produce a system notification');
+    } finally { h.cleanup(); }
+  }
 });
 
 test('3.7 latest scope and single-row check touch only the requested row', async () => {
@@ -104,7 +132,7 @@ test('3.7 latest scope and single-row check touch only the requested row', async
     assert.deepEqual(single.fetches, ['1000001']);
     assert.equal(single.queries.filter(keyword => keyword.toLowerCase() === baseTitle.toLowerCase()).length, 1,
       'single-row check still uses the latest family season for the shared sequel search');
-    assert.equal(single.playback['1000001'].sequels.length, 2);
+    assert.equal(single.playback['1000001'].sequels.length, 0, 'single-row checks also respect the highest watched season');
   } finally { single.cleanup(); }
 });
 

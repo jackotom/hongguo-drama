@@ -51,6 +51,9 @@ export default function WatchHistory({ active = true, onNavigate }) {
   const completedCount = listedRows.filter(row => row.completed === true).length;
   const visibleRows = listedRows.filter(row => filter === 'all' || (row.completed === true) === (filter === 'completed'));
   const visibleIds = new Set(visibleRows.map(row => row.series_id));
+  const updatedGroups = new Set(groups.filter(items => suggestionsByGroup.get(items).hasUnreadSequels
+    || items.some(row => visibleIds.has(row.series_id) && row.unreadEpisodes > 0)));
+  visibleRows.sort((a, b) => Number(updatedGroups.has(groupById.get(b.series_id))) - Number(updatedGroups.has(groupById.get(a.series_id))));
 
   const savePreferences = next => {
     setPreferences(next);
@@ -199,7 +202,7 @@ export default function WatchHistory({ active = true, onNavigate }) {
         <span>折叠同剧低季</span>
       </label>
     </div>
-    <p className="history-hint">按当前最后一集的片尾进度判断；隐藏低季后，计数仅代表列表中的季，旧记录可能显示未看完。</p>
+    <p className="history-hint">有更新的组优先显示，同组季序不变。按当前最后一集的片尾进度判断；隐藏低季后，计数仅代表列表中的季，旧记录可能显示未看完。</p>
     {error && <div className="history-error" role="alert"><span>{error}</span><button className="btn btn-outline btn-sm" onClick={load}>重新加载</button></div>}
     {status && <p className="history-hint" role="status">{status}</p>}
     {checking && progress?.total > 0 && <p className="history-hint" role="status">

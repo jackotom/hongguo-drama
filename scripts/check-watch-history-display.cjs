@@ -189,6 +189,40 @@ const button = (ui, label) => ui.find(node => node.type === 'button' && text(nod
   assert.deepEqual(ui.checkedRequests, [], 'changing the view must not run update checks');
   assert.deepEqual(ui.removals, [], 'changing the view must not remove records');
 
+  // #97: unread groups rise together; their season order and progress filters remain intact.
+  let priorityRows = [
+    { series_id: '1000200', series_title: '最近无更新', updatedAt: 500, completed: false },
+    { series_id: '1000211', series_title: '旧剧第一季', family: 'old', season: 1, updatedAt: 400, completed: false, unreadEpisodes: 1 },
+    { series_id: '1000213', series_title: '旧剧第三季', family: 'old', season: 3, updatedAt: 300, completed: true },
+    { series_id: '1000220', series_title: '更旧的续作提醒', updatedAt: 200, completed: false,
+      sequels: [{ series_id: '1000221', series_title: '未来续作' }], unreadSequelIds: ['1000221'] },
+    { series_id: '1000230', series_title: '仅相似提示', updatedAt: 100, completed: false,
+      similarSeries: [{ series_id: '1000231', series_title: '相近标题' }] },
+  ].map(row => ({ total: 1, vid_index: 1, ...row }));
+  const priorityUi = mount(() => priorityRows);
+  await priorityUi.flush();
+  const priorityOrder = () => priorityUi.find(node => node.props.className === 'history-list').children
+    .filter(node => node?.type === 'li').map(node => node.props.key);
+  assert.deepEqual(priorityOrder(), ['1000213', '1000211', '1000220', '1000200', '1000230'],
+    'episode and sequel updates rise as groups, never as detached child rows');
+  priorityUi.find(node => node.type === 'input').props.onChange({ target: { checked: true } });
+  await priorityUi.flush();
+  assert.deepEqual(priorityOrder(), ['1000220', '1000200', '1000213', '1000230'],
+    'a hidden child dot must not pin an unmarked visible group');
+  priorityUi.find(node => node.type === 'input').props.onChange({ target: { checked: false } });
+  await priorityUi.flush();
+  button(priorityUi, '未看完 4').props.onClick();
+  await priorityUi.flush();
+  assert.deepEqual(priorityOrder(), ['1000211', '1000220', '1000200', '1000230'],
+    'a progress-filtered child can lead its unread group');
+  button(priorityUi, '全部 5').props.onClick();
+  priorityRows = priorityRows.map(row => ({ ...row, unreadEpisodes: 0, unreadSequelIds: [] }));
+  priorityUi.triggerUpdated();
+  await priorityUi.flush();
+  assert.deepEqual(priorityOrder(), ['1000200', '1000213', '1000211', '1000220', '1000230'],
+    'cleared updates restore the original recent-watch group order');
+  assert.deepEqual(priorityUi.acknowledgements, [], 'sorting must never mark updates as read');
+
   const preferencesKey = 'hongguo:watch-history-preferences';
   const storage = new Map();
   const savedUi = mount(() => historyRows(), storage);
@@ -332,7 +366,7 @@ const button = (ui, label) => ui.find(node => node.type === 'button' && text(nod
     seenSequelIds: [externalSequel.series_id], similarSeries: [fuzzy],
   }]));
   let updateRows = listHistory(groupedSeries, groupedPlayback);
-  assert.deepEqual(updateRows.find(row => row.series_id === '1000101').unreadSequelIds, ['1000102', '1000103'], 'IPC rows must distinguish unread internal sequels from seen external ones');
+  assert.deepEqual(updateRows.find(row => row.series_id === '1000101').unreadSequelIds, [], 'already watched seasons must not remain unread sequel candidates');
   const updateStorage = new Map([[preferencesKey, JSON.stringify({ scope: 'skip-completed-low', hideLowSeasons: false })]]);
   const updateUi = mount(() => updateRows, updateStorage);
   await updateUi.flush();

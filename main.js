@@ -1,5 +1,5 @@
 /**
- * main.js - 红果短剧 6.1 下载器（独立版）主进程
+ * main.js - 红果短剧 6.2 下载器（独立版）主进程
  *
  * 功能：
  *   1. 红果短剧解析（分享链接 / series_id -> 全剧集列表）
@@ -4180,7 +4180,7 @@ function historyContext(rows, allRows, force, deadline, retryFailed = false) {
   const latestSeries = seriesRegistry.find(item => String(item.series_id) === String(latest.series_id));
   const sequelPromise = sequelDue.size && latestSeries && watchHistory.sourceOf(String(latestSeries.series_id))
     ? historySequelResult(latestSeries, deadline, retryFailed) : null;
-  return { sequelDue, sequelPromise, deadline, notifiedSequelIds: new Set() };
+  return { sequelDue, sequelPromise, deadline, latestSeason: watchHistory.seasonOf(latest), notifiedSequelIds: new Set() };
 }
 
 async function checkHistoryRow(row, context) {
@@ -4204,8 +4204,8 @@ async function checkHistoryRow(row, context) {
       const previousRecord = map[sid];
       const next = watchHistory.applyEpisodeUpdate(previousRecord, currentSeries, fresh);
       if (sequelResponse) {
-        const candidates = watchHistory.findSequels(currentSeries, sequelResponse.candidates || sequelResponse.results || []);
-        const combined = new Map((previousRecord.sequels || []).map(item => [item.series_id, item]));
+        const candidates = watchHistory.findSequels(currentSeries, sequelResponse.candidates || sequelResponse.results || [], context.latestSeason);
+        const combined = new Map(watchHistory.findSequels(currentSeries, previousRecord.sequels || [], context.latestSeason).map(item => [item.series_id, item]));
         for (const item of candidates) combined.set(item.series_id, item);
         next.sequels = [...combined.values()].slice(-20);
         next.similarSeries = watchHistory.findSimilarSeries(currentSeries,
@@ -4217,7 +4217,7 @@ async function checkHistoryRow(row, context) {
       const newEpisodes = next.knownTotal > (previousRecord.knownTotal ?? currentSeries.total ?? currentSeries.episodes?.length ?? 0);
       const knownSequels = new Set((previousRecord.sequels || []).map(item => item.series_id));
       const rowCandidates = sequelResponse
-        ? watchHistory.findSequels(currentSeries, sequelResponse.candidates || sequelResponse.results || [])
+        ? watchHistory.findSequels(currentSeries, sequelResponse.candidates || sequelResponse.results || [], context.latestSeason)
         : [];
       const newSequel = sequelResponse?.success === true && rowCandidates.some(item => !knownSequels.has(item.series_id));
       if (fresh.episodes.length >= (currentSeries.episodes?.length || 0)) {

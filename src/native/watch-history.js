@@ -16,7 +16,8 @@ function listHistory(series, playback, showSequels = true) {
   }
   return watched.map(item => {
     const record = playback[item.series_id];
-    const sequels = showSequels && Array.isArray(record.sequels) ? record.sequels : [];
+    const sequels = showSequels && Array.isArray(record.sequels)
+      ? findSequels(item, record.sequels, latestByFamily.get(familyKey(item)) || 0) : [];
     const confirmedIds = new Set(sequels.map(candidate => String(candidate.series_id)));
     const seen = new Set(record.seenSequelIds || []);
     const unreadSequelIds = sequels.filter(candidate => !seen.has(candidate.series_id)).map(candidate => candidate.series_id);
@@ -101,7 +102,7 @@ function seasonOf(series) {
 }
 
 // shortcut: independent sequels have no authoritative relation; only exact base titles with higher explicit seasons qualify.
-function findSequels(series, candidates) {
+function findSequels(series, candidates, afterSeason = 0) {
   const current = seasonTitle(series.series_title);
   const source = sourceOf(String(series.series_id));
   if (!current.base || current.invalid || !source) return [];
@@ -109,7 +110,7 @@ function findSequels(series, candidates) {
   return candidates.filter(candidate => {
     const id = String(candidate.series_id || '');
     const next = seasonTitle(candidate.series_title);
-    if (seen.has(id) || sourceOf(id) !== source || !next.explicit || next.invalid || next.base !== current.base || next.season <= current.season) return false;
+    if (seen.has(id) || sourceOf(id) !== source || !next.explicit || next.invalid || next.base !== current.base || next.season <= Math.max(current.season, afterSeason)) return false;
     seen.add(id);
     return true;
   }).sort((a, b) => seasonTitle(a.series_title).season - seasonTitle(b.series_title).season)
