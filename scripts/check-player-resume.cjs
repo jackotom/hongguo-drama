@@ -30,7 +30,7 @@ function mount({ local = false, localIndexes = [], localQuality, saved = null, t
   const stage = { ownerDocument: document, closest: selector => selector === '.main-content' ? scrollArea : null,
     requestFullscreen: async () => { document.fullscreenElement = stage; scrollArea.scrollTop = 0; documentEvents.get('fullscreenchange')?.(); } };
   let cursor = 0, tree, timerId = 0, oldSrc = '', oldKey;
-  let transcodeProgress;
+  let transcodeProgress, onlineProgress;
   const media = { currentTime: 0, duration: 100, readyState: 0, videoWidth: 640, paused: false,
     play: async () => {
       mediaCalls.play++;
@@ -68,6 +68,7 @@ function mount({ local = false, localIndexes = [], localQuality, saved = null, t
     prepareOnlinePlay: async p => { structuredClone(p); prepares.push(p); return prepare ? prepare(p) : { success: true, url: `hongguo-stream://mock-${prepares.length}` }; },
     transcodeForPlayback: async p => { transcodes.push(p); return transcode ? transcode(p) : { success: true, url: 'file:///mock-compat.mp4' }; },
     cancelTranscodeForPlayback: async p => cancelled.push(p),
+    onOnlinePlayProgress: fn => { onlineProgress = fn; return () => { onlineProgress = null; }; },
     onTranscodeProgress: fn => { transcodeProgress = fn; return () => { transcodeProgress = null; }; },
     getSettings: async () => ({ compat_mode: true, ...settings }),
     saveSettings: async s => { settingsSaved.push(s); return { success: true }; },
@@ -123,6 +124,7 @@ function mount({ local = false, localIndexes = [], localQuality, saved = null, t
     historyUpdated: payload => [...historyListeners].forEach(listener => listener(payload)),
     flushBatched: async () => { for (let i = 0; i < 20; i++) await Promise.resolve(); render(); },
     transcodeProgress: payload => transcodeProgress?.(payload),
+    onlineProgress: payload => onlineProgress?.(payload),
     button: label => find(n => n.type === 'button' && text(n).includes(label)),
     enterFloatingPlayer: () => { floating = true; stage.ownerDocument = popupDocument; document.pictureInPictureElement = media; render(); },
     exitFloatingPlayer: () => document.exitPictureInPicture(),

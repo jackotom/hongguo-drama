@@ -156,6 +156,85 @@ async function fixture(options = {}) {
     assert(!ended.held());
   } finally { ended.ui.unmount(); }
 
+  const queued = mount({ props: { target: { seriesId: 'A', vidIndex: 1, ts: 1 } },
+    prepare: () => new Promise(() => {}), settings: { cache_next_episode: false } });
+  try {
+    await queued.flush();
+    queued.onlineProgress({ requestId: queued.prepares[0].requestId, vid: 'v1', phase: 'queued', percent: 0 });
+    await queued.flush();
+    assert(queued.text().includes('等待其他视频转换完成'), 'queued work must have a distinct player status');
+    assert(!queued.find(node => node.props.className === 'player-wait-bar'), 'queue time must not pretend to be conversion progress');
+    queued.onlineProgress({ requestId: queued.prepares[0].requestId, vid: 'v1', phase: 'transcoding', percent: 20 });
+    await queued.flush();
+    assert(queued.text().includes('正在转换为可播放格式'));
+    assert(queued.find(node => node.props.className === 'player-wait-bar'));
+  } finally { queued.unmount(); }
+
+  const missed = await fixture();
+  try {
+    missed.ui.episode(2); await missed.ui.flush();
+    missed.ui.metadata(); await missed.ui.flush();
+    missed.ui.media.pause();
+    missed.ui.media.readyState = 2;
+    const decoded = missed.ui.mediaEvents.get('loadeddata');
+    assert.equal(typeof decoded, 'function', 'decoded-data fallback must exist even with the frame API');
+    decoded();
+    for (let paint = 0; paint < 2; paint++) {
+      const pending = [...missed.ui.timers].filter(([, timer]) => timer.delay === 0);
+      for (const [id, timer] of pending) { missed.ui.timers.delete(id); timer.fn(); }
+      await missed.ui.flush();
+    }
+    assert(!missed.held(), 'a decoded paused frame must reveal even when the frame callback never arrives');
+    assert(missed.ui.media.paused, 'the fallback must never start playback');
+    assert.equal(missed.frames.size, 0, 'reveal must cancel the unused frame callback');
+  } finally { missed.ui.unmount(); }
+
+  const delayed = await fixture();
+  try {
+    delayed.ui.episode(2); await delayed.ui.flush();
+    delayed.ui.metadata(); await delayed.ui.flush();
+    for (const [id, timer] of [...delayed.ui.timers]) if (timer.delay === 3000) {
+      delayed.ui.timers.delete(id); timer.fn();
+    }
+    await delayed.ui.flush();
+    assert(delayed.held(), 'a timeout must not expose an undecoded black frame');
+    assert(delayed.ui.text().includes('正在等待新画面'), 'a slow first frame must have a visible recovery state');
+    assert(delayed.ui.button('重新加载本集'), 'a slow first frame must offer explicit recovery');
+    delayed.ui.media.pause();
+    await delayed.ui.button('重新加载本集').props.onClick(); await delayed.ui.flush();
+    delayed.ui.metadata(); await delayed.ui.flush();
+    assert(delayed.ui.media.paused, 'reloading a paused retained frame must preserve pause intent');
+    await delayed.present();
+    assert(!delayed.ui.text().includes('正在等待新画面'));
+  } finally { delayed.ui.unmount(); }
+
+  const alreadyReady = await fixture();
+  try {
+    const load = alreadyReady.ui.media.load;
+    alreadyReady.ui.media.load = () => {
+      load(); alreadyReady.ui.metadata(); alreadyReady.ui.media.readyState = 2;
+    };
+    alreadyReady.ui.episode(2); await alreadyReady.ui.flush();
+    alreadyReady.ui.media.pause();
+    for (let paint = 0; paint < 2; paint++) {
+      for (const [id, timer] of [...alreadyReady.ui.timers]) if (timer.delay === 0) {
+        alreadyReady.ui.timers.delete(id); timer.fn();
+      }
+      await alreadyReady.ui.flush();
+    }
+    assert(!alreadyReady.held(), 'a frame already decoded before subscription needs no further media event');
+    assert(alreadyReady.ui.media.paused);
+  } finally { alreadyReady.ui.unmount(); }
+
+  const scaled = await fixture();
+  try {
+    scaled.ui.media.videoWidth = 3840; scaled.ui.media.videoHeight = 2160;
+    scaled.ui.stage.getBoundingClientRect = () => ({ width: 640, height: 360 });
+    scaled.ui.episode(2); await scaled.ui.flush();
+    assert.equal(scaled.canvas.width, 640, 'capture should match visible stage pixels instead of allocating 4K');
+    assert.equal(scaled.canvas.height, 360);
+  } finally { scaled.ui.unmount(); }
+
   const paused = await fixture();
   try {
     delete paused.ui.media.requestVideoFrameCallback;

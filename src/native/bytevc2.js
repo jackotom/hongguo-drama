@@ -35,15 +35,17 @@ function acquire(signal, cancelToken, getPriority) {
   });
 }
 
-async function convertBytevc2({ executable, input, output, contentKey, duration, signal, cancelToken, onProgress, maxBytes = Infinity, getPriority = () => 0 }) {
+async function convertBytevc2({ executable, input, output, contentKey, duration, signal, cancelToken, onProgress, onPhase, maxBytes = Infinity, getPriority = () => 0 }) {
   const cancelled = () => signal?.aborted || cancelToken?.reason;
   if (cancelled()) throw abortError();
   if (!executable) throw new Error('未找到内置 ByteVC2 解码组件，请重新下载完整版本后重试');
   if (contentKey != null && !/^[a-f\d]{32}$/i.test(contentKey)) throw new Error('片源解密密钥格式无效');
   if (!Number.isFinite(duration) || duration <= 0 || !(maxBytes > 0) || input === output) throw new Error('ByteVC2 视频参数无效');
+  if (converting || waiting.length) onPhase?.('queued');
   const release = await acquire(signal, cancelToken, getPriority);
   try {
     if (cancelled()) throw abortError();
+    onPhase?.('transcoding');
     const file = await fs.open(output, 'wx', 0o600);
     await file.close();
     try {

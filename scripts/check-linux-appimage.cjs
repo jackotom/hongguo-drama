@@ -47,7 +47,7 @@ const pkg = require('../package.json');
       return {player:typeof module.default,wasm:WebAssembly.validate(bytes)};
     })()`);
     assert.equal(assets.player, 'function'); assert.equal(assets.wasm, true);
-    result.checks.push('AppImage launches its UI and reports 6.1; packaged CPU player and HEVC Wasm load');
+    result.checks.push(`AppImage launches its UI and reports ${pkg.version}; packaged CPU player and HEVC Wasm load`);
     result.passed = true;
     console.log('PASS actual Linux AppImage: extraction, media tools, launch, version and bundled software decoder');
   } catch (error) { result.error = error.message; throw error; }

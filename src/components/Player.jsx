@@ -109,6 +109,7 @@ function Player({ target, onNavigate, onSeriesSelected, onFloatingChange, active
   const [onlineUrl, setOnlineUrl] = useState('');
   const [mediaBuffering, setMediaBuffering] = useState(false);
   const [holdingFrame, setHoldingFrame] = useState(false);
+  const [frameWaiting, setFrameWaiting] = useState(false);
   const [onlineProgress, setOnlineProgress] = useState(null); // {percent, phase}
   const [cacheInfo, setCacheInfo] = useState({ count: 0, bytes: 0 });
   const [downloadedRevision, setDownloadedRevision] = useState(0);
@@ -199,9 +200,14 @@ function Player({ target, onNavigate, onSeriesSelected, onFloatingChange, active
     try {
       const context = canvas.getContext('2d');
       if (!context) return;
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
-      context.drawImage(video, 0, 0);
+      const bounds = stageRef.current?.getBoundingClientRect?.();
+      const pixelRatio = video.ownerDocument?.defaultView?.devicePixelRatio || window.devicePixelRatio || 1;
+      const scale = bounds?.width > 0 && bounds?.height > 0
+        ? Math.min(1, bounds.width * pixelRatio / video.videoWidth,
+          stageRef.current?.dataset?.pictureMode === 'width' ? 1 : bounds.height * pixelRatio / video.videoHeight) : 1;
+      canvas.width = Math.max(1, Math.ceil(video.videoWidth * scale));
+      canvas.height = Math.max(1, Math.ceil(video.videoHeight * scale));
+      context.drawImage(video, 0, 0, canvas.width, canvas.height);
       setHoldingFrame(true);
     } catch { setHoldingFrame(false); }
   }, []);
@@ -687,32 +693,40 @@ function Player({ target, onNavigate, onSeriesSelected, onFloatingChange, active
 
   useEffect(() => {
     const video = videoRef.current;
+    setFrameWaiting(false);
     if (!holdingFrame || !video || loading || !canPlay) return;
     const version = playbackVersion;
+    let cancelled = false, frame, paint;
     const reveal = () => {
-      if (version !== mediaVersion.current || loadedMediaRef.current?.version !== version
+      if (cancelled || version !== mediaVersion.current || loadedMediaRef.current?.version !== version
         || video.currentSrc !== videoSrc || video.readyState < 2 || !video.videoWidth || !video.videoHeight) return false;
       setHoldingFrame(false);
       return true;
     };
-    // metadata/playing precedes presentation; keep the cover until Chromium submits the new frame.
+    // A paused frame may already have been submitted before the one-shot callback was registered.
+    const decoded = () => {
+      if (!video.requestVideoFrameCallback) { reveal(); return; }
+      cancelAnimationFrame(paint);
+      paint = requestAnimationFrame(() => { paint = requestAnimationFrame(reveal); });
+    };
     if (video.requestVideoFrameCallback) {
-      let cancelled = false;
-      let frame;
       const onFrame = () => {
         if (cancelled || version !== mediaVersion.current) return;
-        // A queued old frame can arrive during load; one-shot callbacks must be renewed until reveal succeeds.
         if (!reveal()) frame = video.requestVideoFrameCallback(onFrame);
       };
       frame = video.requestVideoFrameCallback(onFrame);
-      return () => { cancelled = true; video.cancelVideoFrameCallback(frame); };
-    }
-    video.addEventListener('loadeddata', reveal);
-    video.addEventListener('seeked', reveal);
-    reveal();
+    } else reveal();
+    video.addEventListener('loadeddata', decoded);
+    video.addEventListener('seeked', decoded);
+    decoded();
+    const wait = setTimeout(() => { if (!cancelled) setFrameWaiting(true); }, 3000);
     return () => {
-      video.removeEventListener('loadeddata', reveal);
-      video.removeEventListener('seeked', reveal);
+      cancelled = true;
+      clearTimeout(wait);
+      cancelAnimationFrame(paint);
+      if (frame != null) video.cancelVideoFrameCallback?.(frame);
+      video.removeEventListener('loadeddata', decoded);
+      video.removeEventListener('seeked', decoded);
     };
   }, [holdingFrame, loading, canPlay, videoSrc, playbackVersion, softwareDecode]);
 
@@ -909,9 +923,9 @@ function Player({ target, onNavigate, onSeriesSelected, onFloatingChange, active
               requestId: request.requestId, vid: ep.vid, seriesId: activeSeriesId, vidIndex,
               quality: qualities[index], force,
             });
-          } catch (error) { res = { success: false, error: error.message }; }
+          } catch (error) { res = { success: false, error: error?.message || String(error), code: error?.code }; }
           if (onlineRequestRef.current !== request) break;
-          if (!res?.success && index + 1 < qualities.length) {
+          if (!res?.success && !stopsQualityFallback(res) && index + 1 < qualities.length) {
             showToast(`${qualities[index].toUpperCase()} 暂不可用，正在尝试${qualities[index + 1] === 'auto' ? '兼容片源' : qualities[index + 1].toUpperCase()}`);
           }
         }
@@ -961,19 +975,19 @@ function Player({ target, onNavigate, onSeriesSelected, onFloatingChange, active
 
   // 切集
   const goToEpisode = useCallback(
-    (vidIndex, resumeAt) => {
+    (vidIndex, resumeAt, autoplay = true) => {
       const ep = episodes.find((e) => e.vid_index === vidIndex);
       if (!ep || ep.locked) return;
       prefetchRejectedRef.current = false;
       fallbackAttemptRef.current = null;
       reconnectAttemptRef.current = null;
       if (!usableLocal(ep, String(activeSeriesId))) {
-        startOnlinePlay(vidIndex, resumeAt);
+        startOnlinePlay(vidIndex, resumeAt, false, autoplay);
         return;
       }
       onlineSourceRef.current = null;
       const seekTo = resumeAt ?? (vidIndex === stateRef.current.currentIndex ? currentPosition() : 0);
-      resetPlayback(true, true);
+      resetPlayback(autoplay, true);
       prunePrefetchAfter(activeSeriesId, vidIndex, onlineQuality);
       setCurrentIndex(vidIndex);
       setWaitingFor(null);
@@ -982,20 +996,20 @@ function Player({ target, onNavigate, onSeriesSelected, onFloatingChange, active
     [episodes, activeSeriesId, resetPlayback, startOnlinePlay, currentPosition, usableLocal, prunePrefetchAfter, onlineQuality]
   );
 
-  const retryPlayback = async () => {
+  const retryPlayback = async (autoplay = true) => {
     const version = mediaVersion.current, selection = selectionVersion.current, navigation = navigationVersion.current;
     let data;
     try { data = await loadDetail(activeSeriesId); } catch (_) {}
     if (!activeRef.current || navigation !== navigationVersion.current || version !== mediaVersion.current || selection !== selectionVersion.current) return;
     prefetchRejectedRef.current = false;
     const latest = data?.episodes.find(ep => ep.vid_index === currentIndex && ep.vid === current?.vid);
-    if (usableLocal(latest, String(activeSeriesId))) { resumeLocal(latest, currentPosition()); return; }
+    if (usableLocal(latest, String(activeSeriesId))) { resumeLocal(latest, currentPosition(), autoplay); return; }
     setCompatMap(prev => { const next = { ...prev }; delete next[currentIndex]; return next; });
     if (onlineSourceRef.current === `${activeSeriesId}:${currentIndex}` || current?.status !== 'completed') {
       fallbackAttemptRef.current = null;
       reconnectAttemptRef.current = null;
-      startOnlinePlay(currentIndex, currentPosition(), true);
-    } else goToEpisode(currentIndex, currentPosition());
+      startOnlinePlay(currentIndex, currentPosition(), true, autoplay);
+    } else goToEpisode(currentIndex, currentPosition(), autoplay);
   };
 
   const changeOnlineQuality = (quality) => {
@@ -1954,20 +1968,20 @@ function Player({ target, onNavigate, onSeriesSelected, onFloatingChange, active
           <div className={`player-placeholder${holdingFrame && !playbackError ? ' player-placeholder-over-frame' : ''}`} style={{ position: 'absolute', inset: 0, zIndex: 3 }}>
             {playbackError ? (
               <><Film size={34} /><p role="alert">{playbackError}</p><div className="player-placeholder-actions">
-                <button className="btn btn-primary" onClick={retryPlayback}>{current?.status === 'completed' ? '重试本集' : '重试本集（在线播放）'}</button>
+                <button className="btn btn-primary" onClick={() => retryPlayback()}>{current?.status === 'completed' ? '重试本集' : '重试本集（在线播放）'}</button>
                 {current?.vid && <button className="btn btn-outline" onClick={() => startOnlinePlay(currentIndex, undefined, true)}>重新连接片源</button>}
                 {current?.vid && !current.locked && (decodeFailed || current?.status === 'completed') && !fallbackRef.current?.submitting && <button className="btn btn-outline" onClick={() => startCompatPlay(currentIndex, true)}>转码后播放</button>}
               </div></>
             ) : onlineProgress && onlineProgress.vid && (!current || current.vid === onlineProgress.vid) ? (
               <>
                 <RefreshCw size={30} className="spin" />
-                <p>{onlineProgress.phase === 'preparing' ? '正在连接片源…' : onlineProgress.phase === 'transcoding' ? '正在转换为可播放格式…' : onlineProgress.phase === 'decrypting' ? '正在准备播放…' : '正在缓冲在线播放…'}</p>
-                {onlineProgress.phase !== 'preparing' && <div className="player-wait-bar">
+                <p>{onlineProgress.phase === 'preparing' ? '正在连接片源…' : onlineProgress.phase === 'queued' ? '等待其他视频转换完成…' : onlineProgress.phase === 'transcoding' ? '正在转换为可播放格式…' : onlineProgress.phase === 'decrypting' ? '正在准备播放…' : '正在缓冲在线播放…'}</p>
+                {!['preparing', 'queued'].includes(onlineProgress.phase) && <div className="player-wait-bar">
                   <div className="player-wait-fill" style={{ width: `${onlineProgress.percent || 0}%` }} />
                 </div>}
                 <span className="player-placeholder-sub">
-                  {onlineProgress.phase === 'preparing' ? '获取可播放地址' : `${onlineProgress.percent || 0}%`}
-                  {onlineProgress.total && onlineProgress.phase !== 'transcoding' ? ` · ${(onlineProgress.received / 1048576).toFixed(1)} / ${(onlineProgress.total / 1048576).toFixed(1)} MB` : ''}
+                  {onlineProgress.phase === 'preparing' ? '获取可播放地址' : onlineProgress.phase === 'queued' ? '已排队，轮到本集后开始转换' : `${onlineProgress.percent || 0}%`}
+                  {onlineProgress.total && !['transcoding', 'queued'].includes(onlineProgress.phase) ? ` · ${(onlineProgress.received / 1048576).toFixed(1)} / ${(onlineProgress.total / 1048576).toFixed(1)} MB` : ''}
                   {' · 不写入下载目录'}
                 </span>
                 <button className="btn btn-outline" onClick={() => stopPlayback()}>取消播放</button>
@@ -2029,6 +2043,19 @@ function Player({ target, onNavigate, onSeriesSelected, onFloatingChange, active
           </div>
         )}
 
+        {canPlay && holdingFrame && frameWaiting && !mediaBuffering && !compatProgress && !decodeFailed && (
+          <div className="compat-overlay" role="status">
+            <Film size={26} />
+            <p>{softwareDecode && videoRef.current?.paused ? '已暂停，继续播放后显示新画面' : '正在等待新画面…'}</p>
+            <div className="player-placeholder-actions">
+              {softwareDecode && videoRef.current?.paused && <button className="btn btn-primary"
+                onClick={() => videoRef.current?.play().catch(() => showToast('暂时无法播放，请重试本集'))}>继续播放</button>}
+              <button className="btn btn-outline" onClick={() => retryPlayback(!videoRef.current?.paused)}>重新加载本集</button>
+              <button className="btn btn-outline" onClick={() => stopPlayback()}>取消播放</button>
+            </div>
+          </div>
+        )}
+
         {canPlay && mediaBuffering && !compatProgress && (
           <div className="compat-overlay" role="status">
             <RefreshCw size={26} className="spin" /><p>正在加载视频…</p>
@@ -2059,7 +2086,7 @@ function Player({ target, onNavigate, onSeriesSelected, onFloatingChange, active
               {compatError || '请先重新连接片源；若仍有画面或格式问题，可尝试转码为 H.264 兼容格式。'}
             </span>
             <div className="player-placeholder-actions">
-              <button className="btn btn-primary" onClick={retryPlayback}>重试本集</button>
+              <button className="btn btn-primary" onClick={() => retryPlayback()}>重试本集</button>
               <button className="btn btn-outline" onClick={() => startOnlinePlay(currentIndex, undefined, true)}>重新连接片源</button>
               <button className="btn btn-outline" onClick={() => startCompatPlay(currentIndex, true)}>
                 <Zap size={15} />

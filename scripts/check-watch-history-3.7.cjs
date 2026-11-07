@@ -12,7 +12,7 @@ const source = path.resolve(__dirname, '../main.js');
 const req = createRequire(source);
 const baseTitle = '聚宝仙盆之杂灵根才是真BOSS';
 
-function fixture({ failId = '', now = Date.now(), remoteSeries = [], seasons = [1, 2, 3], notify = false } = {}) {
+function fixture({ failId = '', now = Date.now(), remoteSeries = [], seasons = [1, 2, 3], notify = false, fetchWait } = {}) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'hongguo-history-37-'));
   const handlers = {}, queries = [], fetches = [], notifications = [];
   const seriesList = seasons.map(season => ({
@@ -45,6 +45,7 @@ function fixture({ failId = '', now = Date.now(), remoteSeries = [], seasons = [
   const hongguo = {
     fetchEpisodeList: async id => {
       fetches.push(String(id));
+      await fetchWait;
       if (String(id) === failId) throw new Error('分集接口超时');
       return structuredClone(seriesList.find(item => item.series_id === String(id)));
     },
@@ -115,6 +116,33 @@ test('#97 missing lower seasons are not updates after a higher season was watche
       assert.equal(h.queries.filter(keyword => keyword.toLowerCase() === baseTitle.toLowerCase()).length, 1);
       assert.equal(h.notifications.length, expected.length, 'only a future season can produce a system notification');
     } finally { h.cleanup(); }
+  }
+});
+
+test('#97 late checks use seasons watched while the network request was pending', async () => {
+  for (const single of [false, true]) for (const future of [false, true]) {
+    let finish;
+    const fetchWait = new Promise(resolve => { finish = resolve; });
+    const h = fixture({ seasons: [1, 3, 4, 5], notify: true, fetchWait,
+      remoteSeries: future ? [{ series_id: '1000006', series_title: baseTitle + '第6季' }] : [] });
+    delete h.playback['1000005'];
+    try {
+      const pending = single ? h.checkOne('1000001') : h.refresh({ scope: 'all' });
+      await new Promise(resolve => setImmediate(resolve));
+      assert.ok(h.fetches.length, 'the request must start before playback changes');
+      h.playback['1000005'] = { ...h.playback['1000004'], vid_index: 3, currentTime: 42, updatedAt: Date.now() };
+      finish();
+      await pending;
+      const expected = future ? ['1000006'] : [];
+      for (const id of single ? ['1000001'] : ['1000001', '1000003', '1000004']) {
+        assert.deepEqual(h.playback[id].sequels.map(item => item.series_id), expected,
+          'a newly watched season must not be saved as a new sequel');
+      }
+      assert.equal(h.notifications.length, expected.length, 'only a still-unwatched future season may notify');
+      assert.equal(h.playback['1000005'].currentTime, 42, 'late checks must preserve concurrent playback');
+      assert.ok((await h.handlers['get-watch-history']({})).results.every(row =>
+        row.sequels.every(item => item.series_id !== '1000005')));
+    } finally { finish(); h.cleanup(); }
   }
 });
 

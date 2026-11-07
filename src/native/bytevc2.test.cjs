@@ -84,6 +84,20 @@ test('conversion queue serializes helpers and prioritizes playback without resta
   f.finish(3); await work[1];
 });
 
+test('conversion reports queued work separately from the active converter', async t => {
+  const f = fixture(t, { wait: true }), controller = new AbortController(), phases = [];
+  const first = f.run({ signal: controller.signal });
+  while (!f.calls.length) await new Promise(resolve => setImmediate(resolve));
+  const second = f.run({ output: f.output + '-queued-phase', signal: controller.signal,
+    onPhase: phase => phases.push(phase) });
+  t.after(async () => { controller.abort(); await Promise.allSettled([first, second]); });
+  assert.deepEqual(phases, ['queued'], 'queued work must not claim to be converting');
+  f.finish(0); await first;
+  while (f.calls.length < 2) await new Promise(resolve => setImmediate(resolve));
+  assert.deepEqual(phases, ['queued', 'transcoding']);
+  f.finish(1); await second;
+});
+
 for (const token of [false, true]) test(`queued cancellation removes work before creating output (${token ? 'download token' : 'signal'})`, async t => {
   const f = fixture(t, { wait: true }), activeController = new AbortController();
   const active = f.run({ signal: activeController.signal });

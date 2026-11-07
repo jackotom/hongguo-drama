@@ -41,6 +41,19 @@ const flushWithoutBuffering = async ui => {
     catch (error) { failures++; console.error('FAIL ' + name + ': ' + (error.stack || error.message)); }
   };
 
+  await test('foreground thrown cancellation and rejection stop the quality ladder', async () => {
+    for (const code of ['ERR_CANCELED', 'DEVICE_REGISTRATION_FAILED', 'BUSINESS_REJECTED', 'SECURITY_BLOCKED']) {
+      const ui = mount({ settings: { cache_next_episode: false },
+        props: { target: { seriesId: 'A', vidIndex: 1, ts: 1 } },
+        prepare: async () => { throw Object.assign(new Error('preparation stopped'), { code }); } });
+      try {
+        await ui.flush();
+        assert.deepEqual(ui.prepares.map(item => item.quality), ['1080p'], code);
+        assert.ok(!ui.text().includes('正在尝试'), 'stopped fallback must not announce another quality attempt');
+      } finally { ui.unmount(); }
+    }
+  });
+
   await test('every prefetch quality attempt carries only cloneable IPC fields', async () => {
     const payloads = [], cloneErrors = [];
     const ui = await openEpisode({ apiOverrides: { prepareOnlinePlay: async payload => {
@@ -366,9 +379,12 @@ const flushWithoutBuffering = async ui => {
         assert.equal(h.run('onlineSessions.size'), 0, 'failed preparations must release their sessions');
       }
       const h = fixture();
-      h.run("onlineSessions.set('selected', {requestId:'chosen',prefetch:true}); onlineSessions.set('later', {requestId:'later',prefetch:true});");
+      h.run("onlineSessions.set('selected', {requestId:'chosen',prefetch:true,vid:'11',seriesId:'1',vidIndex:1,job:{progress:{phase:'queued',received:0,total:100,percent:0}}}); onlineSessions.set('later', {requestId:'later',prefetch:true});");
       await h.handlers['promote-online-play']({}, { requestId: 'chosen' });
       assert.equal(h.run("onlineSessions.get('selected').prefetch"), false);
+      assert(h.events.some(event => event.channel === 'online-play-progress'
+        && event.data.requestId === 'chosen' && event.data.phase === 'queued'),
+        'taking over a queued prefetch must immediately replay its queue state');
       assert.equal(h.run("onlineSessions.get('later').prefetch"), true);
       await h.handlers['promote-online-play']({}, {});
       assert.equal(h.run("onlineSessions.get('later').prefetch"), true, 'empty promotion cannot elevate unrelated requests');
