@@ -25,28 +25,31 @@
 
 
 
-**当前正式版：6.1**（内部 `6.1.0`）。新增从本集至末集下载、内置CPU软件解码和Linux x64 AppImage，修复搜索联想滚动悬留。Mac已签名、公证与装订；Windows EXE未签名，Linux实际播放仍有验收边界。见 [6.1说明](docs/release-6.1.md)。
+**当前正式版：6.2**（内部 `6.2.0`）。优化切集画面交接、等待恢复和转码排队，修复观看记录续作误报与无效降档。Mac已签名、公证与装订；Windows EXE未签名，Linux实际播放仍有验收边界。见 [6.2说明](docs/release-6.2.md)。
 
 按设备下载一个安装文件即可；其余源码、更新清单和校验文件供对应用途使用。
 
-| 设备 | 下载 6.1 | 安装方式 |
+| 设备 | 下载 6.2 | 安装方式 |
 |---|---|---|
-| Apple 芯片 Mac（M 系列），macOS 13+ | [下载 DMG](https://github.com/jackotom/hongguo-drama/releases/download/v6.1/Hongguo-6.1-mac-arm64.dmg) | 打开 DMG，拖入「应用程序」后启动；后续支持应用内更新 |
-| Intel Mac，macOS 13+ | [下载 DMG](https://github.com/jackotom/hongguo-drama/releases/download/v6.1/Hongguo-6.1-mac-x64.dmg) | 打开 DMG，拖入「应用程序」后启动；后续支持应用内更新 |
-| Windows x64（推荐安装版） | [下载安装版 EXE](https://github.com/jackotom/hongguo-drama/releases/download/v6.1/hongguo-downloader-6.1-win-x64-setup.exe) | 按向导安装，后续支持应用内更新 |
-| Windows x64（便携版） | [下载便携 EXE](https://github.com/jackotom/hongguo-drama/releases/download/v6.1/hongguo-downloader-6.1-win-x64.exe) · [下载便携 ZIP](https://github.com/jackotom/hongguo-drama/releases/download/v6.1/hongguo-downloader-6.1-win-x64.zip) | 直接运行 EXE；ZIP 解压后运行同一程序，后续仍需手动替换 |
-| Linux x64 | [下载 AppImage](https://github.com/jackotom/hongguo-drama/releases/download/v6.1/hongguo-downloader-6.1-linux-x64.AppImage) | 赋予执行权限后运行；需支持 Chromium 沙箱，后续手动更新 |
+| Apple 芯片 Mac（M 系列），macOS 13+ | [下载 DMG](https://github.com/jackotom/hongguo-drama/releases/download/v6.2/Hongguo-6.2-mac-arm64.dmg) | 打开 DMG，拖入「应用程序」后启动；后续支持应用内更新 |
+| Intel Mac，macOS 13+ | [下载 DMG](https://github.com/jackotom/hongguo-drama/releases/download/v6.2/Hongguo-6.2-mac-x64.dmg) | 打开 DMG，拖入「应用程序」后启动；后续支持应用内更新 |
+| Windows x64（推荐安装版） | [下载安装版 EXE](https://github.com/jackotom/hongguo-drama/releases/download/v6.2/hongguo-downloader-6.2-win-x64-setup.exe) | 按向导安装，后续支持应用内更新 |
+| Windows x64（便携版） | [下载便携 EXE](https://github.com/jackotom/hongguo-drama/releases/download/v6.2/hongguo-downloader-6.2-win-x64.exe) · [下载便携 ZIP](https://github.com/jackotom/hongguo-drama/releases/download/v6.2/hongguo-downloader-6.2-win-x64.zip) | 直接运行 EXE；ZIP 解压后运行同一程序，后续仍需手动替换 |
+| Linux x64 | [下载 AppImage](https://github.com/jackotom/hongguo-drama/releases/download/v6.2/hongguo-downloader-6.2-linux-x64.AppImage) | 赋予执行权限后运行；需支持 Chromium 沙箱，后续手动更新 |
 
-[查看已发布正式版](https://github.com/jackotom/hongguo-drama/releases/latest) · [6.1发行说明](docs/release-6.1.md) · [6.1发行页](https://github.com/jackotom/hongguo-drama/releases/tag/v6.1) · [SHA256 校验文件](https://github.com/jackotom/hongguo-drama/releases/download/v6.1/SHA256SUMS.txt)
+[查看已发布正式版](https://github.com/jackotom/hongguo-drama/releases/latest) · [6.2发行说明](docs/release-6.2.md) · [6.2发行页](https://github.com/jackotom/hongguo-drama/releases/tag/v6.2) · [SHA256 校验文件](https://github.com/jackotom/hongguo-drama/releases/download/v6.2/SHA256SUMS.txt)
 
 
-- **升级到 6.1**：安装版保留应用内更新入口；完整6.0到6.1应用内更新尚未实测；也可退出旧程序后替换 Mac 应用或运行 Windows 安装包。便携版保留同目录的 `data` 后手动替换；1.75 及更早版本需要手动安装。
+- **升级到 6.2**：安装版保留应用内更新入口；完整6.1到6.2应用内更新尚未实测；也可退出旧程序后替换 Mac 应用或运行 Windows 安装包。便携版保留同目录的 `data` 后手动替换；1.75 及更早版本需要手动安装。
 - **后续更新**：Mac 与 Windows 安装版可在应用内下载新版，下载完成后由你点击重启安装，不强制升级。Windows 便携版继续通过发行页下载并手动替换。
-- **Mac**：6.1双架构 App 与 DMG 均已完成 Developer ID 签名、Apple 公证 Accepted 和票据装订。无需全局关闭 Gatekeeper；公证不等于 App Store 审核或内容授权。
+- **Mac**：6.2双架构 App 与 DMG 均已完成 Developer ID 签名、Apple 公证 Accepted 和票据装订。无需全局关闭 Gatekeeper；公证不等于 App Store 审核或内容授权。
 - **Windows**：安装版和便携版 EXE 尚未签名，可能出现系统安全提示。请核对官方下载来源；便携版首次启动会展开临时运行文件。安装版沿用原用户资料目录；3.4 起便携版把设置和下载记录放在程序目录的 `data` 文件夹，移动程序时请连同该文件夹一起保留。安装版与便携版不能同时运行（同一应用只允许一个实例）；更换版本前请先退出正在运行的窗口。
 - **普通使用只需上表安装文件**：发行页中的 Mac 更新 ZIP、`latest*.yml` 和 `.blockmap` 供更新程序使用；`source` 文件和 GitHub 自动生成的 Source code 是源码，不能直接运行。
 
 本项目是社区维护的开源修改版，**不是红果、西饭或河马的官方客户端，也未获平台官方背书**。不提供付费分集解锁；剧集、清晰度和可用范围取决于来源平台。
+
+
+此前安装过同版本6.2候选包的用户，请重新下载本次安装包。
 
 <details>
 <summary>3.9 历史下载与升级说明</summary>
@@ -73,7 +76,7 @@
 3. 打开详情点「立即播放」，也可选择集数与清晰度加入下载队列。
 4. 下次从「我的剧库」或「观看记录」接着看；下载进度、失败重试和整剧合并在「下载管理」。
 
-## 6.2（源码／发行目标）
+## 6.2
 
 - 优化切集画面交接、旧帧等待恢复及显示尺寸抓帧；暂停重载保持暂停，软件解码暂停状态更清晰。
 - 转码排队与执行分开显示，预缓存接管立即同步进度；修复取源终止码丢失后无效降档。
