@@ -40,6 +40,7 @@ const pkg = require('../package.json');
       ...(process.getuid?.() === 0 ? ['--no-sandbox'] : [])], { cwd: folder, stdio: ['ignore', log, log] });
     fs.closeSync(log);
     cdp = await connect(port);
+    await cdp.evaluate(`(async()=>{const deadline=Date.now()+15000;while(!document.querySelector('.sidebar-item')){if(Date.now()>deadline)throw Error('AppImage interface initialization timed out');await new Promise(resolve=>setTimeout(resolve,50));}})()`);
     const info = await cdp.evaluate('window.electronAPI.getAppInfo()');
     assert.equal(info.version, pkg.version);
     assert.equal(await cdp.evaluate('document.title'), /^zh/i.test(info.systemLocale) ? '红果短剧' : 'Hongguo Drama');
