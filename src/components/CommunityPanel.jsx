@@ -1,15 +1,17 @@
+import { t, useLanguage, getLanguage } from '../i18n';
 import React, { useEffect, useId, useState } from 'react';
 import { readLocalLibrary, saveLocalSeries, subscribeLocalLibrary, publicDateKey } from '../localLibrary';
 import './CommunityPanel.css';
 
-const count = value => typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value.toLocaleString('zh-CN') : '暂无数据';
+const count = value => typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value.toLocaleString(getLanguage()) : '暂无数据';
 const reviewDate = value => {
   if (!value) return '';
   const date = new Date(typeof value === 'number' && value < 1e12 ? value * 1000 : value);
-  return Number.isNaN(date.getTime()) ? '' : date.toLocaleDateString('zh-CN', { timeZone: 'Asia/Shanghai' });
+  return Number.isNaN(date.getTime()) ? '' : date.toLocaleDateString(getLanguage(), { timeZone: 'Asia/Shanghai' });
 };
 
 export default function CommunityPanel({ seriesId, episodeId, title, cover, children, trailingAction }) {
+  useLanguage();
   const id = String(seriesId || '');
   const panelId = useId();
   const [openedSeries, setOpenedSeries] = useState('');
@@ -64,60 +66,60 @@ export default function CommunityPanel({ seriesId, episodeId, title, cover, chil
     ? `本次展示 ${items.length} 条公开评论，公开总数 ${count(reviews.total)}；更多评论可在红果 App 查看。`
     : `本次展示 ${items.length} 条公开评论；更多评论可在红果 App 查看。`;
 
-  return <section className="community-panel" aria-label="公开剧评与本机收藏">
+  return <section className="community-panel" aria-label={t("公开剧评与本机收藏")}>
     <div className="community-heading">
-      <div><h3>剧评与收藏</h3><p>公开评论，只读。收藏仅保存在本机。</p></div>
+      <div><h3>{t("剧评与收藏")}</h3><p>{t("公开评论，只读。收藏仅保存在本机。")}</p></div>
       <div className="community-actions">
-        {children}
+        {t(children)}
         <button type="button" className="btn btn-outline" onClick={async () => {
           try {
             await navigator.clipboard.writeText(`https://hongguoduanju.com/detail?series_id=${encodeURIComponent(id)}`);
             setShareStatus('官方分享链接已复制');
           } catch { setShareStatus('复制失败，请重试'); }
-        }}>复制分享链接</button>
-        <button type="button" className={`btn ${favorite ? 'community-favorited' : 'btn-outline'}`} aria-pressed={favorite} onClick={() => setLibrary(saveLocalSeries({ id, title, cover, favorite: !favorite }))}>{favorite ? '已收藏到本机' : '收藏到本机'}</button>
+        }}>{t("复制分享链接")}</button>
+        <button type="button" className={`btn ${favorite ? 'community-favorited' : 'btn-outline'}`} aria-pressed={favorite} onClick={() => setLibrary(saveLocalSeries({ id, title, cover, favorite: !favorite }))}>{t(favorite ? '已收藏到本机' : '收藏到本机')}</button>
         <button type="button" className={`btn community-episode-like ${episodeLiked ? 'community-favorited' : 'btn-outline'}`} aria-pressed={episodeLiked} disabled={!episodeId} onClick={() => {
           if (!currentEpisodeId) return;
           const next = episodeLiked ? likedEpisodeIds.filter(value => value !== currentEpisodeId) : [...likedEpisodeIds, currentEpisodeId];
           setLibrary(saveLocalSeries({ id, title, cover, liked_episode_ids: next }));
-        }}><span className="community-heart" aria-hidden="true">{episodeLiked ? '♥' : '♡'}</span>{episodeLiked ? '已点小红心（本机）' : '本集小红心（本机）'}</button>
+        }}><span className="community-heart" aria-hidden="true">{t(episodeLiked ? '♥' : '♡')}</span>{t(episodeLiked ? '已点小红心（本机）' : '本集小红心（本机）')}</button>
         {episodeId && <button type="button" className="btn btn-outline community-episode-button" aria-expanded={opened && episodeScope} aria-controls={panelId} onClick={() => {
           if (opened && episodeScope) setOpenedSeries('');
           else { setScope('episode'); setOpenedSeries(id); }
-        }}>{opened && episodeScope ? '收起当前集评论' : '当前集评论'}</button>}
+        }}>{t(opened && episodeScope ? '收起当前集评论' : '当前集评论')}</button>}
         <button type="button" className="btn btn-outline" aria-expanded={opened && !episodeScope} aria-controls={panelId} onClick={() => {
           if (opened && !episodeScope) setOpenedSeries('');
           else { setScope('series'); setOpenedSeries(id); }
-        }}>{opened && !episodeScope ? '收起剧评' : '查看公开剧评'}</button>
-        {trailingAction && <div className="community-action-trailing">{trailingAction}</div>}
+        }}>{t(opened && !episodeScope ? '收起剧评' : '查看公开剧评')}</button>
+        {trailingAction && <div className="community-action-trailing">{t(trailingAction)}</div>}
       </div>
     </div>
-    {library.error && <p className="community-error" role="alert">{library.error}</p>}
-    {shareStatus && <p className="community-note" role="status">{shareStatus}</p>}
+    {library.error && <p className="community-error" role="alert">{t(library.error)}</p>}
+    {shareStatus && <p className="community-note" role="status">{t(shareStatus)}</p>}
     {opened && <div id={panelId} className="community-content" aria-busy={loading}>
-      {loading && <p className="community-status" role="status">正在读取公开评分与评论…</p>}
-      {!loading && error && <div className="community-error" role="alert"><p>{error}</p><button type="button" className="btn btn-sm" onClick={() => setRetry(value => value + 1)}>重试</button></div>}
+      {loading && <p className="community-status" role="status">{t("正在读取公开评分与评论…")}</p>}
+      {!loading && error && <div className="community-error" role="alert"><p>{t(error)}</p><button type="button" className="btn btn-sm" onClick={() => setRetry(value => value + 1)}>{t("重试")}</button></div>}
       {!loading && !error && detail && <>
         <dl className="community-metrics">
-          <div><dt>公开评分</dt><dd>{count(detail.rating)}</dd></div>
-          <div><dt>评分人数</dt><dd>{count(detail.rating_count)}</dd></div>
-          <div><dt>公开点赞</dt><dd>{count(detail.like_count)}</dd></div>
-          <div><dt>公开收藏</dt><dd>{count(detail.favorite_count)}</dd></div>
+          <div><dt>{t("公开评分")}</dt><dd>{t(count(detail.rating))}</dd></div>
+          <div><dt>{t("评分人数")}</dt><dd>{t(count(detail.rating_count))}</dd></div>
+          <div><dt>{t("公开点赞")}</dt><dd>{t(count(detail.like_count))}</dd></div>
+          <div><dt>{t("公开收藏")}</dt><dd>{t(count(detail.favorite_count))}</dd></div>
         </dl>
-        {publishedDate && <p className="community-date">首次公开：{publishedDate}（北京时间）</p>}
+        {publishedDate && <p className="community-date">{t("首次公开：")}{t(publishedDate)}{t("（北京时间）")}</p>}
         <div className="community-review-heading">
-          <div className="community-switch" role="group" aria-label="评论范围">
-            <button type="button" aria-pressed={!episodeScope} onClick={() => setScope('series')}>整剧剧评</button>
-            <button type="button" aria-pressed={episodeScope} disabled={!episodeId} onClick={() => setScope('episode')}>当前集评论</button>
+          <div className="community-switch" role="group" aria-label={t("评论范围")}>
+            <button type="button" aria-pressed={!episodeScope} onClick={() => setScope('series')}>{t("整剧剧评")}</button>
+            <button type="button" aria-pressed={episodeScope} disabled={!episodeId} onClick={() => setScope('episode')}>{t("当前集评论")}</button>
           </div>
-          <span>{reviews?.total != null ? `公开总数 ${count(reviews.total)} · ` : ''}本次返回 {items.length} 条</span>
+          <span>{t(reviews?.total != null ? `公开总数 ${count(reviews.total)} · ` : '')}{t("本次返回 ")}{t(items.length)}{t(" 条")}</span>
         </div>
         {items.length ? <ul className="community-reviews">{items.map((review, index) => <li key={`${review.created_at || ''}:${index}`}>
-          <div className="community-review-meta"><strong>{typeof review.author === 'string' && review.author.trim() ? review.author : '公开用户'}</strong><span>{reviewDate(review.created_at)}</span></div>
+          <div className="community-review-meta"><strong>{(typeof review.author === 'string' && review.author.trim() ? review.author : t('公开用户'))}</strong><span>{t(reviewDate(review.created_at))}</span></div>
           <p>{review.content}</p>
-          <div className="community-review-foot">{review.rating != null && <span>评分 {count(review.rating)}</span>}{review.likes != null && <span>公开点赞 {count(review.likes)}</span>}</div>
-        </li>)}</ul> : <p className="community-status">{emptyText}</p>}
-        {items.length > 0 && <p className="community-note">{partialText}</p>}
+          <div className="community-review-foot">{review.rating != null && <span>{t("评分 ")}{t(count(review.rating))}</span>}{review.likes != null && <span>{t("公开点赞 ")}{t(count(review.likes))}</span>}</div>
+        </li>)}</ul> : <p className="community-status">{t(emptyText)}</p>}
+        {items.length > 0 && <p className="community-note">{t(partialText)}</p>}
       </>}
     </div>}
   </section>;

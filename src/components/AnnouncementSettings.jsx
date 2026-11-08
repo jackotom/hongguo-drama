@@ -1,6 +1,8 @@
+import { t, useLanguage } from '../i18n';
 import React, { useEffect, useRef, useState } from 'react';
 
 export default function AnnouncementSettings() {
+  useLanguage();
   const [preferences, setPreferences] = useState(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -43,15 +45,15 @@ export default function AnnouncementSettings() {
     finally { manualPending.current = false; setReading(false); }
   };
   return <div className="settings-group">
-    <span className="settings-label">公告通知</span>
+    <span className="settings-label">{t("公告通知")}</span>
     <label className="proxy-switch-row"><input type="checkbox" checked={preferences?.normalEnabled === false} disabled={!preferences || saving}
-      onChange={event => update('normalEnabled', !event.target.checked)} /><span className="proxy-switch-text">关闭普通公告<em>开启后不读取、不展示普通公告；软件升级后也保持关闭</em></span></label>
+      onChange={event => update('normalEnabled', !event.target.checked)} /><span className="proxy-switch-text">{t("关闭普通公告")}<em>{t("开启后不读取、不展示普通公告；软件升级后也保持关闭")}</em></span></label>
     <label className="proxy-switch-row"><input type="checkbox" checked={preferences?.emergencyEnabled === false} disabled={!preferences || saving}
-      onChange={event => update('emergencyEnabled', !event.target.checked)} /><span className="proxy-switch-text">关闭紧急公告<em>开启后停止紧急公告检查；重新接收后，已提醒过的公告也不会重复</em></span></label>
-    <p className="settings-hint">更改立即保存。接收紧急公告时每 5 分钟检查一次，每条只提醒一次；不会受普通公告的“今日不提醒”和“版本更新前不提醒”影响。</p>
-    <button type="button" className="btn btn-outline" disabled={reading} aria-busy={reading} onClick={viewCurrent}>{reading ? '正在读取公告…' : '查看当前公告'}</button>
-    <p className="settings-hint">手动查看不受自动接收开关或免提醒设置限制。</p>
-    {manualMessage && <p className="settings-hint" role="status">{manualMessage}</p>}
-    {error && <p className="alert alert-error" role="alert">{error}</p>}
+      onChange={event => update('emergencyEnabled', !event.target.checked)} /><span className="proxy-switch-text">{t("关闭紧急公告")}<em>{t("开启后停止紧急公告检查；重新接收后，已提醒过的公告也不会重复")}</em></span></label>
+    <p className="settings-hint">{t("更改立即保存。接收紧急公告时每 5 分钟检查一次，每条只提醒一次；不会受普通公告的“今日不提醒”和“版本更新前不提醒”影响。")}</p>
+    <button type="button" className="btn btn-outline" disabled={reading} aria-busy={reading} onClick={viewCurrent}>{t(reading ? '正在读取公告…' : '查看当前公告')}</button>
+    <p className="settings-hint">{t("手动查看不受自动接收开关或免提醒设置限制。")}</p>
+    {manualMessage && <p className="settings-hint" role="status">{t(manualMessage)}</p>}
+    {error && <p className="alert alert-error" role="alert">{t(error)}</p>}
   </div>;
 }

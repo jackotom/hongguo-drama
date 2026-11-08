@@ -19,7 +19,7 @@ function mount(api = {}, component = 'AppUpdateNotice', props = {}) {
     addEventListener: (name, cb) => events.set(name, cb), removeEventListener: name => events.delete(name), dispatchEvent: event => events.get(event.type)?.(event) };
   const module = { exports: {} };
   vm.runInNewContext(transformSync(fs.readFileSync(`${__dirname}/../src/components/${component}.jsx`, 'utf8'), { loader: 'jsx', format: 'cjs' }).code, {
-    module, exports: module.exports, require: name => name === 'react' ? react : name === './useDialogKeyboard' ? () => {}
+    module, exports: module.exports, require: name => name === '../i18n' ? { t: require('../src/i18n/translator.mjs').formatMessage, useLanguage() {} } : name === 'react' ? react : name === './useDialogKeyboard' ? () => {}
       : name === './danmakuSource.mjs' ? { useDanmakuSource: () => 'official', writeDanmakuSource() {} } : {}, window, console,
     CustomEvent: class { constructor(type) { this.type = type; } },
     setInterval: fn => { timers.set(++timerId, fn); return timerId; }, clearInterval: id => timers.delete(id), setTimeout: () => 1, clearTimeout() {},

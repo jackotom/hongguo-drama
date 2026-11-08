@@ -9,7 +9,7 @@ const { pathToFileURL } = require('node:url');
 const file = path.resolve(__dirname, '../main.js'), req = createRequire(file);
 const handlers = {}, opened = [];
 const app = new EventEmitter();
-Object.assign(app, { getVersion: () => 'test', getPath: () => '/synthetic', commandLine: { appendSwitch() {} }, requestSingleInstanceLock: () => true, whenReady: () => ({ then() {} }) });
+Object.assign(app, { getVersion: () => 'test', getPath: () => '/synthetic', getLocale: () => 'zh-CN', commandLine: { appendSwitch() {} }, requestSingleInstanceLock: () => true, whenReady: () => ({ then() {} }) });
 class View extends EventEmitter {
   constructor() { super(); this.children = []; this.bounds = { width: 1100, height: 750 }; }
   addChildView(view) { this.children.push(view); }
@@ -39,7 +39,7 @@ class WebContentsView extends View {
 }
 const electron = { app, BrowserWindow: Window, BaseWindow: Window, View, WebContentsView, screen: { getDisplayMatching: () => ({ workArea: { x: 0, y: 0, width: 1920, height: 1080 } }) }, ipcMain: { handle: (name, fn) => { handlers[name] = fn; } }, protocol: { registerSchemesAsPrivileged() {} }, shell: { openExternal: async url => { opened.push(url); } } };
 const context = vm.createContext({ require: name => name === 'electron' ? electron : name === './src/store' ? { setErrorHandler() {}, getSettings: () => ({}), saveSettings() {} } : req(name), __dirname: path.dirname(file), process, Buffer, URL, AbortController, setTimeout, clearTimeout, console: { log() {}, warn() {}, error() {} } });
-vm.runInContext(fs.readFileSync(file, 'utf8'), context, { filename: file });
+vm.runInContext(fs.readFileSync(file, 'utf8'), context, { filename: file, importModuleDynamically: vm.constants.USE_MAIN_CONTEXT_DEFAULT_LOADER });
 context.createWindow();
 const win = vm.runInContext('mainWindow', context);
 const event = { sender: win.webContents, senderFrame: win.webContents.mainFrame };

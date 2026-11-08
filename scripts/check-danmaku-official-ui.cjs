@@ -1,4 +1,5 @@
 // Pure in-memory hook checks; no browser, real playback or upstream requests.
+const i18nStub = { t: require('../src/i18n/translator.mjs').formatMessage, useLanguage() {}, getLanguage: () => 'zh-CN' };
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
@@ -48,7 +49,7 @@ function mount({ response, enabled = true } = {}) {
     if (modules.has(file)) return modules.get(file).exports;
     const module = { exports: {} }; modules.set(file, module);
     const source = transformSync(fs.readFileSync(file, 'utf8'), { loader: file.endsWith('.jsx') ? 'jsx' : 'js', format: 'cjs' }).code;
-    vm.runInNewContext(source, { module, exports: module.exports, require: name => name === 'react' ? react : load(path.resolve(path.dirname(file), name)), window, document, CustomEvent, console });
+    vm.runInNewContext(source, { module, exports: module.exports, require: name => name === '../i18n' ? i18nStub : name === 'react' ? react : load(path.resolve(path.dirname(file), name)), window, document, CustomEvent, console });
     return module.exports;
   }
   const source = load(path.join(root, 'danmakuSource.mjs'));

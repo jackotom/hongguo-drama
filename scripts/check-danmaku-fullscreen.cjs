@@ -1,5 +1,6 @@
 // Actual OfficialDanmaku effects + model in memory; no browser, network or playback.
 const test = require('node:test');
+const i18nStub = { t: require('../src/i18n/translator.mjs').formatMessage, useLanguage() {}, getLanguage: () => 'zh-CN' };
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
@@ -30,7 +31,7 @@ function mount(kind = 'official') {
     const module = { exports: {} }; modules.set(file, module);
     const source = transformSync(fs.readFileSync(file, 'utf8'), { loader: file.endsWith('.jsx') ? 'jsx' : 'js', format: 'cjs' }).code;
     vm.runInNewContext(source, { module, exports: module.exports,
-      require: name => name === 'react' ? react : load(path.resolve(path.dirname(file), name)), window, document,
+      require: name => name === '../i18n' ? i18nStub : name === 'react' ? react : load(path.resolve(path.dirname(file), name)), window, document,
       requestAnimationFrame: fn => { const id = ++nextFrame; frames.set(id, fn); return id; },
       cancelAnimationFrame: id => frames.delete(id),
       ResizeObserver: class { constructor(fn) { resize = fn; } observe() {} disconnect() {} },

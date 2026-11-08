@@ -1,3 +1,4 @@
+import { t, useLanguage } from '../i18n';
 import React, { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { createAnime4KRenderer, normalizeEnhancement, sharpenKernel } from '../videoEnhancement';
 import './VideoEnhancement.css';
@@ -20,28 +21,28 @@ export function useVideoEnhancement() {
 }
 
 export function VideoEnhancementControls({ enhancement, available = true }) {
+  useLanguage();
   const { mode, strength, update, status, saveError } = enhancement;
   return <div className="video-enhancement-settings">
-    <label>画质增强
-      <select aria-label="画质增强" value={mode} disabled={!available} onChange={event => update({ mode: event.target.value })}>
-        <option value="original">原画</option>
-        <option value="sharpen">锐化</option>
+    <label>{t("画质增强")}<select aria-label={t("画质增强")} value={mode} disabled={!available} onChange={event => update({ mode: event.target.value })}>
+        <option value="original">{t("原画")}</option>
+        <option value="sharpen">{t("锐化")}</option>
         <option value="anime4k">Anime4K 2×</option>
       </select>
     </label>
-    {mode === 'sharpen' && <label className="video-enhancement-strength">锐化强度
-      <input aria-label="锐化强度" type="range" min="0" max="100" step="5" value={strength}
+    {mode === 'sharpen' && <label className="video-enhancement-strength">{t("锐化强度")}<input aria-label={t("锐化强度")} type="range" min="0" max="100" step="5" value={strength}
         disabled={!available} onChange={event => update({ strength: Number(event.target.value) })} />
-      <output>{strength}%</output>
+      <output>{t(strength)}%</output>
     </label>}
-    <p className="video-enhancement-note">只增强播放画面，下载文件保持原画。</p>
-    {mode === 'anime4k' && <p className="video-enhancement-note">适合动漫；支持 1080p 及以下片源，真人画面可能偏平滑。</p>}
-    {status.message && <p className={`video-enhancement-note ${status.state === 'error' ? 'enhancement-error' : ''}`} role="status">{status.message}</p>}
-    {saveError && <p className="video-enhancement-note" role="status">设置未能保存，下次打开可能恢复默认。</p>}
+    <p className="video-enhancement-note">{t("只增强播放画面，下载文件保持原画。")}</p>
+    {mode === 'anime4k' && <p className="video-enhancement-note">{t("适合动漫；支持 1080p 及以下片源，真人画面可能偏平滑。")}</p>}
+    {status.message && <p className={`video-enhancement-note ${status.state === 'error' ? 'enhancement-error' : ''}`} role="status">{t(status.message)}</p>}
+    {saveError && <p className="video-enhancement-note" role="status">{t("设置未能保存，下次打开可能恢复默认。")}</p>}
   </div>;
 }
 
 export default function VideoEnhancement({ videoRef, source, available = true, enhancement }) {
+  useLanguage();
   const { mode, strength, setStatus } = enhancement;
   const canvasRef = useRef(null);
   const filterId = `video-sharpen-${useId().replace(/:/g, '')}`;

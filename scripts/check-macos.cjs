@@ -29,7 +29,7 @@ function load(platform = 'darwin') {
     return fs.accessSync(file, mode);
   };
   Object.assign(app, {
-    getVersion: () => require('../package.json').version, getPath: () => root,
+    getVersion: () => require('../package.json').version, getPath: () => root, getLocale: () => 'zh-CN',
     setAboutPanelOptions: options => { about = options; },
     commandLine: { appendSwitch() {} },
     requestSingleInstanceLock: () => true, whenReady: () => ({ then(fn) { ready = fn; } }),

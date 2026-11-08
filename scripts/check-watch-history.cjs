@@ -99,7 +99,7 @@ function mountHistory({ missing = false, playError = '', resolveError = '', lock
   onWatchHistoryProgress: () => () => {},
  };
  const module = { exports: {} };
- vm.runInNewContext(historySource, { module, exports: module.exports, require: name => name === './historyGroups.mjs' ? require('../src/components/historyGroups.mjs') : name === 'react' ? react : {}, window: { electronAPI: api } });
+ vm.runInNewContext(historySource, { module, exports: module.exports, require: name => name === '../i18n' ? { t: require('../src/i18n/translator.mjs').formatMessage, useLanguage() {}, getLanguage: () => 'zh-CN' } : name === './historyGroups.mjs' ? require('../src/components/historyGroups.mjs') : name === 'react' ? react : {}, window: { electronAPI: api } });
  const render = () => { cursor = 0; tree = module.exports.default({}); effects.splice(0).forEach(fn => fn()); };
  const find = predicate => { const visit = node => { if (!node || typeof node !== 'object') return; if (predicate(node)) return node; return node.children?.map(visit).find(Boolean); }; return visit(tree); };
  const flush = async () => { for (let i = 0; i < 8; i++) { await Promise.resolve(); render(); } };

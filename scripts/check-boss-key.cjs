@@ -14,7 +14,7 @@ async function checkRecorder() {
   const module = { exports: {} };
   const source = require('node:fs').readFileSync(`${__dirname}/../src/components/BossKeySettings.jsx`, 'utf8');
   require('node:vm').runInNewContext(require('esbuild').transformSync(source, { loader: 'jsx', format: 'cjs' }).code, {
-    module, exports: module.exports, require: name => name === 'react' ? react : {}, navigator: { platform: 'MacIntel' },
+    module, exports: module.exports, require: name => name === '../i18n' ? { t: require('../src/i18n/translator.mjs').formatMessage, useLanguage() {} } : name === 'react' ? react : {}, navigator: { platform: 'MacIntel' },
     window: { electronAPI: { getBossKeyState: async () => ({ ...DEFAULT_BOSS_KEY }),
       setBossKey: async value => { saved.push(value); return { success: true, ...normalizeBossKey(value) }; } } },
   });

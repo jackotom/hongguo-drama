@@ -99,3 +99,5 @@
   color: var(--danger, #c0392b);
   font-size: 12px;
 }
+
+.search-card-item { display: contents; }

@@ -26,7 +26,7 @@ function mount(overrides = {}, propOverrides = {}) {
     ...overrides,
   };
   const module = { exports: {} };
-  vm.runInNewContext(source, { module, exports: module.exports, require: name => name === 'react' ? react : {}, window: { electronAPI: api }, setTimeout, clearTimeout });
+  vm.runInNewContext(source, { module, exports: module.exports, require: name => name === '../i18n' ? { t: require('../src/i18n/translator.mjs').formatMessage, useLanguage() {} } : name === 'react' ? react : {}, window: { electronAPI: api }, setTimeout, clearTimeout });
   const render = () => { cursor = 0; tree = module.exports.default(props); effects.splice(0).forEach(fn => fn()); };
   const find = predicate => { const visit = node => { if (!node || typeof node !== 'object') return; if (predicate(node)) return node; return node.children?.map(visit).find(Boolean); }; return visit(tree); };
   const text = node => typeof node === 'string' || typeof node === 'number' ? String(node) : node?.children?.map(text).join('') || '';

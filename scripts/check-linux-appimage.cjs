@@ -40,8 +40,18 @@ const pkg = require('../package.json');
       ...(process.getuid?.() === 0 ? ['--no-sandbox'] : [])], { cwd: folder, stdio: ['ignore', log, log] });
     fs.closeSync(log);
     cdp = await connect(port);
-    assert.equal((await cdp.evaluate('window.electronAPI.getAppInfo()')).version, pkg.version);
-    assert.equal(await cdp.evaluate('document.title'), '红果短剧');
+    const info = await cdp.evaluate('window.electronAPI.getAppInfo()');
+    assert.equal(info.version, pkg.version);
+    assert.equal(await cdp.evaluate('document.title'), /^zh/i.test(info.systemLocale) ? '红果短剧' : 'Hongguo Drama');
+    await cdp.evaluate(`(async () => {
+    localStorage.setItem('hongguo:language', 'zh-CN');
+    window.dispatchEvent(new StorageEvent('storage', { key: 'hongguo:language' }));
+    const deadline = Date.now() + 5000;
+    while (document.documentElement.lang !== 'zh-CN') {
+      if (Date.now() > deadline) throw Error('Interface language did not switch');
+      await new Promise(resolve => setTimeout(resolve, 25));
+    }
+  })()`);
     const assets = await cdp.evaluate(`(async()=>{
       const module=await import(new URL('software/avplayer/avplayer.js',document.baseURI).href);
       const bytes=await (await fetch(new URL('software/decode/hevc-simd.wasm',document.baseURI))).arrayBuffer();

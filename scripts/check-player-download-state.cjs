@@ -1,4 +1,5 @@
 // Component behavior via the existing in-memory hook/media harness; no app, network or user data.
+const i18nStub = { t: require('../src/i18n/translator.mjs').formatMessage, useLanguage() {}, getLanguage: () => 'zh-CN' };
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const vm = require('node:vm');
@@ -50,13 +51,14 @@ function mountApp() {
   const api = new Proxy({ onNavigate(fn) { navigateEvent = fn; } }, { get: (o, k) => o[k] || (() => Promise.resolve({})) });
   const context = { module: { exports: {} }, window: { electronAPI: api }, navigator: { platform: 'Mac' }, require: name => {
     if (name === 'react') return react;
+    if (name === './i18n') return i18nStub;
     if (name.endsWith('useStealthWindow')) return () => ({ stealthMode: false });
     return name;
   } };
   context.exports = context.module.exports;
   vm.runInNewContext(transformSync(fs.readFileSync(require.resolve('../src/App.jsx'), 'utf8'), { loader: 'jsx', format: 'cjs' }).code, context);
   const nodes = () => { const out = []; const walk = n => { if (!n || typeof n !== 'object') return; out.push(n); n.children?.forEach(walk); }; walk(tree); return out; };
-  const render = () => { cursor = 0; tree = context.module.exports.default(); pending.splice(0).forEach(fn => fn()); };
+  const render = () => { cursor = 0; tree = context.module.exports.default({}); pending.splice(0).forEach(fn => fn()); };
   render();
   return { render, request(payload) { navigateEvent({ page: 'player', payload }); render(); },
     navigate(id) { nodes().find(n => n.type === 'button' && n.props.key === id).props.onClick(); render(); },

@@ -1,5 +1,7 @@
 # 同步发行规则
 
+6.4发行准备：2026-11-08用户明确授权本次例外先发双Mac、Windows、Linux四平台，TV继续开发且候选APK不公开。Mac正式签名、公证已授权；仍须本版精确源码、最终包验收和Draft摘要核对齐备才公开。后续五平台规则保留。见[6.4说明](release-6.4.md)。
+
 6.3已于2026-11-08 19:46:30（Asia/Shanghai）正式公开并设Latest，内部6.3.0、桌面构建6.3.1，冻结源码`13a07e30f1e4ec5b4dd4fcc73871bc097d09d816`。用户明确授权本次先双Mac、Windows、Linux四平台，TV未实机验收、候选APK不公开。23附件远端大小/SHA256及两份更新清单已核对；双Mac签名/公证/装订，Windows便携11项和安装升级9项通过但EXE未签名；Linux原生Ubuntu CI提取AppImage后，以CPU软件解码播放两集新下载1080p红果素材各10秒。Mac真实两集静音播放及x64 Rosetta启动通过；未替换正式安装。 这是本轮明确例外；后续默认五平台规则保留。详见 [6.3说明](release-6.3.md)。
 
 ## 当前规则：五平台齐备后一次发布
@@ -8,7 +10,7 @@
 
 按“冻结统一源码 → 各平台构建及验收 → Draft汇总五平台包、更新清单、对应源码、许可与SHA256 → 核对远端附件版本／大小／摘要 → 一次公开并设Latest”执行。任一平台缺包或缺少必要验收时保留Draft，记录阻碍；不得先公开部分平台、再另跳版本补齐。例外须用户明确授权。已发布的历史标签和资产保持不变。
 
-当前6.3正在整合6.2基线，按上述规则准备，尚未发布。
+6.3已发布；当前6.4沿用6.3冻结基线准备。
 
 6.2优化版已于2026-11-07 19:17:14（Asia/Shanghai）正式发布，四平台23附件已核对；冻结`affc81c7f885bcdbcbc06e4c205b820c61f9c0c4`。双Mac签名、公证、装订，Windows安装升级通过但EXE未签名，Linux启动通过、实际播放未验。未替换正式安装。详见[6.2说明](release-6.2.md)。
 
@@ -98,7 +100,7 @@
 | macOS arm64 | npm run build:mac | 对应 arm64 媒体组件、Developer ID、Apple 公证 Accepted、装订验证 |
 | macOS x64 | npm run build:mac | 对应 x64 媒体组件、Developer ID、Apple 公证 Accepted、装订验证；另记录 Intel 实机覆盖 |
 | Windows x64 | Windows x64 release candidate 工作流 | NSIS 安装 EXE、latest.yml、便携 EXE/ZIP；精确 FFmpeg 对应源码；安装版安装/启动/同版本重装资料保留与便携版媒体窗口冒烟；明确签名状态 |
-| Linux x64 | 最新源码的Linux构建入口；当前6.0工作区尚未同步 | AppImage、匹配媒体工具和对应源码；原生Linux启动及真实素材静音播放；单独记录发行版、GPU/FUSE与更新方式 |
+| Linux x64 | 最新源码的Linux构建入口；本分支已同步 | AppImage、匹配媒体工具和对应源码；原生Linux启动及真实素材静音播放；单独记录发行版、GPU/FUSE与更新方式 |
 | Android TV | `python3 android/build.py --tv`（本地开发候选） | 独立TV包名、同公开版本、稳定升级签名、Leanback入口、无需触屏、横屏与遥控器操作；TV真机真实红果素材静音播放、切集、后台与缓存清理；手机测试不能替代 |
 
 Windows 工作流只上传 Actions 构建资产，不创建 Release，不改 latest，不覆盖总校验文件。正式版本由统一发行会话汇总五平台资产、对应源码和总 SHA256SUMS。

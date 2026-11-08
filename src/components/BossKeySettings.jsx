@@ -1,8 +1,10 @@
+import { t, useLanguage } from '../i18n';
 import React, { useEffect, useRef, useState } from 'react';
 
 const displayKey = value => value.replaceAll('CommandOrControl', navigator.platform.includes('Mac') ? 'Cmd' : 'Ctrl').replaceAll('Command', 'Cmd').replaceAll('Control', 'Ctrl');
 
 export default function BossKeySettings({ active = true }) {
+  useLanguage();
   const [config, setConfig] = useState(null);
   const [draft, setDraft] = useState('');
   const [saving, setSaving] = useState(false);
@@ -49,19 +51,19 @@ export default function BossKeySettings({ active = true }) {
   };
   return <>
     <div className="shortcut-settings-row boss-key-row" data-boss-key-settings>
-      <label className="boss-key-toggle"><input type="checkbox" aria-label="启用老板键" checked={config?.enabled === true} disabled={disabled}
-        onChange={event => save(event.target.checked)} /> 老板键</label>
-      <button id="boss-key-shortcut" type="button" className={`btn btn-outline shortcut-record boss-key-input${recording ? ' is-recording' : ''}`} aria-label="老板键快捷键" disabled={disabled}
+      <label className="boss-key-toggle"><input type="checkbox" aria-label={t("启用老板键")} checked={config?.enabled === true} disabled={disabled}
+        onChange={event => save(event.target.checked)} />{t(" 老板键")}</label>
+      <button id="boss-key-shortcut" type="button" className={`btn btn-outline shortcut-record boss-key-input${recording ? ' is-recording' : ''}`} aria-label={t("老板键快捷键")} disabled={disabled}
         aria-describedby="boss-key-help" aria-pressed={recording}
         onClick={() => { setRecording(!recording); setError(''); setMessage(''); }} onKeyDown={record}
         onKeyUp={event => { if (capturedKey.current === (event.code || event.key)) { event.preventDefault(); capturedKey.current = null; } }}
         onBlur={() => { setRecording(false); capturedKey.current = null; }}>
-        {recording ? '请按组合键…' : displayKey(draft)}
+        {t(recording ? '请按组合键…' : displayKey(draft))}
       </button>
-      <button type="button" className="btn btn-outline btn-sm" aria-label="保存老板键" disabled={disabled} onClick={() => save(config.enabled)}>{saving ? '保存中…' : '保存'}</button>
+      <button type="button" className="btn btn-outline btn-sm" aria-label={t("保存老板键")} disabled={disabled} onClick={() => save(config.enabled)}>{t(saving ? '保存中…' : '保存')}</button>
     </div>
-    <p className="settings-hint boss-key-hint" id="boss-key-help">老板键点击按键后，同时按下组合键，再点保存；Esc 取消。支持 Ctrl、Cmd、Alt 组合或 F1–F12。启用后在其他应用中也生效：按一次暂停并隐藏，再按恢复窗口，保持暂停。Mac 同时隐藏和恢复 Dock 图标。</p>
-    {error && <p className="shortcut-error settings-hint boss-key-hint" role="alert">{error}</p>}
-    {message && <p className="settings-hint boss-key-hint" role="status" aria-live="polite">{message}</p>}
+    <p className="settings-hint boss-key-hint" id="boss-key-help">{t("老板键点击按键后，同时按下组合键，再点保存；Esc 取消。支持 Ctrl、Cmd、Alt 组合或 F1–F12。启用后在其他应用中也生效：按一次暂停并隐藏，再按恢复窗口，保持暂停。Mac 同时隐藏和恢复 Dock 图标。")}</p>
+    {error && <p className="shortcut-error settings-hint boss-key-hint" role="alert">{t(error)}</p>}
+    {message && <p className="settings-hint boss-key-hint" role="status" aria-live="polite">{t(message)}</p>}
   </>;
 }

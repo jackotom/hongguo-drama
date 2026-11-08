@@ -25,18 +25,18 @@ export function shortcutKey(event) {
   return KEY_PATTERN.test(value) && value !== 'shift+space' ? value : null;
 }
 
-export function formatShortcut(value) {
+export function formatShortcut(value, translate = value => value) {
   const names = { space: '空格', arrowleft: '←', arrowright: '→', arrowup: '↑', arrowdown: '↓' };
-  return value.split('+').map(key => names[key] || (key === 'shift' ? 'Shift' : key.toUpperCase())).join(' + ');
+  return value.split('+').map(key => translate(names[key] || (key === 'shift' ? 'Shift' : key.toUpperCase()))).join(' + ');
 }
 
-export function validateShortcuts(bindings) {
+export function validateShortcuts(bindings, translate = value => value) {
   const seen = new Map();
   for (const action of SHORTCUT_ACTIONS) {
     const key = bindings?.[action.id];
-    if (typeof key !== 'string' || !KEY_PATTERN.test(key) || key === 'shift+space') return `${action.label}的按键不可用`;
+    if (typeof key !== 'string' || !KEY_PATTERN.test(key) || key === 'shift+space') return `${translate(action.label)}的按键不可用`;
     const previous = seen.get(key);
-    if (previous && !(previous.id === 'play' && action.id === 'holdSpeed')) return `与「${previous.label}」冲突，请换一个按键`;
+    if (previous && !(previous.id === 'play' && action.id === 'holdSpeed')) return `与「${translate(previous.label)}」冲突，请换一个按键`;
     seen.set(key, action);
   }
   return '';

@@ -1,3 +1,4 @@
+import { t, useLanguage } from '../i18n';
 import React, { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { X } from './icons';
@@ -9,6 +10,7 @@ const FEEDBACK_URL = 'https://github.com/jackotom/hongguo-drama/issues';
 const FEEDBACK_EMAIL = 'jaoktom@outlook.com';
 
 export default function AnnouncementNotice() {
+  useLanguage();
   const [notice, setNotice] = useState(null);
   const [error, setError] = useState('');
   const [emailCopied, setEmailCopied] = useState(false);
@@ -144,23 +146,23 @@ export default function AnnouncementNotice() {
     <section className="announcement-dialog" role="dialog" aria-modal="true" aria-labelledby="announcement-title" aria-describedby="announcement-body" tabIndex={-1}>
       <header className="announcement-heading">
         <h2 id="announcement-title">{notice.title}</h2>
-        <button type="button" className="icon-btn" aria-label="关闭公告" title="关闭公告" onClick={close}><X size={18} /></button>
+        <button type="button" className="icon-btn" aria-label={t("关闭公告")} title={t("关闭公告")} onClick={close}><X size={18} /></button>
       </header>
-      {notice.urgent && <p className="announcement-urgent">紧急公告 · {notice.manual ? '手动查看' : '本条仅提醒一次'}</p>}
+      {notice.urgent && <p className="announcement-urgent">{t("紧急公告 · ")}{t(notice.manual ? '手动查看' : '本条仅提醒一次')}</p>}
       <div id="announcement-body" className="announcement-body">{notice.body.split(/\r?\n\r?\n/).map((paragraph, index) =>
         <p className="announcement-paragraph" key={index}>{paragraph.includes('vipai.pro')
-          ? <a className="announcement-link announcement-purchase-link" href={PURCHASE_URL} title="在浏览器中打开 vipai.pro" onClick={event => openLink(event, PURCHASE_URL)}>{paragraph}</a>
+          ? <a className="announcement-link announcement-purchase-link" href={PURCHASE_URL} title={t("在浏览器中打开 vipai.pro")} onClick={event => openLink(event, PURCHASE_URL)}>{t(paragraph)}</a>
           : paragraph.split(/(\r?\n)/).map((line, part) => {
-            if (line.includes(FEEDBACK_URL)) return <a className="announcement-link" href={FEEDBACK_URL} key={part} onClick={event => openLink(event, FEEDBACK_URL)}>{line}</a>;
-            return line.includes(FEEDBACK_EMAIL) ? <button type="button" className="announcement-link" key={part} onClick={copyEmail}>{line}</button> : line;
+            if (line.includes(FEEDBACK_URL)) return <a className="announcement-link" href={FEEDBACK_URL} key={part} onClick={event => openLink(event, FEEDBACK_URL)}>{t(line)}</a>;
+            return line.includes(FEEDBACK_EMAIL) ? <button type="button" className="announcement-link" key={part} onClick={copyEmail}>{t(line)}</button> : line;
           })}</p>
       )}</div>
-      <p className="announcement-hint">30 秒后自动关闭。{notice.urgent ? '下方选项仅影响普通公告，新的紧急公告仍会提醒。' : '下方选项仅影响普通公告。'}</p>
-      {emailCopied && <p className="announcement-copy-status" role="status">邮箱已复制</p>}
-      {error && <p className="announcement-error" role="alert">{error}</p>}
+      <p className="announcement-hint">{t("30 秒后自动关闭。")}{t(notice.urgent ? '下方选项仅影响普通公告，新的紧急公告仍会提醒。' : '下方选项仅影响普通公告。')}</p>
+      {emailCopied && <p className="announcement-copy-status" role="status">{t("邮箱已复制")}</p>}
+      {error && <p className="announcement-error" role="alert">{t(error)}</p>}
       <footer className="announcement-actions">
-        <button type="button" className="btn btn-outline" disabled={saving} onClick={() => dismiss('version')}>版本更新前不再提醒</button>
-        <button type="button" className="btn btn-primary" disabled={saving} onClick={() => dismiss('day')}>今日打开不再提醒</button>
+        <button type="button" className="btn btn-outline" disabled={saving} onClick={() => dismiss('version')}>{t("版本更新前不再提醒")}</button>
+        <button type="button" className="btn btn-primary" disabled={saving} onClick={() => dismiss('day')}>{t("今日打开不再提醒")}</button>
       </footer>
     </section>
   </div>, portalTarget);

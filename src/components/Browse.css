@@ -71,3 +71,5 @@
 .browse-completion-filter > span { line-height: 1.7; }
 .browse-completion-label { color: var(--text-secondary); font-size: 11px; margin-top: 4px; }
 .browse-filter-empty { display: flex; flex-direction: column; align-items: center; gap: 14px; padding: 40px 16px; text-align: center; color: var(--text-secondary); }
+
+.browse-card-item { display: contents; }

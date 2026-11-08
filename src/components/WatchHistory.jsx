@@ -1,3 +1,4 @@
+import { t, useLanguage, getLanguage } from '../i18n';
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Play, RefreshCw, Clock } from './icons';
 import './WatchHistory.css';
@@ -6,6 +7,7 @@ import { groupHistory, historyGroupSuggestions } from './historyGroups.mjs';
 const PREFERENCES_KEY = 'hongguo:watch-history-preferences';
 
 export default function WatchHistory({ active = true, onNavigate }) {
+  useLanguage();
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [checking, setChecking] = useState(false);
@@ -175,45 +177,44 @@ export default function WatchHistory({ active = true, onNavigate }) {
 
   return <section className="history-container" aria-labelledby="history-title">
     <div className="history-header">
-      <div><h1 id="history-title">观看记录</h1><p>继续上次的故事。记录仅保存在这台电脑。</p></div>
+      <div><h1 id="history-title">{t("观看记录")}</h1><p>{t("继续上次的故事。记录仅保存在这台电脑。")}</p></div>
       <div className="history-tools">
-        <select className="history-scope" value={scope} onChange={event => savePreferences({ ...preferences, scope: event.target.value })} disabled={checking || !!checkingRow || loading} aria-label="批量检测范围">
-          <option value="all">全部记录</option>
-          <option value="latest">仅最高季</option>
-          <option value="unfinished">仅未看完</option>
-          <option value="skip-completed-low">排除已看完低季</option>
+        <select className="history-scope" value={scope} onChange={event => savePreferences({ ...preferences, scope: event.target.value })} disabled={checking || !!checkingRow || loading} aria-label={t("批量检测范围")}>
+          <option value="all">{t("全部记录")}</option>
+          <option value="latest">{t("仅最高季")}</option>
+          <option value="unfinished">{t("仅未看完")}</option>
+          <option value="skip-completed-low">{t("排除已看完低季")}</option>
         </select>
         <button className="btn btn-outline" onClick={checkUpdates} disabled={checking || !!checkingRow || loading || !rows.length}>
-          <RefreshCw size={15} className={checking ? 'spin' : ''} />{checking ? '正在检查更新…' : '检查更新'}
+          <RefreshCw size={15} className={checking ? 'spin' : ''} />{t(checking ? '正在检查更新…' : '检查更新')}
         </button>
       </div>
     </div>
-    <p className="history-hint">运行期间自动检查新集；同一部剧的多个季会共用一次续作搜索，已看完的低季每 24 小时检测一次。不同剧号的新一季标为“疑似续作”。批量检测范围只决定本次检查哪些记录，不会隐藏记录或清除已有红点。同组续作和疑似同剧汇总到组头，子级红点仅表示新增分集。可在设置中关闭检测或开启系统通知。</p>
+    <p className="history-hint">{t("运行期间自动检查新集；同一部剧的多个季会共用一次续作搜索，已看完的低季每 24 小时检测一次。不同剧号的新一季标为“疑似续作”。批量检测范围只决定本次检查哪些记录，不会隐藏记录或清除已有红点。同组续作和疑似同剧汇总到组头，子级红点仅表示新增分集。可在设置中关闭检测或开启系统通知。")}</p>
     <div className="history-filter-bar">
-      <div className="history-filter" role="group" aria-label="观看进度筛选">
+      <div className="history-filter" role="group" aria-label={t("观看进度筛选")}>
         {[
           ['all', '全部', listedRows.length],
           ['unfinished', '未看完', listedRows.length - completedCount],
           ['completed', '已看完', completedCount],
-        ].map(([value, label, count]) => <button key={value} type="button" aria-pressed={filter === value} disabled={loading} onClick={() => setFilter(value)}>{label} {count}</button>)}
+        ].map(([value, label, count]) => <button key={value} type="button" aria-pressed={filter === value} disabled={loading} onClick={() => setFilter(value)}>{t(label)} {t(count)}</button>)}
       </div>
-      <label className="history-display-option" title="只调整当前列表；批量检测范围不变，也不会删除记录">
+      <label className="history-display-option" title={t("只调整当前列表；批量检测范围不变，也不会删除记录")}>
         <input type="checkbox" checked={hideLowSeasons} disabled={loading} onChange={event => savePreferences({ ...preferences, hideLowSeasons: event.target.checked })} />
-        <span>折叠同剧低季</span>
+        <span>{t("折叠同剧低季")}</span>
       </label>
     </div>
-    <p className="history-hint">有更新的组优先显示，同组季序不变。按当前最后一集的片尾进度判断；隐藏低季后，计数仅代表列表中的季，旧记录可能显示未看完。</p>
-    {error && <div className="history-error" role="alert"><span>{error}</span><button className="btn btn-outline btn-sm" onClick={load}>重新加载</button></div>}
-    {status && <p className="history-hint" role="status">{status}</p>}
-    {checking && progress?.total > 0 && <p className="history-hint" role="status">
-      正在检查 {(progress.checked || 0) + (progress.failed || 0) + (progress.skipped || 0)} / {progress.total}{progress.current ? `：${progress.current}` : ''}
+    <p className="history-hint">{t("有更新的组优先显示，同组季序不变。")}{t("按当前最后一集的片尾进度判断；隐藏低季后，计数仅代表列表中的季，旧记录可能显示未看完。")}</p>
+    {error && <div className="history-error" role="alert"><span>{t(error)}</span><button className="btn btn-outline btn-sm" onClick={load}>{t("重新加载")}</button></div>}
+    {status && <p className="history-hint" role="status">{t(status)}</p>}
+    {checking && progress?.total > 0 && <p className="history-hint" role="status">{t("正在检查 ")}{t((progress.checked || 0) + (progress.failed || 0) + (progress.skipped || 0))} / {t(progress.total)}{t(progress.current ? `：${progress.current}` : '')}
     </p>}
-    {loading ? <p role="status">正在读取观看记录…</p> : !rows.length ? <div className="history-empty">
-      <Clock size={30} /><h2>还没有观看记录</h2><p>真正开始播放后，短剧和进度会出现在这里。</p>
-      <button className="btn btn-primary" onClick={() => onNavigate?.('browse')}>去发现短剧</button>
+    {t(loading ? <p role="status">{t("正在读取观看记录…")}</p> : !rows.length ? <div className="history-empty">
+      <Clock size={30} /><h2>{t("还没有观看记录")}</h2><p>{t("真正开始播放后，短剧和进度会出现在这里。")}</p>
+      <button className="btn btn-primary" onClick={() => onNavigate?.('browse')}>{t("去发现短剧")}</button>
     </div> : !visibleRows.length ? <div className="history-empty" role="status">
-      <Clock size={30} /><h2>{emptyTitle}</h2>
-      <button type="button" className="btn btn-outline" onClick={() => setFilter('all')}>查看全部</button>
+      <Clock size={30} /><h2>{t(emptyTitle)}</h2>
+      <button type="button" className="btn btn-outline" onClick={() => setFilter('all')}>{t("查看全部")}</button>
     </div> : <ul className="history-list">{visibleRows.map(row => {
       const group = groupById.get(row.series_id);
       const groupHeadId = group[0].series_id;
@@ -222,39 +223,39 @@ export default function WatchHistory({ active = true, onNavigate }) {
       const hasUpdates = row.unreadEpisodes > 0 || (isHead && hasUnreadSequels);
       return <li className={`history-row ${!isHead ? 'history-child' : ''}`} key={row.series_id}>
       <div className="history-main">
-      <button className="history-resume" onClick={() => resume(row)} disabled={!active || !!opening || !!removing} aria-label={`继续观看 ${row.series_title} 第${row.vid_index}集${hasUpdates ? `，有更新${row.unreadEpisodes ? `，新增${row.unreadEpisodes}集` : '，发现疑似续作'}` : ''}`}>
+      <button className="history-resume" onClick={() => resume(row)} disabled={!active || !!opening || !!removing} aria-label={t(`继续观看 ${row.series_title} 第${row.vid_index}集${hasUpdates ? `，有更新${row.unreadEpisodes ? `，新增${row.unreadEpisodes}集` : '，发现疑似续作'}` : ''}`)}>
         {row.cover ? <img className="history-cover" src={row.cover} alt="" loading="lazy" /> : <span className="history-cover history-cover-empty"><Play size={20} /></span>}
         <span className="history-copy">
-          <span className="history-name">{hasUpdates && <span className="history-dot" role="img" aria-label="有更新" />}{row.series_title}</span>
-          <span className="history-progress">看到第 {row.vid_index} 集 / 共 {row.total} 集 · {Math.floor((row.currentTime || 0) / 60)}:{String(Math.floor((row.currentTime || 0) % 60)).padStart(2, '0')}</span>
-          <span className="history-time">最近观看 {new Date(row.updatedAt).toLocaleString('zh-CN', { month:'numeric', day:'numeric', hour:'2-digit', minute:'2-digit' })}{row.completed && <span className="history-completed"> · 已看完</span>}</span>
-          {decisions[row.series_id] === null ? <span className="history-group-state">独立显示 · 手动</span> : group.length > 1 && group.some(item => Object.hasOwn(decisions, item.series_id)) && <span className="history-group-state">手动分组</span>}
-          {row.unreadEpisodes > 0 && <span className="history-update">新增 {row.unreadEpisodes} 集</span>}
+          <span className="history-name">{hasUpdates && <span className="history-dot" role="img" aria-label={t("有更新")} />}{row.series_title}</span>
+          <span className="history-progress">{t("看到第 ")}{t(row.vid_index)}{t(" 集 / 共 ")}{t(row.total)}{t(" 集 · ")}{t(Math.floor((row.currentTime || 0) / 60))}:{t(String(Math.floor((row.currentTime || 0) % 60)).padStart(2, '0'))}</span>
+          <span className="history-time">{t("最近观看 ")}{t(new Date(row.updatedAt).toLocaleString(getLanguage(), { month:'numeric', day:'numeric', hour:'2-digit', minute:'2-digit' }))}{row.completed && <span className="history-completed">{t(" · 已看完")}</span>}</span>
+          {t(decisions[row.series_id] === null ? <span className="history-group-state">{t("独立显示 · 手动")}</span> : group.length > 1 && group.some(item => Object.hasOwn(decisions, item.series_id)) && <span className="history-group-state">{t("手动分组")}</span>)}
+          {row.unreadEpisodes > 0 && <span className="history-update">{t("新增 ")}{t(row.unreadEpisodes)}{t(" 集")}</span>}
         </span>
-        <span className="history-action"><Play size={15} />{opening === row.series_id ? '打开中…' : '继续观看'}</span>
+        <span className="history-action"><Play size={15} />{t(opening === row.series_id ? '打开中…' : '继续观看')}</span>
       </button>
       <div className="history-row-actions">
         <div className="history-group-actions">
-        {group.length > 1 && isHead && <button className="btn btn-outline btn-sm" aria-expanded={!hideLowSeasons || !!expanded[groupHeadId]} onClick={() => { if (!hideLowSeasons) savePreferences({ ...preferences, hideLowSeasons: true }); setExpanded(value => ({ ...value, [groupHeadId]: hideLowSeasons ? !value[groupHeadId] : false })); }}>{!hideLowSeasons || expanded[groupHeadId] ? '折叠组' : '展开组'}</button>}
-        {group.length > 1 && <button className="btn btn-outline btn-sm" onClick={() => decide(row.series_id, null)}>独立显示</button>}
-        {Object.hasOwn(decisions, row.series_id) && <button className="btn btn-outline btn-sm" onClick={() => decide(row.series_id, undefined)}>恢复自动分组</button>}
+        {group.length > 1 && isHead && <button className="btn btn-outline btn-sm" aria-expanded={!hideLowSeasons || !!expanded[groupHeadId]} onClick={() => { if (!hideLowSeasons) savePreferences({ ...preferences, hideLowSeasons: true }); setExpanded(value => ({ ...value, [groupHeadId]: hideLowSeasons ? !value[groupHeadId] : false })); }}>{t(!hideLowSeasons || expanded[groupHeadId] ? '折叠组' : '展开组')}</button>}
+        {group.length > 1 && <button className="btn btn-outline btn-sm" onClick={() => decide(row.series_id, null)}>{t("独立显示")}</button>}
+        {Object.hasOwn(decisions, row.series_id) && <button className="btn btn-outline btn-sm" onClick={() => decide(row.series_id, undefined)}>{t("恢复自动分组")}</button>}
         </div>
         <div className="history-maintenance-actions">
-        <button type="button" className="btn btn-outline btn-sm history-check" disabled={checking || !!checkingRow || !!removing || !!opening} aria-label={`检测《${row.series_title}》的更新`} title="只检测这一条观看记录" onClick={() => checkRow(row)}>
-          <RefreshCw size={14} className={checkingRow === row.series_id ? 'spin' : ''} />{checkingRow === row.series_id ? '检测中…' : '检测'}
+        <button type="button" className="btn btn-outline btn-sm history-check" disabled={checking || !!checkingRow || !!removing || !!opening} aria-label={t(`检测《${row.series_title}》的更新`)} title={t("只检测这一条观看记录")} onClick={() => checkRow(row)}>
+          <RefreshCw size={14} className={checkingRow === row.series_id ? 'spin' : ''} />{t(checkingRow === row.series_id ? '检测中…' : '检测')}
         </button>
-        <button type="button" className="btn btn-outline btn-sm history-remove" disabled={!!removing || !!opening || !!checkingRow} aria-label={`移除观看记录《${row.series_title}》`} title="仅移除观看记录，不删除视频文件" onClick={() => remove(row)}>{removing === row.series_id ? '移除中…' : '移除'}</button>
+        <button type="button" className="btn btn-outline btn-sm history-remove" disabled={!!removing || !!opening || !!checkingRow} aria-label={t(`移除观看记录《${row.series_title}》`)} title={t("仅移除观看记录，不删除视频文件")} onClick={() => remove(row)}>{t(removing === row.series_id ? '移除中…' : '移除')}</button>
         </div>
       </div>
       </div>
-      {isHead && !!sequels.length && <div className="history-sequels"><span>疑似续作</span>{sequels.map(sequel => <button key={sequel.series_id} className="btn btn-outline btn-sm" disabled={!active || !!opening || !!removing} onClick={() => resume(sequel.origin, sequel)}>{sequel.series_title}</button>)}</div>}
-      {isHead && !!similar.length && <div className="history-sequels" title="名称相近，仅供核对；不会用于隐藏低季或批量归组">
-        <span>疑似同剧（仅提示）</span>{similar.map(candidate => <button key={candidate.series_id} className="btn btn-outline btn-sm" disabled={!active || !!opening || !!removing} onClick={() => resume(candidate.origin, candidate)}>{candidate.series_title}</button>)}
-        {similar.filter(candidate => rows.some(item => item.series_id === candidate.series_id)).map(candidate => <button key={`group:${candidate.series_id}`} className="btn btn-outline btn-sm" onClick={() => decide(candidate.series_id, row.series_id)}>确认《{candidate.series_title}》为同剧</button>)}
+      {isHead && !!sequels.length && <div className="history-sequels"><span>{t("疑似续作")}</span>{sequels.map(sequel => <button key={sequel.series_id} className="btn btn-outline btn-sm" disabled={!active || !!opening || !!removing} onClick={() => resume(sequel.origin, sequel)}>{sequel.series_title}</button>)}</div>}
+      {isHead && !!similar.length && <div className="history-sequels" title={t("名称相近，仅供核对；不会用于隐藏低季或批量归组")}>
+        <span>{t("疑似同剧（仅提示）")}</span>{similar.map(candidate => <button key={candidate.series_id} className="btn btn-outline btn-sm" disabled={!active || !!opening || !!removing} onClick={() => resume(candidate.origin, candidate)}>{candidate.series_title}</button>)}
+        {similar.filter(candidate => rows.some(item => item.series_id === candidate.series_id)).map(candidate => <button key={`group:${candidate.series_id}`} className="btn btn-outline btn-sm" onClick={() => decide(candidate.series_id, row.series_id)}>{t("确认《")}{candidate.series_title}{t("》为同剧")}</button>)}
       </div>}
-      {row.lastEpisodeCheckError && <p className="history-check-error">分集更新检查未完成：{row.lastEpisodeCheckError}</p>}
-      {row.lastSequelCheckError && <p className="history-check-error">续作检查未完成：{row.lastSequelCheckError}</p>}
-      {!row.lastEpisodeCheckError && !row.lastSequelCheckError && row.lastCheckError && <p className="history-check-error">更新检查未完成：{row.lastCheckError}</p>}
-    </li>; })}</ul>}
+      {row.lastEpisodeCheckError && <p className="history-check-error">{t("分集更新检查未完成：")}{t(row.lastEpisodeCheckError)}</p>}
+      {row.lastSequelCheckError && <p className="history-check-error">{t("续作检查未完成：")}{t(row.lastSequelCheckError)}</p>}
+      {!row.lastEpisodeCheckError && !row.lastSequelCheckError && row.lastCheckError && <p className="history-check-error">{t("更新检查未完成：")}{t(row.lastCheckError)}</p>}
+    </li>; })}</ul>)}
   </section>;
 }

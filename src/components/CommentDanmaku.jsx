@@ -1,3 +1,4 @@
+import { t, useLanguage } from '../i18n';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { DEFAULT_DANMAKU_SETTINGS, normalizeDanmakuSettings, createCommentFeed, appendCommentPage, commentIsBlocked, advanceDanmaku, resizeDanmaku } from './danmakuModel.mjs';
 import './CommentDanmaku.css';
@@ -69,6 +70,7 @@ export function useCommentDanmaku({ seriesId, episodeId, active }) {
 }
 
 export default function CommentDanmaku({ videoRef, source, available, danmaku }) {
+  useLanguage();
   const layerRef = useRef(null);
   const nodes = useRef(new Map());
   const [items, setItems] = useState([]);
@@ -152,24 +154,25 @@ export default function CommentDanmaku({ videoRef, source, available, danmaku })
 }
 
 export function DanmakuSettings({ danmaku, onClose, panelRef, maxHeight }) {
+  useLanguage();
   const { settings, update } = danmaku;
-  return <div className="danmaku-settings" ref={panelRef} role="dialog" aria-label="弹幕设置" data-player-menu style={{ maxHeight }}
+  return <div className="danmaku-settings" ref={panelRef} role="dialog" aria-label={t("弹幕设置")} data-player-menu style={{ maxHeight }}
     onKeyDown={event => { if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); onClose(); } }}>
-    <div className="danmaku-settings-heading"><strong>{danmaku.sourceKind === 'official' ? '时间轴弹幕' : '本集评论'}</strong><button type="button" aria-label="关闭弹幕设置" onClick={onClose}>
+    <div className="danmaku-settings-heading"><strong>{t(danmaku.sourceKind === 'official' ? '时间轴弹幕' : '本集评论')}</strong><button type="button" aria-label={t("关闭弹幕设置")} onClick={onClose}>
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18" /></svg>
     </button></div>
-    <label>弹幕来源<select aria-label="弹幕来源" value={danmaku.sourceKind || 'comments'} onChange={event => danmaku.setSource?.(event.target.value)}><option value="official">时间轴弹幕</option><option value="comments">本集评论（备用）</option></select></label>
-    <p>{danmaku.sourceKind === 'official' ? '按视频时间展示红果剧集弹幕，快进、回退和切集时重新对齐。接口异常时可手动切换本集评论。' : '本集公开评论依次展示，与视频时间无对应。全文可在「剧评与收藏」查看。'}</p>
-    <label>不透明度 <output>{settings.opacity}%</output><input autoFocus aria-label="弹幕不透明度" type="range" min="20" max="100" step="5" value={settings.opacity} onChange={event => update({ opacity: Number(event.target.value) })} /></label>
-    <label>字号 <output>{settings.fontSize}px</output><input aria-label="弹幕字号" type="range" min="16" max="32" step="2" value={settings.fontSize} onChange={event => update({ fontSize: Number(event.target.value) })} /></label>
-    <label>滚动速度 <output>{settings.speed}×</output><input aria-label="弹幕滚动速度" type="range" min="0.5" max="2" step="0.25" value={settings.speed} onChange={event => update({ speed: Number(event.target.value) })} /></label>
-    <label>显示区域<select aria-label="弹幕显示区域" value={settings.area} onChange={event => update({ area: event.target.value })}><option value="quarter">四分之一屏</option><option value="half">半屏</option><option value="full">全屏</option></select></label>
-    <label>弹幕密度<select aria-label="弹幕密度" value={settings.density} onChange={event => update({ density: event.target.value })}><option value="sparse">稀疏</option><option value="normal">适中</option><option value="dense">密集</option></select></label>
-    <label className="danmaku-filter-toggle">内置敏感词过滤<input aria-label="内置敏感词过滤" type="checkbox" checked={settings.sensitiveFilter} onChange={event => update({ sensitiveFilter: event.target.checked })} /></label>
-    <label>自定义屏蔽词<textarea aria-label="自定义屏蔽词" rows="3" maxLength="10000" value={settings.blockedWords} placeholder="每行一个词，也可用逗号分隔" onChange={event => update({ blockedWords: event.target.value })} /></label>
-    <p>内置词含常见涉政及辱骂词；自定义词始终生效。命中后整条隐藏，仅保存在本机。词库无法覆盖所有表达或变体。</p>
-    <p>默认在上半屏显示。跟随播放暂停与倍速；系统开启减少动态效果时，改为静态轮换。</p>
-    <p role="status">{danmaku.saveError || danmaku.status}</p>
-    <div className="danmaku-settings-actions">{danmaku.error && <button type="button" onClick={danmaku.retry}>重试加载</button>}<button type="button" onClick={danmaku.reset}>恢复默认</button></div>
+    <label>{t("弹幕来源")}<select aria-label={t("弹幕来源")} value={danmaku.sourceKind || 'comments'} onChange={event => danmaku.setSource?.(event.target.value)}><option value="official">{t("时间轴弹幕")}</option><option value="comments">{t("本集评论（备用）")}</option></select></label>
+    <p>{t(danmaku.sourceKind === 'official' ? '按视频时间展示红果剧集弹幕，快进、回退和切集时重新对齐。接口异常时可手动切换本集评论。' : '本集公开评论依次展示，与视频时间无对应。全文可在「剧评与收藏」查看。')}</p>
+    <label>{t("不透明度 ")}<output>{t(settings.opacity)}%</output><input autoFocus aria-label={t("弹幕不透明度")} type="range" min="20" max="100" step="5" value={settings.opacity} onChange={event => update({ opacity: Number(event.target.value) })} /></label>
+    <label>{t("字号 ")}<output>{t(settings.fontSize)}px</output><input aria-label={t("弹幕字号")} type="range" min="16" max="32" step="2" value={settings.fontSize} onChange={event => update({ fontSize: Number(event.target.value) })} /></label>
+    <label>{t("滚动速度 ")}<output>{t(settings.speed)}×</output><input aria-label={t("弹幕滚动速度")} type="range" min="0.5" max="2" step="0.25" value={settings.speed} onChange={event => update({ speed: Number(event.target.value) })} /></label>
+    <label>{t("显示区域")}<select aria-label={t("弹幕显示区域")} value={settings.area} onChange={event => update({ area: event.target.value })}><option value="quarter">{t("四分之一屏")}</option><option value="half">{t("半屏")}</option><option value="full">{t("全屏")}</option></select></label>
+    <label>{t("弹幕密度")}<select aria-label={t("弹幕密度")} value={settings.density} onChange={event => update({ density: event.target.value })}><option value="sparse">{t("稀疏")}</option><option value="normal">{t("适中")}</option><option value="dense">{t("密集")}</option></select></label>
+    <label className="danmaku-filter-toggle">{t("内置敏感词过滤")}<input aria-label={t("内置敏感词过滤")} type="checkbox" checked={settings.sensitiveFilter} onChange={event => update({ sensitiveFilter: event.target.checked })} /></label>
+    <label>{t("自定义屏蔽词")}<textarea aria-label={t("自定义屏蔽词")} rows="3" maxLength="10000" value={settings.blockedWords} placeholder={t("每行一个词，也可用逗号分隔")} onChange={event => update({ blockedWords: event.target.value })} /></label>
+    <p>{t("内置词含常见涉政及辱骂词；自定义词始终生效。命中后整条隐藏，仅保存在本机。词库无法覆盖所有表达或变体。")}</p>
+    <p>{t("默认在上半屏显示。跟随播放暂停与倍速；系统开启减少动态效果时，改为静态轮换。")}</p>
+    <p role="status">{t(danmaku.saveError || danmaku.status)}</p>
+    <div className="danmaku-settings-actions">{danmaku.error && <button type="button" onClick={danmaku.retry}>{t("重试加载")}</button>}<button type="button" onClick={danmaku.reset}>{t("恢复默认")}</button></div>
   </div>;
 }

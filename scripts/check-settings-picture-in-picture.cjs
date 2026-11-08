@@ -14,7 +14,7 @@ const text = node => typeof node === 'string' || typeof node === 'number' ? Stri
   const accountSource = fs.readFileSync(path.join(__dirname, '../src/components/AccountManagement.jsx'), 'utf8');
   const appSource = fs.readFileSync(path.join(__dirname, '../src/App.jsx'), 'utf8');
   const shortcutIndex = settingsSource.indexOf('<ShortcutSettings');
-  const pictureModeIndex = settingsSource.indexOf('aria-label="画中画小窗设置"');
+  const pictureModeIndex = settingsSource.indexOf('aria-label={t("画中画小窗设置")}');
   const builtinIndex = settingsSource.indexOf('<BuiltinSources');
   assert.ok(shortcutIndex >= 0 && shortcutIndex < pictureModeIndex && pictureModeIndex < builtinIndex, 'picture-in-picture setting must sit between shortcuts and built-in sources');
   assert.match(appSource, /label: '红果账号'/);

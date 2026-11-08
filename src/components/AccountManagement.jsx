@@ -1,8 +1,10 @@
+import { t, useLanguage, getLanguage } from '../i18n';
 import React, { useEffect, useRef, useState } from 'react';
 import { Play, RefreshCw, User } from './icons';
 import './AccountManagement.css';
 
 export default function AccountManagement({ active = true }) {
+  useLanguage();
   const [account, setAccount] = useState(null);
   const [rows, setRows] = useState([]);
   const [query, setQuery] = useState('');
@@ -150,66 +152,66 @@ export default function AccountManagement({ active = true }) {
     clearTimeout(pollTimer.current);
   }, []);
 
-  if (loading) return <div className="account-page"><p role="status">正在读取红果账号…</p></div>;
+  if (loading) return <div className="account-page"><p role="status">{t("正在读取红果账号…")}</p></div>;
 
   return <div className="account-page">
     <div className="account-page-header">
       <User size={22} />
-      <div><h2>红果账号</h2><p>网页扫码登录红果账号，读取 APP 观看记录。</p></div>
+      <div><h2>{t("红果账号")}</h2><p>{t("网页扫码登录红果账号，读取 APP 观看记录。")}</p></div>
     </div>
-    {!account && <div><button className="btn btn-outline" disabled={busy} onClick={async () => { try { const result = await window.electronAPI.openAccountWebLogin(); if (!result?.success) throw new Error(result?.error || '打开官网登录失败'); } catch(e) { setError(e.message); } }}>使用官网登录</button><p>手机提示二维码无效时，可打开官网并使用官网当前提供的登录方式。</p></div>}
-    <section className="account-card" aria-label="红果账号状态">
+    {!account && <div><button className="btn btn-outline" disabled={busy} onClick={async () => { try { const result = await window.electronAPI.openAccountWebLogin(); if (!result?.success) throw new Error(result?.error || '打开官网登录失败'); } catch(e) { setError(e.message); } }}>{t("使用官网登录")}</button><p>{t("手机提示二维码无效时，可打开官网并使用官网当前提供的登录方式。")}</p></div>}
+    <section className="account-card" aria-label={t("红果账号状态")}>
       {account ? <>
         <div className="account-identity">
           <span className="account-avatar"><User size={24} /></span>
-          <div><strong>{account.nickname}</strong><p>已登录红果账号</p></div>
+          <div><strong>{account.nickname}</strong><p>{t("已登录红果账号")}</p></div>
         </div>
         <div className="account-summary">
-          <span>APP 观看记录</span>
-          <strong>{historyLoading && !rows.length ? '读取中' : `${rows.length} 部`}</strong>
-          <small>最近 50 部；不会批量导入本机记录</small>
+          <span>{t("APP 观看记录")}</span>
+          <strong>{t(historyLoading && !rows.length ? '读取中' : `${rows.length} 部`)}</strong>
+          <small>{t("最近 50 部；不会批量导入本机记录")}</small>
         </div>
         <div className="account-page-actions">
           <button className="btn btn-outline" type="button" disabled={busy || historyLoading} onClick={async () => {
             setBusy(true); setError(''); setStatus('');
             try { await loadHistory(true); } finally { setBusy(false); }
-          }}><RefreshCw size={15} />刷新记录</button>
-          <button className="btn btn-outline" type="button" disabled={busy} onClick={logout}>退出账号</button>
+          }}><RefreshCw size={15} />{t("刷新记录")}</button>
+          <button className="btn btn-outline" type="button" disabled={busy} onClick={logout}>{t("退出账号")}</button>
         </div>
         <div className="account-history-heading">
-          <h3>观看记录</h3>
-          <label>搜索<input className="input-field" type="search" value={query} onChange={event => setQuery(event.target.value)} placeholder="输入剧名" /></label>
+          <h3>{t("观看记录")}</h3>
+          <label>{t("搜索")}<input className="input-field" type="search" value={query} onChange={event => setQuery(event.target.value)} placeholder={t("输入剧名")} /></label>
         </div>
-        {historyLoading && !rows.length ? <div className="account-history-empty" role="status">正在读取 APP 观看记录…</div>
-          : !rows.length ? <div className="account-history-empty">APP 还没有观看记录。</div>
-          : !visibleRows.length ? <div className="account-history-empty">没有匹配的 APP 记录。</div>
+        {t(historyLoading && !rows.length ? <div className="account-history-empty" role="status">{t("正在读取 APP 观看记录…")}</div>
+          : !rows.length ? <div className="account-history-empty">{t("APP 还没有观看记录。")}</div>
+          : !visibleRows.length ? <div className="account-history-empty">{t("没有匹配的 APP 记录。")}</div>
           : <ul className="account-history-list">{visibleRows.map(row => <li key={row.series_id}>
-            <button type="button" disabled={busy} onClick={() => open(row)} aria-label={`继续观看 ${row.series_title} 第${row.vid_index}集`}>
+            <button type="button" disabled={busy} onClick={() => open(row)} aria-label={t(`继续观看 ${row.series_title} 第${row.vid_index}集`)}>
               <span className="account-history-cover">
                 {row.cover && <img src={row.cover} alt="" loading="lazy" onError={event => event.currentTarget.remove()} />}
                 <Play size={18} />
               </span>
               <span className="account-history-copy">
                 <strong>{row.series_title}</strong>
-                <small>看到第 {row.vid_index || '?'} 集{row.total ? ` / 共 ${row.total} 集` : ''} · {Math.floor(row.currentTime || 0)}:{String(Math.floor((row.currentTime || 0) % 60)).padStart(2, '0')}</small>
-                <small>{row.updatedAt ? new Date(row.updatedAt).toLocaleString('zh-CN', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '时间未知'}</small>
+                <small>{t("看到第 ")}{t(row.vid_index || '?')}{t(" 集")}{t(row.total ? ` / 共 ${row.total} 集` : '')} · {t(Math.floor(row.currentTime || 0))}:{t(String(Math.floor((row.currentTime || 0) % 60)).padStart(2, '0'))}</small>
+                <small>{t(row.updatedAt ? new Date(row.updatedAt).toLocaleString(getLanguage(), { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '时间未知')}</small>
               </span>
-              <span className="account-history-action"><Play size={14} />继续观看</span>
+              <span className="account-history-action"><Play size={14} />{t("继续观看")}</span>
             </button>
-          </li>)}</ul>}
+          </li>)}</ul>)}
       </> : <>
         <div className="account-login-copy">
-          <h3>扫码登录</h3>
-          <p>使用手机红果 App 扫码并确认。登录态由系统安全存储加密，普通资料备份不会包含账号凭据。</p>
+          <h3>{t("扫码登录")}</h3>
+          <p>{t("使用手机红果 App 扫码并确认。登录态由系统安全存储加密，普通资料备份不会包含账号凭据。")}</p>
         </div>
-        {qr && <div className="account-qr"><img src={qr.image} alt="红果登录二维码" /><span>手机红果 App → 我的 → 扫一扫</span></div>}
+        {qr && <div className="account-qr"><img src={qr.image} alt={t("红果登录二维码")} /><span>{t("手机红果 App → 我的 → 扫一扫")}</span></div>}
         <div className="account-page-actions">
-          {qr ? <button className="btn btn-outline" type="button" onClick={cancelLogin}>取消扫码</button>
-            : <button className="btn btn-primary" type="button" disabled={busy} onClick={beginLogin}>{busy ? '正在获取二维码…' : '获取登录二维码'}</button>}
+          {qr ? <button className="btn btn-outline" type="button" onClick={cancelLogin}>{t("取消扫码")}</button>
+            : <button className="btn btn-primary" type="button" disabled={busy} onClick={beginLogin}>{t(busy ? '正在获取二维码…' : '获取登录二维码')}</button>}
         </div>
       </>}
-      {status && <p className="account-page-status" role="status">{status}</p>}
-      {error && <div className="history-error" role="alert"><span>{error}</span></div>}
+      {status && <p className="account-page-status" role="status">{t(status)}</p>}
+      {error && <div className="history-error" role="alert"><span>{t(error)}</span></div>}
     </section>
   </div>;
 }

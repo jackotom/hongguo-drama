@@ -19,7 +19,7 @@ function fixture(initialTasks) {
   dirs.push(root);
   const handlers = {}, timers = [], app = new EventEmitter(), state = { result: unavailable(webGone), calls: 0, qualities: [] };
   let settings = { root }, saved = initialTasks, ready, reportStorageError;
-  Object.assign(app, { getVersion: () => 'test', getPath: () => root,
+  Object.assign(app, { getVersion: () => 'test', getPath: () => root, getLocale: () => 'zh-CN',
     commandLine: { appendSwitch() {} }, requestSingleInstanceLock: () => true, whenReady: () => ({ then(fn) { ready = fn; } }) });
   // Scheduled retries are fired manually; immediate recovery still uses short timers.
   const fakeSetTimeout = (fn, ms, ...args) => {

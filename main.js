@@ -270,7 +270,8 @@ let proxyApplyVersion = 0;
 let desiredProxyConfig = null;
 
 // proxy-from-env 2.1.0 没有 env 参数；按相同规则解析启动快照，测试与真实依赖逐例对照。
-function snapshotProxyUrl(targetUrl = 'https://www.baidu.com') {
+const PROXY_TEST_URL = 'https://hongguoduanju.com';
+function snapshotProxyUrl(targetUrl = PROXY_TEST_URL) {
   let target;
   try { target = new URL(targetUrl); } catch (_) { return null; }
   if (!target.host) return null;
@@ -4606,9 +4607,12 @@ ipcMain.handle('test-proxy', async (event, draft) => {
   }
 
   const started = Date.now();
+  const controller = new AbortController();
+  const deadline = setTimeout(() => controller.abort(), 12000);
   try {
-    const res = await axios.get('https://www.baidu.com', {
+    const res = await axios.get(PROXY_TEST_URL, {
       timeout: 12000,
+      signal: controller.signal,
       proxy: proxyOption,
       headers: { 'User-Agent': 'Mozilla/5.0' },
       validateStatus: () => true,
@@ -4620,7 +4624,7 @@ ipcMain.handle('test-proxy', async (event, draft) => {
         elapsed: ms,
         mode: resolved.mode,
         via: publicProxyUrl(resolved.url) || '(直连)',
-        message: `API/下载连通正常（HTTP ${res.status}，耗时 ${ms}ms）`,
+        message: `红果官网连接正常（HTTP ${res.status}，耗时 ${ms}ms）`,
       };
     }
     return { success: false, error: `请求返回 HTTP ${res.status}（耗时 ${ms}ms）` };
@@ -4628,11 +4632,14 @@ ipcMain.handle('test-proxy', async (event, draft) => {
     const ms = Date.now() - started;
     const code = (error && error.code) || '';
     let hint = publicProxyError(error.message, settings, resolved);
-    if (code === 'ECONNREFUSED') hint = '代理端口拒绝连接，请确认代理软件已启动、端口填写正确';
-    else if (code === 'ETIMEDOUT' || code === 'ECONNABORTED') hint = '连接超时，请检查代理地址/端口或代理是否可用';
+    if (['UNABLE_TO_VERIFY_LEAF_SIGNATURE', 'UNABLE_TO_GET_ISSUER_CERT_LOCALLY', 'CERT_HAS_EXPIRED', 'DEPTH_ZERO_SELF_SIGNED_CERT', 'SELF_SIGNED_CERT_IN_CHAIN', 'ERR_TLS_CERT_ALTNAME_INVALID'].includes(code)) hint = `测试站点证书校验失败，连接已拒绝；请检查系统时间、证书链或代理的 HTTPS 配置（${code}）`;
+    else if (code === 'ECONNREFUSED') hint = '代理端口拒绝连接，请确认代理软件已启动、端口填写正确';
+    else if (controller.signal.aborted || code === 'ETIMEDOUT' || code === 'ECONNABORTED') hint = '连接超时，请检查代理地址/端口或代理是否可用';
     else if (code === 'ENOTFOUND') hint = '无法解析代理地址，请检查主机名';
     else if (/407/.test(hint)) hint = '代理需要认证，请填写用户名与密码';
     return { success: false, error: `${hint}（耗时 ${ms}ms）`, code };
+  } finally {
+    clearTimeout(deadline);
   }
 });
 
@@ -5237,6 +5244,50 @@ ipcMain.handle('get-episode-danmaku', async (_event, options) => {
   return fetchDanmaku({ seriesId, vid, fresh, limit });
 });
 
+function applyInterfaceLanguage(language) {
+  const label = (zh, en) => language === 'en' ? en : zh;
+  const appName = label(APP_TITLE, IS_PREVIEW ? 'Hongguo Drama Preview' : 'Hongguo Drama');
+  if (mainWindow && !mainWindow.isDestroyed()) mainWindow.setTitle?.(appName);
+  if (process.platform !== 'darwin') return;
+  Menu.setApplicationMenu(Menu.buildFromTemplate([
+    { label: appName, submenu: [
+      { role: 'about', label: label(`关于${APP_TITLE}`, `About ${appName}`) },
+      { type: 'separator' },
+      { role: 'services', label: label('服务', 'Services') },
+      { type: 'separator' },
+      { role: 'hide', label: label('隐藏', 'Hide') },
+      { role: 'hideOthers', label: label('隐藏其他应用', 'Hide Others') },
+      { role: 'unhide', label: label('显示全部', 'Show All') },
+      { type: 'separator' },
+      { role: 'quit', label: label('退出', 'Quit') },
+    ] },
+    { label: label('编辑', 'Edit'), submenu: [
+      { role: 'undo', label: label('撤销', 'Undo') }, { role: 'redo', label: label('重做', 'Redo') },
+      { type: 'separator' },
+      { role: 'cut', label: label('剪切', 'Cut') }, { role: 'copy', label: label('复制', 'Copy') },
+      { role: 'paste', label: label('粘贴', 'Paste') }, { role: 'selectAll', label: label('全选', 'Select All') },
+    ] },
+    { label: label('视图', 'View'), submenu: [
+      { label: label('实际大小', 'Actual Size'), accelerator: 'CmdOrCtrl+0', click: () => changeMainWindowZoom('reset') },
+      { label: label('放大', 'Zoom In'), accelerator: 'CmdOrCtrl+Plus', click: () => changeMainWindowZoom('in') },
+      { label: label('缩小', 'Zoom Out'), accelerator: 'CmdOrCtrl+-', click: () => changeMainWindowZoom('out') },
+      { type: 'separator' }, { role: 'togglefullscreen', label: label('全屏', 'Full Screen') },
+    ] },
+    { label: label('窗口', 'Window'), submenu: [
+      { role: 'minimize', label: label('最小化', 'Minimize') }, { role: 'close', label: label('关闭窗口', 'Close Window') },
+      { type: 'separator' },
+      { label: label('回到主窗口', 'Return to Main Window'), accelerator: 'CmdOrCtrl+1', click: () => app.emit('activate') },
+      { label: label('退出隐身小窗', 'Exit Mini Window'), click: () => { stealth.setEnabled(false); syncMainWindowScale(); } },
+    ] },
+  ]));
+}
+
+ipcMain.handle('set-interface-language', (_event, language) => {
+  if (!['zh-CN', 'en'].includes(language)) return { success: false, error: 'Unsupported interface language' };
+  applyInterfaceLanguage(language);
+  return { success: true };
+});
+
 ipcMain.handle('get-app-info', async () => ({
   version: APP_VERSION,
   brand: APP_TITLE,
@@ -5244,6 +5295,8 @@ ipcMain.handle('get-app-info', async () => ({
   platform: process.platform,
   preview: IS_PREVIEW,
   dataDir: app.getPath('userData'),
+  systemLocale: (await import('./src/native/ui-language.mjs')).systemLocale(
+    process.env, app.getPreferredSystemLanguages?.()[0] || app.getLocale(), process.platform),
   configMode: portableConfig.mode,
   configNote: portableConfig.reason || '',
 }));
@@ -5489,37 +5542,7 @@ if (hasSingleInstanceLock) app.whenReady().then(async () => {
 
     if (process.platform === 'darwin') {
       app.setAboutPanelOptions?.({ applicationVersion: APP_VERSION.replace(/^(\d+\.\d+)\.0$/, '$1'), version: '' });
-      Menu.setApplicationMenu(Menu.buildFromTemplate([
-        { label: APP_TITLE, submenu: [
-          { role: 'about', label: `关于${APP_TITLE}` },
-          { type: 'separator' },
-          { role: 'services', label: '服务' },
-          { type: 'separator' },
-          { role: 'hide', label: '隐藏' },
-          { role: 'hideOthers', label: '隐藏其他应用' },
-          { role: 'unhide', label: '显示全部' },
-          { type: 'separator' },
-          { role: 'quit', label: '退出' },
-        ] },
-        { label: '编辑', submenu: [
-          { role: 'undo', label: '撤销' }, { role: 'redo', label: '重做' },
-          { type: 'separator' },
-          { role: 'cut', label: '剪切' }, { role: 'copy', label: '复制' },
-          { role: 'paste', label: '粘贴' }, { role: 'selectAll', label: '全选' },
-        ] },
-        { label: '视图', submenu: [
-          { label: '实际大小', accelerator: 'CmdOrCtrl+0', click: () => changeMainWindowZoom('reset') },
-          { label: '放大', accelerator: 'CmdOrCtrl+Plus', click: () => changeMainWindowZoom('in') },
-          { label: '缩小', accelerator: 'CmdOrCtrl+-', click: () => changeMainWindowZoom('out') },
-          { type: 'separator' }, { role: 'togglefullscreen', label: '全屏' },
-        ] },
-        { label: '窗口', submenu: [
-          { role: 'minimize', label: '最小化' }, { role: 'close', label: '关闭窗口' },
-          { type: 'separator' },
-          { label: '回到主窗口', accelerator: 'CmdOrCtrl+1', click: () => app.emit('activate') },
-          { label: '退出隐身小窗', click: () => { stealth.setEnabled(false); syncMainWindowScale(); } },
-        ] },
-      ]));
+      applyInterfaceLanguage(/^zh(?:[-_.@]|$)/i.test(app.getPreferredSystemLanguages?.()[0] || app.getLocale()) ? 'zh-CN' : 'en');
     }
     // Warm the official-host trusted DNS cache before the first catalog card request.
     // This is best-effort and must never block startup or a user action.

@@ -1,5 +1,5 @@
-// 红果短剧 6.3：版本及发行状态见 package.json 和 docs/release-6.3.md。
-// 红果短剧 6.1：三端统一发行。
+import { t, useLanguage } from './i18n';
+// 红果短剧：版本及发行状态见 package.json 和 docs/release-6.4.md。
 import React, { useState, useEffect, useLayoutEffect, useRef, useCallback } from 'react';
 import { Film, Download, Settings, Play, Home, Search, Clock, User } from './components/icons';
 import HongguoDownload from './components/HongguoDownload';
@@ -30,7 +30,13 @@ const MENU = [
   { id: 'settings', label: '设置', icon: Settings },
 ];
 
-export default function App() {
+export default function App({ platformPages = {} }) {
+  useLanguage();
+  const mobile = window.electronAPI.platform === 'android';
+  const [moreOpen, setMoreOpen] = useState(false);
+  const navigationHistory = useRef(['browse']);
+  const backNavigation = useRef(false);
+  useEffect(() => { if (mobile) console.info('HG:shared-react:ready'); }, [mobile]);
   const { stealthMode, toggleStealth, stealthError } = useStealthWindow();
   useLayoutEffect(() => initializeTheme(), []);
   const [layout, setLayout] = useState('landscape');
@@ -81,6 +87,11 @@ export default function App() {
   }, []);
 
   const navigate = (nextPage) => {
+    setMoreOpen(false);
+    if (mobile && nextPage !== pageRef.current) {
+      if (!backNavigation.current) navigationHistory.current.push(nextPage);
+      backNavigation.current = false;
+    }
     if (nextPage !== pageRef.current) {
       calendarRequest.current++;
       calendarOpeningRef.current = false;
@@ -91,6 +102,24 @@ export default function App() {
     setVisited((pages) => pages.includes(nextPage) ? pages : [...pages, nextPage]);
     setPage(nextPage);
   };
+
+  useEffect(() => {
+    if (!mobile) return;
+    window.appBack = () => {
+      if (document.fullscreenElement) { document.exitFullscreen().catch(() => {}); return true; }
+      if (moreOpen) { setMoreOpen(false); return true; }
+      if (episodesOpen) { setEpisodesOpen(false); return true; }
+      if ([...document.querySelectorAll('[role="dialog"], .browse-drawer, .proxy-modal, .player-confirm')].some(element => element.getClientRects().length)) {
+        document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); return true;
+      }
+      if (navigationHistory.current.length > 1) {
+        navigationHistory.current.pop(); backNavigation.current = true;
+        navigate(navigationHistory.current.at(-1)); return true;
+      }
+      return false;
+    };
+    return () => { delete window.appBack; };
+  }, [mobile, moreOpen, episodesOpen]);
 
   const renderPage = (id) => {
     switch (id) {
@@ -130,6 +159,7 @@ export default function App() {
       case 'manager':
         return <DownloadManager active={page === id} onNavigate={navigate} />;
       case 'settings':
+        if (platformPages.settings) return React.createElement(platformPages.settings, { active: page === id, appInfo });
         return <SettingsPage active={page === id} preview={appInfo?.preview} appInfo={appInfo} />;
       case 'download':
       default:
@@ -159,21 +189,21 @@ export default function App() {
   const currentPage = MENU.find((item) => item.id === page);
 
   return (
-    <div className={`app-layout ${stealthMode ? 'stealth-mode' : ''} ${isMac ? 'platform-mac' : ''} layout-${layout} ${page === 'player' ? 'player-focused' : ''} ${borderless && page === 'player' && layout === 'portrait' ? 'player-borderless' : ''}`}>
-      <aside className="sidebar" aria-label="主导航">
+    <div className={`app-layout ${mobile ? 'platform-android' : ''} ${stealthMode ? 'stealth-mode' : ''} ${isMac ? 'platform-mac' : ''} layout-${layout} ${page === 'player' ? 'player-focused' : ''} ${borderless && page === 'player' && layout === 'portrait' ? 'player-borderless' : ''}`}>
+      <aside className="sidebar" aria-label={t("主导航")}>
         <div className="sidebar-window-drag" aria-hidden="true" />
         <div className="sidebar-brand">
           <div className="logo"><Play size={21} /></div>
-          <div><div className="brand-text">{appInfo?.appName || '红果短剧'}</div><div className="brand-sub">{appInfo?.preview ? '独立体验 · 本机保存' : '每一集，都值得期待'}</div></div>
+          <div><div className="brand-text">{t(appInfo?.appName || '红果短剧')}</div><div className="brand-sub">{t(appInfo?.preview ? '独立体验 · 本机保存' : '每一集，都值得期待')}</div></div>
         </div>
         <nav className="sidebar-menu">
-          <div className="sidebar-group-label">内容</div>
+          <div className="sidebar-group-label">{t("内容")}</div>
           {MENU.filter((item) => item.id !== 'settings').map((item) => {
             const Icon = item.icon;
             return (
               <button key={item.id} className={`sidebar-item ${page === item.id ? 'active' : ''}`}
                 aria-current={page === item.id ? 'page' : undefined} onClick={() => navigate(item.id)}>
-                <Icon size={19} /><span>{item.label}</span>
+                <Icon size={19} /><span>{t(item.label)}</span>
               </button>
             );
           })}
@@ -181,29 +211,29 @@ export default function App() {
         <div className="sidebar-footer">
           <button className={`sidebar-item ${page === 'settings' ? 'active' : ''}`}
             aria-current={page === 'settings' ? 'page' : undefined} onClick={() => navigate('settings')}>
-            <Settings size={19} /><span>设置</span>
+            <Settings size={19} /><span>{t("设置")}</span>
           </button>
-          <div className="footer-note"><span>{appInfo?.preview ? '功能预览' : '红果短剧'}</span><span>{appInfo?.version ? `v${appInfo.version.replace(/^(\d+\.\d+)\.0$/, '$1')}` : ''}</span></div>
+          <div className="footer-note"><span>{t(appInfo?.preview ? '功能预览' : '红果短剧')}</span><span>{t(appInfo?.version ? `v${appInfo.version.replace(/^(\d+\.\d+)\.0$/, '$1')}` : '')}</span></div>
         </div>
       </aside>
       <div className="main-wrapper">
         <header className="window-toolbar">
-          <span className="toolbar-location">{currentPage?.label}</span>
+          {mobile ? <><button className="mobile-back btn btn-outline btn-sm" aria-label={t("返回上一页")} onClick={() => window.appBack?.()}>{t("返回")}</button><h1 className="toolbar-location">{t(currentPage?.label)}</h1></> : <span className="toolbar-location">{t(currentPage?.label)}</span>}
           {page === 'player' && layout === 'portrait' && <PageMenu items={MENU} page={page} onNavigate={navigate} />}
           <div className="toolbar-actions">
-            <span className="toolbar-caption">{appInfo?.preview ? '功能预览' : '红果短剧'}</span>
-            {page === 'player' && <button className="btn btn-outline btn-sm" onClick={() => { setEpisodesOpen(false); toggleStealth(true); }} title="小窗置顶播放并在支持的系统上跨虚拟桌面可见；鼠标移开时暂停隐藏，移回继续；Esc 退出">小窗模式</button>}
-            {page === 'player' && layout === 'portrait' && <button className="btn btn-outline btn-sm portrait-episodes-toggle" aria-expanded={episodesOpen}
-              aria-controls="player-episode-panel" onClick={() => setEpisodesOpen(open => !open)}>{episodesOpen ? '收起选集' : '选集'}</button>}
+            <span className="toolbar-caption">{t(appInfo?.preview ? '功能预览' : '红果短剧')}</span>
+            {!mobile && page === 'player' && <button className="btn btn-outline btn-sm" onClick={() => { setEpisodesOpen(false); toggleStealth(true); }} title={t("小窗置顶播放并在支持的系统上跨虚拟桌面可见；鼠标移开时暂停隐藏，移回继续；Esc 退出")}>{t("小窗模式")}</button>}
+            {!mobile && page === 'player' && layout === 'portrait' && <button className="btn btn-outline btn-sm portrait-episodes-toggle" aria-expanded={episodesOpen}
+              aria-controls="player-episode-panel" onClick={() => setEpisodesOpen(open => !open)}>{t(episodesOpen ? '收起选集' : '选集')}</button>}
             {page === 'player' && <button className="btn btn-outline btn-sm player-actions-toggle" aria-pressed={actionsHidden || borderless && layout === 'portrait'}
               onClick={() => {
                 if (borderless && layout === 'portrait') { setBorderless(false); setActionsHidden(false); }
                 else setActionsHidden(hidden => !hidden);
-              }}>{actionsHidden || borderless && layout === 'portrait' ? '显示按钮' : '隐藏按钮'}</button>}
+              }}>{t(actionsHidden || borderless && layout === 'portrait' ? '显示按钮' : '隐藏按钮')}</button>}
             {page === 'player' && layout === 'portrait' && <button className="btn btn-outline btn-sm borderless-toggle" aria-pressed={borderless}
-              onClick={() => setBorderless(value => !value)}>{borderless ? '恢复边框' : '去掉边框'}</button>}
+              onClick={() => setBorderless(value => !value)}>{t(borderless ? '恢复边框' : '去掉边框')}</button>}
             <button className="btn btn-outline btn-sm pin-toggle" aria-pressed={alwaysOnTop} disabled={pinBusy}
-              aria-label={alwaysOnTop ? '取消置顶' : '置顶'} title={alwaysOnTop ? '取消置顶' : '置顶'}
+              aria-label={t(alwaysOnTop ? '取消置顶' : '置顶')} title={t(alwaysOnTop ? '取消置顶' : '置顶')}
               onClick={async () => {
                 setPinBusy(true);
                 try { setAlwaysOnTop(await window.electronAPI.setAlwaysOnTop(!alwaysOnTop)); }
@@ -212,28 +242,42 @@ export default function App() {
               }}><svg width="17" height="17" viewBox="0 0 24 24" fill={alwaysOnTop ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M8 3h8l-1 6 4 4v2H5v-2l4-4-1-6Z" /><path d="M12 15v6" /></svg></button>
             <button className="btn btn-outline btn-sm layout-toggle" onClick={toggleLayout}
               disabled={layoutBusy} aria-pressed={layout === 'portrait'}
-              aria-label={layout === 'portrait' ? '切换横屏版' : '切换竖屏版'}
-              title={layout === 'portrait' ? '恢复横屏窗口与布局' : '切换竖屏窗口，放大竖屏视频'}>
+              aria-label={t(layout === 'portrait' ? '切换横屏版' : '切换竖屏版')}
+              title={t(layout === 'portrait' ? '恢复横屏窗口与布局' : '切换竖屏窗口，放大竖屏视频')}>
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" aria-hidden="true">
                 {layout === 'portrait' ? <rect x="3" y="6" width="18" height="12" rx="2" /> : <rect x="6" y="3" width="12" height="18" rx="2" />}
               </svg>
-              {layoutBusy ? '切换中…' : layout === 'portrait' ? '横屏版' : '竖屏版'}
+              {t(layoutBusy ? '切换中…' : layout === 'portrait' ? '横屏版' : '竖屏版')}
             </button>
           </div>
         </header>
-        <nav className="compact-navigation" aria-label="竖屏导航">
+        <nav className="compact-navigation" aria-label={t("竖屏导航")}>
           {MENU.map((item) => {
             const Icon = item.icon;
             return <button key={item.id} aria-current={page === item.id ? 'page' : undefined}
-              onClick={() => navigate(item.id)} title={item.label}><Icon size={18} /><span>{item.label}</span></button>;
+              onClick={() => navigate(item.id)} title={t(item.label)}><Icon size={18} /><span>{t(item.label)}</span></button>;
           })}
         </nav>
-        {!appInfo?.preview && <AppUpdateNotice />}
-        {!appInfo?.preview && <AnnouncementNotice />}
-        {stealthMode && <div className="stealth-toolbar"><span>移开暂停隐藏 · 移回继续</span><button className="btn btn-outline btn-sm" onClick={() => toggleStealth(false)}>退出小窗</button></div>}
-        {stealthError && <div className="app-storage-error" role="alert">{stealthError}</div>}
-        {storageError && <div className="app-storage-error" role="alert"><span>{storageError}</span><button className="btn btn-outline btn-sm" onClick={() => setStorageError('')}>关闭提示</button></div>}
-        {visited.map((id) => <main className="main-content" data-page={id} hidden={page !== id} key={id}>{renderPage(id)}</main>)}
+        {!mobile && !appInfo?.preview && <AppUpdateNotice />}
+        {!mobile && !appInfo?.preview && <AnnouncementNotice />}
+        {stealthMode && <div className="stealth-toolbar"><span>{t("移开暂停隐藏 · 移回继续")}</span><button className="btn btn-outline btn-sm" onClick={() => toggleStealth(false)}>{t("退出小窗")}</button></div>}
+        {stealthError && <div className="app-storage-error" role="alert">{t(stealthError)}</div>}
+        {storageError && <div className="app-storage-error" role="alert"><span>{t(storageError)}</span><button className="btn btn-outline btn-sm" onClick={() => setStorageError('')}>{t("关闭提示")}</button></div>}
+        {visited.map((id) => <main className="main-content" data-page={id} hidden={page !== id} key={id}>{t(renderPage(id))}</main>)}
+        {mobile && <nav className="mobile-navigation" aria-label={t("手机主导航")}>
+          {MENU.filter(item => ['browse','download','player','history'].includes(item.id)).map(item => {
+            const Icon = item.icon;
+            return <button key={item.id} aria-current={page === item.id ? 'page' : undefined} onClick={() => navigate(item.id)}><Icon size={21} /><span>{t(({ browse: '发现', download: '搜索', player: '剧库', history: '记录' })[item.id])}</span></button>;
+          })}
+          <button aria-expanded={moreOpen} onClick={() => setMoreOpen(value => !value)}><Settings size={21} /><span>{t("更多")}</span></button>
+        </nav>}
+        {mobile && moreOpen && <div className="mobile-more-mask" onClick={() => setMoreOpen(false)}><section className="mobile-more" role="dialog" aria-modal="true" aria-label={t("更多功能")} onClick={event => event.stopPropagation()}>
+          <h2>{t("更多功能")}</h2>
+          {MENU.filter(item => !['browse','download','player','history'].includes(item.id)).map(item => {
+            const Icon = item.icon; return <button key={item.id} onClick={() => navigate(item.id)}><Icon size={21} /><span>{t(item.label)}</span></button>;
+          })}
+          <button className="btn btn-outline" onClick={() => setMoreOpen(false)}>{t("关闭")}</button>
+        </section></div>}
       </div>
     </div>
   );

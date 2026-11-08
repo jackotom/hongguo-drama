@@ -1,3 +1,4 @@
+const i18nStub = { t: require('../src/i18n/translator.mjs').formatMessage, useLanguage() {}, getLanguage: () => 'zh-CN' };
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const vm = require('node:vm');
@@ -15,15 +16,16 @@ const react = {
   useRef: value => { const i = cursor++; return slots[i] ||= { current: value }; }, useCallback: fn => fn, useEffect() {}, useLayoutEffect() {},
 };
 const document = { pictureInPictureElement: null };
-const context = { document, module: { exports: {} }, navigator: { platform: 'Mac' }, require: name => {
+const context = { window: { electronAPI: { platform: 'darwin' } }, document, module: { exports: {} }, navigator: { platform: 'Mac' }, require: name => {
   if (name === 'react') return react;
+  if (name === './i18n') return i18nStub;
   if (name.endsWith('useStealthWindow')) return () => ({ stealthMode: false, toggleStealth() {} });
   return name;
 } };
 context.exports = context.module.exports;
 vm.runInNewContext(transformSync(fs.readFileSync(path.join(__dirname, '../src/App.jsx'), 'utf8'), { loader: 'jsx', format: 'cjs' }).code, context);
 let tree;
-const render = () => { cursor = 0; tree = context.module.exports.default(); };
+const render = () => { cursor = 0; tree = context.module.exports.default({}); };
 const nodes = () => {
   const out = [];
   const visit = node => { if (!node || typeof node !== 'object') return; out.push(node); node.children?.forEach(visit); };

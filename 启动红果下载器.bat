@@ -1,5 +1,5 @@
 ﻿@echo off
-rem Hongguo Drama 6.3 source candidate - version metadata: package.json
+rem Hongguo Drama 6.4 source candidate - version metadata: package.json
 chcp 65001 >nul
 cd /d "%~dp0"
 if exist "dist\win-unpacked\红果短剧.exe" (

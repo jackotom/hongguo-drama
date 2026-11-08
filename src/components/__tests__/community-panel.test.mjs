@@ -2,6 +2,8 @@ import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
+import { formatMessage } from '../../i18n/translator.mjs';
+const i18n = { t: formatMessage, useLanguage: () => 'zh-CN:zh-CN', getLanguage: () => 'zh-CN' };
 import {transformSync} from 'esbuild';
 
 const code=transformSync(fs.readFileSync(new URL('../CommunityPanel.jsx',import.meta.url),'utf8'),{loader:'jsx',format:'cjs'}).code;
@@ -20,7 +22,7 @@ function harness(props,getPublicDetails,initialLibrary={items:[]}){
   library.items=[...library.items.filter(item=>item.id!==next.id),next];library.error='';
   return{...library,items:[...library.items]};
  };
- const require=id=>id==='react'?react:id==='./CommunityPanel.css'?{}:id==='../localLibrary'?{readLocalLibrary:()=>library,saveLocalSeries,subscribeLocalLibrary:()=>()=>{},publicDateKey:value=>value||''}:undefined;
+ const require=id=>id==='../i18n'?i18n:id==='react'?react:id==='./CommunityPanel.css'?{}:id==='../localLibrary'?{readLocalLibrary:()=>library,saveLocalSeries,subscribeLocalLibrary:()=>()=>{},publicDateKey:value=>value||''}:undefined;
  vm.runInNewContext(code,{module,exports:module.exports,require,window:{electronAPI:{getPublicDetails}},navigator:{clipboard:{writeText:async()=>{}}}});
  const render=p=>{if(p)props=p;cursor=0;tree=module.exports.default(props);while(effects.length)effects.shift()();};
  const walk=(node,visit)=>{if(!node||typeof node!=='object')return;visit(node);node.children?.forEach(child=>walk(child,visit));};

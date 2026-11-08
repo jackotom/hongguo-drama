@@ -1,4 +1,5 @@
 // In-memory records only. Never reads the user's local storage or Electron profile.
+const i18nStub = { t: require('../src/i18n/translator.mjs').formatMessage, useLanguage() {}, getLanguage: () => 'zh-CN' };
 const assert = require('node:assert/strict');
 const { test } = require('node:test');
 const fs = require('node:fs');
@@ -16,7 +17,7 @@ function fixture() {
   const load = (file, imports = {}) => {
     const module = { exports: {} };
     const code = transformSync(fs.readFileSync(path.join(__dirname, '../src', file), 'utf8'), { loader: file.endsWith('.jsx') ? 'jsx' : 'js', format: 'cjs' }).code;
-    vm.runInNewContext(code, { module, exports: module.exports, require: name => name === './historyGroups.mjs' ? require('../src/components/historyGroups.mjs') : imports[name] || {}, window, Event, setTimeout, clearTimeout });
+    vm.runInNewContext(code, { module, exports: module.exports, require: name => name === '../i18n' ? i18nStub : name === './historyGroups.mjs' ? require('../src/components/historyGroups.mjs') : imports[name] || {}, window, Event, setTimeout, clearTimeout });
     return module.exports;
   };
   const mount = (file, imports = {}, props = {}) => {

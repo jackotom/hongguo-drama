@@ -1,3 +1,4 @@
+import { t, useLanguage } from '../i18n';
 import React, { useState, useRef, useEffect } from 'react';
 import './HongguoDownload.css';
 import { Film, Download, CheckSquare, Square, RefreshCw, Folder, Link2, Search, Play } from './icons';
@@ -8,6 +9,8 @@ import { isSubmitKey, parseEpisodeRange } from './episodeRange';
 
 
 function HongguoDownload({ onNavigate, active = true }) {
+  useLanguage();
+  const mobile = window.electronAPI.platform === 'android';
   const { sources: mediaSources, revision: sourceRevision } = useMediaSources();
   const [tab, setTab] = useState('search'); // 'search' | 'input'
   const [inputUrl, setInputUrl] = useState('');
@@ -61,6 +64,7 @@ function HongguoDownload({ onNavigate, active = true }) {
   }, [seriesData, seriesDescription]);
 
   useEffect(() => () => { resolveRequest.current++; }, []);
+  useEffect(() => { if (!active) { resolveRequest.current++; playPending.current = false; } }, [active]);
   useEffect(() => {
     resolveRequest.current++; pendingResolve.current = null; setLoading(false);
     setSeriesData(current => current?.series_id?.startsWith('custom:') ? null : current);
@@ -117,8 +121,19 @@ function HongguoDownload({ onNavigate, active = true }) {
   };
 
   // 搜索选中一部剧后：复用既有的选集下载界面
-  const handleSeriesFromSearch = (data) => {
+  const handleSeriesFromSearch = async (data, viewDetails = false) => {
     if (searchVersion !== resolveRequest.current) return;
+    if (mobile && !viewDetails) {
+      if (playPending.current) return;
+      const first = data.episodes.find(ep => !ep.locked);
+      if (!first) throw new Error('来源尚未开放可播放集数');
+      playPending.current = true;
+      try {
+        const result = await window.electronAPI.playSeries({ seriesId: data.series_id, resume: true });
+        if (!result?.success) throw new Error(result?.error || '打开播放器失败，请重试');
+      } finally { playPending.current = false; }
+      return;
+    }
     resolveRequest.current++;
     setLoading(false);
     setRangeInput('');
@@ -307,8 +322,8 @@ function HongguoDownload({ onNavigate, active = true }) {
           <Film size={32} />
         </div>
         <div className="hero-text">
-          <h2>找到下一部好剧</h2>
-          <p>搜一个剧名，或粘贴分享链接。选择喜欢的集数，保存到本地慢慢看。</p>
+          <h2>{t("找到下一部好剧")}</h2>
+          <p>{t(mobile ? '搜到就能看，也可单独查看详情、选择下载。' : '搜一个剧名，或粘贴分享链接。选择喜欢的集数，保存到本地慢慢看。')}</p>
         </div>
       </div>
 
@@ -319,14 +334,14 @@ function HongguoDownload({ onNavigate, active = true }) {
           onClick={() => switchTab('search')}
         >
           <Search size={16} />
-          <span>搜索剧集</span>
+          <span>{t("搜索剧集")}</span>
         </button>
         <button
           className={`mode-tab ${tab === 'input' ? 'active' : ''}`}
           onClick={() => switchTab('input')}
         >
           <Link2 size={16} />
-          <span>粘贴链接 / ID</span>
+          <span>{t("粘贴链接 / ID")}</span>
         </button>
       </div>
 
@@ -334,6 +349,7 @@ function HongguoDownload({ onNavigate, active = true }) {
         <SearchPanel
           active={active && tab === 'search'}
           onSelectSeries={handleSeriesFromSearch}
+          onViewSeries={mobile ? data => handleSeriesFromSearch(data, true) : undefined}
           onSwitchToInput={() => switchTab('input')}
         />
       </div>
@@ -342,14 +358,14 @@ function HongguoDownload({ onNavigate, active = true }) {
         <div className="hongguo-card">
           <div className="card-header-title">
             <Link2 size={18} />
-            <span>输入短剧链接或 ID</span>
+            <span>{t("输入短剧链接或 ID")}</span>
           </div>
           <div className="input-group">
             <input
               type="text"
               className="input-field"
-              aria-label="短剧分享链接或剧集 ID"
-              placeholder="粘贴短剧分享链接，或输入剧集 ID"
+              aria-label={t("短剧分享链接或剧集 ID")}
+              placeholder={t("粘贴短剧分享链接，或输入剧集 ID")}
               value={inputUrl}
               onChange={(e) => { resolveRequest.current++; pendingResolve.current = null; setLoading(false); setInputUrl(e.target.value); }}
               onKeyDown={(e) => isSubmitKey(e) && handleResolve()}
@@ -364,32 +380,32 @@ function HongguoDownload({ onNavigate, active = true }) {
                 setErrorMsg('');
                 setSuccessMsg('已粘贴，请确认链接后获取剧集');
               } catch (error) { setErrorMsg(error.message || '读取剪贴板失败，请手动粘贴'); }
-            }}>粘贴链接</button>
+            }}>{t("粘贴链接")}</button>
             <button className="btn btn-primary" onClick={handleResolve} disabled={loading}>
               {loading ? (
                 <>
                   <RefreshCw size={16} className="spin" />
-                  <span>解析中...</span>
+                  <span>{t("解析中...")}</span>
                 </>
               ) : (
                 <>
                   <Film size={16} />
-                  <span>获取剧集</span>
+                  <span>{t("获取剧集")}</span>
                 </>
               )}
             </button>
           </div>
 
-          {errorMsg && <div className="alert alert-error" role="alert">{errorMsg}</div>}
-          {successMsg && <div className="alert alert-success" role="status">{successMsg}</div>}
+          {errorMsg && <div className="alert alert-error" role="alert">{t(errorMsg)}</div>}
+          {successMsg && <div className="alert alert-success" role="status">{t(successMsg)}</div>}
         </div>
       )}
 
       {/* 搜索模式下的提示信息（解析卡片被替换了，这里单独显示） */}
       {tab === 'search' && (errorMsg || successMsg) && (
         <div className="hongguo-card" style={{ marginTop: 0 }}>
-          {errorMsg && <div className="alert alert-error" role="alert">{errorMsg}</div>}
-          {successMsg && <div className="alert alert-success" role="status">{successMsg}</div>}
+          {errorMsg && <div className="alert alert-error" role="alert">{t(errorMsg)}</div>}
+          {successMsg && <div className="alert alert-success" role="status">{t(successMsg)}</div>}
         </div>
       )}
 
@@ -410,19 +426,19 @@ function HongguoDownload({ onNavigate, active = true }) {
                 <h3 className="series-title">《{seriesData.series_title}》</h3>
                 <div className="series-tags">
                   <span className="badge">{mediaSourceLabel(seriesData.series_id, mediaSources)}</span>
-                  <span className="badge">共 {seriesData.total} 集</span>
-                  <span className="badge badge-secondary">已选 {selectedVids.size} 集</span>
+                  <span className="badge">{t("共 ")}{t(seriesData.total)}{t(" 集")}</span>
+                  <span className="badge badge-secondary">{t("已选 ")}{t(selectedVids.size)}{t(" 集")}</span>
                 </div>
                 <div className="series-description">
-                  <h4>剧情简介</h4>
+                  <h4>{t("剧情简介")}</h4>
                   {description ? <>
                     <p id="series-description-text">{introExpanded || description.length <= 120 ? description : `${description.slice(0, 120).trimEnd()}…`}</p>
                     {description.length > 120 && <button type="button" className="btn-chip" aria-expanded={introExpanded}
                       aria-controls="series-description-text" onClick={() => setIntroExpanded(value => !value)}>
-                      {introExpanded ? '收起简介' : '展开简介'}
+                      {t(introExpanded ? '收起简介' : '展开简介')}
                     </button>}
-                  </> : <p role="status">{publicIntro?.seriesId === seriesData.series_id && publicIntro.loading ? '简介加载中…'
-                    : publicIntro?.seriesId === seriesData.series_id && publicIntro.failed ? '简介暂未获取，请稍后重新打开剧集。' : '当前来源暂无剧情简介'}</p>}
+                  </> : <p role="status">{t(publicIntro?.seriesId === seriesData.series_id && publicIntro.loading ? '简介加载中…'
+                    : publicIntro?.seriesId === seriesData.series_id && publicIntro.failed ? '简介暂未获取，请稍后重新打开剧集。' : '当前来源暂无剧情简介')}</p>}
                 </div>
               </div>
             </div>
@@ -431,16 +447,16 @@ function HongguoDownload({ onNavigate, active = true }) {
               <div className="batch-action-row">
                 <button className="btn btn-outline" onClick={handlePlay}
                   disabled={openingPlayer || !firstPlayable}
-                  title={firstPlayable ? '在我的剧库播放，未下载的分集会在线播放' : '当前剧集没有可播放的分集'}>
+                  title={t(firstPlayable ? '在我的剧库播放，未下载的分集会在线播放' : '当前剧集没有可播放的分集')}>
                   {openingPlayer ? <RefreshCw size={16} className="spin" /> : <Play size={16} />}
-                  <span>{openingPlayer ? '正在打开…' : '立即播放'}</span>
+                  <span>{t(openingPlayer ? '正在打开…' : '立即播放')}</span>
                 </button>
                 <label className="batch-quality-control">
-                  <span>下载清晰度</span>
+                  <span>{t("下载清晰度")}</span>
                   <select className="input-field" value={downloadQuality}
                     aria-describedby="batch-quality-hint" disabled={qualityLoading || submitting}
                     onChange={(event) => setDownloadQuality(event.target.value)}>
-                    <option value="auto">自动（兼容优先）</option>
+                    <option value="auto">{t("自动（兼容优先）")}</option>
                     <option value="1080p">1080P</option>
                     <option value="720p">720P</option>
                   </select>
@@ -451,65 +467,65 @@ function HongguoDownload({ onNavigate, active = true }) {
                   disabled={qualityLoading || submitting || selectedVids.size === 0}
                 >
                   <Download size={16} />
-                  <span>下载选中集数 ({selectedVids.size}/{seriesData.total})</span>
+                  <span>{t("下载选中集数 (")}{t(selectedVids.size)}/{t(seriesData.total)})</span>
                 </button>
                 {onNavigate && (
                   <button className="btn btn-outline" onClick={() => onNavigate('manager')}>
                     <Folder size={16} />
-                    <span>查看下载管理</span>
+                    <span>{t("查看下载管理")}</span>
                   </button>
                 )}
               </div>
               {isHongguoSource && (
-                <div className="batch-export-controls" role="group" aria-label="随下载导出的文字数据">
-                  <span className="batch-export-title">随下载导出</span>
+                <div className="batch-export-controls" role="group" aria-label={t("随下载导出的文字数据")}>
+                  <span className="batch-export-title">{t("随下载导出")}</span>
                   {[['danmaku', '弹幕'], ['comments', '评论'], ['reviews', '剧评']].map(([key, label]) => (
                     <label key={key} className="batch-export-check">
-                      <input type="checkbox" aria-label={label} checked={exportKinds[key]}
+                      <input type="checkbox" aria-label={t(label)} checked={exportKinds[key]}
                         disabled={qualityLoading || submitting}
                         onChange={(event) => setExportKinds(prev => ({ ...prev, [key]: event.target.checked }))} />
-                      <span>{label}</span>
+                      <span>{t(label)}</span>
                     </label>
                   ))}
-                  {exportNote && <span className="batch-export-note" role="status">{exportNote}</span>}
-                  {exportSettingsNote && <span className="batch-export-note" role="alert">{exportSettingsNote}</span>}
+                  {exportNote && <span className="batch-export-note" role="status">{t(exportNote)}</span>}
+                  {exportSettingsNote && <span className="batch-export-note" role="alert">{t(exportSettingsNote)}</span>}
                 </div>
               )}
             </div>
           </div>
 
-          <p className="settings-hint batch-quality-hint" id="batch-quality-hint">新建下载任务生效；红果片源所选清晰度不可用或下载失败时，自动尝试更低清晰度，并在下载管理中提示。已有文件不自动删除或覆盖。</p>
+          <p className="settings-hint batch-quality-hint" id="batch-quality-hint">{t("新建下载任务生效；红果片源所选清晰度不可用或下载失败时，自动尝试更低清晰度，并在下载管理中提示。已有文件不自动删除或覆盖。")}</p>
 
           {seriesData.web_accessible_episodes != null && seriesData.web_accessible_episodes < seriesData.total && (
-            <p className="settings-hint">网页源提供前 {seriesData.web_accessible_episodes} 集，后续集数自动尝试 App 片源。</p>
+            <p className="settings-hint">{t("网页源提供前 ")}{t(seriesData.web_accessible_episodes)}{t(" 集，后续集数自动尝试 App 片源。")}</p>
           )}
 
-          {seriesData.episodes.some((ep) => ep.locked) && <p className="settings-hint">锁定集需在来源平台解锁，本应用不提供解锁；全选和范围选择会自动跳过。</p>}
+          {seriesData.episodes.some((ep) => ep.locked) && <p className="settings-hint">{t("锁定集需在来源平台解锁，本应用不提供解锁；全选和范围选择会自动跳过。")}</p>}
 
           {/* 筛选与操作栏 */}
           <div className="controls-row">
             <div className="select-buttons">
-              <button className="btn-chip" onClick={handleSelectAll}>全选</button>
-              <button className="btn-chip" onClick={handleInvertSelect}>反选</button>
-              <button className="btn-chip" onClick={handleDeselectAll}>取消全选</button>
+              <button className="btn-chip" onClick={handleSelectAll}>{t("全选")}</button>
+              <button className="btn-chip" onClick={handleInvertSelect}>{t("反选")}</button>
+              <button className="btn-chip" onClick={handleDeselectAll}>{t("取消全选")}</button>
               <span className="divider"></span>
-              <button className="btn-chip" onClick={() => handleQuickSelect('first10')}>前 10 集</button>
-              <button className="btn-chip" onClick={() => handleQuickSelect('first30')}>前 30 集</button>
-              <button className="btn-chip" onClick={() => handleQuickSelect('last30')}>后 30 集</button>
+              <button className="btn-chip" onClick={() => handleQuickSelect('first10')}>{t("前 10 集")}</button>
+              <button className="btn-chip" onClick={() => handleQuickSelect('first30')}>{t("前 30 集")}</button>
+              <button className="btn-chip" onClick={() => handleQuickSelect('last30')}>{t("后 30 集")}</button>
             </div>
 
             <div className="range-filter">
-              <span className="range-label">范围筛选:</span>
+              <span className="range-label">{t("范围筛选:")}</span>
               <input
                 type="text"
                 className="range-input"
-                aria-label="选择集数范围"
-                placeholder="如 1-30 或 1,5,10"
+                aria-label={t("选择集数范围")}
+                placeholder={t("如 1-30 或 1,5,10")}
                 value={rangeInput}
                 onChange={(e) => setRangeInput(e.target.value)}
                 onKeyDown={(e) => isSubmitKey(e) && handleApplyRange()}
               />
-              <button className="btn-chip btn-chip-primary" onClick={handleApplyRange}>应用</button>
+              <button className="btn-chip btn-chip-primary" onClick={handleApplyRange}>{t("应用")}</button>
             </div>
           </div>
 
@@ -521,7 +537,7 @@ function HongguoDownload({ onNavigate, active = true }) {
                 <button
                   type="button"
                   disabled={ep.locked === true}
-                  title={ep.locked ? '需在来源平台解锁' : undefined}
+                  title={t(ep.locked ? '需在来源平台解锁' : undefined)}
                   aria-pressed={isChecked}
                   key={ep.vid}
                   className={`episode-card ${isChecked ? 'selected' : ''}`}
@@ -531,8 +547,8 @@ function HongguoDownload({ onNavigate, active = true }) {
                     {isChecked ? <CheckSquare size={18} className="icon-checked" /> : <Square size={18} className="icon-unchecked" />}
                   </div>
                   <div className="episode-info">
-                    <span className="episode-num">第 {String(ep.vid_index).padStart(2, '0')} 集</span>
-                    {ep.locked ? <span className="episode-title">锁定 · 需在来源解锁</span> : ep.title && <span className="episode-title">{ep.title}</span>}
+                    <span className="episode-num">{t("第 {0} 集", [String(ep.vid_index).padStart(2, '0')])}</span>
+                    {t(ep.locked ? <span className="episode-title">{t("锁定 · 需在来源解锁")}</span> : ep.title && <span className="episode-title">{ep.title}</span>)}
                   </div>
                 </button>
               );

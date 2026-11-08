@@ -1,8 +1,10 @@
+import { t, useLanguage } from '../i18n';
 import React, { useEffect, useId, useRef, useState } from 'react';
 import { Download } from './icons';
 import './NasDownload.css';
 
 export default function NasDownload({ seriesId, quality = 'auto', disabled = false }) {
+  useLanguage();
   const descriptionId = useId();
   const [submitting, setSubmitting] = useState(false);
   const [feedback, setFeedback] = useState(null);
@@ -74,18 +76,18 @@ export default function NasDownload({ seriesId, quality = 'auto', disabled = fal
   if (!seriesId) return null;
   return <div className="nas-download">
     <button type="button" className="btn btn-outline" onClick={submit} disabled={disabled || submitting}
-      aria-describedby={descriptionId} aria-label="下载到 NAS">
+      aria-describedby={descriptionId} aria-label={t("下载到 NAS")}>
       <Download size={15} />
-      {submitting ? '提交中…' : '下载到 NAS'}
+      {t(submitting ? '提交中…' : '下载到 NAS')}
     </button>
     <label className="nas-download-description"><input type="checkbox" checked={createFolder} disabled={disabled || submitting}
-      onChange={event => setCreateFolder(event.target.checked)} /> 自动创建剧名文件夹</label>
+      onChange={event => setCreateFolder(event.target.checked)} />{t(" 自动创建剧名文件夹")}</label>
     <div id={descriptionId} className="nas-download-description">
-      <p>保存整剧封面、简介和 tvshow.nfo，不再新建分集 NFO。已有视频安全复用，缺失资料补齐。</p>
-      <p>先挂载 NAS，再选择保存位置；已建好本剧文件夹时可取消自动创建。也可在设置中将 NAS 设为普通下载目录并开启整剧资料，无需每次使用本按钮。</p>
+      <p>{t("保存整剧封面、简介和 tvshow.nfo，不再新建分集 NFO。已有视频安全复用，缺失资料补齐。")}</p>
+      <p>{t("先挂载 NAS，再选择保存位置；已建好本剧文件夹时可取消自动创建。也可在设置中将 NAS 设为普通下载目录并开启整剧资料，无需每次使用本按钮。")}</p>
     </div>
-    {feedback?.kind === 'success' && <p className="nas-download-success" role="status">{feedback.message}</p>}
-    {feedback?.kind === 'error' && <p className="nas-download-error" role="alert">{feedback.message}</p>}
-    {feedback?.kind === 'success' && feedback.warnings.map(warning => <p key={warning} className="nas-download-warning">{warning}</p>)}
+    {feedback?.kind === 'success' && <p className="nas-download-success" role="status">{t(feedback.message)}</p>}
+    {feedback?.kind === 'error' && <p className="nas-download-error" role="alert">{t(feedback.message)}</p>}
+    {feedback?.kind === 'success' && feedback.warnings.map(warning => <p key={warning} className="nas-download-warning">{t(warning)}</p>)}
   </div>;
 }

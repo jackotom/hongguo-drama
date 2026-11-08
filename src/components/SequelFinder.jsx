@@ -1,6 +1,8 @@
+import { t, useLanguage } from '../i18n';
 import React, { useEffect, useRef, useState } from 'react';
 
 export default function SequelFinder({ seriesId, active = true, timeoutMs = 25000 }) {
+  useLanguage();
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [results, setResults] = useState([]);
@@ -91,21 +93,21 @@ export default function SequelFinder({ seriesId, active = true, timeoutMs = 2500
   };
 
   if (!active || !seriesId) return null;
-  return <section className="sequel-finder" aria-label="查找当前剧的下一季">
+  return <section className="sequel-finder" aria-label={t("查找当前剧的下一季")}>
     <div className="sequel-finder-actions">
       <button type="button" className="btn btn-outline btn-sm" onClick={find} disabled={loading || !!opening}
-        aria-expanded={open} aria-controls="sequel-finder-results">{loading ? '正在查找…' : open ? error ? '重试' : '重新查找' : '查找下一季'}</button>
-      {open && <button type="button" className="btn btn-outline btn-sm" onClick={close}>收起</button>}
+        aria-expanded={open} aria-controls="sequel-finder-results">{t(loading ? '正在查找…' : open ? error ? '重试' : '重新查找' : '查找下一季')}</button>
+      {open && <button type="button" className="btn btn-outline btn-sm" onClick={close}>{t("收起")}</button>}
     </div>
     {open && <div id="sequel-finder-results" className="sequel-finder-results">
-      <p>可能的续作，请核对剧名</p>
-      {loading && <p role="status">{results.length ? '已找到本地记录，正在补充查询…' : '正在查找下一季…'}</p>}
-      {error && <p className="sequel-finder-error" role="alert">{error}</p>}
-      {partial && <p role="status">部分查询未完成，可稍后重试。</p>}
-      {!loading && !results.length && <p role="status">{error || partial ? '查询未完成，暂时无法判断是否有下一季。' : '暂未找到下一季，可稍后再查。'}</p>}
+      <p>{t("可能的续作，请核对剧名")}</p>
+      {loading && <p role="status">{t(results.length ? '已找到本地记录，正在补充查询…' : '正在查找下一季…')}</p>}
+      {error && <p className="sequel-finder-error" role="alert">{t(error)}</p>}
+      {partial && <p role="status">{t("部分查询未完成，可稍后重试。")}</p>}
+      {!loading && !results.length && <p role="status">{t(error || partial ? '查询未完成，暂时无法判断是否有下一季。' : '暂未找到下一季，可稍后再查。')}</p>}
       {!!results.length && <ul className="sequel-finder-list">{results.map(sequel => <li key={sequel.series_id}>
         <button type="button" className="btn btn-outline btn-sm" onClick={() => play(sequel)} disabled={!!opening}
-          aria-label={`播放可能的续作《${sequel.series_title}》`}>{sequel.series_title}{opening === sequel.series_id ? ' · 打开中…' : ''}</button>
+          aria-label={t(`播放可能的续作《${sequel.series_title}》`)}>{sequel.series_title}{t(opening === sequel.series_id ? ' · 打开中…' : '')}</button>
       </li>)}</ul>}
     </div>}
   </section>;

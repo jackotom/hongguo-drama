@@ -1,4 +1,5 @@
 // In-memory App -> real play-series IPC -> Player contract; no network or user files.
+const i18nStub = { t: require('../src/i18n/translator.mjs').formatMessage, useLanguage() {}, getLanguage: () => 'zh-CN' };
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
@@ -48,10 +49,10 @@ function fixture({ exists = true, dismissed = false, saveError = '', resolveErro
   };
   const module = { exports: {} };
   vm.runInNewContext(appSource, { module, exports: module.exports, window: { electronAPI: api }, navigator: {},
-    require: name => name === 'react' ? react : name === './theme' ? { initializeTheme() {} }
+    require: name => name === './i18n' ? i18nStub : name === 'react' ? react : name === './theme' ? { initializeTheme() {} }
       : name === './components/useStealthWindow' ? { __esModule: true, default: () => ({}) } : component(name),
   });
-  const render = () => { cursor = 0; tree = module.exports.default(); effects.splice(0).forEach(fn => fn()); };
+  const render = () => { cursor = 0; tree = module.exports.default({}); effects.splice(0).forEach(fn => fn()); };
   const find = predicate => {
     const visit = node => { if (!node || typeof node !== 'object') return; if (predicate(node)) return node; return node.children?.map(visit).find(Boolean); };
     return visit(tree);
@@ -218,7 +219,7 @@ function mountHistoryNavigation() {
     acknowledgeWatchUpdates: async () => { calls.push(['ack']); return { success: true }; },
   };
   const module = { exports: {} };
-  vm.runInNewContext(source, { module, exports: module.exports, require: name => name === './historyGroups.mjs' ? require('../src/components/historyGroups.mjs') : name === 'react' ? react : {}, window: { electronAPI: api } });
+  vm.runInNewContext(source, { module, exports: module.exports, require: name => name === '../i18n' ? i18nStub : name === './historyGroups.mjs' ? require('../src/components/historyGroups.mjs') : name === 'react' ? react : {}, window: { electronAPI: api } });
   const render = (runPassive = true) => {
     cursor = 0; tree = module.exports.default(props);
     layoutEffects.splice(0).forEach(fn => fn());

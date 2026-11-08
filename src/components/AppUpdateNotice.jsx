@@ -1,8 +1,10 @@
+import { t, useLanguage } from '../i18n';
 import React, { useEffect, useRef, useState } from 'react';
 import { X } from './icons';
 import './AppUpdateNotice.css';
 
 export default function AppUpdateNotice() {
+  useLanguage();
   const [release, setRelease] = useState(null);
   const [visible, setVisible] = useState(false);
   const [checking, setChecking] = useState(false);
@@ -140,19 +142,19 @@ export default function AppUpdateNotice() {
   const updateError = error || state.error;
   const percent = Math.max(0, Math.min(100, Math.round(state.percent || 0)));
   const title = checking ? '正在检查更新…' : installing ? '正在重启安装…' : downloaded ? `新版 v${version} 已下载` : downloading ? `正在下载 v${version}` : version ? `发现新版本 v${version}` : '检查更新';
-  return <section className="app-update-notice" role="dialog" aria-label="软件更新" aria-describedby="app-update-description" onKeyDown={event => { if (event.key === 'Escape') { event.stopPropagation(); close(); } }}>
-    <button type="button" className="icon-btn app-update-close" aria-label="关闭更新提醒" title="关闭更新提醒" onClick={close}><X size={18} /></button>
+  return <section className="app-update-notice" role="dialog" aria-label={t("软件更新")} aria-describedby="app-update-description" onKeyDown={event => { if (event.key === 'Escape') { event.stopPropagation(); close(); } }}>
+    <button type="button" className="icon-btn app-update-close" aria-label={t("关闭更新提醒")} title={t("关闭更新提醒")} onClick={close}><X size={18} /></button>
     <h2 aria-live="polite">{title}</h2>
-    <p id="app-update-description">{checking ? '正在查询正式新版，请稍候。' : installing ? '应用即将退出并安装新版。' : downloaded ? '点击后退出应用并安装新版。请先完成视频下载、合并或转码；稍后也可在设置中找回此提醒。' : downloading ? '关闭提醒后继续下载。下载完成不会自动安装，可在设置中找回进度。' : version ? (state.supported ? '在应用内下载新版，完成后由你决定何时重启安装。关闭提醒可继续使用当前版本。' : state.reason) : updateError ? '可稍后重新检查。' : '已是最新版本。'}</p>
-    {downloading && <div className="app-update-progress"><progress max="100" value={percent} aria-label="更新下载进度" /><span>{percent}%</span></div>}
+    <p id="app-update-description">{t(checking ? '正在查询正式新版，请稍候。' : installing ? '应用即将退出并安装新版。' : downloaded ? '点击后退出应用并安装新版。请先完成视频下载、合并或转码；稍后也可在设置中找回此提醒。' : downloading ? '关闭提醒后继续下载。下载完成不会自动安装，可在设置中找回进度。' : version ? (state.supported ? '在应用内下载新版，完成后由你决定何时重启安装。关闭提醒可继续使用当前版本。' : state.reason) : updateError ? '可稍后重新检查。' : '已是最新版本。')}</p>
+    {downloading && <div className="app-update-progress"><progress max="100" value={percent} aria-label={t("更新下载进度")} /><span>{t(percent)}%</span></div>}
     <div className="app-update-actions">
     {(version || downloaded) && <button type="button" className="btn btn-primary" disabled={busy || !enabled.current} onClick={() => act(downloaded ? 'installAppUpdate' : state.supported ? 'downloadAppUpdate' : 'openAppUpdate')}>
-      {installing ? '正在重启…' : downloading ? '正在下载…' : pending ? '请稍候…' : downloaded ? '重启并安装' : state.supported ? '下载更新' : '前往 GitHub 下载'}
+      {t(installing ? '正在重启…' : downloading ? '正在下载…' : pending ? '请稍候…' : downloaded ? '重启并安装' : state.supported ? '下载更新' : '前往 GitHub 下载')}
     </button>}
-    {(!version || updateError) && !busy && <button type="button" className="btn btn-outline" onClick={() => checkNow.current?.(true)}>重新检查</button>}
-    {(downloading || state.status === 'checking' || pending && actionPending.current === 'downloadAppUpdate') && <button type="button" className="btn btn-outline" disabled={actionPending.current === 'cancelAppUpdate' || !enabled.current} onClick={() => act('cancelAppUpdate')}>取消下载</button>}
-    {(state.supported || !version) && <button type="button" className="btn btn-outline" disabled={!enabled.current} onClick={() => act('openAppUpdate')}>前往发布页手动下载</button>}
+    {(!version || updateError) && !busy && <button type="button" className="btn btn-outline" onClick={() => checkNow.current?.(true)}>{t("重新检查")}</button>}
+    {(downloading || state.status === 'checking' || pending && actionPending.current === 'downloadAppUpdate') && <button type="button" className="btn btn-outline" disabled={actionPending.current === 'cancelAppUpdate' || !enabled.current} onClick={() => act('cancelAppUpdate')}>{t("取消下载")}</button>}
+    {(state.supported || !version) && <button type="button" className="btn btn-outline" disabled={!enabled.current} onClick={() => act('openAppUpdate')}>{t("前往发布页手动下载")}</button>}
     </div>
-    {updateError && <p role="alert">{updateError}</p>}
+    {updateError && <p role="alert">{t(updateError)}</p>}
   </section>;
 }

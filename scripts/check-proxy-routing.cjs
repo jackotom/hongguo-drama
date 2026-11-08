@@ -8,7 +8,7 @@ const { EventEmitter } = require('node:events');
 const { createRequire } = require('node:module');
 const source = path.resolve(__dirname, '../main.js'), req = createRequire(source);
 const root = fs.mkdtempSync(path.join(os.tmpdir(), 'hongguo-proxy-'));
-const target = 'https://www.baidu.com';
+const target = 'https://hongguoduanju.com';
 const system = { proxy_enabled: true, proxy_mode: 'system' };
 const custom = { proxy_enabled: true, proxy_mode: 'custom', proxy_host: '127.0.0.1', proxy_port: 19192 };
 let failures = 0;
@@ -17,19 +17,19 @@ function realResolver(env) {
   vm.runInNewContext(fs.readFileSync(req.resolve('proxy-from-env'), 'utf8'), { module, exports: module.exports, process: { env }, URL });
   return module.exports.getProxyForUrl;
 }
-function load(env, initialSettings = { root }) {
-  const handlers = {}, proxyCalls = [], requests = [], app = new EventEmitter();
+function load(env, initialSettings = { root }, requestError = null) {
+  const handlers = {}, proxyCalls = [], requests = [], menus = [], app = new EventEmitter();
   let saved = structuredClone(initialSettings);
   const store = {
     getSettings: () => structuredClone(saved),
     saveSettings: next => { saved = structuredClone(next); },
   };
   Object.assign(app, { getVersion: () => 'test', getPath: () => root, commandLine: { appendSwitch() {} }, requestSingleInstanceLock: () => true, whenReady: () => ({ then() {} }) });
-  const electron = { app, ipcMain: { handle: (name, fn) => handlers[name] = fn }, protocol: { registerSchemesAsPrivileged() {} }, session: { defaultSession: { setProxy: async config => proxyCalls.push(config) } } };
-  const context = vm.createContext({ require: name => name === 'electron' ? electron : name === './src/store' ? store : name === 'axios' ? { get: async (url, options) => { requests.push({ url, options }); return { status: 200 }; } } : req(name), __dirname: path.dirname(source), process: { ...process, env: { ...env } }, console: { log() {}, warn() {}, error() {} }, Buffer, URL, Response, Request, Headers, AbortController, setTimeout, clearTimeout });
+  const electron = { app, Menu: { buildFromTemplate: value => value, setApplicationMenu: value => menus.push(value) }, ipcMain: { handle: (name, fn) => handlers[name] = fn }, protocol: { registerSchemesAsPrivileged() {} }, session: { defaultSession: { setProxy: async config => proxyCalls.push(config) } } };
+  const context = vm.createContext({ require: name => name === 'electron' ? electron : name === './src/store' ? store : name === 'axios' ? { get: async (url, options) => { requests.push({ url, options }); if (typeof requestError === 'function') return requestError(url, options); if (requestError) throw requestError; return { status: 200 }; } } : req(name), __dirname: path.dirname(source), process: { ...process, env: { ...env } }, console: { log() {}, warn() {}, error() {} }, Buffer, URL, Response, Request, Headers, AbortController, setTimeout, clearTimeout });
   vm.runInContext(fs.readFileSync(source, 'utf8'), context, { filename: source });
   require('./fixtures/trusted-ipc.cjs')(context, handlers);
-  return { context, handlers, proxyCalls, requests, session: electron.session.defaultSession, store, saved: () => structuredClone(saved) };
+  return { context, handlers, proxyCalls, requests, menus, session: electron.session.defaultSession, store, saved: () => structuredClone(saved) };
 }
 async function check(name, run) {
   try { await run(); console.log('PASS ' + name); }
@@ -74,7 +74,7 @@ async function check(name, run) {
     }
   });
   await check('test reports actual direct or proxy route, including HTTP-only and NO_PROXY', async () => {
-    for (const env of [{}, { HTTP_PROXY: 'http://http-only:80' }, { HTTPS_PROXY: 'http://proxy:80', NO_PROXY: '*' }, { HTTPS_PROXY: 'http://upper:80', https_proxy: 'http://lower:81' }]) {
+    for (const env of [{}, { HTTP_PROXY: 'http://http-only:80' }, { HTTPS_PROXY: 'http://proxy:80', NO_PROXY: '*' }, { HTTPS_PROXY: 'http://proxy:80', NO_PROXY: 'hongguoduanju.com' }, { HTTPS_PROXY: 'http://upper:80', https_proxy: 'http://lower:81' }]) {
       const h = load(env), result = await h.handlers['test-proxy']({}, system), expected = realResolver(env)(target);
       assert.equal(h.requests[0].url, target);
       if (expected) {
@@ -85,6 +85,38 @@ async function check(name, run) {
         assert.equal(result.via, '(直连)');
       }
     }
+  });
+  await check('a stalled proxy handshake is bounded by an independent abort deadline', async () => {
+    const h = load({}, { root }, (_url, options) => new Promise((resolve, reject) => {
+      assert(options.signal, 'the probe must supply a cancellation signal');
+      options.signal.addEventListener('abort', () => reject(Object.assign(new Error('canceled'), {code:'ERR_CANCELED'})), {once:true});
+    }));
+    h.context.setTimeout = (fn, ms) => setTimeout(fn, Math.min(ms, 5));
+    const result = await h.handlers['test-proxy']({}, custom);
+    assert.equal(result.success, false);
+    assert.match(result.error, /超时/);
+    assert.equal(h.requests[0].options.signal.aborted, true);
+  });
+  await check('interface language updates native menu and rejects unsupported values', async () => {
+    const h = load({});
+    assert.equal((await h.handlers['set-interface-language']({}, 'en')).success, true);
+    if (process.platform === 'darwin') assert.equal(h.menus.at(-1)[1].label, 'Edit');
+    const count = h.menus.length;
+    assert.equal((await h.handlers['set-interface-language']({}, 'invalid')).success, false);
+    assert.equal(h.menus.length, count);
+    assert.equal((await h.handlers['set-interface-language']({}, 'zh-CN')).success, true);
+    if (process.platform === 'darwin') assert.equal(h.menus.at(-1)[1].label, '编辑');
+  });
+  await check('official probe keeps TLS verification and reports certificate failures without fallback', async () => {
+    const h = load({}, { root }, Object.assign(new Error('certificate chain failure'), { code: 'UNABLE_TO_VERIFY_LEAF_SIGNATURE' }));
+    const result = await h.handlers['test-proxy']({}, { proxy_enabled: false });
+    assert.equal(h.requests.length, 1);
+    assert.equal(h.requests[0].url, target);
+    assert.equal(h.requests[0].options.httpsAgent, undefined);
+    assert.notEqual(h.context.process.env.NODE_TLS_REJECT_UNAUTHORIZED, '0');
+    assert.equal(result.success, false);
+    assert.equal(result.code, 'UNABLE_TO_VERIFY_LEAF_SIGNATURE');
+    assert.match(result.error, /证书校验失败/);
   });
   await check('invalid custom proxy is rejected before saving and does not change the active proxy', async () => {
     const h = load({}, { root });

@@ -70,6 +70,7 @@ async function mount(file, api, props = {}, storage = null) {
     cache.set(resolved, module);
     const localRequire = (spec) => {
       if (spec === 'react' || spec === 'react/jsx-runtime' || spec === 'react/jsx-dev-runtime') return react;
+      if (spec === '../i18n' || spec === './i18n') return { t: require('../i18n/translator.mjs').formatMessage, useLanguage() {}, getLanguage: () => 'zh-CN' };
       if (spec === 'react-dom') return { createPortal: children => children };
       if (spec.endsWith('.css')) return {};
       if (spec.startsWith('.')) {
@@ -1238,7 +1239,7 @@ async function mount(file, api, props = {}, storage = null) {
       : { success: true, results: [] } });
     ui.find(n => n.type === 'input').props.onChange({ target: { value: '双子房客' } }); ui.render(); ui.button('搜索').props.onClick(); await ui.flush();
     const cards = ui.nodes().filter(n => n.props.className?.startsWith('search-card '));
-    assert.deepEqual(cards.map(card => card.props.title), ['点击查看并下载：双子房客', '点击查看并下载：双子房客第三季', '点击查看并下载：其他短剧']);
+    assert.deepEqual(cards.map(card => card.props.title), ['点击查看并下载: 双子房客', '点击查看并下载: 双子房客第三季', '点击查看并下载: 其他短剧']);
     assert.ok(ui.text().includes('找到 2 部标题匹配短剧')); assert.ok(ui.text().includes('其他结果（排在后面）'));
     assert.ok(ui.text().includes('补充搜索未完成：连接超时')); assert.ok(ui.find(n => n.props.role === 'status'));
     ui.find(n => n.type === 'input').props.onChange({ target: { value: '新的剧名' } }); ui.render();

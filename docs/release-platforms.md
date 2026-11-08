@@ -1,5 +1,7 @@
 # 五平台同步发布规则
 
+6.4发行准备：2026-11-08用户明确授权本次例外先发双Mac、Windows、Linux四平台，TV继续开发且候选APK不公开。Mac正式签名、公证已授权；仍须本版精确源码、最终包验收和Draft摘要核对齐备才公开。后续五平台规则保留。见[6.4说明](release-6.4.md)。
+
 6.3已于2026-11-08 19:46:30（Asia/Shanghai）正式公开并设Latest，内部6.3.0、桌面构建6.3.1，冻结源码`13a07e30f1e4ec5b4dd4fcc73871bc097d09d816`。用户明确授权本次先双Mac、Windows、Linux四平台，TV未实机验收、候选APK不公开。23附件远端大小/SHA256及两份更新清单已核对；双Mac签名/公证/装订，Windows便携11项和安装升级9项通过但EXE未签名；Linux原生Ubuntu CI提取AppImage后，以CPU软件解码播放两集新下载1080p红果素材各10秒。Mac真实两集静音播放及x64 Rosetta启动通过；未替换正式安装。 这是本轮明确例外；后续默认五平台规则保留。详见 [6.3说明](release-6.3.md)。
 
 2026-11-06起，后续正式版本统一发布五类平台包：Mac Apple Silicon arm64、Mac Intel x64、Windows x64、Linux x64 AppImage、Android TV APK。同一公开版本、标签和Release，全部包在Draft齐备后一次公开并更新Latest；缺平台保留草稿，不先发部分平台。完整门槛见 [RELEASING.md](RELEASING.md)。以下旧版回执保留历史范围，不代表五平台已完成。

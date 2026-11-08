@@ -2,6 +2,8 @@ import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
+import { formatMessage } from '../../i18n/translator.mjs';
+const i18n = { t: formatMessage, useLanguage: () => 'zh-CN:zh-CN', getLanguage: () => 'zh-CN' };
 import {transformSync} from 'esbuild';
 
 const code=transformSync(fs.readFileSync(new URL('../DownloadManager.jsx',import.meta.url),'utf8'),{loader:'jsx',format:'cjs'}).code;
@@ -12,7 +14,7 @@ function harness(api,{tasks=[],mergeTasks=[]}={}){
  const react={createElement:(type,props,...children)=>({type,props:props||{},children:children.flat(Infinity)}),useState(initial){const at=cursor++;if(!(at in slots))slots[at]=initial;return[slots[at],value=>slots[at]=value];},useRef(initial){const at=cursor++;return slots[at]||=( {current:initial} );},useEffect(effect,deps){const at=cursor++,previous=slots[at];if(!previous||deps.some((value,index)=>value!==previous.deps[index])){previous?.cleanup?.();slots[at]={deps};effects.push(()=>slots[at].cleanup=effect());}},useCallback:fn=>fn,useMemo:fn=>fn()};
  const icon=props=>({type:'icon',props:props||{},children:[]});
  const module={exports:{}};
- const require=id=>id==='react'?react:id==='./useDialogKeyboard'?()=>{}:id==='./DownloadManager.css'?{}:id==='./icons'?new Proxy({},{get:()=>icon}):undefined;
+ const require=id=>id==='../i18n'?i18n:id==='react'?react:id==='./useDialogKeyboard'?()=>{}:id==='./DownloadManager.css'?{}:id==='./icons'?new Proxy({},{get:()=>icon}):undefined;
  vm.runInNewContext(code,{module,exports:module.exports,require,window:{electronAPI:api},setTimeout,clearTimeout,setInterval,clearInterval});
  slots[0]=tasks;slots[8]=mergeTasks;
  const render=()=>{cursor=0;tree=module.exports.default({active:false});while(effects.length)effects.shift()();};

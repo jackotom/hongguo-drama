@@ -1,3 +1,4 @@
+const i18nStub = { t: require('../src/i18n/translator.mjs').formatMessage, useLanguage() {}, getLanguage: () => 'zh-CN' };
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
@@ -55,7 +56,7 @@ const source = transformSync(fs.readFileSync(path.join(__dirname, '../src/compon
     else if (document.fullscreenElement === stage) await document.exitFullscreen();
     else await stage.requestFullscreen();
   };
-  const context = { module: { exports: {} }, document, Date: TestDate, window: { addEventListener: (name, fn) => windowListeners.set(name, fn), removeEventListener: name => windowListeners.delete(name) }, setTimeout: (fn, delay) => { timers.set(++nextTimer, { fn, at: now + delay }); return nextTimer; }, clearTimeout: id => timers.delete(id), setInterval: (fn, delay) => { timers.set(++nextTimer, { fn, at: now + delay }); return nextTimer; }, clearInterval: id => timers.delete(id), require: name => name === 'react' ? react : name === '../shortcuts' ? shortcutModule.exports : name === '../playerDisplay.mjs' ? displayModule.exports : name === './VideoEnhancement' ? videoEnhancementStub : {} };
+  const context = { module: { exports: {} }, document, Date: TestDate, window: { addEventListener: (name, fn) => windowListeners.set(name, fn), removeEventListener: name => windowListeners.delete(name) }, setTimeout: (fn, delay) => { timers.set(++nextTimer, { fn, at: now + delay }); return nextTimer; }, clearTimeout: id => timers.delete(id), setInterval: (fn, delay) => { timers.set(++nextTimer, { fn, at: now + delay }); return nextTimer; }, clearInterval: id => timers.delete(id), require: name => name === '../i18n' ? i18nStub : name === 'react' ? react : name === '../shortcuts' ? shortcutModule.exports : name === '../playerDisplay.mjs' ? displayModule.exports : name === './VideoEnhancement' ? videoEnhancementStub : {} };
   context.exports = context.module.exports; vm.runInNewContext(source, context);
   const nodes = () => { const out = []; const visit = node => { if (!node || typeof node !== 'object') return; out.push(node); node.children?.forEach(visit); }; visit(tree); return out; };
   const find = label => nodes().find(node => node.props['aria-label'] === label);

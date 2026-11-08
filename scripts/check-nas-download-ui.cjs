@@ -67,7 +67,7 @@ function mountNas(overrides = {}) {
   vm.runInNewContext(source, {
     module,
     exports: module.exports,
-    require: name => name === 'react' ? react : name === './icons' ? { Download: () => null } : {},
+    require: name => name === '../i18n' ? { t: require('../src/i18n/translator.mjs').formatMessage, useLanguage() {} } : name === 'react' ? react : name === './icons' ? { Download: () => null } : {},
     window: { electronAPI: api },
   });
   const nodes = () => {

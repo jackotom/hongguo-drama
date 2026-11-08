@@ -3,6 +3,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
+import { formatMessage } from '../../i18n/translator.mjs';
+const i18n = { t: formatMessage, useLanguage: () => 'zh-CN:zh-CN', getLanguage: () => 'zh-CN' };
 import { transformSync } from 'esbuild';
 import { rankSearchResults } from '../searchRanking.mjs';
 
@@ -30,6 +32,7 @@ function mount(file, props, api) {
     },
   };
   const modules = {
+    '../i18n': i18n,
     react, './HongguoDownload.css': {}, './SearchPanel': 'SearchPanel',
     './icons': Object.fromEntries(['Film', 'Download', 'CheckSquare', 'Square', 'RefreshCw', 'Folder', 'Link2', 'Search', 'Play', 'ExternalLink'].map(name => [name, name])),
     './useMediaSources': () => sources,

@@ -23,7 +23,7 @@ function mount(api = {}, props = {}) {
   const setTimer = (fn, delay, interval = false) => { const id = ++timerId; timers.set(id, { fn, delay, interval }); return id; };
   const module = { exports: {} };
   vm.runInNewContext(transformSync(fs.readFileSync(`${__dirname}/../src/components/DownloadManager.jsx`, 'utf8'), { loader: 'jsx', format: 'cjs' }).code, {
-    module, exports: module.exports, require: name => name === 'react' ? react : name === './useDialogKeyboard' ? open => { dialogOpen = open; } : {}, window,
+    module, exports: module.exports, require: name => name === '../i18n' ? { t: require('../src/i18n/translator.mjs').formatMessage, useLanguage() {}, getLanguage: () => 'zh-CN' } : name === 'react' ? react : name === './useDialogKeyboard' ? open => { dialogOpen = open; } : {}, window,
     document: { ...domTarget('document'), querySelector: () => null }, console, setTimeout: (fn, delay) => setTimer(fn, delay), clearTimeout: id => timers.delete(id), setInterval: (fn, delay) => setTimer(fn, delay, true), clearInterval: id => timers.delete(id),
   });
   const render = () => { cursor = 0; tree = module.exports.default(props); const visit = node => { if (!node || typeof node !== 'object') return; if (node.props?.className === 'dm-more-actions' && node.props.ref) node.props.ref.current = moreActions; node.children?.forEach(visit); }; visit(tree); effects.splice(0).forEach(fn => fn()); };

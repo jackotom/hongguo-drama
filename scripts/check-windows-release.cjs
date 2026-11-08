@@ -255,6 +255,16 @@ async function realFootage(mediaDir, ffmpeg) {
   }
   const info = await evaluate('window.electronAPI.getAppInfo()');
   assert.equal(info.version, pkg.version); assert.equal(info.platform, 'win32');
+  assert.equal(await evaluate('document.title'), /^zh/i.test(info.systemLocale) ? '红果短剧' : 'Hongguo Drama');
+  await evaluate(`(async () => {
+    localStorage.setItem('hongguo:language', 'zh-CN');
+    window.dispatchEvent(new StorageEvent('storage', { key: 'hongguo:language' }));
+    const deadline = Date.now() + 5000;
+    while (document.documentElement.lang !== 'zh-CN') {
+      if (Date.now() > deadline) throw Error('Interface language did not switch');
+      await new Promise(resolve => setTimeout(resolve, 25));
+    }
+  })()`);
   const settings = await evaluate('window.electronAPI.getSettings()');
   assert.equal(settings.root, mediaDir, 'Temporary profile must isolate all user state');
   assert.deepEqual(await evaluate('window.electronAPI.getAnnouncementPreferences()'), { normalEnabled: false, emergencyEnabled: false }, 'Disposable playback profile must opt out of remote notices');

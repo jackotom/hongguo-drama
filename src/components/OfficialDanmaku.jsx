@@ -1,3 +1,4 @@
+import { t, useLanguage } from '../i18n';
 // Adapted from dawei233/hongguo-drama, commit c884fab6c6e36ad38173e251738b9b35f958383f (GPL-3.0).
 // https://github.com/dawei233/hongguo-drama
 import React, { useEffect, useMemo, useRef, useState } from 'react';
@@ -111,6 +112,7 @@ export function useOfficialDanmaku({ seriesId, vid, active, preferences }) {
 }
 
 export default function OfficialDanmaku({ videoRef, source, available, danmaku }) {
+  useLanguage();
   const layerRef = useRef(null);
   const layoutRef = useRef(null);
   const nodes = useRef(new Map());
@@ -192,6 +194,6 @@ export default function OfficialDanmaku({ videoRef, source, available, danmaku }
       {((list.length ? items : [])).map(item => <span className="comment-danmaku-item" key={item.id} ref={node => { if (node) nodes.current.set(item.id, node); else nodes.current.delete(item.id); }}
         style={{ transform: `translate(${item.x}px, ${item.y}px)`, color: item.color || '#FFFFFF' }}>{item.text}</span>)}
     </div>
-    {((loading && !items.length) || error || !list.length) && <span className="comment-danmaku-status" role="status">{status}</span>}
+    {((loading && !items.length) || error || !list.length) && <span className="comment-danmaku-status" role="status">{t(status)}</span>}
   </div>;
 }

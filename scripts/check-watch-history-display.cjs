@@ -88,7 +88,7 @@ function mount(rows, storage = new Map()) {
   vm.runInNewContext(source, {
     module,
     exports: module.exports,
-    require: name => name === './historyGroups.mjs' ? require('../src/components/historyGroups.mjs') : name === 'react' ? react : name === './icons' ? { Play: Icon, RefreshCw: Icon, Clock: Icon } : {},
+    require: name => name === '../i18n' ? { t: require('../src/i18n/translator.mjs').formatMessage, useLanguage() {}, getLanguage: () => 'zh-CN' } : name === './historyGroups.mjs' ? require('../src/components/historyGroups.mjs') : name === 'react' ? react : name === './icons' ? { Play: Icon, RefreshCw: Icon, Clock: Icon } : {},
     localStorage,
     window: { electronAPI: api, localStorage },
   });

@@ -51,7 +51,7 @@ function mount({ notice = null, fullscreen = null, hidden = false, openExternal 
   vm.runInNewContext(transformSync(fs.readFileSync(file, 'utf8'), { loader: 'jsx', format: 'cjs' }).code, {
     module, exports: module.exports,
     navigator: clipboardAvailable ? { clipboard: { writeText: async text => { copied.push(text); return writeClipboard(text); } } } : {},
-    require: name => name === 'react' ? react : name === 'react-dom' ? { createPortal: (node, root) => ({ node, root }) }
+    require: name => name === '../i18n' ? { t: require('../src/i18n/translator.mjs').formatMessage, useLanguage() {} } : name === 'react' ? react : name === 'react-dom' ? { createPortal: (node, root) => ({ node, root }) }
       : name === './useDialogKeyboard' ? () => {} : {},
     window: { electronAPI: api, addEventListener: (name, fn) => windowListeners.set(name, fn), removeEventListener: name => windowListeners.delete(name) }, document,
     setInterval: (fn, delay) => schedule(fn, delay, true), clearInterval: id => timers.delete(id),

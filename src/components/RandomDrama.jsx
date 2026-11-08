@@ -1,3 +1,4 @@
+import { t, useLanguage } from '../i18n';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Film, Play, RefreshCw } from './icons';
 import useMediaSources from './useMediaSources';
@@ -6,15 +7,17 @@ import { loadRandomPool, pickRandomDrama, playRecommendedDrama } from './randomD
 import './RandomDrama.css';
 
 export function DramaPoster({ item, className = '' }) {
+  useLanguage();
   const [failed, setFailed] = useState(false);
   useEffect(() => setFailed(false), [item?.cover]);
   return <div className={`drama-poster ${className}`}>
-    {item?.cover && !failed ? <img key={`${item.series_id}:${item.cover}`} src={item.cover} alt={`${item.series_title}海报`} onError={() => setFailed(true)} />
-      : <div className="drama-poster-fallback"><Film size={36} /><span>暂无海报</span></div>}
+    {item?.cover && !failed ? <img key={`${item.series_id}:${item.cover}`} src={item.cover} alt={t(`${item.series_title}海报`)} onError={() => setFailed(true)} />
+      : <div className="drama-poster-fallback"><Film size={36} /><span>{t("暂无海报")}</span></div>}
   </div>;
 }
 
 function StoryTickets({ shaking }) {
+  useLanguage();
   return <svg className={`story-tickets ${shaking ? 'is-shaking' : ''}`} viewBox="0 0 240 270" aria-hidden="true">
     <g className="story-tickets-sticks" fill="var(--bg-elevated)" stroke="var(--accent)" strokeWidth="2.5">
       <rect x="67" y="42" width="25" height="155" rx="5" transform="rotate(-15 80 180)" />
@@ -31,6 +34,7 @@ function StoryTickets({ shaking }) {
 }
 
 export default function RandomDrama({ active, refreshKey = 0, onNavigate }) {
+  useLanguage();
   const [source, setSource] = useState('all');
   const { sources: mediaSources, revision: sourceRevision, loading: sourcesLoading, error: sourcesError } = useMediaSources();
   const [pool, setPool] = useState([]);
@@ -98,46 +102,46 @@ export default function RandomDrama({ active, refreshKey = 0, onNavigate }) {
   const sourceLabel = id => mediaSourceLabel(id, mediaSources);
   return <div className="random-drama">
     <div className="random-drama-toolbar">
-      <p>不想挑？把下一部交给短剧签筒。</p>
-      <label>抽取范围<select value={source} onChange={event => setSource(event.target.value)}>
-        <option value="all">全部来源</option>{mediaSources.map(({ id, label }) => <option key={id} value={id}>{label}</option>)}
+      <p>{t("不想挑？把下一部交给短剧签筒。")}</p>
+      <label>{t("抽取范围")}<select value={source} onChange={event => setSource(event.target.value)}>
+        <option value="all">{t("全部来源")}</option>{mediaSources.map(({ id, label }) => <option key={id} value={id}>{id.startsWith('custom:') ? label : t(label)}</option>)}
       </select></label>
     </div>
     <div className={`random-drama-stage ${selected ? 'has-result' : ''}`}>
       <div className="random-drama-ritual">
         <button className="story-ticket-button" onClick={draw} disabled={loading || sourcesLoading || shaking || resolving || !pool.length}
-          aria-label={selected ? '摇动短剧签筒，再抽一部' : '摇动短剧签筒，抽一部短剧'}>
+          aria-label={t(selected ? '摇动短剧签筒，再抽一部' : '摇动短剧签筒，抽一部短剧')}>
           <StoryTickets shaking={shaking} />
-          <span>{shaking ? '好故事，马上揭晓' : selected ? '点击签筒，再遇见一部' : '点一下，摇出下一部'}</span>
+          <span>{t(shaking ? '好故事，马上揭晓' : selected ? '点击签筒，再遇见一部' : '点一下，摇出下一部')}</span>
         </button>
-        {!selected && <div className="random-drama-opening"><h3>今晚，看点意料之外的</h3><p>一签一部真实短剧，喜欢就开看。</p></div>}
+        {!selected && <div className="random-drama-opening"><h3>{t("今晚，看点意料之外的")}</h3><p>{t("一签一部真实短剧，喜欢就开看。")}</p></div>}
       </div>
       {selected && <div className="random-drama-result" aria-live="polite">
         <DramaPoster item={selected} />
-        <div className="random-drama-result-copy"><p className="drama-source-label">{sourceLabel(selected.source)} · 随机抽取</p>
+        <div className="random-drama-result-copy"><p className="drama-source-label">{sourceLabel(selected.source)}{t(" · 随机抽取")}</p>
           <h3>{selected.series_title}</h3>
-          {selected.episode_count > 0 && <p>共 {selected.episode_count} 集</p>}
+          {selected.episode_count > 0 && <p>{t("共 ")}{t(selected.episode_count)}{t(" 集")}</p>}
           {selected.tags?.length > 0 && <p className="random-drama-tags">{selected.tags.join(' · ')}</p>}
           <div className="random-drama-actions">
-            <button className="btn btn-primary" disabled={resolving || shaking} onClick={play}><Play size={16} />{resolving ? '正在打开…' : '在剧库播放'}</button>
-            <button className="btn btn-outline" disabled={resolving || shaking} onClick={draw}><RefreshCw size={15} />再抽一次</button>
+            <button className="btn btn-primary" disabled={resolving || shaking} onClick={play}><Play size={16} />{t(resolving ? '正在打开…' : '在剧库播放')}</button>
+            <button className="btn btn-outline" disabled={resolving || shaking} onClick={draw}><RefreshCw size={15} />{t("再抽一次")}</button>
           </div>
-          {resolving && <button className="drama-text-button" onClick={() => { playController.current?.abort(); setResolving(false); setPlayError('已取消加载，可以重试或再抽一部。'); }}>取消加载</button>}
-          {playError && <p className="drama-inline-error" role="alert">{playError}</p>}
+          {resolving && <button className="drama-text-button" onClick={() => { playController.current?.abort(); setResolving(false); setPlayError('已取消加载，可以重试或再抽一部。'); }}>{t("取消加载")}</button>}
+          {playError && <p className="drama-inline-error" role="alert">{t(playError)}</p>}
         </div>
       </div>}
     </div>
     <div className="random-drama-status" aria-live="polite">
-      {loading || sourcesLoading ? <><p><RefreshCw size={14} className="spin" />正在把真实短剧装进签筒…</p><button className="drama-text-button" onClick={() => {
+      {loading || sourcesLoading ? <><p><RefreshCw size={14} className="spin" />{t("正在把真实短剧装进签筒…")}</p><button className="drama-text-button" onClick={() => {
         listController.current?.abort(); setLoading(false); setError('已取消加载。可以重新加载，或换个来源。');
-      }}>取消加载</button></> : <>
-        {error ? <p role="alert">{error}</p> : <p>签筒已装好 {pool.length} 部 · 不会连续抽到同一部</p>}
-        {unavailable.length > 0 && pool.length > 0 && <p>{unavailable.map(sourceLabel).join('、')}暂未取到片单，本次从其余来源抽取。</p>}
-        {(error || unavailable.length > 0) && <button className="drama-text-button" onClick={() => load(true)}>重新加载片单</button>}
-        {!pool.length && onNavigate && <button className="drama-text-button" onClick={() => onNavigate('download')}>按剧名搜索</button>}
+      }}>{t("取消加载")}</button></> : <>
+        {error ? <p role="alert">{t(error)}</p> : <p>{t("签筒已装好 ")}{t(pool.length)}{t(" 部 · 不会连续抽到同一部")}</p>}
+        {unavailable.length > 0 && pool.length > 0 && <p>{unavailable.map(sourceLabel).join('、')}{t("暂未取到片单，本次从其余来源抽取。")}</p>}
+        {(error || unavailable.length > 0) && <button className="drama-text-button" onClick={() => load(true)}>{t("重新加载片单")}</button>}
+        {!pool.length && onNavigate && <button className="drama-text-button" onClick={() => onNavigate('download')}>{t("按剧名搜索")}</button>}
       </>}
     </div>
-    {sourcesError && <p className="random-drama-note" role="status">来源列表更新失败，暂用上次列表；可在设置重新保存来源后重试。</p>}
-    <p className="random-drama-note">从所选来源当前目录随机抽取，不代表热播排名。播放以来源实际可用的免费分集为准。</p>
+    {sourcesError && <p className="random-drama-note" role="status">{t("来源列表更新失败，暂用上次列表；可在设置重新保存来源后重试。")}</p>}
+    <p className="random-drama-note">{t("从所选来源当前目录随机抽取，不代表热播排名。播放以来源实际可用的免费分集为准。")}</p>
   </div>;
 }

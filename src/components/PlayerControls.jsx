@@ -1,3 +1,4 @@
+import { t, useLanguage } from '../i18n';
 import React, { useEffect, useRef, useState } from 'react';
 import { Play, Pause, Settings as SettingsIcon, PictureInPicture } from './icons';
 import './PlayerControls.css';
@@ -10,9 +11,12 @@ const formatTime = seconds => {
   const value = Math.max(0, Math.floor(seconds || 0));
   return `${Math.floor(value / 60)}:${String(value % 60).padStart(2, '0')}`;
 };
-const Icon = ({ children }) => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{children}</svg>;
+const Icon = ({ children }) => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{t(children)}</svg>;
 
-export default function PlayerControls({ danmaku, enhancement, shortcuts = DEFAULT_SHORTCUTS, onToggleFullscreen, videoRef, stageRef, source, available, floating = false, onToggleFloating, continuing = false, autoContinue = false, rate, onRateChange, onError, pictureMode = 'fit', onPictureModeChange, portrait = false, windowFill = false, onWindowFill, seriesTitle = '', episodes = [], currentIndex, onEpisodeChange, onlineQuality = 'auto', supportsOnlineQuality = false, onQualityChange, onOpenSettings }) {
+export default function PlayerControls({ danmaku, enhancement, shortcuts = DEFAULT_SHORTCUTS, onToggleFullscreen, videoRef, stageRef, source, available, floating = false, onToggleFloating, continuing = false, autoContinue = false, rate, onRateChange, onError, pictureMode = 'fit', onPictureModeChange, portrait = false, windowFill = false, onWindowFill, seriesTitle = '', episodes = [], currentIndex, onEpisodeChange, onlineQuality = 'auto', supportsOnlineQuality = false, onQualityChange, onOpenSettings, episodesOpen = false, onOpenEpisodes, onOpenDownloads }) {
+  useLanguage();
+  const mobile = window.electronAPI?.platform === 'android';
+  const controlsIdleMs = mobile ? 2000 : 1000;
   const [media, setMedia] = useState({ paused: true, ended: false, time: 0, duration: 0, muted: false, volume: 1 });
   const [fullscreen, setFullscreen] = useState(false);
   const [clock, setClock] = useState(() => formatClock());
@@ -70,7 +74,7 @@ export default function PlayerControls({ danmaku, enhancement, shortcuts = DEFAU
     let pauseTimer;
     let dragging = false;
     const hide = () => {
-      if (available && !media.paused && !menuOpen && !danmakuOpen && !selectionPanel && !dragging && !controlsRef.current?.querySelector(':focus-visible')) {
+      if (available && !media.paused && !menuOpen && !danmakuOpen && !selectionPanel && !episodesOpen && !dragging && !controlsRef.current?.querySelector(':focus-visible')) {
         // Clear pointer focus so the next playback key cannot highlight a hidden button.
         if (controlsRef.current?.contains(stageDocument.activeElement)) stageDocument.activeElement.blur();
         setControlsHidden(true);
@@ -78,14 +82,14 @@ export default function PlayerControls({ danmaku, enhancement, shortcuts = DEFAU
     };
     const scheduleHide = () => {
       clearTimeout(timer);
-      if (available && !media.paused && !menuOpen && !danmakuOpen && !selectionPanel && !dragging) {
+      if (available && !media.paused && !menuOpen && !danmakuOpen && !selectionPanel && !episodesOpen && !dragging) {
         // Fullscreen and source changes keep the deadline set by actual user activity.
-        if (!idleDeadlineRef.current) idleDeadlineRef.current = Date.now() + 1000;
+        if (!idleDeadlineRef.current) idleDeadlineRef.current = Date.now() + controlsIdleMs;
         timer = setTimeout(hide, Math.max(0, idleDeadlineRef.current - Date.now()));
       }
     };
-    const reveal = () => { clearTimeout(pauseTimer); idleDeadlineRef.current = Date.now() + 1000; setControlsHidden(false); scheduleHide(); };
-    const onPointerLeave = () => { pointerRef.current = null; clearTimeout(timer); hide(); };
+    const reveal = () => { clearTimeout(pauseTimer); idleDeadlineRef.current = Date.now() + controlsIdleMs; setControlsHidden(false); scheduleHide(); };
+    const onPointerLeave = event => { if (mobile && event?.pointerType === 'touch') return; pointerRef.current = null; clearTimeout(timer); hide(); };
     const onKey = event => {
       const physicalKey = event.code || event.key;
       // Keep the release paired across source/effect changes, even if Shift is released first.
@@ -150,7 +154,7 @@ export default function PlayerControls({ danmaku, enhancement, shortcuts = DEFAU
       stageWindow.removeEventListener('pointercancel', stopDrag);
       stageWindow.removeEventListener('blur', onBlur);
     };
-  }, [portrait, expanded, available, media.paused, media.ended, continuing, autoContinue, menuOpen, danmakuOpen, selectionPanel, source, floating, stageRef, shortcuts]);
+  }, [portrait, expanded, available, media.paused, media.ended, continuing, autoContinue, menuOpen, danmakuOpen, selectionPanel, source, floating, stageRef, shortcuts, controlsIdleMs, episodesOpen]);
 
   useEffect(() => {
     setMenuOpen(false);
@@ -210,12 +214,18 @@ export default function PlayerControls({ danmaku, enhancement, shortcuts = DEFAU
     const outside = event => {
       if (!danmakuPanelRef.current?.contains(event.target) && !danmakuButtonRef.current?.contains(event.target)) setDanmakuOpen(false);
     };
+    const escape = event => {
+      if (event.key !== 'Escape') return;
+      event.preventDefault(); event.stopPropagation();
+      setDanmakuOpen(false); (mobile ? menuButtonRef : danmakuButtonRef).current?.focus();
+    };
     measure();
     const observer = new stageWindow.ResizeObserver(measure);
     if (stageRef.current) observer.observe(stageRef.current);
     if (controlsRef.current) observer.observe(controlsRef.current);
     stageDocument.addEventListener('pointerdown', outside);
-    return () => { observer.disconnect(); stageDocument.removeEventListener('pointerdown', outside); };
+    stageDocument.addEventListener('keydown', escape);
+    return () => { observer.disconnect(); stageDocument.removeEventListener('pointerdown', outside); stageDocument.removeEventListener('keydown', escape); };
   }, [danmakuOpen, floating, stageRef]);
 
   useEffect(() => {
@@ -258,7 +268,7 @@ export default function PlayerControls({ danmaku, enhancement, shortcuts = DEFAU
     setSelectionPanel(open => open === panel ? null : panel);
   };
 
-  const closeDanmaku = () => { setDanmakuOpen(false); danmakuButtonRef.current?.focus(); };
+  const closeDanmaku = () => { setDanmakuOpen(false); (mobile ? menuButtonRef : danmakuButtonRef).current?.focus(); };
 
   const togglePlay = async () => {
     const video = videoRef.current;
@@ -286,87 +296,98 @@ export default function PlayerControls({ danmaku, enhancement, shortcuts = DEFAU
   };
 
   return (
-    <div className={`player-controls ${controlsHidden ? 'controls-hidden' : ''}`} role="group" aria-label="视频播放控制">
-      {expanded && <div className="player-now-playing" aria-label="当前播放信息">
-        <div className="player-now-title"><strong title={seriesTitle}>{seriesTitle || '正在播放'}</strong><span>第 {currentIndex} 集</span></div>
-        <div className="player-now-meta">{formatQualityMeta(media.width, media.height)}</div>
-        <time className="player-clock" dateTime={clock} aria-label={`当前时间 ${clock}`}>{clock}</time>
+    <div className={`player-controls ${controlsHidden ? 'controls-hidden' : ''}`} role="group" aria-label={t("视频播放控制")}>
+      {expanded && <div className="player-now-playing" aria-label={t("当前播放信息")}>
+        <div className="player-now-title"><strong title={seriesTitle}>{(seriesTitle || t('正在播放'))}</strong><span>{t("第 {0} 集", [currentIndex])}</span></div>
+        <div className="player-now-meta">{t(formatQualityMeta(media.width, media.height))}</div>
+        <time className="player-clock" dateTime={clock} aria-label={t(`当前时间 ${clock}`)}>{t(clock)}</time>
       </div>}
       <div ref={controlsRef} className="player-controls-bar">
-      <input className="player-controls-seek" type="range" aria-label="播放进度" aria-valuetext={`${formatTime(media.time)} / ${formatTime(media.duration)}`} min="0" max={media.duration || 0} step="0.1" value={Math.min(media.time, media.duration)} disabled={!available || !media.duration} onChange={seek} />
+      <input className="player-controls-seek" type="range" aria-label={t("播放进度")} aria-valuetext={`${formatTime(media.time)} / ${formatTime(media.duration)}`} min="0" max={media.duration || 0} step="0.1" value={Math.min(media.time, media.duration)} disabled={!available || !media.duration} onChange={seek} />
       <div className="player-controls-row">
-        <button type="button" data-player-control aria-label={media.paused ? '播放' : '暂停'} title={`播放/暂停（${formatShortcut(shortcuts.play)}）`} disabled={!available} onClick={togglePlay}>{media.paused ? <Play size={18} /> : <Pause size={18} />}</button>
-        <button type="button" data-player-control aria-label="下一集" title={`下一集（${formatShortcut(shortcuts.next)}）`} disabled={!nextEpisode} onClick={() => nextEpisode && onEpisodeChange(nextEpisode.vid_index)}>
+        <button type="button" data-player-control aria-label={t(media.paused ? '播放' : '暂停')} title={t(`播放/暂停（${formatShortcut(shortcuts.play, t)}）`)} disabled={!available} onClick={togglePlay}>{media.paused ? <Play size={18} /> : <Pause size={18} />}</button>
+        <button type="button" data-player-control aria-label={t("下一集")} title={t(`下一集（${formatShortcut(shortcuts.next, t)}）`)} disabled={!nextEpisode} onClick={() => nextEpisode && onEpisodeChange(nextEpisode.vid_index)}>
           <Icon><path d="m5 4 11 8-11 8V4Zm14 0v16" /></Icon>
         </button>
-        <span className="player-controls-time">{formatTime(media.time)} / {formatTime(media.duration)}</span>
+        <span className="player-controls-time">{t(formatTime(media.time))} / {t(formatTime(media.duration))}</span>
         {danmaku && <div className="player-controls-danmaku">
-          <button type="button" data-player-menu className={`danmaku-icon-button ${danmaku.enabled ? 'danmaku-enabled' : ''}`} aria-label={`${danmaku.enabled ? '关闭' : '开启'}${danmaku.sourceKind === 'official' ? '时间轴弹幕' : '本集评论'}`} aria-pressed={danmaku.enabled}
-            title={danmaku.supported ? (danmaku.sourceKind === 'official' ? '按视频时间展示时间轴弹幕' : '依次展示本集评论，与视频时间无对应') : '仅红果来源的当前集支持弹幕'} disabled={!danmaku.supported} onClick={danmaku.toggle}><span className="danmaku-symbol" aria-hidden="true">弹<span className="danmaku-state-mark" /></span></button>
-          <button type="button" data-player-menu className="danmaku-icon-button" ref={danmakuButtonRef} aria-label="弹幕设置" title="弹幕来源与显示设置" aria-haspopup="dialog" aria-expanded={danmakuOpen}
+          <button type="button" data-player-menu className={`danmaku-icon-button ${danmaku.enabled ? 'danmaku-enabled' : ''}`} aria-label={t(`${danmaku.enabled ? '关闭' : '开启'}${danmaku.sourceKind === 'official' ? '时间轴弹幕' : '本集评论'}`)} aria-pressed={danmaku.enabled}
+            title={t(danmaku.supported ? (danmaku.sourceKind === 'official' ? '按视频时间展示时间轴弹幕' : '依次展示本集评论，与视频时间无对应') : '仅红果来源的当前集支持弹幕')} disabled={!danmaku.supported} onClick={danmaku.toggle}><span className="danmaku-symbol" aria-hidden="true">{t("弹")}<span className="danmaku-state-mark" /></span></button>
+          <button type="button" data-player-menu className="danmaku-icon-button" ref={danmakuButtonRef} aria-label={t("弹幕设置")} title={t("弹幕来源与显示设置")} aria-haspopup="dialog" aria-expanded={danmakuOpen}
             onClick={() => { setMenuOpen(false); setSelectionPanel(null); setDanmakuOpen(open => !open); }}>
-            <span className="danmaku-symbol" aria-hidden="true">弹<span className="danmaku-settings-mark"><SettingsIcon size={10} /></span></span>
+            <span className="danmaku-symbol" aria-hidden="true">{t("弹")}<span className="danmaku-settings-mark"><SettingsIcon size={10} /></span></span>
           </button>
           {danmakuOpen && <DanmakuSettings danmaku={danmaku} onClose={closeDanmaku} panelRef={danmakuPanelRef} maxHeight={danmakuHeight} />}
         </div>}
         <div className="player-controls-selection" data-player-menu ref={selectionRef}>
-          {!!episodes.length && <button type="button" ref={episodeButtonRef} aria-label="选集" aria-haspopup="dialog" aria-expanded={selectionPanel === 'episodes'}
-            onClick={() => toggleSelection('episodes')}>选集</button>}
-          {onQualityChange && <button type="button" ref={qualityButtonRef} aria-label="清晰度" aria-haspopup="dialog" aria-expanded={selectionPanel === 'quality'}
-            onClick={() => toggleSelection('quality')}>{onlineQuality === 'compat' ? '老电脑' : onlineQuality === 'auto' ? (media.width > 0 && media.height > 0 ? `${Math.min(media.width, media.height)}P` : '自动') : onlineQuality.toUpperCase()}</button>}
-          {selectionPanel === 'episodes' && <div className="player-controls-popover player-episode-popover" role="dialog" aria-label="选集面板" style={{ maxHeight: selectionHeight }}>
-            <div className="player-popover-heading"><strong>选集</strong><span>第 {currentIndex} 集 / 共 {episodes.length} 集</span></div>
+          {!!episodes.length && <button type="button" ref={episodeButtonRef} aria-label={t("选集")} aria-haspopup="dialog" aria-expanded={episodesOpen || selectionPanel === 'episodes'}
+            onClick={() => mobile && !fullscreen && onOpenEpisodes ? onOpenEpisodes() : toggleSelection('episodes')}>{t("选集")}</button>}
+          {!mobile && onQualityChange && <button type="button" ref={qualityButtonRef} aria-label={t("清晰度")} aria-haspopup="dialog" aria-expanded={selectionPanel === 'quality'}
+            onClick={() => toggleSelection('quality')}>{t(onlineQuality === 'compat' ? (mobile ? '兼容' : '老电脑') : onlineQuality === 'auto' ? (media.width > 0 && media.height > 0 ? `${Math.min(media.width, media.height)}P` : '自动') : onlineQuality.toUpperCase())}</button>}
+          {selectionPanel === 'episodes' && <div className="player-controls-popover player-episode-popover" role="dialog" aria-label={t("选集面板")} style={{ maxHeight: selectionHeight }}>
+            <div className="player-popover-heading"><strong>{t("选集")}</strong><span>{t("第 {0} 集 / 共 {1} 集", [currentIndex, episodes.length])}</span></div>
             <div className="player-episode-grid">
-              {episodes.map(episode => <button type="button" key={episode.vid_index} aria-label={`播放第 ${episode.vid_index} 集`} aria-current={episode.vid_index === currentIndex ? 'true' : undefined}
-                disabled={episode.locked} title={episode.locked ? '来源未开放本集' : `播放第 ${episode.vid_index} 集`}
+              {episodes.map(episode => <button type="button" key={episode.vid_index} aria-label={t(`播放第 ${episode.vid_index} 集`)} aria-current={episode.vid_index === currentIndex ? 'true' : undefined}
+                disabled={episode.locked} title={t(episode.locked ? '来源未开放本集' : `播放第 ${episode.vid_index} 集`)}
                 onClick={() => { setSelectionPanel(null); episodeButtonRef.current?.focus(); onEpisodeChange(episode.vid_index); }}>
-                {episode.vid_index}{episode.locked && <small>未开放</small>}
+                {t(episode.vid_index)}{episode.locked && <small>{t("未开放")}</small>}
               </button>)}
             </div>
           </div>}
-          {selectionPanel === 'quality' && <div className="player-controls-popover player-quality-popover" role="dialog" aria-label="清晰度面板" style={{ maxHeight: selectionHeight }}>
-            <div className="player-popover-heading"><strong>清晰度</strong></div>
-            <p className="player-quality-current">当前画面：{media.width > 0 && media.height > 0 ? `${Math.min(media.width, media.height)}P（${media.width} × ${media.height}）` : '等待视频信息'}</p>
-            <div role="group" aria-label="选择播放清晰度">
-              {(supportsOnlineQuality ? ['auto', 'compat', '720p', '1080p'] : ['auto']).map(quality => <button type="button" key={quality} aria-label={`选择 ${quality === 'compat' ? '老电脑' : quality === 'auto' ? '自动' : quality.toUpperCase()}`}
+          {selectionPanel === 'quality' && <div className="player-controls-popover player-quality-popover" role="dialog" aria-label={t("清晰度面板")} style={{ maxHeight: selectionHeight }}>
+            <div className="player-popover-heading"><strong>{t("清晰度")}</strong></div>
+            <p className="player-quality-current">{t("当前画面：")}{t(media.width > 0 && media.height > 0 ? `${Math.min(media.width, media.height)}P（${media.width} × ${media.height}）` : '等待视频信息')}</p>
+            <div role="group" aria-label={t("选择播放清晰度")}>
+              {(supportsOnlineQuality ? ['auto', 'compat', '720p', '1080p'] : ['auto']).map(quality => <button type="button" key={quality} aria-label={t('选择 {0}', [t(quality === 'compat' ? '老电脑' : quality === 'auto' ? '自动' : quality.toUpperCase())])}
                 aria-pressed={onlineQuality === quality} onClick={() => { setSelectionPanel(null); qualityButtonRef.current?.focus(); if (quality !== onlineQuality) onQualityChange(quality); }}>
-                <span>{quality === 'compat' ? '老电脑（H.264优先）' : quality === 'auto' ? (supportsOnlineQuality ? '自动（1080P优先）' : '由片源决定') : quality.toUpperCase()}</span><span aria-hidden="true">{onlineQuality === quality ? '✓' : ''}</span>
+                <span>{t(quality === 'compat' ? (mobile ? '兼容片源（H.264优先）' : '老电脑（H.264优先）') : quality === 'auto' ? (supportsOnlineQuality ? '自动（1080P优先）' : '由片源决定') : quality.toUpperCase())}</span><span aria-hidden="true">{t(onlineQuality === quality ? '✓' : '')}</span>
               </button>)}
             </div>
-            <p className="player-quality-hint">{supportsOnlineQuality ? '自动优先1080P，失败后尝试720P和兼容片源。老电脑优先H.264，画质可能降低；开启兼容模式时，已知H.265片源提前转码，CPU较慢仍需等待。手动720P / 1080P保持固定画质；切换保留进度和暂停状态。' : '此来源的清晰度由片源决定，暂不支持指定画质。当前画面分辨率不代表来源的最高画质。'}</p>
+            <p className="player-quality-hint">{t(supportsOnlineQuality ? mobile ? '自动优先1080P，失败后尝试720P与兼容片源；手动指定画质时保持固定。兼容片源优先H.264，画质可能降低。安卓使用系统解码，ByteVC2转换暂未接入。切换保留进度和暂停状态。' : '自动优先1080P，失败后尝试720P和兼容片源。老电脑优先H.264，画质可能降低；开启兼容模式时，已知H.265片源提前转码，CPU较慢仍需等待。手动720P / 1080P保持固定画质；切换保留进度和暂停状态。' : '此来源的清晰度由片源决定，暂不支持指定画质。当前画面分辨率不代表来源的最高画质。')}</p>
           </div>}
         </div>
         <div className="player-controls-volume">
-          <button type="button" data-player-control aria-label={media.muted ? '取消静音' : '静音'} onClick={() => { const video = videoRef.current; if (video) video.muted = !video.muted; }}>
+          <button type="button" data-player-control aria-label={t(media.muted ? '取消静音' : '静音')} onClick={() => { const video = videoRef.current; if (video) video.muted = !video.muted; }}>
             <Icon><path d="M11 5 6 9H3v6h3l5 4Z" />{media.muted ? <path d="m16 9 5 6m0-6-5 6" /> : <path d="M15 8a6 6 0 0 1 0 8m3-11a10 10 0 0 1 0 14" />}</Icon>
           </button>
-          <input type="range" aria-label="音量" aria-valuetext={`${Math.round((media.muted ? 0 : media.volume) * 100)}%`} min="0" max="1" step="0.05" value={media.muted ? 0 : media.volume} onChange={changeVolume} />
+          <input type="range" aria-label={t("音量")} aria-valuetext={`${Math.round((media.muted ? 0 : media.volume) * 100)}%`} min="0" max="1" step="0.05" value={media.muted ? 0 : media.volume} onChange={changeVolume} />
         </div>
-        <button type="button" data-player-control aria-label={expanded ? '退出全屏' : '全屏'} title={`${expanded ? '退出全屏' : portrait ? '填满当前窗口' : '全屏'}（${formatShortcut(shortcuts.fullscreen)}）`} onClick={onToggleFullscreen}>
+        <button type="button" data-player-control aria-label={t(expanded ? '退出全屏' : '全屏')} title={t(expanded ? '退出全屏（{0}）' : portrait ? '填满当前窗口（{0}）' : '全屏（{0}）', [formatShortcut(shortcuts.fullscreen, t)])} onClick={onToggleFullscreen}>
           <Icon><path d={expanded ? 'M9 3v6H3m12-6v6h6M9 21v-6H3m12 6v-6h6' : 'M9 3H3v6m12-6h6v6M3 15v6h6m12-6v6h-6'} /></Icon>
         </button>
-        <button type="button" data-player-control aria-label={floating ? '退出画中画' : '画中画'} aria-pressed={floating}
-          title={floating ? '返回主窗口' : '画中画：在设置中选择系统原生或应用自带小窗'}
+        <button type="button" data-player-control className="player-controls-pip" aria-label={t(floating ? '退出画中画' : '画中画')} aria-pressed={floating}
+          title={t(floating ? '返回主窗口' : '画中画：在设置中选择系统原生或应用自带小窗')}
           disabled={!available} onClick={toggleFloating}>
           <PictureInPicture size={18} />
         </button>
-        <button type="button" data-player-control className="player-controls-rate" aria-label="增加播放速度" title={`播放速度 ${rate}×，点击增加 0.25 倍，4 倍后回到 1 倍`} onClick={() => onRateChange(rate >= 4 ? 1 : Math.min(4, rate + 0.25))}>{rate}×</button>
+        {mobile ? <select data-player-menu className="player-controls-rate" aria-label={t("播放速度")} value={rate} onChange={event => { idleDeadlineRef.current = Date.now() + controlsIdleMs; event.currentTarget.blur(); onRateChange(Number(event.target.value)); }}>
+          {Array.from({ length: 16 }, (_, index) => (index + 1) / 4).map(value => <option key={value} value={value}>{t(value)}×</option>)}
+        </select> : <button type="button" data-player-control className="player-controls-rate" aria-label={t("增加播放速度")} title={t(`播放速度 ${rate}×，点击增加 0.25 倍，4 倍后回到 1 倍`)} onClick={() => onRateChange(rate >= 4 ? 1 : Math.min(4, rate + 0.25))}>{t(rate)}×</button>}
         <div className="player-controls-options" data-player-menu ref={menuRef}>
-          <button type="button" ref={menuButtonRef} aria-label="更多播放选项" title="更多播放选项" aria-haspopup="dialog" aria-expanded={menuOpen} onClick={() => { setDanmakuOpen(false); setSelectionPanel(null); setMenuOpen(open => !open); }}>
+          <button type="button" ref={menuButtonRef} aria-label={t("更多播放选项")} title={t("更多播放选项")} aria-haspopup="dialog" aria-expanded={menuOpen} onClick={() => { setDanmakuOpen(false); setSelectionPanel(null); setMenuOpen(open => !open); }}>
             <Icon><circle cx="12" cy="5" r="1" /><circle cx="12" cy="12" r="1" /><circle cx="12" cy="19" r="1" /></Icon>
           </button>
-          {menuOpen && <div className="player-controls-menu" style={{ maxHeight: menuHeight }} role="dialog" aria-label="播放选项">
-            <label>播放速度<select ref={speedRef} aria-label="播放速度" value={rate} onChange={event => onRateChange(Number(event.target.value))}>
-              {Array.from({ length: 16 }, (_, index) => (index + 1) / 4).map(value => <option key={value} value={value}>{value}×</option>)}
+          {menuOpen && <div className="player-controls-menu" style={{ maxHeight: menuHeight }} role="dialog" aria-label={t("播放选项")}>
+            {mobile && <>
+              {onOpenDownloads && <button type="button" onClick={() => { setMenuOpen(false); onOpenDownloads(); }}>{t("下载管理")}</button>}
+              {onQualityChange && <button type="button" onClick={() => toggleSelection('quality')}>{t("清晰度 · ")}{t(onlineQuality === 'auto' ? '自动' : onlineQuality === 'compat' ? '兼容' : onlineQuality.toUpperCase())}</button>}
+              <button type="button" disabled={!available} onClick={() => { setMenuOpen(false); toggleFloating(); }}>{t(floating ? '退出画中画' : '画中画')}</button>
+              {danmaku && <>
+                <button type="button" disabled={!danmaku.supported} aria-pressed={danmaku.enabled} onClick={danmaku.toggle}>{t(danmaku.enabled ? '关闭弹幕' : '开启弹幕')}</button>
+                <button type="button" onClick={() => { setMenuOpen(false); setDanmakuOpen(true); }}>{t("弹幕设置")}</button>
+              </>}
+            </>}
+            {!mobile && <label>{t("播放速度")}<select ref={speedRef} aria-label={t("播放速度")} value={rate} onChange={event => onRateChange(Number(event.target.value))}>
+              {Array.from({ length: 16 }, (_, index) => (index + 1) / 4).map(value => <option key={value} value={value}>{t(value)}×</option>)}
+            </select></label>}
+            <label className="player-picture-mode">{t("画面模式")}<select aria-label={t("画面模式")} aria-describedby="picture-mode-hint" value={pictureMode} onChange={event => onPictureModeChange(event.target.value)}>
+              <option value="fit">{t("适应窗口")}</option>
+              <option value="width">{t("保持宽度")}</option>
             </select></label>
-            <label className="player-picture-mode">画面模式<select aria-label="画面模式" aria-describedby="picture-mode-hint" value={pictureMode} onChange={event => onPictureModeChange(event.target.value)}>
-              <option value="fit">适应窗口</option>
-              <option value="width">保持宽度</option>
-            </select></label>
-            <span id="picture-mode-hint">{pictureMode === 'width' ? '按宽度显示，上下可能裁剪。按剧单独记忆。' : '完整显示，随窗口缩放。按剧单独记忆。'}</span>
+            <span id="picture-mode-hint">{t(pictureMode === 'width' ? '按宽度显示，上下可能裁剪。按剧单独记忆。' : '完整显示，随窗口缩放。按剧单独记忆。')}</span>
             {enhancement && <VideoEnhancementControls enhancement={enhancement} available={available} />}
-            {onOpenSettings && <button type="button" aria-label="播放设置" onClick={() => { setMenuOpen(false); onOpenSettings(); }}>播放设置</button>}
-            {SHORTCUT_ACTIONS.map(action => <span key={action.id}>{formatShortcut(shortcuts[action.id])}：{action.label}</span>)}
+            {onOpenSettings && <button type="button" aria-label={t("播放设置")} onClick={() => { setMenuOpen(false); onOpenSettings(); }}>{t("播放设置")}</button>}
+            {!mobile && SHORTCUT_ACTIONS.map(action => <span key={action.id}>{t(formatShortcut(shortcuts[action.id], t))}：{t(action.label)}</span>)}
           </div>}
         </div>
       </div>
