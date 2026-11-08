@@ -64,6 +64,9 @@ jobs:
           node-version: '22'
           cache: npm
       - run: npm ci --no-audit --no-fund
+      - run: node scripts/prepare-electron.cjs
+        env:
+          GH_TOKEN: ${{ github.token }}
       - uses: actions/download-artifact@v4
         with:
           name: windows-media
@@ -95,9 +98,9 @@ jobs:
       - shell: pwsh
         if: steps.app-cache.outputs.cache-hit != 'true'
         run: |
-          npm run build:portable
+          npm run build:portable -- --config.electronDist=.cache/electron
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
-          npx electron-builder --win nsis --x64 --publish never
+          npx electron-builder --win nsis --x64 --publish never --config.electronDist=.cache/electron
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'

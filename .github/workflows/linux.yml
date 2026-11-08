@@ -30,7 +30,10 @@ jobs:
           cp "$RUNNER_TEMP/linux-media/ffmpeg/artifacts/bin/"* build/ffmpeg/linux-x64/
           cp "$RUNNER_TEMP/linux-media/librempeg/artifacts/bin/"* build/ffmpeg/linux-x64/
       - run: npm ci --no-audit --no-fund
-      - run: npm run build:linux
+      - run: node scripts/prepare-electron.cjs
+        env:
+          GH_TOKEN: ${{ github.token }}
+      - run: npm run build:linux -- --config.electronDist=.cache/electron
       - run: xvfb-run -a node scripts/check-linux-appimage.cjs
       - run: cp "$RUNNER_TEMP/linux-media/ffmpeg/artifacts/"*source.tar.gz "$RUNNER_TEMP/linux-media/librempeg/artifacts/"*source.tar.gz dist/
       - uses: actions/upload-artifact@v4
