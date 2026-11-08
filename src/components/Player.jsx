@@ -22,7 +22,7 @@ const PREFETCH_RETRY_MS = 15 * 1000;
 // 播放期间最多预取后续两集；跳到更远时再按新位置补齐。
 const PREFETCH_AHEAD = 2;
 const AUTO_ONLINE_QUALITIES = ['1080p', '720p', 'auto'];
-const playbackQualities = (quality, seriesId) => quality === 'auto' && !/^(xifan|hema|custom):/.test(seriesId)
+const playbackQualities = (quality, seriesId) => quality === 'auto' && !/^(xifan|hema|reelshort|dramabox|custom):/.test(seriesId)
   ? AUTO_ONLINE_QUALITIES : [quality === 'compat' ? 'auto' : quality];
 const rejectsPlaybackSource = result => /^(?:DEVICE_REGISTRATION_FAILED|BUSINESS_REJECTED|SECURITY_BLOCKED)$/.test(result?.code || '')
   || Array.isArray(result?.sources) && result.sources.some(item => item.source === 'app'
@@ -93,7 +93,7 @@ function Player({ target, onNavigate, onSeriesSelected, onFloatingChange, active
     try { const value = window.localStorage.getItem('hongguo:online-quality'); return ['720p', '1080p', 'compat'].includes(value) ? value : 'auto'; }
     catch { return 'auto'; }
   });
-  const supportsOnlineQuality = !/^(xifan|hema|custom):/.test(activeSeriesId);
+  const supportsOnlineQuality = !/^(xifan|hema|reelshort|dramabox|custom):/.test(activeSeriesId);
   const onlineQuality = supportsOnlineQuality ? onlineQualityChoice : 'auto';
   const [qualityLoading, setQualityLoading] = useState(true);
   const [waitingFor, setWaitingFor] = useState(null); // 正在等待下载的集号
@@ -384,7 +384,7 @@ function Player({ target, onNavigate, onSeriesSelected, onFloatingChange, active
 
   const usableLocal = useCallback((ep, seriesId) => ep && !ep.locked && ep.status === 'completed' && ep.fileUrl
     && localMediaKey(seriesId, ep) !== rejectedLocalRef.current
-    && (['auto', 'compat'].includes(stateRef.current.onlineQuality) || /^(xifan|hema|custom):/.test(seriesId)
+    && (['auto', 'compat'].includes(stateRef.current.onlineQuality) || /^(xifan|hema|reelshort|dramabox|custom):/.test(seriesId)
       || Number.parseInt(ep.actualQuality, 10) >= Number.parseInt(stateRef.current.onlineQuality, 10)), []);
 
   const resumeLocal = useCallback((ep, seekTo, autoplay = true) => {
@@ -428,7 +428,7 @@ function Player({ target, onNavigate, onSeriesSelected, onFloatingChange, active
       if (!isCurrentFallback(intent)) return;
       let quality = stateRef.current.onlineQuality === 'compat' ? 'auto' : stateRef.current.onlineQuality !== 'auto' ? stateRef.current.onlineQuality : stateRef.current.qualityLoading
         ? (['1080p', '720p'].includes(settings?.download_quality) ? settings.download_quality : 'auto') : stateRef.current.downloadQuality;
-      if (quality === 'auto' && stateRef.current.onlineQuality !== 'compat' && !/^(xifan|hema|custom):/.test(intent.seriesId)) quality = '1080p';
+      if (quality === 'auto' && stateRef.current.onlineQuality !== 'compat' && !/^(xifan|hema|reelshort|dramabox|custom):/.test(intent.seriesId)) quality = '1080p';
       fallbackAttemptRef.current = key;
       setPlaybackError(''); setWaitingFor(intent.vidIndex);
       // Enqueue validates quality and reuses an existing task; cancelling playback never stops that shared download.
@@ -956,7 +956,7 @@ function Player({ target, onNavigate, onSeriesSelected, onFloatingChange, active
 
   function reconnectOnce() {
     const key = `${activeSeriesId}:${currentIndex}`;
-    if (stateRef.current.onlineQuality === 'auto' && !/^(xifan|hema|custom):/.test(activeSeriesId)
+    if (stateRef.current.onlineQuality === 'auto' && !/^(xifan|hema|reelshort|dramabox|custom):/.test(activeSeriesId)
       && onlineSourceRef.current === key) {
       const next = (onlineRequestRef.current?.qualityIndex ?? 0) + 1;
       if (!current?.vid || current.locked || next >= AUTO_ONLINE_QUALITIES.length) return false;

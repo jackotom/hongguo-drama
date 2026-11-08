@@ -1,0 +1,10 @@
+--- a/libavcodec/vt_internal.h
++++ b/libavcodec/vt_internal.h
+@@ -53,6 +53,7 @@
+ int ff_videotoolbox_common_init(AVCodecContext *avctx);
+ int ff_videotoolbox_frame_params(AVCodecContext *avctx,
+                                  AVBufferRef *hw_frames_ctx);
++int ff_videotoolbox_buffer_append(VTContext *vtctx, const uint8_t *buffer, uint32_t size);
+ int ff_videotoolbox_buffer_copy(VTContext *vtctx,
+                                 const uint8_t *buffer,
+                                 uint32_t size);

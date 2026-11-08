@@ -576,6 +576,8 @@ function Browse({ onNavigate, active = true }) {
       {source.startsWith('custom:') && <p className="browse-source-note">来自 {mediaSourceLabel(source, mediaSources)} 的接口目录，按来源顺序显示，不代表热播榜。</p>}
       {source === 'xifan' && <p className="browse-source-note">当前提供题材分类，西饭热播榜暂未接入。</p>}
 
+      {source === 'reelshort' && <p className="browse-source-note">官网公开片单，按原顺序显示，每类最多 12 部；当前只提供首页快照，无后续分页。受地区限制，付费集请在官方平台确认权限。</p>}
+
       {/* 题材 chips */}
       {meta.genres.length > 0 && (
         <div className="browse-genres">

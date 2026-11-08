@@ -1,4 +1,4 @@
-# Hongguo Drama 6.2: three-platform release candidate; publication is coordinated separately.
+# Hongguo Drama 6.3: three-platform release candidate; publication is coordinated separately.
 name: Windows x64 release candidate
 on:
   workflow_dispatch:
@@ -30,7 +30,7 @@ jobs:
         id: librempeg-cache
         with:
           path: ${{ runner.temp }}/librempeg/artifacts
-          key: windows-librempeg-${{ hashFiles('scripts/build-librempeg-source.sh') }}
+          key: windows-librempeg-${{ hashFiles('scripts/build-librempeg-source.sh', 'scripts/librempeg-videotoolbox-prototype.patch') }}
       - if: steps.media-cache.outputs.cache-hit != 'true' || steps.librempeg-cache.outputs.cache-hit != 'true'
         run: sudo apt-get update -qq && sudo apt-get install -y -qq gcc-mingw-w64-x86-64 make pkg-config
       - if: steps.media-cache.outputs.cache-hit != 'true'
@@ -91,7 +91,7 @@ jobs:
             dist/*.exe
             dist/*.yml
             dist/*.blockmap
-          key: windows-update-v2-${{ hashFiles('package*.json', 'main.js', 'preload.js', 'index.html', 'vite.config.js', 'src/**', 'build/**', 'scripts/build-ffmpeg-source-win.sh', 'scripts/build-librempeg-source.sh', 'scripts/setup-software-player.cjs', 'scripts/software-player-assets.json') }}
+          key: windows-update-v2-${{ hashFiles('package*.json', 'main.js', 'preload.js', 'index.html', 'vite.config.js', 'src/**', 'build/**', 'scripts/build-ffmpeg-source-win.sh', 'scripts/build-librempeg-source.sh', 'scripts/librempeg-videotoolbox-prototype.patch', 'scripts/setup-software-player.cjs', 'scripts/software-player-assets.json') }}
       - shell: pwsh
         if: steps.app-cache.outputs.cache-hit != 'true'
         run: |

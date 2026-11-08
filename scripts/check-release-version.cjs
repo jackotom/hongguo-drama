@@ -22,7 +22,7 @@ for (const flags of [{ prerelease: true }, { draft: true }]) {
 }
 const pkg = require('../package.json');
 const lock = require('../package-lock.json');
-assert.equal(pkg.version, '6.2.0', 'Current source release target must be 6.2.0');
+assert.equal(pkg.version, '6.3.0', 'Current source release target must be 6.3.0');
 assert.equal(lock.version, pkg.version, 'Lockfile version must match the release');
 assert.equal(lock.packages[''].version, pkg.version, 'Lockfile root package must match the release');
 assert.match(pkg.version, /^\d+\.\d+\.0$/, 'Release versions use two public components and an internal zero patch');
@@ -107,6 +107,8 @@ for (const current of ['5.9', '5.9.0']) {
   }
 }
 assert.equal(availableRelease({ tag_name: 'v6.0' }, '5.9.0').version, '6.0');
+assert.equal(availableRelease({ tag_name: 'v6.3' }, '6.2.0').version, '6.3');
+assert.equal(availableRelease({ tag_name: 'v6.3' }, '6.3.0'), null);
 console.log(`PASS ${checks} version pairs, equivalent versions, invalid versions and unpublished releases`);
 
 for (const current of ['6.0', '6.0.0']) for (const tag of ['v6.0', '6.0', 'v6.0.0', '6.0.0']) assert.equal(availableRelease({ tag_name: tag }, current), null);

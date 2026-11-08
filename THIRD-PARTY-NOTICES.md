@@ -11,6 +11,8 @@
 
 开发分支新增独立 ByteVC2 解码组件 Librempeg，固定提交 `cb1f8f3eef84999e61b27e2d44664858179bc240`。其命令行程序启用 AGPLv3+；许可证、x264 许可及准确对应源码要求见 `build/ffmpeg/LIBREMPEG-NOTICE.txt`。普通编码继续使用原 FFmpeg；本地构建不代表已发行。
 
+6.3开发候选在macOS arm64启用系统VideoToolbox H.264编码，保留x264回退；`scripts/librempeg-videotoolbox-prototype.patch`补齐固定上游版本缺失的内部函数声明，对应源码包同时包含该补丁及完整构建脚本。
+
 | 组件 | 版本 | 许可证 | 项目地址 |
 |---|---|---|---|
 | Electron | 44.9.1 | MIT | https://github.com/electron/electron |
@@ -150,3 +152,64 @@ SOFTWARE.
 - ASS dependencies bundled by upstream (assjs and ass-compiler): MIT. libmedia uses FFmpeg under LGPL 2.1 or later and SoundTouch under LGPL 2.1. See upstream licensing notices and pinned sources.
 
 6.2沿用6.1固定版本的媒体与软件解码组件；本轮仅修复观看记录更新候选和排序。
+
+
+## ReelShort 公开页面接入（6.3 开发候选）
+
+参考并改编 [wanglinsaputra/Rest-Api-ReelShort](https://github.com/wanglinsaputra/Rest-Api-ReelShort/tree/95d04d04400bcfc4ce2c77583b1b9702d994fc19)，固定提交 `95d04d04400bcfc4ce2c77583b1b9702d994fc19`。
+复用搜索、剧集、分集公开页面路径与数据契约，以及首页缺失编号时的精确标题搜索方法。改为直接读取网页 `__NEXT_DATA__.props.pageProps`，避免硬编码 Next.js buildId；保留本项目的公网地址检查、超时、来源身份检查和错误脱敏。不包含 Express 服务、Swagger、解锁接口或第三方中转。
+
+以下 MIT 许可随源码和安装包中的本文件保留。代码许可不代表影视内容的再分发授权。
+
+MIT License
+
+Copyright (c) 2026 Wanglin Saputra
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+
+## DramaBox 公开网页接入（6.3 开发）
+
+参考并改编 [zuomeizuoyang/shortdrama-player](https://github.com/zuomeizuoyang/shortdrama-player/tree/081e7ee796372f9029724352f769c286052b9007) 的 `overseas/dramabox.py`，固定提交 `081e7ee796372f9029724352f769c286052b9007`，MIT。
+
+使用公开英文 SSR 搜索、浏览、剧集目录及明确解锁集的 MP4 字段；移植为本项目 CommonJS 来源契约，增加完整性、连续索引、语言、来源身份与官方 HTTPS CDN／跳转验证。未复制其下载器、账号或代理配置；不使用15秒预览代替锁定集。生产实现不需要保存签名密钥或匿名令牌。
+
+以下保留原始 MIT 许可全文；代码许可不代表影视作品再分发授权。
+
+MIT License
+
+Copyright (c) 2026 zuomeizuoyang
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.

@@ -237,6 +237,8 @@ function load(fetchPlayUrlSingle, overrides = {}) {
   await check('stop during lookup stays stopped and retry cannot overlap old run', async () => {
     let resolve; const h = hload(() => new Promise(r => resolve = r));
     h.run("downloadTasks = [{id:'stop',status:'pending',type:'hongguo',filename:'stop.mp4',customDir:" + JSON.stringify(root) + ",hongguoInfo:{vid:'stop'}}]; downloadQueue = downloadTasks.slice(); pumpQueue();");
+    for (let i = 0; i < 20 && !resolve; i++) await new Promise(setImmediate);
+    assert.equal(typeof resolve, 'function', 'the source lookup must be active before stopping');
     await h.handlers['stop-download']({}, 'stop');
     resolve({ url: base + '/range' }); await sleep(50);
     assert.equal(h.run('downloadTasks[0].status'), 'stopped');
@@ -247,6 +249,8 @@ function load(fetchPlayUrlSingle, overrides = {}) {
     const before = hits;
     const h = hload(() => { lookups++; return lookups === 1 ? new Promise(r => resolve = r) : Promise.resolve({ url: base + '/range' }); });
     h.run("downloadTasks = [{id:'retry',status:'pending',type:'hongguo',filename:'retry.mp4',customDir:" + JSON.stringify(root) + ",hongguoInfo:{vid:'retry'}}]; downloadQueue = downloadTasks.slice(); pumpQueue();");
+    for (let i = 0; i < 20 && !resolve; i++) await new Promise(setImmediate);
+    assert.equal(typeof resolve, 'function', 'the source lookup must be active before stopping');
     await h.handlers['stop-download']({}, 'retry');
     await h.handlers['retry-task']({}, 'retry');
     assert.ok(h.run('runningDownloads.size') <= 1, 'only one task may own the destination');

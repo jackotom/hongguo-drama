@@ -39,11 +39,13 @@ try {
       console.log(name + ': 源码构建校验、' + arch + ' 与系统库依赖通过');
     }
     const helperScript = path.resolve(__dirname, 'build-librempeg-source.sh');
+    const helperPatch = path.resolve(__dirname, 'librempeg-videotoolbox-prototype.patch');
     const helper = path.join(dest, 'librempeg');
     const helperManifest = path.join(dest, 'librempeg-manifest.json');
     let helperSaved;
     try { helperSaved = JSON.parse(fs.readFileSync(helperManifest, 'utf8')); } catch {}
     if (helperSaved?.source !== helperSource || helperSaved?.script_sha256 !== sha256(helperScript)
+        || helperSaved?.patch_sha256 !== sha256(helperPatch)
         || !fs.existsSync(helper) || sha256(helper) !== helperSaved?.sha256) {
       const helperRoot = path.join(root, `.librempeg-build-${arch}`);
       console.log('从固定源码构建 ByteVC2 解码组件，通常需要数分钟。');
@@ -52,7 +54,7 @@ try {
       for (const name of fs.readdirSync(path.join(helperRoot, 'artifacts/bin')).filter(name => name.startsWith('LIBREMPEG-'))) {
         fs.copyFileSync(path.join(helperRoot, 'artifacts/bin', name), path.join(root, name));
       }
-      fs.writeFileSync(helperManifest, JSON.stringify({ source: helperSource, script_sha256: sha256(helperScript), sha256: sha256(helper) }, null, 2) + '\n');
+      fs.writeFileSync(helperManifest, JSON.stringify({ source: helperSource, script_sha256: sha256(helperScript), patch_sha256: sha256(helperPatch), sha256: sha256(helper) }, null, 2) + '\n');
     }
     fs.chmodSync(helper, 0o755);
     execFileSync('/usr/bin/lipo', [helper, '-verify_arch', arch === 'x64' ? 'x86_64' : 'arm64']);
@@ -60,5 +62,9 @@ try {
     assert(helperDependencies.length && helperDependencies.every(line => /^\s+\/(usr\/lib|System\/Library)\//.test(line)), 'ByteVC2组件含非系统动态库');
     const decoders = execFileSync(helper, ['-hide_banner', '-decoders'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
     assert(/^\s*V\S*\s+bvc2\s/m.test(decoders), 'ByteVC2组件未包含所需解码器');
+    if (arch === 'arm64') {
+      const encoders = execFileSync(helper, ['-hide_banner', '-encoders'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
+      assert(/^\s*V\S*\s+h264_videotoolbox\s/m.test(encoders), 'ByteVC2组件未包含硬件编码器');
+    }
   }
 } catch (error) { console.error('Mac FFmpeg 准备失败：' + error.message); process.exitCode = 1; }

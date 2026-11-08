@@ -20,7 +20,7 @@ jobs:
         id: media
         with:
           path: ${{ runner.temp }}/linux-media
-          key: linux-x64-media-${{ hashFiles('scripts/build-ffmpeg-source-linux.sh', 'scripts/build-librempeg-source.sh') }}
+          key: linux-x64-media-${{ hashFiles('scripts/build-ffmpeg-source-linux.sh', 'scripts/build-librempeg-source.sh', 'scripts/librempeg-videotoolbox-prototype.patch') }}
       - if: steps.media.outputs.cache-hit != 'true'
         run: |
           bash scripts/build-ffmpeg-source-linux.sh "$RUNNER_TEMP/linux-media/ffmpeg" 4

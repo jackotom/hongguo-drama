@@ -17,6 +17,11 @@ Build: bash scripts/build-librempeg-source.sh BUILD_DIRECTORY TARGET JOBS
 TARGET is arm64, x64 (macOS), or win-x64 (Linux with mingw-w64).
 Distributions containing this executable must include the generated exact
 librempeg-cb1f8f3-x264-b35605a-TARGET-corresponding-source.tar.gz archive,
-which contains both pinned upstream archives and the complete build script.
+which contains both pinned upstream archives, the complete build script,
+and librempeg-videotoolbox-prototype.patch. The patch adds the missing internal
+ff_videotoolbox_buffer_append declaration in the pinned upstream source.
+macOS arm64 explicitly enables VideoToolbox H.264 encoding alongside x264;
+other targets retain software encoding. The build manifest records both the
+script and patch SHA256 on macOS.
 
 This source change is not itself a signed or published release.

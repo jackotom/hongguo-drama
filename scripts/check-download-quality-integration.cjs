@@ -343,6 +343,137 @@ const checks = [
     assert.equal(h.saved()[0].status, 'completed', h.saved()[0].error);
     assert.equal(fs.statSync(h.saved()[0].savePath).size, 200000);
   }],
+  ['1080p prepared cache satisfies auto and 720p downloads without another transfer', async () => {
+    for (const quality of ['auto', '720p']) {
+      const h = fixture();
+      await h.handlers['prepare-online-play']({}, { vid:'11', seriesId:'1', quality:'1080p', prefetch:true });
+      assert.equal(h.run("onlineCache.has('11:1080p')"), true);
+      h.run("requestMedia = async () => { throw new Error('unexpected repeated transfer or conversion'); }");
+      await h.handlers['hongguo-download-batch']({}, payload(quality));
+      await h.run('executeHongguoDownload(downloadTasks[0])');
+      assert.equal(h.saved()[0].status, 'completed', h.saved()[0].error);
+      assert.equal(h.saved()[0].actualQuality, '1080p');
+      assert.equal(h.calls.length, 1, 'source lookup and media conversion must not repeat for a complete cache');
+    }
+  }],
+  ['cross-quality prepared cache still rejects foreign identity and incomplete results', async () => {
+    for (const field of ["entry.vid = 'other'", "entry.seriesId = 'other'", "entry.source = 'hema'", "entry.complete = false"]) {
+      const h = fixture();
+      await h.handlers['prepare-online-play']({}, { vid:'11', seriesId:'1', quality:'1080p', prefetch:true });
+      h.run(`{ const entry = onlineCache.get('11:1080p'); ${field}; }`);
+      h.run("requestMedia = async () => { throw new Error('network required'); }");
+      await h.handlers['hongguo-download-batch']({}, payload());
+      await h.run('executeHongguoDownload(downloadTasks[0])');
+      assert.equal(h.saved()[0].status, 'failed', field);
+    }
+  }],
+  ['download waits for the same in-progress episode instead of preparing it twice', async () => {
+    for (const quality of ['auto', '1080p']) {
+      const h = fixture();
+      if (quality === '1080p') {
+        h.context.testDimensions = { w:720, h:1280, duration:12, codec:'h264' };
+        await h.handlers['prepare-online-play']({}, { vid:'11', seriesId:'1', quality:'720p', prefetch:true });
+      }
+      let phase, timer;
+      const workPhase = new Promise(resolve => { phase = resolve; });
+      h.context.workPhase = phase;
+      h.context.sendToRenderer = (channel, data) => { h.events.push({channel, data}); if (data.qualityNotice?.startsWith('等待同集')) phase('waiting'); };
+      h.run("transferCount=0; finishTransfers=[]; requestMedia=async()=>{ transferCount++; if(transferCount>1)workPhase('duplicate'); await new Promise(resolve=>finishTransfers.push(resolve)); testDimensions={w:1080,h:1920,duration:12,codec:'h264'}; return {headers:{'content-length':'200000'},data:testReadStream()}; };");
+      const online = h.handlers['prepare-online-play']({}, { vid:'11', seriesId:'1', quality:'1080p', prefetch:true });
+      while (!h.run('transferCount')) await new Promise(resolve => setImmediate(resolve));
+      await h.handlers['hongguo-download-batch']({}, payload(quality));
+      const download = h.run('executeHongguoDownload(downloadTasks[0])');
+      download.then(() => phase('finished'));
+      try {
+        const observed = await Promise.race([workPhase, new Promise((_,reject)=>{ timer=setTimeout(()=>reject(new Error('shared preparation state did not settle')),1000); })]);
+        assert.equal(observed, 'waiting', 'download must join preparation after rejecting an insufficient cached rendition');
+        assert.equal(h.run('transferCount'), 1, 'one media preparation must serve playback and download');
+        h.run('finishTransfers.forEach(resolve=>resolve())');
+        await download;
+        assert.equal((await online).success, true);
+        assert.equal(h.saved()[0].status, 'completed', h.saved()[0].error);
+      } finally { clearTimeout(timer); h.run('finishTransfers.forEach(resolve=>resolve())'); await Promise.allSettled([online, download]); }
+    }
+  }],
+  ['canceling a download waiting for shared preparation leaves playback running', async () => {
+    const h = fixture();
+    h.run("finishTransfers=[]; requestMedia=async()=>{ await new Promise(resolve=>finishTransfers.push(resolve)); return {headers:{'content-length':'200000'},data:testReadStream()}; };");
+    const online = h.handlers['prepare-online-play']({}, { vid:'11', seriesId:'1', quality:'1080p', prefetch:true });
+    while (!h.run('finishTransfers.length')) await new Promise(resolve=>setImmediate(resolve));
+    await h.handlers['hongguo-download-batch']({}, payload());
+    const download = h.run('executeHongguoDownload(downloadTasks[0])');
+    let timer;
+    try {
+      for (let i=0; i<10; i++) await new Promise(resolve=>setImmediate(resolve));
+      h.run("downloadTasks[0].cancelSource.cancel('cancel waiting download')");
+      await Promise.race([download, new Promise((_,reject)=>{timer=setTimeout(()=>reject(new Error('waiting download did not cancel')),1000);})]);
+      assert.equal(h.saved()[0].status, 'stopped');
+      assert.equal(h.run("onlinePreparing.get('11:1080p').controller.signal.aborted"), false);
+      h.run('finishTransfers.forEach(resolve=>resolve())');
+      assert.equal((await online).success, true);
+    } finally { clearTimeout(timer); h.run('finishTransfers.forEach(resolve=>resolve())'); await Promise.allSettled([online,download]); }
+  }],
+  ['failed shared episode preparation lets the download recover independently', async () => {
+    const h = fixture();
+    let phase, timer;
+    const waiting = new Promise(resolve => { phase = resolve; });
+    h.context.sendToRenderer = (channel,data) => { h.events.push({channel,data}); if(data.qualityNotice?.startsWith('等待同集'))phase(); };
+    h.run("transferCount=0; failOnline=null; requestMedia=async()=>{ if(++transferCount===1)await new Promise((_,reject)=>failOnline=reject); return {headers:{'content-length':'200000'},data:testReadStream()}; };");
+    const online=h.handlers['prepare-online-play']({}, {vid:'11',seriesId:'1',quality:'1080p',prefetch:true});
+    while(!h.run('failOnline'))await new Promise(resolve=>setImmediate(resolve));
+    await h.handlers['hongguo-download-batch']({},payload());
+    const download=h.run('executeHongguoDownload(downloadTasks[0])');
+    try {
+      await Promise.race([waiting,new Promise((_,reject)=>{timer=setTimeout(()=>reject(new Error('download never joined online preparation')),1000);})]);
+      h.run("failOnline(new Error('online preparation failed'))");
+      assert.equal((await online).success,false);
+      await download;
+      assert.equal(h.saved()[0].status,'completed',h.saved()[0].error);
+      assert.equal(h.run('transferCount'),2,'only a failed shared preparation may cause a fresh media transfer');
+    } finally {clearTimeout(timer);h.run("failOnline(new Error('cleanup'))");await Promise.allSettled([online,download]);}
+  }],
+  ['completed preparation racing a rejected lower-quality cache is reused without another transfer', async () => {
+    const h=fixture({width:720,height:1280});
+    await h.handlers['prepare-online-play']({}, {vid:'11',seriesId:'1',quality:'720p',prefetch:true});
+    h.run("transferCount=0; finishOnline=null; requestMedia=async()=>{if(++transferCount>1)throw new Error('unexpected duplicate transfer');await new Promise(resolve=>finishOnline=resolve);return {headers:{'content-length':'200000'},data:testReadStream()};};");
+    const online=h.handlers['prepare-online-play']({}, {vid:'11',seriesId:'1',quality:'1080p',prefetch:true});
+    while(!h.run('finishOnline'))await new Promise(resolve=>setImmediate(resolve));
+    let first=true;
+    h.context.probeVideoInfo=async()=>{
+      if(first){first=false;h.run('finishOnline()');assert.equal((await online).success,true);return {w:720,h:1280,duration:12,codec:'h264'};}
+      return {w:1080,h:1920,duration:12,codec:'h264'};
+    };
+    await h.handlers['hongguo-download-batch']({},payload('1080p'));
+    await h.run('executeHongguoDownload(downloadTasks[0])');
+    assert.equal(h.saved()[0].status,'completed',h.saved()[0].error);
+    assert.equal(h.saved()[0].actualQuality,'1080p');
+    assert.equal(h.run('transferCount'),1);
+  }],
+  ['real converted ByteVC2 cache is downloaded without fetching or converting again', async () => {
+    const sample=path.resolve(__dirname,'../.planning/playback-bytevc2/episode-1.h264.mp4');
+    assert.ok(fs.existsSync(sample),'requires the real Hongguo ByteVC2 conversion fixture; no synthetic substitute');
+    const h=fixture({realMedia:true}),bytes=fs.readFileSync(sample);
+    h.context.realCacheBytes=bytes;
+    h.run("onlineCache.set('11:1080p',{buffer:realCacheBytes,size:realCacheBytes.length,lastUsed:Date.now(),seriesId:'1',vidIndex:1,vid:'11',source:'hongguo',quality:'1080p',complete:true});requestMedia=async()=>{throw new Error('unexpected repeated media transfer')};");
+    const cp=require('node:child_process'),spawn=cp.spawn;
+    let conversions=0;
+    cp.spawn=function(executable,...args){if(path.basename(String(executable)).startsWith('librempeg'))conversions++;return spawn.call(this,executable,...args);};
+    try {
+      await h.handlers['hongguo-download-batch']({},payload());
+      const started=Date.now();
+      await h.run('executeHongguoDownload(downloadTasks[0])');
+      assert.equal(h.saved()[0].status,'completed',h.saved()[0].error);
+      assert.equal(h.saved()[0].actualQuality,'1080p');
+      assert.equal(h.calls.length,0);assert.equal(conversions,0);
+      const output=fs.readFileSync(h.saved()[0].savePath),hash=data=>require('node:crypto').createHash('sha256').update(data).digest('hex');
+      assert.equal(hash(output),hash(bytes));
+      const proof={sample:'real Hongguo ByteVC2 converted fixture',bytes:output.length,actualQuality:h.saved()[0].actualQuality,
+        reuseMs:Date.now()-started,extraSourceLookups:h.calls.length,extraConversions:conversions,sha256:hash(output)};
+      const destination=path.resolve(__dirname,'../.planning/bytevc2-6.3');fs.mkdirSync(destination,{recursive:true});
+      fs.writeFileSync(path.join(destination,'real-cache-reuse.json'),JSON.stringify(proof,null,2)+'\n');
+      console.log('REAL_CACHE '+JSON.stringify(proof));
+    } finally {cp.spawn=spawn;}
+  }, true],
   ['mismatched or unconfirmed cache cannot be downloaded', async () => {
     for (const field of ["entry.vid = 'other'", "entry.seriesId = 'other'", "entry.source = 'hema'", "entry.complete = false"]) {
       const h = fixture();
@@ -448,10 +579,13 @@ const checks = [
 ];
 (async () => {
   let failures = 0;
-  try { for (const [name, check] of checks) {
+  // Local converted footage is excluded from published sources and runs only with an explicit selector.
+  const selected = checks.filter(([name, , localFixture]) => process.argv[2] ? new RegExp(process.argv[2]).test(name) : !localFixture);
+  assert(selected.length, 'no matching download integration checks');
+  try { for (const [name, check] of selected) {
     try { await check(); console.log('PASS ' + name); }
     catch (e) { failures++; console.error('FAIL ' + name + ': ' + e.message); }
   } } finally { for (const dir of dirs) fs.rmSync(dir, {recursive:true, force:true}); }
-  console.log(`${checks.length - failures}/${checks.length} passed`);
+  console.log(`${selected.length - failures}/${selected.length} passed`);
   process.exitCode = failures ? 1 : 0;
 })();

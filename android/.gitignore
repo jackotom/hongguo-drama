@@ -1,0 +1,10 @@
+node_modules/
+build/
+.private/
+app/src/main/assets/app.js
+app/src/main/assets/app.js.map
+app/src/main/assets/LICENSE
+app/src/main/assets/NOTICE
+app/src/main/assets/THIRD-PARTY-NOTICES.md
+app/src/main/assets/ANDROID-DEPENDENCIES.txt
+app/src/main/res/drawable/icon.png

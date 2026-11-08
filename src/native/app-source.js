@@ -445,6 +445,7 @@ function parseAppPlayModel(info, vid, options, inline, requireEncryptionMetadata
         const aMeets = meetsDownloadQuality(a, requestedQuality), bMeets = meetsDownloadQuality(b, requestedQuality);
         if (aMeets !== bMeets) return Number(bMeets) - Number(aMeets);
         const aPixels = Math.min(a.width, a.height), bPixels = Math.min(b.width, b.height);
+        if (aMeets && (a.codecRank === 2) !== (b.codecRank === 2)) return Number(a.codecRank === 2) - Number(b.codecRank === 2);
         return (aMeets ? aPixels - bPixels : bPixels - aPixels) || a.codecRank - b.codecRank;
     });
     if (!rows.length) {

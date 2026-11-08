@@ -1,4 +1,8 @@
-# 三端同步发布规则
+# 五平台同步发布规则
+
+2026-11-06起，后续正式版本统一发布五类平台包：Mac Apple Silicon arm64、Mac Intel x64、Windows x64、Linux x64 AppImage、Android TV APK。同一公开版本、标签和Release，全部包在Draft齐备后一次公开并更新Latest；缺平台保留草稿，不先发部分平台。完整门槛见 [RELEASING.md](RELEASING.md)。以下旧版回执保留历史范围，不代表五平台已完成。
+
+现场核对：GitHub最新正式标签为 `v6.1`，2026-11-06 13:26:14（Asia/Shanghai）公开，附件已有双Mac、Windows及Linux x64 AppImage，没有Android TV APK。当前工作区仍为6.0；后续开发须先对齐最新冻结源码，不覆盖已发布包。问题整理见 [最新反馈](issues-2026-11-06.md)，TV移植进度见 [Android TV](android-tv.md)。
 
 6.2优化版已于2026-11-07 19:17:14（Asia/Shanghai）正式发布，四平台23附件已核对；冻结`affc81c7f885bcdbcbc06e4c205b820c61f9c0c4`。双Mac签名、公证、装订，Windows安装升级通过但EXE未签名，Linux启动通过、实际播放未验。未替换正式安装。详见[6.2说明](release-6.2.md)。
 
@@ -54,7 +58,7 @@
 
 上一正式版为 **3.9**（内部 `3.9.0`，标签 `v3.9`）。三端 16 项附件已发布；Mac 已签名、公证和装订，Windows CI 已通过。详细变化、回执及验证边界见 [3.9 说明](release-3.9.md)。
 
-从1.1.9开始，每次项目更新统一评估并构建三端：macOS Apple Silicon arm64、macOS Intel x64、Windows x64。使用同一发行版本，分别记录构建、签名、公证、安装和运行验收。
+历史上从1.1.9开始统一三端；2026-11-06起按本文顶部五平台规则执行，分别记录构建、签名、公证、安装和运行验收。
 
 3.9（内部 `3.9.0`）已于 2026-10-27 14:15（Asia/Shanghai）正式发布，标签 `v3.9`。冻结源码 `4a88f2ea597101a5c2e92f2ab564afee9c5167e0`；三端 16 项附件的远端 SHA256 与大小逐项匹配。双 Mac App 与 DMG 已完成 Developer ID 签名、Apple 公证 Accepted 和装订。Windows CI 40458538824 的便携播放、安装、重装与真实 1.80 升级资料保留通过；EXE 未签名。 本版包含 App 取流恢复、搜索补搜、双集预取与窗口模式改进；见 [3.9 说明](release-3.9.md)。
 

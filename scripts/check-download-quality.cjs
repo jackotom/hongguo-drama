@@ -13,13 +13,13 @@ function load(name, dependencies) {
   vm.runInNewContext(fs.readFileSync(path.join(nativeDir, name), 'utf8'), context);
   return context.module.exports;
 }
-function appFixture(videoList) {
+function appFixture(videoList, model = {}) {
   const calls = [];
   const app = load('app-source.js', { axios: async config => {
     calls.push(config);
     return { status: 200, headers: {}, data: JSON.stringify(config.method === 'POST'
       ? { data: { '11': { video_model: { fallback_api: 'https://vod.snssdk.com/info' } } } }
-      : { video_info: { data: { video_list: videoList } } }) };
+      : { video_info: { data: { ...model, video_list: videoList } } }) };
   } });
   return { ...app, calls };
 }
@@ -70,6 +70,21 @@ const checks = [
     assert.equal(result.url, mediaUrl('avc'));
     const higher = await appFixture({ high: stream('high', 1440, 2560) }).fetchAppPlayUrl('11', { quality: '1080p' });
     assert.equal(higher.url, mediaUrl('high'));
+  }],
+  ['fixed quality avoids ByteVC2 when another complete encoding meets the same minimum', async () => {
+    const metadata = { video_id: 'complete-video', video_duration: 12 };
+    for (const codec of ['h264', 'hevc']) {
+      const result = await appFixture({ byte: stream('byte', 720, 1280, 'bytevc2'),
+        compatible: stream('compatible', 1080, 1920, codec) }, metadata).fetchAppPlayUrl('11', { quality: '720p' });
+      assert.equal(result.url, mediaUrl('compatible'));
+      assert.equal(result.codec, codec);
+    }
+    const strict = await appFixture({ byte: stream('byte', 1080, 1920, 'bytevc2'),
+      low: stream('low', 720, 1280) }, metadata).fetchAppPlayUrl('11', { quality: '1080p' });
+    assert.equal(strict.codec, 'bytevc2', 'fixed quality must not drop to a lower compatible stream');
+    const lower = await appFixture({ byte: stream('byte', 720, 1280, 'bytevc2'),
+      low: stream('low', 360, 640) }, metadata).fetchAppPlayUrl('11', { quality: '1080p', allowLowerQuality: true });
+    assert.equal(lower.codec, 'bytevc2', 'lower-tier recovery still preserves the highest available rendition');
   }],
   ['explicit tiers reject absent, unknown-size and unsupported streams', async () => {
     for (const [rows, code] of [

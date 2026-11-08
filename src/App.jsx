@@ -1,3 +1,4 @@
+// 红果短剧 6.3：版本及发行状态见 package.json 和 docs/release-6.3.md。
 // 红果短剧 6.1：三端统一发行。
 import React, { useState, useEffect, useLayoutEffect, useRef, useCallback } from 'react';
 import { Film, Download, Settings, Play, Home, Search, Clock, User } from './components/icons';

@@ -532,6 +532,8 @@ async function check(name, run) { try { await run(); console.log('PASS ' + name)
     let finishLookup;
     const h = load({}, { './src/native/hongguo': { fetchPlayUrlSingle: () => new Promise(resolve => { finishLookup = resolve; }) } });
     const one = task('one', h.dir, 'pending'); h.set('downloadTasks', [one]); h.set('downloadQueue', [one]); h.pump();
+    for (let i = 0; i < 20 && !finishLookup; i++) await new Promise(setImmediate);
+    assert.equal(typeof finishLookup, 'function', 'the source lookup must be active before deletion');
     const deleting = h.handlers['delete-task']({}, 'one', { deleteFiles: true });
     assert.equal(h.run('downloadTasks.length'), 1, 'record removed before its active run settled');
     finishLookup({ url: null }); await deleting;

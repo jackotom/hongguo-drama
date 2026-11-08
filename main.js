@@ -1023,7 +1023,7 @@ async function executeHongguoDownload(task) {
       }
     }
     // Recheck source access before reusing an existing third-party file or URL.
-    const checkedPlayInfo = /^(xifan|hema|custom):/.test(String(vid))
+    const checkedPlayInfo = /^(xifan|hema|reelshort|dramabox|custom):/.test(String(vid))
       ? await hongguo.fetchPlayUrlSingle(vid, hongguoInfo?.series_id, { quality }) : null;
     if (checkedPlayInfo && !checkedPlayInfo.url) throw new Error(checkedPlayInfo.error || '来源未开放该集');
     // Existing complete files need no additional media transfer.
@@ -1039,27 +1039,62 @@ async function executeHongguoDownload(task) {
       return;
     }
     tmpPath = finalPath + '.enc.tmp';
-    const cached = onlineCache.get(onlineCacheKey(vid, quality)) || onlineCache.get(String(vid));
-    const sourceId = /^custom:[^:]+/.exec(String(vid))?.[0] || /^(xifan|hema):/.exec(String(vid))?.[1] || 'hongguo';
-    let reusedCache = false;
-    if (cached?.complete && cached.vid === String(vid) && cached.source === sourceId
+    const sourceId = /^custom:[^:]+/.exec(String(vid))?.[0] || /^(xifan|hema|reelshort|dramabox):/.exec(String(vid))?.[1] || 'hongguo';
+    const completeCache = cached => cached?.complete && cached.vid === String(vid) && cached.source === sourceId
       && cached.seriesId === String(hongguoInfo?.series_id || '') && cached.size > 0
-      && (cached.filePath || Buffer.isBuffer(cached.buffer) && cached.buffer.length === cached.size)) {
-      if (cached.filePath) {
-        cached.disk.readers = (cached.disk.readers || 0) + 1;
-        try { await fsp.copyFile(cached.filePath, tmpPath); }
-        finally { cached.disk.readers--; disposeOnlineDisk(cached); }
-      } else await fsp.writeFile(tmpPath, cached.buffer, { mode: 0o600 });
-      source.token.throwIfRequested();
-      try { task.actualQuality = await verifyDownloadQuality(tmpPath, quality, false, true, source.token); reusedCache = true; }
-      catch (_) { fs.unlinkSync(tmpPath); }
-      source.token.throwIfRequested();
-      checkCustomAccess(vid);
-      if (reusedCache) {
+      && (cached.filePath || Buffer.isBuffer(cached.buffer) && cached.buffer.length === cached.size);
+    let preparedCache;
+    const rejectedCaches = new Set();
+    // Cache keys describe the request, not measured output quality; verify the actual file before publishing.
+    const reuseCache = async () => {
+      const caches = new Set([onlineCache.get(onlineCacheKey(vid, quality)), onlineCache.get(String(vid)), preparedCache,
+        onlineCache.get(onlineCacheKey(vid, '1080p')), onlineCache.get(onlineCacheKey(vid, '720p')), ...onlineCache.values()]);
+      for (const cached of caches) {
+        if (!completeCache(cached) || rejectedCaches.has(cached)) continue;
+        if (cached.filePath) {
+          cached.disk.readers = (cached.disk.readers || 0) + 1;
+          try { await fsp.copyFile(cached.filePath, tmpPath); }
+          finally { cached.disk.readers--; disposeOnlineDisk(cached); }
+        } else await fsp.writeFile(tmpPath, cached.buffer, { mode: 0o600 });
+        source.token.throwIfRequested();
+        try { task.actualQuality = await verifyDownloadQuality(tmpPath, quality, false, true, source.token); }
+        catch (_) {
+          fs.unlinkSync(tmpPath);
+          source.token.throwIfRequested();
+          rejectedCaches.add(cached);
+          continue;
+        }
+        source.token.throwIfRequested();
+        checkCustomAccess(vid);
         publishDownloadFile(tmpPath, finalPath);
         task.receivedBytes = task.totalBytes = cached.size;
         cached.lastUsed = Date.now();
+        return true;
       }
+      return false;
+    };
+    let reusedCache = await reuseCache();
+    if (!reusedCache && /^\d{1,30}$/.test(String(vid))) {
+      const qualities = new Set([quality, 'auto', '1080p', ...(quality === '1080p' ? [] : ['720p'])]);
+      const pending = [...qualities].map(value => onlinePreparing.get(onlineCacheKey(vid, value))).find(job => job
+        && !job.controller.signal.aborted && [...onlineSessions.values()].some(session => session.job === job
+          && session.vid === String(vid) && session.seriesId === String(hongguoInfo?.series_id || '')));
+      if (pending) {
+        const controller = new AbortController(), cancel = () => controller.abort();
+        source.token.subscribe(cancel);
+        task.qualityNotice = '等待同集在线播放缓存准备完成，避免重复下载和转换';
+        sendToRenderer('download-progress', { id, qualityNotice: task.qualityNotice });
+        try { preparedCache = await awaitMediaOperation(pending.promise, controller.signal); }
+        catch (error) {
+          source.token.throwIfRequested();
+          if (isDownloadSourceRejection(error)) throw error;
+        } finally {
+          source.token.unsubscribe(cancel);
+          task.qualityNotice = '';
+          sendToRenderer('download-progress', { id, qualityNotice: '' });
+        }
+      }
+      reusedCache = await reuseCache();
     }
     if (!reusedCache) await withMediaRecovery(vid, hongguoInfo?.series_id, { playInfo: checkedPlayInfo, quality, allowLowerQuality, force: true, cancelToken: source.token }, async playInfo => {
       source.token.throwIfRequested();
@@ -1532,12 +1567,15 @@ ipcMain.handle('test-custom-source', async (_event,draft) => {
 
 
 ipcMain.handle('browse-list', async (_event, options) => {
-  if (['xifan', 'hema'].includes(options?.source) && getCurrentSettings().builtin_sources?.[options.source] === false) return { success: false, results: [], error: '此来源已关闭，可在设置中重新开启' };
+  if ((['xifan', 'hema'].includes(options?.source) && getCurrentSettings().builtin_sources?.[options.source] === false)
+    || (['reelshort', 'dramabox'].includes(options?.source) && getCurrentSettings().builtin_sources?.[options.source] !== true)) return { success: false, results: [], error: '此来源已关闭，可在设置中重新开启' };
   if (proxyStartupFallback) return { success: false, error: '网络代理配置无效，请先在设置中修复或明确关闭代理。' };
   if ((!options?.source || options.source === 'hongguo') && options?.catalogChannel != null
     && !['app', 'web'].includes(options.catalogChannel)) return { success: false, error: '不支持的红果目录线路' };
   const moduleName = String(options?.source).startsWith('custom:') ? './src/native/custom-source' : options?.source === 'hema' ? './src/native/hema'
     : options?.source === 'xifan' ? './src/native/xifan'
+    : options?.source === 'reelshort' ? './src/native/reelshort'
+    : options?.source === 'dramabox' ? './src/native/dramabox'
       : options?.catalogChannel === 'web' ? './src/native/catalog' : './src/native/hongguo-app-catalog';
   const catalogOptions = moduleName === './src/native/catalog'
     ? { ...options, allowTrustedDns: resolveProxyConfig(getCurrentSettings()).mode === 'direct' } : options;
@@ -1620,7 +1658,8 @@ async function searchAtSource(keyword, options = {}) {
   const page = options.page === undefined ? 1 : options.page;
   if (!Number.isSafeInteger(page) || page < 1 || page > 50) throw new Error('搜索页码必须是 1 至 50 的整数');
   const source = options.source || 'hongguo';
-  if (['xifan', 'hema'].includes(source) && getCurrentSettings().builtin_sources?.[source] === false) throw new Error('此来源已关闭，可在设置中重新开启');
+  if ((['xifan', 'hema'].includes(source) && getCurrentSettings().builtin_sources?.[source] === false)
+    || (['reelshort', 'dramabox'].includes(source) && getCurrentSettings().builtin_sources?.[source] !== true)) throw new Error('此来源已关闭，可在设置中重新开启');
   if (page > 1 && source !== 'hongguo' && options.channel && options.channel !== source) throw new Error('搜索通道已变化，请重新搜索');
   const response = await searchAtSourcePage(keyword, { ...options, page });
   if (!response?.success) return response;
@@ -1635,6 +1674,8 @@ async function searchAtSourcePage(keyword, options = {}) {
   if (String(options?.source).startsWith('custom:')) return require('./src/native/custom-source').searchSeries(keyword, options);
   if (options?.source === 'hema') return require('./src/native/hema').search(keyword, options.page, { deadline });
   if (options?.source === 'xifan') return require('./src/native/xifan').search(keyword, options.page, { deadline });
+  if (options?.source === 'reelshort') return require('./src/native/reelshort').search(keyword, options.page, { deadline });
+  if (options?.source === 'dramabox') return require('./src/native/dramabox').search(keyword, options.page, { deadline });
   if (options?.source && options.source !== 'hongguo') throw new Error('不支持的搜索来源');
   const page = options.page;
   const searchQuery = normalizeSearchTitle(keyword);
@@ -2216,7 +2257,7 @@ ipcMain.handle('get-merge-tasks', async () => mergeTasks.map(({ child, ...rest }
 function seriesDownloadDir(root, seriesId, seriesTitle) {
   const title = sanitizeFolderName(seriesTitle) || '未命名短剧';
   const suffix = createHash('sha256').update(String(seriesId)).digest('hex').slice(0, 12);
-  return path.join(root, String(seriesId).startsWith('hema:') ? '河马短剧' : String(seriesId).startsWith('xifan:') ? '西饭短剧' : '红果短剧', `${title}-${suffix}`);
+  return path.join(root, String(seriesId).startsWith('dramabox:') ? 'DramaBox' : String(seriesId).startsWith('reelshort:') ? 'ReelShort' : String(seriesId).startsWith('hema:') ? '河马短剧' : String(seriesId).startsWith('xifan:') ? '西饭短剧' : '红果短剧', `${title}-${suffix}`);
 }
 
 /** 找到某剧在磁盘上的目录（优先用任务记录，其次按标题推导） */
@@ -2230,7 +2271,7 @@ function resolveSeriesDir(seriesId, seriesTitle, covers) {
   const guess = seriesDownloadDir(root, seriesId, seriesTitle);
   if (fs.existsSync(guess)) return guess;
   // Older versions used title-only directories. Reuse only when ownership is unambiguous.
-  if (!/^(xifan|hema|custom):/.test(String(seriesId))) {
+  if (!/^(xifan|hema|reelshort|dramabox|custom):/.test(String(seriesId))) {
     const title = sanitizeFolderName(seriesTitle) || '未命名短剧';
     const owners = seriesRegistry.filter(s => sanitizeFolderName(s.series_title) === title);
     const legacy = path.join(root, '红果短剧', title);
@@ -2646,7 +2687,7 @@ ipcMain.handle('play-series', async (event, payload) => {
 // ===== 在线播放 =====
 function playbackQuality(value = 'auto', vid = '') {
   if (!['auto', '720p', '1080p'].includes(value)) throw new Error('在线播放清晰度无效，请选择自动、720p 或 1080p');
-  if (value !== 'auto' && /^(xifan|hema|custom):/.test(String(vid))) throw new Error('此来源暂不支持指定在线播放清晰度，请选择自动');
+  if (value !== 'auto' && /^(xifan|hema|reelshort|dramabox|custom):/.test(String(vid))) throw new Error('此来源暂不支持指定在线播放清晰度，请选择自动');
   return value;
 }
 
@@ -2680,10 +2721,11 @@ async function requestMedia(playInfo, options = {}) {
   const url = new URL(playInfo.url);
   if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password) throw new Error('无效播放地址');
   checkCustomAccess(playInfo.vid);
-  const custom = playInfo.source === 'custom';
+  const custom = ['custom', 'reelshort'].includes(playInfo.source);
   const web = playInfo.source === 'web';
   const config = { method: 'GET', url: url.href, responseType: 'stream', timeout: 60000, ...options,
     ...((web || custom) ? require('./src/native/web-media-guard').webMediaRequestOptions(url.href) : {}),
+    ...(playInfo.source === 'dramabox' ? require('./src/native/dramabox').mediaRequestOptions(url.href) : {}),
     headers: { 'User-Agent': playInfo.userAgent || (web ? hongguo.WEB_UA : hongguo.UA), 'Accept-Encoding': 'identity',
       ...((playInfo.referer || web) ? { Referer: playInfo.referer || hongguo.WEB_REFERER } : {}), ...options.headers } };
   let response;
@@ -3153,7 +3195,7 @@ ipcMain.handle('prepare-online-play', async (event, payload) => {
   onlineSessions.set(streamId, session);
   try {
     checkCustomAccess(sourceVid);
-    const checkedPlayInfo = /^(xifan|hema|custom):/.test(sourceVid) ? await hongguo.fetchPlayUrlSingle(sourceVid, seriesId, { force, quality }) : null;
+    const checkedPlayInfo = /^(xifan|hema|reelshort|dramabox|custom):/.test(sourceVid) ? await hongguo.fetchPlayUrlSingle(sourceVid, seriesId, { force, quality }) : null;
     if (!onlineSessions.has(streamId)) throw new Error('已取消播放');
     if (checkedPlayInfo && !checkedPlayInfo.url) throw new Error(checkedPlayInfo.error || '来源未开放该集');
     if (force) deleteOnlineCacheEntry(key);
@@ -3179,7 +3221,7 @@ ipcMain.handle('prepare-online-play', async (event, payload) => {
               entry.size = entry.buffer.length;
             }
             if (controller.signal.aborted) throw new Error('已取消播放');
-            Object.assign(entry,{vid:sourceVid,source:/^custom:[^:]+/.exec(sourceVid)?.[0] || /^(xifan|hema):/.exec(sourceVid)?.[1] || 'hongguo',complete:true});
+            Object.assign(entry,{vid:sourceVid,source:/^custom:[^:]+/.exec(sourceVid)?.[0] || /^(xifan|hema|reelshort|dramabox):/.exec(sourceVid)?.[1] || 'hongguo',complete:true});
             return entry;
           });
           prepared.lastUsed = Date.now();
@@ -3542,7 +3584,7 @@ async function transcodeForPlayback(payload, job = { controller: new AbortContro
     if (filePath && fs.existsSync(filePath) && !isInsideMediaRoot(filePath) && !isRecordedMediaFile(filePath, payload)) {
       return { success: false, error: '只能转码下载目录中的视频' };
     }
-    if (!(filePath && fs.existsSync(filePath)) && (/^(xifan|hema|custom):/.test(String(seriesId)) || /^(xifan|hema|custom):/.test(String(payload.vid)))) {
+    if (!(filePath && fs.existsSync(filePath)) && (/^(xifan|hema|reelshort|dramabox|custom):/.test(String(seriesId)) || /^(xifan|hema|reelshort|dramabox|custom):/.test(String(payload.vid)))) {
       const current = await hongguo.fetchEpisodeList(seriesId);
       checkCancelled();
       const episode = current.episodes.find(ep => Number(ep.vid_index) === Number(vidIndex));
@@ -3568,7 +3610,7 @@ async function transcodeForPlayback(payload, job = { controller: new AbortContro
       const cached = !force && onlineCache.get(onlineCacheKey(vid, quality));
       if (cached?.filePath) { diskInput = cached; cached.disk.readers++; inputPath = cached.filePath; }
       else {
-        const playInfo = String(vid).startsWith('custom:') ? await hongguo.fetchPlayUrlSingle(String(vid),seriesId,{force:!!force,quality}) : null;
+        const playInfo = /^(custom|reelshort|dramabox):/.test(String(vid)) ? await hongguo.fetchPlayUrlSingle(String(vid),seriesId,{force:!!force,quality}) : null;
         tmpInput = path.join(getCompatDir(), `.tmp_${randomUUID()}.mp4`);
         if (playInfo) await withMediaRecovery(vid,seriesId,{playInfo,signal,quality},async candidate => {
           if (candidate.format === 'hls') await prepareHlsFile(candidate,tmpInput,{signal});
@@ -3732,7 +3774,7 @@ async function enqueueEpisodes({ seriesId, seriesTitle, episodes, cover, quality
   if (!Array.isArray(episodes) || episodes.length === 0) return 0;
   const settings = getCurrentSettings();
   const downloadQuality = normalizeDownloadQuality(quality ?? settings.download_quality);
-  if (/^(xifan|hema|custom):/.test(String(seriesId))) {
+  if (/^(xifan|hema|reelshort|dramabox|custom):/.test(String(seriesId))) {
     const current = await hongguo.fetchEpisodeList(seriesId);
     episodes = episodes.map(requested => {
       const ep = current.episodes.find(item => item.vid === requested.vid && Number(item.vid_index) === Number(requested.vid_index));
@@ -3740,7 +3782,7 @@ async function enqueueEpisodes({ seriesId, seriesTitle, episodes, cover, quality
       if (ep.locked) throw new Error('该集已锁定，请在来源平台解锁');
       return ep;
     });
-  } else if (episodes.some(ep => /^(xifan|hema|custom):/.test(String(ep.vid)))) {
+  } else if (episodes.some(ep => /^(xifan|hema|reelshort|dramabox|custom):/.test(String(ep.vid)))) {
     throw new Error('剧集来源不匹配');
   }
 

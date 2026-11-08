@@ -1,5 +1,13 @@
 # 同步发行规则
 
+## 当前规则：五平台齐备后一次发布
+
+用户于2026-11-06明确要求：每个后续正式版本同时提供macOS Apple Silicon arm64、macOS Intel x64、Windows x64、Linux x64 AppImage、Android TV APK。五个平台共用公开版本、标签和一次Release，构建号独立递增。Android TV直接移植本项目源码，复用现有取源、签名与解密；手机个人版保持独立版本，不作为TV正式包。
+
+按“冻结统一源码 → 各平台构建及验收 → Draft汇总五平台包、更新清单、对应源码、许可与SHA256 → 核对远端附件版本／大小／摘要 → 一次公开并设Latest”执行。任一平台缺包或缺少必要验收时保留Draft，记录阻碍；不得先公开部分平台、再另跳版本补齐。例外须用户明确授权。已发布的历史标签和资产保持不变。
+
+当前6.3正在整合6.2基线，按上述规则准备，尚未发布。
+
 6.2优化版已于2026-11-07 19:17:14（Asia/Shanghai）正式发布，四平台23附件已核对；冻结`affc81c7f885bcdbcbc06e4c205b820c61f9c0c4`。双Mac签名、公证、装订，Windows安装升级通过但EXE未签名，Linux启动通过、实际播放未验。未替换正式安装。详见[6.2说明](release-6.2.md)。
 
 6.1 已于 2026-11-06 13:26（Asia/Shanghai）正式发布，内部 `6.1.0`，标签 `v6.1` 并设为 Latest。冻结源码 `a93793dea2f13864e8a56771bb6bea05ea6ddbb6`；后续文档提交不改变冻结标签和安装包。23份附件远端大小与SHA256逐项一致。 Mac签名/公证/装订，Windows安装升级通过；Linux启动通过、实际播放未验。详见 [6.1说明](release-6.1.md)。
@@ -88,8 +96,10 @@
 | macOS arm64 | npm run build:mac | 对应 arm64 媒体组件、Developer ID、Apple 公证 Accepted、装订验证 |
 | macOS x64 | npm run build:mac | 对应 x64 媒体组件、Developer ID、Apple 公证 Accepted、装订验证；另记录 Intel 实机覆盖 |
 | Windows x64 | Windows x64 release candidate 工作流 | NSIS 安装 EXE、latest.yml、便携 EXE/ZIP；精确 FFmpeg 对应源码；安装版安装/启动/同版本重装资料保留与便携版媒体窗口冒烟；明确签名状态 |
+| Linux x64 | 最新源码的Linux构建入口；当前6.0工作区尚未同步 | AppImage、匹配媒体工具和对应源码；原生Linux启动及真实素材静音播放；单独记录发行版、GPU/FUSE与更新方式 |
+| Android TV | `python3 android/build.py --tv`（本地开发候选） | 独立TV包名、同公开版本、稳定升级签名、Leanback入口、无需触屏、横屏与遥控器操作；TV真机真实红果素材静音播放、切集、后台与缓存清理；手机测试不能替代 |
 
-Windows 工作流只上传 Actions 构建资产，不创建 Release，不改 latest，不覆盖总校验文件。正式版本由统一发行会话汇总三端资产、对应源码和总 SHA256SUMS。
+Windows 工作流只上传 Actions 构建资产，不创建 Release，不改 latest，不覆盖总校验文件。正式版本由统一发行会话汇总五平台资产、对应源码和总 SHA256SUMS。
 Windows 当前未配置代码签名证书；EXE 必须明确标为未签名。Windows CI 虚拟机验证不等于用户实体电脑、GPU/HEVC、真实平台下载与长期稳定性验收。
 若某平台受阻，同版本保留，记录具体缺口及已有资产状态；不得将缺失平台写成已发布，也不得为补平台另跳版本。
 
@@ -118,7 +128,7 @@ Ubuntu 24.04 安装 gcc-mingw-w64-x86-64、make、pkg-config 后运行 `bash scr
 - Windows `latest.yml` 仅指向同名 NSIS 安装包，保留 builder 生成的 SHA512、大小和 blockmap；复制上传不得再改名。安装版与便携版共享同一版本和数据格式。
 - Windows 尚无代码签名证书。SHA512 只验证下载与官方清单一致，不提供独立的发布者身份保证；不得主动关闭签名校验或声称已签名。
 - `node scripts/check-windows-installer.cjs --config` 可本机检查发行配置；不带参数仅允许一次性 GitHub Windows CI，检查安装包元数据、安装启动、同版本重装，以及固定摘要的真实官方 1.80 安装包覆盖升级与资料保留。该检查不等于应用内自动更新端到端或实体 Windows 验收。
-- Draft 中先汇总三端包、更新清单、准确对应源码和总校验文件，检查文件名/摘要/版本一致后统一发布为 latest。旧版 1.75 不具备下载安装能力，需要手动安装一次 1.80；后续版本才使用应用内更新。
+- Draft 中先汇总五平台包、更新清单、准确对应源码和总校验文件，检查文件名/摘要/版本一致且各平台必要验收完成后一次发布为 latest；缺平台保留Draft。旧版 1.75 不具备下载安装能力，需要手动安装一次 1.80；后续支持自动更新的平台才使用应用内更新，Linux和TV不得冒用Mac／Windows更新清单。
 
 ## 每次更新的版本与根目录一致性
 

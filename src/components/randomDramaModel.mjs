@@ -5,6 +5,8 @@ const SOURCE_IDS = {
   hongguo: /^\d{6,30}$/,
   xifan: /^xifan:[a-zA-Z0-9_-]{1,200}:[a-zA-Z0-9_-]{1,200}$/,
   hema: /^hema:\d{1,30}$/,
+  dramabox: /^dramabox:\d{1,24}$/,
+  reelshort: /^reelshort:[a-zA-Z0-9_]{1,100}:[a-z0-9]+(?:-[a-z0-9]+)*$/,
 };
 
 // IPC requests cannot be aborted in transit; cancellation stops waiting and all subsequent UI/player work.

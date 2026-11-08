@@ -363,6 +363,8 @@ function seriesIdFromShareUrl(value) {
 async function resolveSeriesId(shareUrl) {
   if (typeof shareUrl !== 'string' || shareUrl.length > 8192) throw new Error('分享内容无效或过长');
   const trimmed = shareUrl.trim();
+  if (trimmed.startsWith('reelshort:')) return require('./reelshort').resolveSeriesId(trimmed);
+  if (trimmed.startsWith('dramabox:')) return require('./dramabox').resolveSeriesId(trimmed);
   if (trimmed.startsWith('custom:')) {
     if (!/^custom:[a-f\d]{8}-[a-f\d]{4}-[a-f\d]{4}-[a-f\d]{4}-[a-f\d]{12}:\d{1,30}$/i.test(trimmed)) throw new Error('自定义剧集编号无效');
     require('./custom-source').assertEnabled(trimmed);
@@ -376,6 +378,8 @@ async function resolveSeriesId(shareUrl) {
   const link = trimmed.match(linkPattern)?.[0];
   let finalUrl = link ? shareHttpUrl(link.replace(/[),.;!]+$/, '')) : '';
   // Decode URL values separately so encoded digits cannot be truncated by the text matcher.
+  if (finalUrl && new URL(finalUrl).origin === 'https://www.reelshort.com') return require('./reelshort').resolveSeriesId(finalUrl);
+  if (finalUrl && ['https://www.dramabox.com', 'https://www.dramaboxdb.com'].includes(new URL(finalUrl).origin)) return require('./dramabox').resolveSeriesId(finalUrl);
   const initialId = finalUrl ? seriesIdFromShareUrl(finalUrl) : '';
   if (initialId) return initialId;
   if (!finalUrl) throw new Error('请输入有效的 HTTP 或 HTTPS 分享链接，或剧集 ID');
@@ -427,6 +431,8 @@ async function resolveSeriesId(shareUrl) {
  * 获取全集剧集列表
  */
 async function fetchEpisodeList(seriesId, options = {}) {
+  if (String(seriesId).startsWith('dramabox:')) return require('./dramabox').fetchEpisodeList(seriesId, options);
+  if (String(seriesId).startsWith('reelshort:')) return require('./reelshort').fetchEpisodeList(seriesId);
   if (String(seriesId).startsWith('custom:')) return require('./custom-source').fetchEpisodeList(seriesId);
   if (String(seriesId).startsWith('hema:')) return require('./hema').fetchEpisodeList(seriesId);
   if (String(seriesId).startsWith('xifan:')) return require('./xifan').fetchEpisodeList(seriesId);
@@ -621,6 +627,8 @@ function parseModelVideo(vm) {
 async function fetchPlayUrlSingle(vid, sid, options = {}) {
   try {
     const quality = normalizeDownloadQuality(options.quality);
+    if (String(vid).startsWith('reelshort:') || String(sid).startsWith('reelshort:')) return require('./reelshort').fetchPlayUrlSingle(vid, sid);
+    if (String(vid).startsWith('dramabox:') || String(sid).startsWith('dramabox:')) return require('./dramabox').fetchPlayUrlSingle(vid, sid, options);
     if (String(vid).startsWith('custom:') || String(sid).startsWith('custom:')) return require('./custom-source').fetchPlayUrlSingle(vid, sid, options);
     if (String(vid).startsWith('hema:') || String(sid).startsWith('hema:')) return require('./hema').fetchPlayUrlSingle(vid, sid);
     if (String(vid).startsWith('xifan:') || String(sid).startsWith('xifan:')) return require('./xifan').fetchPlayUrlSingle(vid, sid);
@@ -976,7 +984,7 @@ function rebuildMoov(data, moovOff, moovSize, top) {
       const nc = data.readUInt32BE(b.off + 12);
       for (let i = 0; i < nc; i++) {
         const v = data.readUInt32BE(b.off + 16 + i * 4);
-        if (v >= delta) {
+        if (v >= moovOff + moovSize) {
           data.writeUInt32BE(v - delta, b.off + 16 + i * 4);
         }
       }
