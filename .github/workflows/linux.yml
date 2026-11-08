@@ -34,9 +34,10 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
       - run: npm run build:linux -- --config.electronDist=.cache/electron
-      - run: xvfb-run -a node scripts/check-linux-appimage.cjs
       - run: cp "$RUNNER_TEMP/linux-media/ffmpeg/artifacts/"*source.tar.gz "$RUNNER_TEMP/linux-media/librempeg/artifacts/"*source.tar.gz dist/
+      - run: xvfb-run -a node scripts/check-linux-appimage.cjs
       - uses: actions/upload-artifact@v4
+        if: always()
         with:
           name: linux-appimage-candidate
           path: |

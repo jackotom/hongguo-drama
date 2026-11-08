@@ -34,6 +34,7 @@ const pkg = require('../package.json');
     const port = server.address().port; await new Promise(resolve => server.close(resolve));
     const log = fs.openSync(path.join(output, 'launch.log'), 'w');
     child = spawn(path.join(folder, 'AppRun'), ['--mute-audio', '--user-data-dir=' + path.join(temp, 'profile'),
+      '--disable-renderer-backgrounding', '--disable-background-timer-throttling', '--disable-backgrounding-occluded-windows',
       '--remote-debugging-address=127.0.0.1', '--remote-debugging-port=' + port,
       ...(emulated ? ['--disable-gpu', '--in-process-gpu', '--no-zygote', '--single-process'] : []),
       ...(process.getuid?.() === 0 ? ['--no-sandbox'] : [])], { cwd: folder, stdio: ['ignore', log, log] });
@@ -62,6 +63,7 @@ const pkg = require('../package.json');
       if(episodes.length!==2)throw Error('Two unlocked real episodes required');
       const states=[];
       localStorage.setItem('hongguo:online-quality','compat');
+      localStorage.setItem('hongguo:software-decode','true');
       for(const episode of episodes){
         const queued=await api.downloadSingleEpisode(drama.series_id,episode.vid_index,'auto');
         if(!queued.success)throw Error('Real Hongguo download submission failed');
@@ -91,7 +93,7 @@ const pkg = require('../package.json');
                 const state={episode:episode.vid_index,vid:episode.vid,bytes:downloaded.receivedBytes,
                   actualQuality:downloaded.actualQuality,time:video.currentTime,width:video.videoWidth,height:video.videoHeight,
                   muted:video.muted,volume:video.volume,paused:video.paused,error:video.error?.code||null,
-                  frames:video.getVideoPlaybackQuality().totalVideoFrames};
+                  frames:video.getVideoPlaybackQuality().totalVideoFrames,decoder:document.querySelector('select[aria-label="解码方式"]')?.value};
                 if(!state.width||!state.height||!state.frames||state.error||!state.muted||state.volume!==0)throw Error('Real playback validation failed');
                 states.push(state);played=true;break;
               }
@@ -99,7 +101,12 @@ const pkg = require('../package.json');
           }
           await new Promise(resolve=>setTimeout(resolve,100));
         }
-        if(!played)throw Error('Real local playback did not advance to ten seconds');
+        if(!played){
+          const video=document.querySelector('.player-video');video?.pause();
+          throw Error('Real local playback did not advance to ten seconds: '+JSON.stringify({episode:episode.vid_index,
+            time:video?.currentTime,width:video?.videoWidth,readyState:video?.readyState,paused:video?.paused,error:video?.error?.code,
+            decoder:document.querySelector('select[aria-label="解码方式"]')?.value,visibility:document.visibilityState}));
+        }
       }
       return {seriesId:drama.series_id,title:drama.series_title,completeDownloads:true,downloadedFromOfficialSource:true,states};
     })()`, 420000);
