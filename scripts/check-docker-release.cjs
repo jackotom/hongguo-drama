@@ -4,7 +4,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const os = require('node:os');
 const crypto = require('node:crypto');
-const { execFileSync, spawn } = require('node:child_process');
+const { execFileSync, spawn, spawnSync } = require('node:child_process');
 const root = path.resolve(__dirname, '..');
 const output = path.join(root, 'dist/docker');
 const name = `hongguo-65-acceptance-${process.pid}`;
@@ -54,6 +54,8 @@ async function main() {
   assert.equal(code, 0, 'Real search/download/merge failed; see safe live-check receipt');
   const before = await (await request('/api/tasks')).json();
   docker('restart', name);
+  // Docker can assign a different ephemeral host port when restarting the container.
+  base = `http://${docker('port', name, '3000/tcp')}`;
   await ready();
   const after = await (await request('/api/tasks')).json();
   assert.deepEqual(after, before, 'Completed task state must survive a container restart');
@@ -70,7 +72,8 @@ main().catch(error => {
   fs.mkdirSync(output, { recursive: true });
   let diagnostic = '';
   try { diagnostic += docker('inspect', '--format', '{{json .State}}', name) + '\n'; } catch {}
-  try { diagnostic += docker('logs', '--tail', '40', name); } catch (logError) { diagnostic += String(logError.stdout || '') + String(logError.stderr || ''); }
+  const logs = spawnSync('docker', ['logs', '--tail', '40', name], { encoding: 'utf8', timeout: 15000 });
+  diagnostic += String(logs.stdout || '') + String(logs.stderr || '');
   diagnostic = diagnostic.replaceAll(token, '[redacted]').replace(/https?:\/\/[^\s"']+/g, '[URL]');
   fs.writeFileSync(path.join(output, 'container-failure.log'), diagnostic);
   console.error(diagnostic);
