@@ -38,6 +38,8 @@ export default function App({ platformPages = {} }) {
   const backNavigation = useRef(false);
   useEffect(() => { if (mobile) console.info('HG:shared-react:ready'); }, [mobile]);
   const { stealthMode, toggleStealth, stealthError } = useStealthWindow();
+  const [wakeRegionFocus, setWakeRegionFocus] = useState(0);
+  const [wakeSettingsOpening, setWakeSettingsOpening] = useState(false);
   useLayoutEffect(() => initializeTheme(), []);
   const [layout, setLayout] = useState('landscape');
   const [layoutBusy, setLayoutBusy] = useState(false);
@@ -160,7 +162,7 @@ export default function App({ platformPages = {} }) {
         return <DownloadManager active={page === id} onNavigate={navigate} />;
       case 'settings':
         if (platformPages.settings) return React.createElement(platformPages.settings, { active: page === id, appInfo });
-        return <SettingsPage active={page === id} preview={appInfo?.preview} appInfo={appInfo} />;
+        return <SettingsPage active={page === id} preview={appInfo?.preview} appInfo={appInfo} wakeRegionFocus={wakeRegionFocus} />;
       case 'download':
       default:
         return <HongguoDownload active={page === id} onNavigate={navigate} />;
@@ -260,7 +262,20 @@ export default function App({ platformPages = {} }) {
         </nav>
         {!mobile && !appInfo?.preview && <AppUpdateNotice />}
         {!mobile && !appInfo?.preview && <AnnouncementNotice />}
-        {stealthMode && <div className="stealth-toolbar"><span>{t("移开暂停隐藏 · 移回继续")}</span><button className="btn btn-outline btn-sm" onClick={() => toggleStealth(false)}>{t("退出小窗")}</button></div>}
+        {stealthMode && <div className="stealth-toolbar"><span>{t("移开暂停隐藏 · 移回继续")}</span><div className="stealth-toolbar-actions">
+          <button className="btn btn-outline btn-sm" disabled={wakeSettingsOpening} onClick={async () => {
+            if (wakeSettingsOpening) return;
+            setWakeSettingsOpening(true);
+            try {
+              const result = await window.electronAPI.setStealthMode(false);
+              if (!result?.success) throw new Error(result?.error || '小窗切换失败，请重试');
+              setWakeRegionFocus(value => value + 1);
+              navigate('settings');
+            } catch (error) { setStorageError(error.message || '小窗切换失败，请重试'); }
+            finally { setWakeSettingsOpening(false); }
+          }}>{t('设置唤醒区域')}</button>
+          <button className="btn btn-outline btn-sm" disabled={wakeSettingsOpening} onClick={() => toggleStealth(false)}>{t("退出小窗")}</button>
+        </div></div>}
         {stealthError && <div className="app-storage-error" role="alert">{t(stealthError)}</div>}
         {storageError && <div className="app-storage-error" role="alert"><span>{t(storageError)}</span><button className="btn btn-outline btn-sm" onClick={() => setStorageError('')}>{t("关闭提示")}</button></div>}
         {visited.map((id) => <main className="main-content" data-page={id} hidden={page !== id} key={id}>{t(renderPage(id))}</main>)}

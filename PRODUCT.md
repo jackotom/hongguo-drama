@@ -1,6 +1,6 @@
 # 红果短剧
 
-6.5开发目标：Docker Web UI/API、NAS下载与合并，窗口内全屏及重复弹幕聚合。Docker替代TV，五平台统一发行。状态见docs/release-6.5.md。
+6.5开发目标：Docker Web UI/API、NAS下载与合并，窗口内全屏、重复弹幕聚合及自定义小窗唤醒区域。Docker替代TV，五平台统一发行。状态见docs/release-6.5.md。
 
 6.4已于2026-11-09 00:00:50（Asia/Shanghai）正式公开并设Latest，内部6.4.0、桌面构建6.4.1，冻结源码`12fa10087059be49d8f7d9895bae260130fe0e1f`。本次按明确授权发布双Mac、Windows、Linux四平台，TV继续开发、候选APK不公开；后续默认五平台规则保留。23附件远端大小/SHA256及两份更新清单已核对；双Mac签名、公证、装订与最终DMG/更新ZIP验收通过；Windows真实素材便携播放及安装升级验收通过但EXE未签名；Linux原生Ubuntu CI以CPU软件解码完成两集真实下载与静音播放。Mac两集静音播放及中英文切换、播放器保留、重载记忆通过；x64经Rosetta启动，不等于实体Intel验收。未替换本机正式安装。 详情见[6.4说明](docs/release-6.4.md)。
 

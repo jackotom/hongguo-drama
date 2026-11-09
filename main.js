@@ -70,6 +70,7 @@ const APP_VERSION = app.getVersion() || '1.0.0';
 
 const APP_TITLE = IS_PREVIEW ? '红果短剧预览' : '红果短剧';
 const { createStealthController } = require('./src/native/stealth-window');
+const { DEFAULT_STEALTH_WAKE_REGION, validateStealthWakeRegion, normalizeStealthWakeRegion } = require('./src/native/stealth-region');
 const { createBossKeyController } = require('./src/native/boss-key');
 
 const casting = require('./src/native/casting').createCastingService();
@@ -243,6 +244,7 @@ function getDefaultSettings() {
     compat_mode: true,
     cache_next_episode: true,
     picture_in_picture_mode: 'custom',
+    stealth_wake_region: { ...DEFAULT_STEALTH_WAKE_REGION },
     app_updates_enabled: !IS_PREVIEW,
     watch_updates_enabled: true,
     watch_sequels_enabled: true,
@@ -497,6 +499,7 @@ async function applyProxyForStartup(settings) {
 function getCurrentSettings() {
   const saved = store.getSettings() || {};
   const merged = { ...getDefaultSettings(), ...saved };
+  merged.stealth_wake_region = normalizeStealthWakeRegion(merged.stealth_wake_region);
   // 保证并发数合法
   const mc = parseInt(merged.max_concurrent, 10);
   MAX_CONCURRENT_DOWNLOADS = Number.isInteger(mc) && mc >= 1 && mc <= 10 ? mc : 3;
@@ -4505,7 +4508,7 @@ ipcMain.handle('select-folder', async () => {
   return result.filePaths[0];
 });
 
-const SETTINGS_KEYS = ['root', 'name_format', 'max_concurrent', 'download_quality', 'download_metadata', 'export_text', 'auto_delete_watched', 'compat_mode', 'cache_next_episode', 'picture_in_picture_mode', 'show_danmaku_controls', 'app_updates_enabled', 'watch_updates_enabled', 'watch_sequels_enabled', 'watch_notifications_enabled', 'search_app_enabled', 'proxy_enabled', 'proxy_mode', 'proxy_host', 'proxy_port', 'proxy_username', 'proxy_password'];
+const SETTINGS_KEYS = ['root', 'name_format', 'max_concurrent', 'download_quality', 'download_metadata', 'export_text', 'auto_delete_watched', 'compat_mode', 'cache_next_episode', 'picture_in_picture_mode', 'stealth_wake_region', 'show_danmaku_controls', 'app_updates_enabled', 'watch_updates_enabled', 'watch_sequels_enabled', 'watch_notifications_enabled', 'search_app_enabled', 'proxy_enabled', 'proxy_mode', 'proxy_host', 'proxy_port', 'proxy_username', 'proxy_password'];
 
 function normalizeTextExportKinds(value) {
   return { danmaku: value?.danmaku === true, comments: value?.comments === true, reviews: value?.reviews === true };
@@ -4527,6 +4530,7 @@ function applyEditableSettings(current, incoming) {
     if (key === 'proxy_password') continue;
     if (Object.prototype.hasOwnProperty.call(source, key)) merged[key] = source[key];
   }
+  if (Object.prototype.hasOwnProperty.call(source, 'stealth_wake_region')) merged.stealth_wake_region = validateStealthWakeRegion(source.stealth_wake_region);
   if (Object.prototype.hasOwnProperty.call(source, 'export_text')) merged.export_text = normalizeTextExportKinds(source.export_text);
   if (source.clear_proxy_password === true) merged.proxy_password = '';
   else if (typeof source.proxy_password === 'string' && source.proxy_password.length > 0) merged.proxy_password = source.proxy_password;
@@ -5321,7 +5325,7 @@ ipcMain.handle('open-external-url', async (event, url) => {
 let windowLayout = 'landscape';
 let landscapeBounds = null;
 let layoutChanging = false;
-const stealth = createStealthController({ screen, BaseWindow, View, getWindow: () => mainWindow });
+const stealth = createStealthController({ screen, BaseWindow, View, getWindow: () => mainWindow, getWakeRegion: () => getCurrentSettings().stealth_wake_region });
 const bossKey = createBossKeyController({ globalShortcut, getWindows: () => BaseWindow.getAllWindows(), getMainWindow: () => mainWindow, store,
   dock: process.platform === 'darwin' ? app.dock : undefined });
 ipcMain.handle('get-boss-key-state', () => bossKey.getState());

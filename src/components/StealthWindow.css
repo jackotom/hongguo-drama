@@ -4,6 +4,10 @@
 .stealth-mode .stealth-toolbar { display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; gap: 8px; height: 48px; padding: 6px 10px 6px 82px; background: var(--bg-elevated); -webkit-app-region: drag; }
 .stealth-toolbar span { font-size: 10px; color: var(--text-secondary); }
 .stealth-toolbar button { -webkit-app-region: no-drag; white-space: nowrap; }
+.stealth-toolbar-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; }
+.stealth-mode .stealth-toolbar { height: auto; min-height: 48px; }
+.stealth-toolbar > span { min-width: 0; }
+@media (max-width: 700px) { .stealth-mode .stealth-toolbar > span { display: none; } }
 .stealth-mode .main-content[data-page="player"] { padding: 0; overflow: hidden; }
 .stealth-mode .player-container { display: flex; flex-direction: column; min-height: 0; height: 100%; gap: 0; }
 .stealth-mode .player-container > :not(.player-viewing-layout):not(.player-empty) { display: none !important; }

@@ -5,6 +5,7 @@ import useDialogKeyboard from './useDialogKeyboard';
 import './Settings.css';
 import AppearanceSettings from './AppearanceSettings';
 import ShortcutSettings from './ShortcutSettings';
+import StealthWakeRegion from './StealthWakeRegion.jsx';
 import CustomSources from './CustomSources';
 import BuiltinSources from './BuiltinSources';
 import AnnouncementSettings from './AnnouncementSettings';
@@ -48,7 +49,7 @@ function describeProxy(settings) {
   return { on: true, text: '接口/下载跟随启动环境，浏览器跟随系统' };
 }
 
-function SettingsPage({ active = true, preview = false, appInfo = null }) {
+function SettingsPage({ active = true, preview = false, appInfo = null, wakeRegionFocus = 0 }) {
   useLanguage();
   const danmakuSource = useDanmakuSource();
   const [settings, setSettings] = useState(null);
@@ -280,6 +281,9 @@ function SettingsPage({ active = true, preview = false, appInfo = null }) {
           {pictureModeError && <p className="appearance-error" role="alert">{t(pictureModeError)}</p>}
         </div>
       </section>
+      {window.electronAPI.platform !== 'android' && <section className="settings-card" aria-label={t('小窗模式')}>
+        <StealthWakeRegion active={active} focusRequest={wakeRegionFocus} />
+      </section>}
       <BuiltinSources />
       <CustomSources active={active} />
       <p className="settings-hint">{t("播放页顶部可开启小窗模式：窗口缩小、置顶并在支持的系统上跨虚拟桌面可见；鼠标移开时暂停隐藏，移回继续，Esc 或 Dock 可恢复主窗口。")}</p>

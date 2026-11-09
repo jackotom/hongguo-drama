@@ -1,0 +1,18 @@
+.stealth-wake-settings h3 { margin: 0; }
+.stealth-wake-editor { min-width: 0; border: 0; padding: 12px 0; margin: 0; display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(190px, 1fr); gap: 24px; }
+.stealth-wake-preview-column { min-width: 0; display: flex; flex-direction: column; gap: 12px; }
+.stealth-wake-canvas { position: relative; aspect-ratio: 16 / 9; margin: 0 20px 20px 0; background: var(--bg-inset); border: 1px solid var(--border-color); border-radius: 8px; }
+.stealth-wake-area { position: absolute; box-sizing: border-box; background: var(--accent-soft); border: 2px solid var(--accent); }
+.stealth-wake-move { position: absolute; inset: 0; width: 100%; height: 100%; padding: 0; border: 0; background: transparent; cursor: move; touch-action: none; }
+.stealth-wake-resize { position: absolute; right: -19px; bottom: -19px; width: 24px; height: 24px; display: grid; place-items: center; padding: 0; border: 1px solid var(--accent); border-radius: 5px; background: var(--bg-card); color: var(--accent-text); cursor: nwse-resize; touch-action: none; }
+.stealth-wake-move:focus-visible, .stealth-wake-resize:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+.stealth-wake-editor:disabled { opacity: .65; }
+.stealth-wake-editor:disabled button { cursor: default; }
+.stealth-wake-fields { min-width: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; align-content: start; }
+.stealth-wake-field { display: flex; flex-direction: column; gap: 5px; color: var(--text-secondary); font-size: 12px; }
+.stealth-wake-field > div { display: flex; align-items: center; gap: 6px; }
+.stealth-wake-field input { width: 100%; min-width: 0; font-variant-numeric: tabular-nums; }
+.stealth-wake-field input[aria-invalid="true"] { border-color: var(--danger); }
+.stealth-wake-fields > p { grid-column: 1 / -1; }
+.stealth-wake-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; }
+@media (max-width: 620px) { .stealth-wake-editor { grid-template-columns: minmax(0, 1fr); gap: 20px; } }
