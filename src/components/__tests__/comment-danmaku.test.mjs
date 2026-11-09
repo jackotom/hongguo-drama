@@ -3,6 +3,18 @@ import assert from 'node:assert/strict';
 import * as model from '../danmakuModel.mjs';
 import { DEFAULT_DANMAKU_SETTINGS, normalizeDanmakuSettings, advanceDanmaku } from '../danmakuModel.mjs';
 
+test('评论按完整相同内容聚合，分页重复ID不增加计数，显示保留计数', () => {
+  const feed = model.createCommentFeed('123456', '654321');
+  const page = items => ({ success: true, series_id: '123456', episode_id: '654321', items, has_more: false });
+  model.appendCommentPage(feed, page([{ id: '1', content: '好看' }, { id: '2', content: '好看' }, { id: '3', content: '好看！' }]), DEFAULT_DANMAKU_SETTINGS);
+  model.appendCommentPage(feed, page([{ id: '2', content: '好看' }, { id: '4', content: '好看' }]), DEFAULT_DANMAKU_SETTINGS);
+  assert.equal(feed.comments.length, 4, '原始评论保留');
+  assert.deepEqual(feed.groupedComments.map(item => [item.content, item.count]), [['好看', 3], ['好看！', 1]]);
+  advanceDanmaku(feed.animation, feed.groupedComments, 0.1, { width: 500, height: 300, settings: DEFAULT_DANMAKU_SETTINGS, reducedMotion: true });
+  assert.equal(feed.animation.items[0].text, '好看 × 3');
+  assert.equal(feed.animation.items[0].content, '好看');
+});
+
 test('settings reject malformed storage and clamp supported numeric values', () => {
   assert.deepEqual(normalizeDanmakuSettings(null), DEFAULT_DANMAKU_SETTINGS);
   assert.deepEqual(normalizeDanmakuSettings({ opacity: -1, fontSize: 200, speed: NaN, area: 'unsafe', density: 'many' }),

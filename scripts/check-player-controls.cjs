@@ -67,6 +67,14 @@ const source = transformSync(fs.readFileSync(path.join(__dirname, '../src/compon
   assert.equal(find('播放').props.title, '播放/暂停（Shift + J）');
   assert.equal(find('全屏').props.title, '全屏（G）');
   props.shortcuts = shortcutModule.exports.DEFAULT_SHORTCUTS; render();
+  const beforeWindowFill = { time: media.currentTime, paused: media.paused };
+  find('窗口全屏').props.onClick(); render();
+  assert.equal(props.windowFill, true);
+  assert.equal(fullscreenCalls, 0, 'window fill must not request display fullscreen');
+  assert.ok(find('退出窗口全屏'));
+  assert.deepEqual({ time: media.currentTime, paused: media.paused }, beforeWindowFill);
+  find('退出窗口全屏').props.onClick(); render();
+  assert.equal(props.windowFill, false);
   assert.equal(find('播放进度').props.max, 100); assert.equal(find('播放进度').props.value, 12);
   await find('播放').props.onClick(); render(); assert.equal(plays, 1); assert.ok(find('暂停'));
   find('暂停').props.onClick(); render(); assert.equal(pauses, 1);

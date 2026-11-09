@@ -17,6 +17,7 @@ const skip = new Set([
   'check-danmaku-live.cjs',
   'check-linux-media.cjs',
   'check-linux-appimage.cjs',
+  'check-docker-release.cjs',
 ]);
 
 function run(args) {

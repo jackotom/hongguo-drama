@@ -1,0 +1,115 @@
+const { test } = require('node:test');
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const os = require('node:os');
+const path = require('node:path');
+const { once } = require('node:events');
+const { createApp, makeTask } = require('./index.cjs');
+const { Storage } = require('./storage.cjs');
+const { mediaGuard } = require('./media.cjs');
+const TOKEN = 'test-only-'.repeat(6);
+const detail = { series_id: '123', series_title: '安全/剧名', total: 2, episodes: [{ vid: '456', vid_index: 1, title: '第一集' }, { vid: '789', vid_index: 2, title: '第二集' }] };
+async function setup(t, options = {}) {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'hongguo-server-test-'));
+  const app = createApp({ token: TOKEN, dataRoot: path.join(root, 'data'), downloadRoot: path.join(root, 'downloads'), autoStart: false, media: { series: async () => detail }, ...options });
+  app.server.listen(0, '127.0.0.1'); await once(app.server, 'listening');
+  const base = `http://127.0.0.1:${app.server.address().port}`;
+  const api = async (route, payload, headers = {}) => {
+    const response = await fetch(base + route, { method: payload === undefined ? 'GET' : 'POST', headers: { Authorization: `Bearer ${TOKEN}`, ...(payload !== undefined ? { 'Content-Type': 'application/json' } : {}), ...headers }, ...(payload === undefined ? {} : { body: JSON.stringify(payload) }) });
+    return { status: response.status, body: await response.json() };
+  };
+  t.after(async () => { await app.close(); fs.rmSync(root, { recursive: true, force: true }); });
+  return { app, root, api, base };
+}
+test('requires a strong token and rejects unauthorized/cross-origin writes', async t => {
+  assert.throws(() => createApp({ token: 'short' }), /HONGGUO_TOKEN/);
+  const { api } = await setup(t);
+  assert.equal((await api('/api/tasks', undefined, { Authorization: '' })).status, 401);
+  assert.equal((await api('/api/downloads', {}, { Origin: 'https://evil.example' })).status, 403);
+  assert.equal((await api('/health', undefined, { Authorization: '' })).status, 200);
+});
+test('accepts only catalogue episode IDs and does not accept URLs or paths', async t => {
+  const { api } = await setup(t);
+  for (const payload of [{ seriesId: '../123', episodeIds: ['456'] }, { seriesId: '123', episodeIds: ['999'] }, { seriesId: '123', episodeIds: ['456'], url: 'http://127.0.0.1' }, { seriesId: '123', episodeIds: ['456'], directory: '/tmp' }, { seriesId: '123', episodeIds: ['456', '456'] }]) assert.equal((await api('/api/downloads', payload)).status, 400);
+  const first = await api('/api/downloads', { seriesId: '123', episodeIds: ['456'] });
+  const second = await api('/api/downloads', { seriesId: '123', episodeIds: ['456'] });
+  assert.equal(first.status, 202); assert.equal(first.body.tasks[0].id, second.body.tasks[0].id);
+});
+test('persistent queue survives restart; running tasks require explicit retry', async t => {
+  const { app, api, root } = await setup(t);
+  const { body } = await api('/api/downloads', { seriesId: '123', episodeIds: ['456', '789'] });
+  app.store.update(app.store.get(body.tasks[0].id), { status: 'running' });
+  const loaded = new Storage(path.join(root, 'data'), path.join(root, 'downloads'));
+  assert.equal(loaded.tasks[0].status, 'interrupted'); assert.equal(loaded.tasks[1].status, 'queued');
+});
+test('rejects destination symlinks and never overwrites a conflicting file', async t => {
+  const { app, api, root } = await setup(t);
+  const added = await api('/api/downloads', { seriesId: '123', episodeIds: ['456'] });
+  const task = app.store.get(added.body.tasks[0].id), file = app.store.output(task), outside = path.join(root, 'outside');
+  fs.writeFileSync(outside, 'keep'); fs.symlinkSync(outside, file);
+  assert.throws(() => app.store.output(task), /普通文件/); assert.equal(fs.readFileSync(outside, 'utf8'), 'keep');
+  fs.unlinkSync(file); fs.rmdirSync(path.dirname(file)); fs.symlinkSync(root, path.dirname(file));
+  assert.throws(() => app.store.output(task), /符号链接/);
+});
+test('CDN guard blocks arbitrary destinations and redirect escapes', () => {
+  for (const url of ['http://v.qznovelvod.com/a.mp4', 'https://127.0.0.1/a', 'https://example.org/a', 'https://qznovelvod.com.evil.org/a', 'https://user:pass@v.qznovelvod.com/a']) assert.throws(() => mediaGuard(url));
+  const guard = mediaGuard('https://v.qznovelvod.com/a');
+  assert.equal(guard.proxy, false);
+  assert.throws(() => guard.beforeRedirect({}, { headers: { location: 'https://127.0.0.1/' } }, { url: 'https://v.qznovelvod.com/a' }));
+});
+test('cancel state is persisted before abort and late completion cannot revive it', async t => {
+  let abortedStatus, release;
+  const { app, api } = await setup(t, { media: { series: async () => detail, download: async (task, store, signal) => new Promise(resolve => { release = resolve; signal.addEventListener('abort', () => { abortedStatus = JSON.parse(fs.readFileSync(store.stateFile)).tasks[0].status; resolve(); }); }) } });
+  const added = await api('/api/downloads', { seriesId: '123', episodeIds: ['456'] });
+  app.drain();
+  const cancelled = await api(`/api/tasks/${added.body.tasks[0].id}/cancel`, {});
+  assert.equal(cancelled.status, 200); assert.equal(abortedStatus, 'cancelled'); release();
+  await new Promise(resolve => setImmediate(resolve)); assert.equal(app.store.tasks[0].status, 'cancelled');
+});
+test('merge rejects unrelated, duplicate or missing files and sorts by episode', async t => {
+  const { app, api } = await setup(t);
+  const added = await api('/api/downloads', { seriesId: '123', episodeIds: ['456', '789'] });
+  const ids = added.body.tasks.map(task => task.id);
+  assert.equal((await api('/api/merge', { taskIds: ids })).status, 400);
+  for (const task of app.store.tasks) { fs.writeFileSync(app.store.output(task), 'metadata-only fixture, never a playback video'); app.store.update(task, { status: 'completed' }); }
+  assert.equal((await api('/api/merge', { taskIds: [ids[0], ids[0]] })).status, 400);
+  const merged = await api('/api/merge', { taskIds: [...ids].reverse() });
+  assert.equal(merged.status, 202); assert.deepEqual(app.store.get(merged.body.task.id).taskIds, ids);
+});
+test('failed persistence rolls status back before cancellation occurs', async t => {
+  const { app, api } = await setup(t);
+  const added = await api('/api/downloads', { seriesId: '123', episodeIds: ['456'] });
+  const oldSave = app.store.save; app.store.save = () => { throw new Error('write failed'); };
+  assert.equal((await api(`/api/tasks/${added.body.tasks[0].id}/cancel`, {})).status, 500);
+  assert.equal(app.store.tasks[0].status, 'queued'); app.store.save = oldSave;
+});
+test('progress persistence failure aborts work safely and stops queue', async t => {
+  let updateProgress, aborted = false;
+  const { app, api } = await setup(t, { media: { series: async () => detail, download: async (task, store, signal, update) => new Promise(resolve => { updateProgress = update; signal.addEventListener('abort', () => { aborted = true; resolve(); }); }) } });
+  await api('/api/downloads', { seriesId: '123', episodeIds: ['456', '789'] });
+  app.drain(); const save = app.store.save; app.store.save = () => { throw new Error('disk full'); };
+  assert.doesNotThrow(() => updateProgress(10));
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(aborted, true); assert.equal(app.store.tasks[1].status, 'queued'); assert.equal((await api('/health')).status, 503);
+  await app.close(); app.store.save = save;
+});
+test('explicit source rejection pauses pending episodes without another request', async t => {
+  let calls = 0;
+  const { app, api } = await setup(t, { media: { series: async () => detail, download: async () => { calls++; throw Object.assign(new Error('没有完整片源'), { code: 'SOURCE_UNAVAILABLE', sources: [{ source: 'app', code: 'HTTP_403' }] }); } } });
+  await api('/api/downloads', { seriesId: '123', episodeIds: ['456', '789'] }); app.drain();
+  await new Promise(resolve => setImmediate(resolve)); await new Promise(resolve => setImmediate(resolve));
+  assert.equal(calls, 1); assert.equal(app.store.tasks[0].status, 'failed'); assert.equal(app.store.tasks[1].status, 'interrupted');
+});
+test('replaced task mount stops persistence without creating a new state file', async t => {
+  const { app } = await setup(t);
+  const dir = app.store.dataRoot; fs.renameSync(dir, dir + '-old'); fs.mkdirSync(dir);
+  assert.throws(() => app.store.save(), /挂载已变化/); assert.equal(fs.existsSync(path.join(dir, 'tasks.json')), false);
+});
+test('retry cannot duplicate another active task for the same episode and quality', async t => {
+  const { api } = await setup(t);
+  const first = await api('/api/downloads', { seriesId: '123', episodeIds: ['456'] });
+  await api(`/api/tasks/${first.body.tasks[0].id}/cancel`, {});
+  const second = await api('/api/downloads', { seriesId: '123', episodeIds: ['456'] });
+  assert.notEqual(first.body.tasks[0].id, second.body.tasks[0].id);
+  assert.equal((await api(`/api/tasks/${first.body.tasks[0].id}/retry`, {})).status, 409);
+});

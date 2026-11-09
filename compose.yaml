@@ -1,0 +1,20 @@
+services:
+  hongguo:
+    image: hongguo-drama:6.5
+    platform: linux/amd64
+    user: "${PUID:-1000}:${PGID:-1000}"
+    ports:
+      - "${BIND_ADDRESS:-127.0.0.1}:${PORT:-3000}:3000"
+    environment:
+      HONGGUO_TOKEN: "${HONGGUO_TOKEN:?请设置至少32字符的随机访问令牌}"
+    volumes:
+      - "${HONGGUO_DATA:-./docker-data}:/data"
+      - "${HONGGUO_DOWNLOADS:?请设置已挂载NAS的绝对路径}:/downloads"
+    restart: unless-stopped
+    init: true
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m,mode=1777
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    stop_grace_period: 45s

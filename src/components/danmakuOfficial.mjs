@@ -2,7 +2,7 @@
 // https://github.com/dawei233/hongguo-drama
 // 时间轴投放与评论队列分开；两种来源共用视觉设置、轨道布局和窗口重排。
 
-import { commentIsBlocked, danmakuLayout, retireDanmaku, takeDanmakuReplay } from './danmakuModel.mjs';
+import { commentIsBlocked, danmakuLayout, retireDanmaku, takeDanmakuReplay, groupDanmaku, danmakuText } from './danmakuModel.mjs';
 
 export const DANMAKU_SOURCES = Object.freeze(['official', 'comments']);
 
@@ -106,6 +106,7 @@ export function appendOfficialPage(feed, data) {
     feed.danmaku.push(item);
   }
   feed.danmaku.sort((a, b) => a.time - b.time);
+  feed.groupedDanmaku = groupDanmaku(feed.danmaku);
   feed.loaded = true;
   feed.truncated = data.truncated === true;
   feed.partial = data.partial === true;
@@ -177,7 +178,7 @@ export function advanceTimedDanmaku(state, danmaku, currentTime, elapsed, option
     const timed = entry && entry.time <= currentTime;
     const stale = timed && currentTime - entry.time > staleAfter;
     const blocked = timed && commentIsBlocked(entry.text, settings);
-    const visible = timed && state.items.some(item => item.entry === entry);
+    const visible = timed && state.items.some(item => item.entry === entry || entry.count && item.content === entry.text && item.entry?.time === entry.time);
     if (blocked || stale || visible) {
       state.cursor++;
       continue;
@@ -194,10 +195,10 @@ export function advanceTimedDanmaku(state, danmaku, currentTime, elapsed, option
       const pending = lowerBoundTime(list, currentTime + 2) - state.cursor;
       entry = takeDanmakuReplay(state, options, Math.max(0, pending), currentTime)?.entry;
       if (!entry) break;
+      entry = list.find(item => item.time === entry.time && item.text === entry.text) || entry;
     }
 
-    const chars = Array.from(entry.text);
-    const text = chars.length > 80 ? `${chars.slice(0, 79).join('')}…` : entry.text;
+    const text = danmakuText(entry.text, entry.count);
     const textWidth = (Array.from(text).length + 1) * settings.fontSize;
     state.items.push({
       id: state.nextId++,

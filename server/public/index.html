@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <meta name="referrer" content="no-referrer">
+  <title>红果短剧 · NAS 下载</title>
+  <link rel="stylesheet" href="/styles.css">
+  <script src="/app.js" defer></script>
+</head>
+<body>
+  <section id="login" class="login-shell" aria-labelledby="login-title">
+    <form id="login-form" class="login-form">
+      <span class="brand-mark" aria-hidden="true">红果</span>
+      <h1 id="login-title">把短剧存进 NAS</h1>
+      <p>搜索剧集、批量下载，再将已完成的分集合并。</p>
+      <label for="token">访问令牌</label>
+      <input id="token" type="password" required autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="输入部署时设置的访问令牌">
+      <p class="hint">由 NAS 管理员设置，无默认密码。令牌仅保留在当前页面内存，刷新后需重新输入。</p>
+      <button id="login-button" class="primary" type="submit">连接 NAS</button>
+      <p id="login-error" class="error" role="alert" hidden></p>
+    </form>
+  </section>
+
+  <div id="app" hidden>
+    <header class="app-header">
+      <a class="brand" href="#search"><span class="brand-mark" aria-hidden="true">红果</span><span>红果短剧<small>NAS 下载</small></span></a>
+      <div class="connection"><span id="connection-status">已连接</span><button id="logout" class="quiet" type="button">断开连接</button></div>
+    </header>
+    <nav class="navigation" aria-label="主导航">
+      <button type="button" data-view="search" aria-pressed="true">搜索剧集</button>
+      <button type="button" data-view="tasks" aria-pressed="false">下载任务 <span id="task-count" class="count">0</span></button>
+      <button type="button" data-view="api" aria-pressed="false">API 使用</button>
+    </nav>
+    <main>
+      <p id="notice" class="notice" role="status" hidden></p>
+      <section id="view-search" aria-labelledby="search-title">
+        <div class="section-heading"><div><h1 id="search-title">搜索剧集</h1><p>下载在 NAS 后台继续，关闭页面不影响任务。</p></div></div>
+        <form id="search-form" class="search-form">
+          <label class="sr-only" for="query">剧名或关键词</label>
+          <input id="query" type="search" required maxlength="100" placeholder="输入剧名或关键词" autocomplete="off">
+          <button id="search-button" class="primary" type="submit">搜索</button>
+        </form>
+        <div class="search-layout">
+          <section class="results-pane" aria-labelledby="results-title">
+            <h2 id="results-title">搜索结果</h2>
+            <p id="search-status" class="empty" role="status">输入剧名，找到想保存的短剧。</p>
+            <div id="results" class="results"></div>
+            <div class="pagination"><button id="previous-page" type="button" hidden>上一页</button><span id="page-label"></span><button id="next-page" type="button" hidden>下一页</button></div>
+          </section>
+          <section id="detail" class="detail-pane" aria-labelledby="detail-title">
+            <div id="detail-empty" class="detail-empty"><h2>选择一部短剧</h2><p>查看分集，再选择保存到 NAS 的内容。</p></div>
+            <div id="detail-content" hidden>
+              <div class="detail-heading"><h2 id="detail-title" tabindex="-1"></h2><p id="episode-total"></p></div>
+              <div class="selection-toolbar"><span id="selection-count">已选 0 集</span><div><button id="select-all" type="button" class="quiet">全选</button><button id="clear-selection" type="button" class="quiet">清空</button></div></div>
+              <div id="episodes" class="episodes" role="group" aria-label="选择分集"></div>
+              <div class="download-toolbar"><label for="quality">下载画质</label><select id="quality"><option value="auto">自动</option><option value="1080p">1080P</option><option value="720p">720P</option></select><button id="download" type="button" class="primary" disabled>下载选中分集</button></div>
+              <p class="hint">保存到部署时挂载的下载目录。实际画质与可用性取决于片源。</p>
+            </div>
+          </section>
+        </div>
+      </section>
+
+      <section id="view-tasks" aria-labelledby="tasks-title" hidden>
+        <div class="section-heading"><div><h1 id="tasks-title">下载任务</h1><p>勾选同一部剧已完成的分集，按集号顺序合并。</p></div><button id="refresh-tasks" type="button">刷新</button></div>
+        <div class="task-toolbar"><label for="task-filter">显示</label><select id="task-filter"><option value="all">全部任务</option><option value="active">进行中</option><option value="completed">已完成</option><option value="failed">需要处理</option></select><button id="merge" class="primary" type="button" disabled>合并已选分集（0）</button></div>
+        <p id="tasks-status" role="status" class="hint"></p>
+        <div id="tasks" class="tasks"></div>
+        <p class="hint">取消只停止当前任务，保留已完成文件。合并保留原分集；输出位置见任务详情。</p>
+      </section>
+
+      <section id="view-api" class="api-page" aria-labelledby="api-title" hidden>
+        <h1 id="api-title">API 使用</h1>
+        <p>让脚本与 NAS 自动化调用相同功能。所有请求都需要访问令牌。</p>
+        <h2>连接与鉴权</h2>
+        <p>服务地址：<code id="api-origin"></code>。在请求头添加 <code>Authorization: Bearer &lt;访问令牌&gt;</code>，JSON 请求添加 <code>Content-Type: application/json</code>。</p>
+        <p>令牌等同管理权限，请通过可信局域网或 HTTPS 访问；不要把令牌放进链接。</p>
+        <pre><code id="api-example"></code></pre>
+        <h2>接口速查</h2>
+        <div class="table-scroll"><table><thead><tr><th>方法与路径</th><th>用途 / 请求正文</th></tr></thead><tbody>
+          <tr><td><code>GET /api/status</code></td><td>验证令牌、查看下载目录与版本</td></tr>
+          <tr><td><code>GET /api/search?q=剧名&amp;page=1</code></td><td>搜索，结果位于 <code>results</code></td></tr>
+          <tr><td><code>GET /api/series/:seriesId</code></td><td>剧集详情，<code>series.episodes</code> 提供分集 <code>vid</code></td></tr>
+          <tr><td><code>POST /api/downloads</code></td><td><code>{"seriesId":"剧集ID","episodeIds":["分集vid"],"quality":"auto"}</code></td></tr>
+          <tr><td><code>GET /api/tasks</code></td><td>下载与合并状态，结果位于 <code>tasks</code></td></tr>
+          <tr><td><code>POST /api/tasks/:id/retry</code></td><td>重试失败、取消或中断的任务，正文 <code>{}</code></td></tr>
+          <tr><td><code>POST /api/tasks/:id/cancel</code></td><td>取消等待或运行中的任务，正文 <code>{}</code></td></tr>
+          <tr><td><code>POST /api/merge</code></td><td><code>{"taskIds":["下载任务ID1","下载任务ID2"]}</code>，至少两个同剧已完成分集</td></tr>
+          <tr><td><code>GET /api/files/:taskId</code></td><td>获取已登记的完成文件，仍需鉴权；也可直接从 NAS 挂载目录读取</td></tr>
+        </tbody></table></div>
+        <p class="hint">画质支持 <code>auto</code>、<code>720p</code>、<code>1080p</code>。接口返回 <code>success</code>；失败原因位于 <code>error</code>。本服务仅提供红果来源，不提供账号登录与在线播放。</p>
+      </section>
+    </main>
+    <footer>红果短剧 · <span id="version"></span><span id="download-root"></span></footer>
+  </div>
+</body>
+</html>

@@ -1,3 +1,5 @@
+> 6.5起TV不再纳入统一发行，Docker替代其第五平台位置。以下Android开发记录保留；不发布TV候选APK。
+
 # 红果短剧 Android TV候选
 
 本发行目录仅提供TV移植，版本跟随根package.json。手机个人版与iOS开发留在独立工作区，不作为TV交付。

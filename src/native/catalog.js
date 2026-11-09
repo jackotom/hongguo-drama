@@ -1,5 +1,6 @@
 const axios = require('axios');
-const { net } = require('electron');
+let net;
+try { ({ net } = require('electron')); } catch (error) { if (error.code !== 'MODULE_NOT_FOUND') throw error; }
 const { webMediaRequestOptions } = require('./web-media-guard');
 
 const SITE = 'https://hongguoduanju.com';

@@ -42,6 +42,24 @@ const { mount } = require('./check-player-resume.cjs');
       await doubleClick({ closest: query => query.split(',').map(value => value.trim()).includes(selector) ? {} : null });
       assert.equal(ui.document.fullscreenElement, null, `${selector} must keep its own double-click behavior`);
     }
+    for (const paused of [false, true]) {
+      ui.media.paused = paused;
+      const time = ui.media.currentTime;
+      tick(0);
+      ui.scrollArea.scrollTop = 260;
+      controls().props.onWindowFill(true); ui.render();
+      assert.ok(stage().props.className.includes('player-window-fill'));
+      assert.equal(ui.document.fullscreenElement, null);
+      assert.equal(ui.media.currentTime, time);
+      assert.equal(ui.media.paused, paused);
+      ui.scrollArea.scrollTop = 0;
+      await doubleClick(ui.stage); ui.render();
+      tick(0);
+      assert.ok(!stage().props.className.includes('player-window-fill'));
+      assert.equal(ui.document.fullscreenElement, null, 'double click exits window fill before display fullscreen');
+      assert.equal(ui.media.paused, paused);
+      assert.equal(ui.scrollArea.scrollTop, 260, 'exiting window fill restores the page scroll');
+    }
     console.log('PASS hold/release/blur speed, short-press seek; full playback area double click, both picture modes, pause state and control/menu boundaries');
   } finally { ui.unmount(); }
 })().catch(error => { console.error(error.message); process.exitCode = 1; });

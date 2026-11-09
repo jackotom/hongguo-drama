@@ -6,13 +6,13 @@
 - 发布回复时选择不会附加该标记的可用方式；无法确认时先保留草稿并说明限制，不使用会自动附加标记的连接器提交。
 - 此规则不授权新增对外回复，也不要求修改或删除历史评论；对外写入仍须已有明确授权。
 
-## 后续五平台统一发行（2026-11-06起）
+## 后续五平台统一发行（2026-11-09更新）
 
-- 每个后续正式版本一次性发布：macOS Apple Silicon arm64、macOS Intel x64、Windows x64、Linux x64 AppImage、Android TV APK。
-- 五个平台共用公开版本、GitHub标签与一次Release；各平台构建号独立递增。先在Draft汇总全部包、更新清单、精确对应源码与SHA256，齐备核对后一次公开并更新Latest。平台缺失则保留草稿，不拆版发布；例外须用户明确授权。
-- Android TV直接从本项目源码移植，复用取源、签名、解密与业务模块；补齐电视横屏、遥控器焦点／确认／返回与播放操作，不接入其他内容源。
-- 手机个人版不等于TV版；手机版本继续独立，不冒用手机、桌面、模拟器或Rosetta结果作为电视／其他硬件实机验收。
-- 当前TV构建入口 `python3 android/build.py --tv`；为本地开发候选，未完成TV实机验收与正式发行。平台门槛见 `docs/RELEASING.md`，进度见 `docs/android-tv.md`。
+- 用户明确将TV发行替换为Docker。6.5及后续每个正式版本一次发布：macOS Apple Silicon arm64、macOS Intel x64、Windows x64、Linux x64 AppImage、Docker服务端。
+- 共用公开版本、GitHub标签与一次Release；先在Draft汇总全部包、更新清单、精确源码与SHA256，完成必要验收后一次公开并更新Latest。缺平台保留草稿，不拆版发布。
+- Docker提供浏览器Web UI与认证API，支持红果搜索、分集选择、批量下载到挂载目录和合并；复用既有取源、签名、解密与媒体校验。
+- TV不再是发行项，保留既有开发源码，不发布候选APK。手机个人版继续独立；不同平台验收不能互相代替。
+- 平台门槛见 `docs/RELEASING.md`；6.5状态见 `docs/release-6.5.md`。
 
 ## 视频测试素材与声音
 

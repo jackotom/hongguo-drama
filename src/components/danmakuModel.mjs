@@ -32,6 +32,28 @@ export function createCommentFeed(seriesId, episodeId) {
     animation: { items: [], cursor: 0, nextId: 0, cooldown: 0 } };
 }
 
+// Keep source entries intact; only the display queue combines identical text.
+export function groupDanmaku(items) {
+  const groups = [], latest = new Map();
+  for (const item of items) {
+    const content = item.content ?? item.text;
+    const previous = latest.get(content);
+    if (previous && (!Number.isFinite(item.time) || item.time - previous.time <= 5)) previous.count++;
+    else {
+      const group = { ...item, count: 1 };
+      groups.push(group);
+      latest.set(content, group);
+    }
+  }
+  return groups;
+}
+
+export function danmakuText(content, count = 1) {
+  const chars = Array.from(content);
+  const text = chars.length > 80 ? `${chars.slice(0, 79).join('')}…` : content;
+  return count > 1 ? `${text} × ${count}` : text;
+}
+
 export function appendCommentPage(feed, data, settings) {
   if (!data?.success || String(data.series_id) !== feed.seriesId || String(data.episode_id) !== feed.episodeId || !Array.isArray(data.items)) throw new Error('Invalid episode comment page');
   let accepted = 0;
@@ -45,6 +67,7 @@ export function appendCommentPage(feed, data, settings) {
     feed.comments.push({ id, content });
     if (!commentIsBlocked(content, settings)) accepted++;
   }
+  feed.groupedComments = groupDanmaku(feed.comments);
   feed.loaded = true;
   feed.sourceLimited = data.source_limited === true;
   if (feed.sourceLimited) feed.notice = typeof data.notice === 'string' && data.notice ? data.notice : '公开网页仅提供部分评论，暂无可用后续页';
@@ -118,15 +141,18 @@ export function advanceDanmaku(state, comments, elapsed, { width, height, settin
     !state.items.some(item => item.lane === index || Math.abs(item.y - (top + index * lineHeight)) < lineHeight));
   if (state.cooldown === 0 && lane !== undefined) {
     let content = '';
+    let count = 1;
     while (state.cursor < comments.length) {
       const comment = comments[state.cursor++];
       const full = typeof comment === 'string' ? comment : comment.content;
-      if (!commentIsBlocked(full, settings)) { content = full; break; }
+      if (!commentIsBlocked(full, settings)) { content = full; count = comment.count || 1; break; }
     }
-    if (!content) content = takeDanmakuReplay(state, { width, height, settings, reducedMotion, bottomInset })?.content;
+    if (!content) {
+      content = takeDanmakuReplay(state, { width, height, settings, reducedMotion, bottomInset })?.content;
+      count = comments.find(comment => comment.content === content)?.count || 1;
+    }
     if (!content) return changed;
-    const chars = Array.from(content);
-    const text = chars.length > 80 ? chars.slice(0, 79).join('') + '…' : content;
+    const text = danmakuText(content, count);
     const textWidth = (Array.from(text).length + 1) * settings.fontSize;
     const x = reducedMotion ? 12 : state.nextId === 0 ? Math.max(12, width - textWidth - 12) : width;
     state.items.push({ id: state.nextId++, text, content, lane, x, y: top + lane * lineHeight, width: textWidth, age: 0 });

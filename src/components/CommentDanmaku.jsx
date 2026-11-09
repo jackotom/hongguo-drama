@@ -33,7 +33,7 @@ export function useCommentDanmaku({ seriesId, episodeId, active }) {
   useEffect(() => {
     if (!running) return;
     const fetchNext = async () => {
-      if (document.hidden || feed.loading || !feed.hasMore || feed.error || feed.comments.length - feed.animation.cursor >= 10 || Date.now() - feed.lastRequest < 1500) return;
+      if (document.hidden || feed.loading || !feed.hasMore || feed.error || (feed.groupedComments || feed.comments).length - feed.animation.cursor >= 10 || Date.now() - feed.lastRequest < 1500) return;
       feed.loading = true;
       feed.lastRequest = Date.now();
       refresh(value => value + 1);
@@ -64,7 +64,7 @@ export function useCommentDanmaku({ seriesId, episodeId, active }) {
   const status = !supported ? '仅红果来源的当前集支持评论弹幕' : !enabled ? '开启后展示本集公开评论' : !active ? '播放本集后显示评论弹幕'
     : !visible ? '' : feed.error || (feed.loading ? '正在加载本集后续评论…' : feed.notice) || (!feed.loaded ? '正在加载本集评论…'
       : feed.comments.length ? `已读取本集 ${feed.comments.length} 条评论${feed.hasMore ? '，播放时继续加载' : '，当前可用评论已读取'}` : '本集暂无可显示的公开评论');
-  return { enabled, supported, running, settings, feed, comments: feed.comments, status, saveError, error: feed.error,
+  return { enabled, supported, running, settings, feed, comments: feed.groupedComments || feed.comments, status, saveError, error: feed.error,
     loading: running && feed.loading, toggle: () => update({ enabled: !preferences.enabled }), update,
     reset: () => update(DEFAULT_DANMAKU_SETTINGS), retry: () => { feed.error = ''; feed.emptyPages = 0; refresh(value => value + 1); } };
 }

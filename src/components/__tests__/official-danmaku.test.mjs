@@ -16,6 +16,22 @@ const makeFeed = () => createOfficialFeed(SERIES, VID);
 const at = (time, text) => ({ time, text, color: '#FFFFFF', mode: 'scroll' });
 const options = (settings = DEFAULT_DANMAKU_SETTINGS, extra = {}) => ({ width: 800, height: 600, settings, reducedMotion: false, ...extra });
 
+test('时间轴相同内容只聚合首条起五秒内，重取不累计，远处重复仍按原时间出现', () => {
+  const feed = makeFeed();
+  const page = { success: true, series_id: SERIES, episode_id: VID, items: [at(1, '好看'), at(4, '好看'), at(5, '其他'), at(7, '好看')] };
+  appendOfficialPage(feed, page);
+  appendOfficialPage(feed, page);
+  assert.equal(feed.danmaku.length, 4);
+  assert.deepEqual(feed.groupedDanmaku.map(item => [item.time, item.text, item.count]), [[1, '好看', 2], [5, '其他', 1], [7, '好看', 1]]);
+  advanceTimedDanmaku(feed.animation, feed.groupedDanmaku, 1, 0.016, options());
+  assert.equal(feed.animation.items[0].text, '好看 × 2');
+  assert.equal(feed.animation.items[0].content, '好看');
+  assert.ok(feed.animation.items[0].width >= Array.from('好看 × 2').length * DEFAULT_DANMAKU_SETTINGS.fontSize);
+  appendOfficialPage(feed, page);
+  advanceTimedDanmaku(feed.animation, feed.groupedDanmaku, 1, 0.016, options());
+  assert.equal(feed.animation.items.length, 1, '重取后不能重发仍在屏上的聚合条目');
+});
+
 /** 按 60fps 推进到指定时间，模拟真实播放。 */
 function playTo(state, list, from, to, optionsFor) {
   const step = 1 / 60;

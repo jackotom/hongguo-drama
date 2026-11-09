@@ -352,6 +352,10 @@ export default function PlayerControls({ danmaku, enhancement, shortcuts = DEFAU
           </button>
           <input type="range" aria-label={t("音量")} aria-valuetext={`${Math.round((media.muted ? 0 : media.volume) * 100)}%`} min="0" max="1" step="0.05" value={media.muted ? 0 : media.volume} onChange={changeVolume} />
         </div>
+        {!mobile && !floating && !portrait && !fullscreen && <button type="button" data-player-control aria-label={t(windowFill ? '退出窗口全屏' : '窗口全屏')} title={t(windowFill ? '退出窗口全屏（Esc）' : '铺满当前窗口，保留弹幕')} aria-pressed={windowFill}
+          onClick={() => onWindowFill(!windowFill)}>
+          <Icon><rect x="3" y="5" width="18" height="14" rx="1" /><path d="M3 8h18" /></Icon>
+        </button>}
         <button type="button" data-player-control aria-label={t(expanded ? '退出全屏' : '全屏')} title={t(expanded ? '退出全屏（{0}）' : portrait ? '填满当前窗口（{0}）' : '全屏（{0}）', [formatShortcut(shortcuts.fullscreen, t)])} onClick={onToggleFullscreen}>
           <Icon><path d={expanded ? 'M9 3v6H3m12-6v6h6M9 21v-6H3m12 6v-6h6' : 'M9 3H3v6m12-6h6v6M3 15v6h6m12-6v6h-6'} /></Icon>
         </button>

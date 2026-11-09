@@ -61,7 +61,7 @@ function Player({ target, onNavigate, onSeriesSelected, onFloatingChange, active
   const [playbackSettingSaving, setPlaybackSettingSaving] = useState(false);
   const playbackSettingPending = useRef(false);
   const [windowFill, setWindowFill] = useState(false);
-  useEffect(() => { if (!portrait || !active) setWindowFill(false); }, [portrait, active]);
+  useEffect(() => { setWindowFill(false); }, [portrait, active]);
   const [seriesList, setSeriesList] = useState([]);
   const [activeSeriesId, setActiveSeriesId] = useState('');
   const [pictureChoice, setPictureChoice] = useState(null);
@@ -1255,6 +1255,18 @@ function Player({ target, onNavigate, onSeriesSelected, onFloatingChange, active
     fullscreenScrollRef.current = null;
   }, []);
 
+  const changeWindowFill = useCallback(fill => {
+    const element = stageRef.current?.closest('.main-content');
+    if (fill && element && !fullscreenScrollRef.current) fullscreenScrollRef.current = { element, top: element.scrollTop };
+    setWindowFill(fill);
+  }, []);
+
+  useEffect(() => {
+    if (windowFill) return;
+    const frame = requestAnimationFrame(restoreFullscreenScroll);
+    return () => cancelAnimationFrame(frame);
+  }, [windowFill, restoreFullscreenScroll]);
+
   useEffect(() => {
     let frame = 0;
     const restore = () => {
@@ -1268,7 +1280,7 @@ function Player({ target, onNavigate, onSeriesSelected, onFloatingChange, active
     if (document.querySelector('.stealth-mode')) { showToast('请先退出小窗模式'); return; }
     try {
       const stageDocument = stageRef.current?.ownerDocument || document;
-      if (portrait && !floatingPlayer.floating && window.electronAPI.platform !== 'android') { setWindowFill(fill => !fill); return; }
+      if (windowFill || portrait && !floatingPlayer.floating && window.electronAPI.platform !== 'android') { changeWindowFill(!windowFill); return; }
       if (stageDocument.fullscreenElement === stageRef.current) await stageDocument.exitFullscreen();
       else {
         const element = stageRef.current?.closest('.main-content');
@@ -1277,7 +1289,7 @@ function Player({ target, onNavigate, onSeriesSelected, onFloatingChange, active
         await stageRef.current?.requestFullscreen();
       }
     } catch { restoreFullscreenScroll(); showToast('无法进入或退出全屏，请重试'); }
-  }, [portrait, floatingPlayer.floating, showToast, restoreFullscreenScroll]);
+  }, [portrait, windowFill, floatingPlayer.floating, showToast, restoreFullscreenScroll, changeWindowFill]);
 
   useEffect(() => () => clearTimeout(videoClickTimer.current), [videoSrc]);
 
@@ -1962,6 +1974,7 @@ function Player({ target, onNavigate, onSeriesSelected, onFloatingChange, active
           : <CommentDanmaku videoRef={videoRef} source={mediaSource} available={visualActive} danmaku={danmaku} />}
       <PlayerControls floating={floatingPlayer.floating || nativePictureInPicture} onToggleFloating={async () => {
           if (document.querySelector('.stealth-mode')) throw new Error('请先退出小窗模式');
+          changeWindowFill(false);
           const video = videoRef.current;
           if (window.electronAPI.enterNativePictureInPicture) {
             const result = await window.electronAPI.enterNativePictureInPicture(video?.videoWidth,video?.videoHeight);
@@ -1979,7 +1992,7 @@ function Player({ target, onNavigate, onSeriesSelected, onFloatingChange, active
           const owner = stageRef.current?.ownerDocument || document;
           if (owner.fullscreenElement) await owner.exitFullscreen();
           floatingPlayer.toggle();
-        }} onOpenSettings={onNavigate ? () => onNavigate('settings') : undefined} danmaku={showDanmakuControls ? danmaku : null} enhancement={enhancement} continuing={autoAdvancing && !playbackError && !decodeFailed} autoContinue={autoNext && !!findNext(currentIndex)} shortcuts={shortcuts} onToggleFullscreen={toggleFullscreen} portrait={portrait} windowFill={windowFill} onWindowFill={setWindowFill} videoRef={videoRef} stageRef={stageRef} source={mediaSource} available={canPlay}
+        }} onOpenSettings={onNavigate ? () => onNavigate('settings') : undefined} danmaku={showDanmakuControls ? danmaku : null} enhancement={enhancement} continuing={autoAdvancing && !playbackError && !decodeFailed} autoContinue={autoNext && !!findNext(currentIndex)} shortcuts={shortcuts} onToggleFullscreen={toggleFullscreen} portrait={portrait} windowFill={windowFill} onWindowFill={changeWindowFill} videoRef={videoRef} stageRef={stageRef} source={mediaSource} available={canPlay}
           seriesTitle={detail?.series_title} episodes={episodes} currentIndex={currentIndex} onEpisodeChange={goToEpisode}
           episodesOpen={episodesOpen} onOpenEpisodes={mobile ? () => setEpisodesOpen(true) : undefined}
           onOpenDownloads={mobile ? () => onNavigate?.('manager') : undefined}

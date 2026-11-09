@@ -1,0 +1,47 @@
+name: Docker server candidate
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  docker:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: sudo apt-get update -qq && sudo apt-get install -y -qq build-essential pkg-config nasm curl git python3
+      - uses: actions/cache@v4
+        id: media
+        with:
+          path: ${{ runner.temp }}/linux-media
+          key: linux-x64-media-${{ hashFiles('scripts/build-ffmpeg-source-linux.sh', 'scripts/build-librempeg-source.sh', 'scripts/librempeg-videotoolbox-prototype.patch') }}
+      - if: steps.media.outputs.cache-hit != 'true'
+        run: |
+          bash scripts/build-ffmpeg-source-linux.sh "$RUNNER_TEMP/linux-media/ffmpeg" 4
+          bash scripts/build-librempeg-source.sh "$RUNNER_TEMP/linux-media/librempeg" linux-x64 4
+      - run: |
+          mkdir -p build/ffmpeg/linux-x64
+          cp "$RUNNER_TEMP/linux-media/ffmpeg/artifacts/bin/"* build/ffmpeg/linux-x64/
+          cp "$RUNNER_TEMP/linux-media/librempeg/artifacts/bin/"* build/ffmpeg/linux-x64/
+      - run: npm ci --no-audit --no-fund --ignore-scripts
+      - run: node scripts/check-linux-media.cjs
+      - run: node --test server/*.test.cjs
+      - name: Build and verify the exact server image
+        run: |
+          docker build --label org.opencontainers.image.revision="$GITHUB_SHA" -t hongguo-drama:6.5 .
+          node scripts/check-docker-release.cjs
+      - name: Save the verified image and corresponding media sources
+        run: |
+          mkdir -p dist/docker
+          docker save hongguo-drama:6.5 | gzip > dist/docker/hongguo-drama-6.5-docker-amd64.tar.gz
+          cp "$RUNNER_TEMP/linux-media/ffmpeg/artifacts/"*source.tar.gz "$RUNNER_TEMP/linux-media/librempeg/artifacts/"*source.tar.gz dist/docker/
+          cp compose.yaml docs/docker.md dist/docker/
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: docker-server-candidate
+          path: dist/docker/

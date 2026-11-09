@@ -678,7 +678,7 @@
 .layout-portrait .player-episode-panel { display: block; }
 .layout-portrait .player-episode-panel .player-tips { display: none; }
 .layout-portrait .player-now-sub, .layout-portrait .player-now-status { display: none; }
-.layout-portrait .player-stage.player-window-fill { position: fixed; inset: 48px 0 0; width: 100%; height: calc(100% - 48px); z-index: 15; border-radius: 0; }
+.player-stage.player-window-fill { position: fixed; inset: 48px 0 0; width: 100%; height: calc(100% - 48px); max-height: none; aspect-ratio: auto; margin: 0; z-index: 15; border-radius: 0; }
 
 /* Width mode follows the available width; only the stage clips the picture. */
 .player-stage[data-picture-mode] .player-video { object-fit: contain; }

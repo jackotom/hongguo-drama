@@ -119,7 +119,7 @@ export default function OfficialDanmaku({ videoRef, source, available, danmaku }
   const [items, setItems] = useState([]);
   const [reducedMotion, setReducedMotion] = useState(() => window.matchMedia('(prefers-reduced-motion: reduce)').matches);
   const { running, enabled, active, supported, settings, feed, status, error, loading } = danmaku;
-  const list = feed.danmaku;
+  const list = feed.groupedDanmaku || feed.danmaku;
 
   useEffect(() => {
     const media = window.matchMedia('(prefers-reduced-motion: reduce)');
