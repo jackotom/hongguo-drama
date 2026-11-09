@@ -1,6 +1,8 @@
 name: Docker server candidate
 on:
   workflow_dispatch:
+  push:
+    branches: ['codex/release-6.5']
 permissions:
   contents: read
 jobs:
