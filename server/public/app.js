@@ -112,7 +112,7 @@ $('login-form').addEventListener('submit', async (event) => {
   try {
     const data = await api('/status');
     if (session !== state.session) return;
-    $('version').textContent = data.version || '';
+    $('version').textContent = (data.version || '').replace(/^(\d+\.\d+)\.0$/, '$1');
     $('download-root').textContent = `容器下载目录：${data.downloadRoot || '/downloads'}`;
     $('connection-status').textContent = '已连接';
     $('login').hidden = true;
