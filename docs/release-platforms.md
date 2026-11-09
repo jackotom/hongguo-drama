@@ -1,5 +1,7 @@
 # 五平台同步发布规则
 
+6.5已于2026-11-09 18:50:43（Asia/Shanghai）正式公开并设Latest，内部6.5.0、桌面构建6.5.1，冻结源码`b99555519d97065b16753cd66326eb62894ec34a`。双Mac、Windows、Linux AppImage、Docker五类产物统一发行，25附件远端大小与SHA256、更新清单和精确源码已核对。双Mac签名、公证、装订；Windows播放/安装/升级与Linux真实静音播放、Docker真实下载合并及重启持久化通过；#124实际鼠标唤醒、真实续播、手动暂停和重启记忆通过。Windows EXE未签名，x64 Mac仅Rosetta，未验飞牛硬件；未替换本机正式安装。 见[6.5说明](release-6.5.md)。
+
 2026-11-09起（6.5及后续）：Docker服务端替换Android TV，五合一为macOS arm64、macOS x64、Windows x64、Linux x64 AppImage、Docker。全部产物及必要验收齐备后同一Release公开；TV不再列为发行阻碍或公开资产。历史回执范围保留。
 
 6.4已于2026-11-09 00:00:50（Asia/Shanghai）正式公开并设Latest，内部6.4.0、桌面构建6.4.1，冻结源码`12fa10087059be49d8f7d9895bae260130fe0e1f`。本次按明确授权发布双Mac、Windows、Linux四平台，TV继续开发、候选APK不公开；后续默认五平台规则保留。23附件远端大小/SHA256及两份更新清单已核对；双Mac签名、公证、装订与最终DMG/更新ZIP验收通过；Windows真实素材便携播放及安装升级验收通过但EXE未签名；Linux原生Ubuntu CI以CPU软件解码完成两集真实下载与静音播放。Mac两集静音播放及中英文切换、播放器保留、重载记忆通过；x64经Rosetta启动，不等于实体Intel验收。未替换本机正式安装。 见[6.4说明](release-6.4.md)。
