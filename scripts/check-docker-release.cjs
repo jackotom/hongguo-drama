@@ -65,5 +65,15 @@ async function main() {
   fs.writeFileSync(path.join(output, 'docker-verification.json'), JSON.stringify(result, null, 2) + '\n');
   console.log('PASS Docker authentication, real search/download/merge and restart persistence');
 }
-main().catch(error => { console.error(error.message.replaceAll(token, '[redacted]')); process.exitCode = 1; })
+main().catch(error => {
+  console.error(error.message.replaceAll(token, '[redacted]'));
+  fs.mkdirSync(output, { recursive: true });
+  let diagnostic = '';
+  try { diagnostic += docker('inspect', '--format', '{{json .State}}', name) + '\n'; } catch {}
+  try { diagnostic += docker('logs', '--tail', '40', name); } catch (logError) { diagnostic += String(logError.stdout || '') + String(logError.stderr || ''); }
+  diagnostic = diagnostic.replaceAll(token, '[redacted]').replace(/https?:\/\/[^\s"']+/g, '[URL]');
+  fs.writeFileSync(path.join(output, 'container-failure.log'), diagnostic);
+  console.error(diagnostic);
+  process.exitCode = 1;
+})
   .finally(() => { try { docker('rm', '-f', name); } catch {} fs.rmSync(temp, { recursive: true, force: true }); });
