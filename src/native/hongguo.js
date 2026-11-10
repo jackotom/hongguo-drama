@@ -5,6 +5,7 @@ const crypto = require('crypto');
 const { URL } = require('node:url');
 const { normalizeDownloadQuality } = require('./download-quality');
 const { isPublicMediaUrl, webMediaRequestOptions } = require('./web-media-guard');
+const { abortError, throwIfAborted } = require('./request-signal');
 
 const API = "https://api5-normal-sinfonlineb.fqnovel.com";
 const UA = "com.phoenix.read/71532 (Linux; U; Android 9; SM-N9860; Build/PQ3A.190705.10241111;tt-ok/3.12.13.20)";
@@ -86,9 +87,10 @@ const MODEL_BIZ_PARAM = {
 /**
  * API 调用封装
  */
-async function apiCall(apiPath, body, retries = 3, timeout = 25000, deadline = 0) {
+async function apiCall(apiPath, body, retries = 3, timeout = 25000, deadline = 0, requestSignal) {
   const q = { ...COMMON_QUERY, _rticket: Date.now().toString() };
   for (let i = 0; i < retries; i++) {
+    throwIfAborted(requestSignal);
     const remaining = deadline ? deadline - Date.now() : timeout;
     if (remaining <= 0) throw new Error('请求超时');
     const signal = {}; // 供错误信息回溯（HTTP 状态 / 字节数 / CDN logid）
@@ -97,10 +99,12 @@ async function apiCall(apiPath, body, retries = 3, timeout = 25000, deadline = 0
         params: q,
         headers: HEADERS,
         timeout: Math.min(timeout, remaining),
+        signal: requestSignal,
         // 200 + 空 body 时 axios 会解析成 ''，这里统一按原始字节处理便于判断
         responseType: 'arraybuffer',
         transformResponse: [(d) => d],
       });
+      throwIfAborted(requestSignal);
       signal.status = res.status;
       signal.logid = res.headers?.['x-tt-logid'];
       const buf = Buffer.from(res.data || []);
@@ -127,6 +131,8 @@ async function apiCall(apiPath, body, retries = 3, timeout = 25000, deadline = 0
         throw err;
       }
     } catch (err) {
+      throwIfAborted(requestSignal);
+      if (requestSignal && err.code === 'ERR_CANCELED') throw abortError();
       if (i === retries - 1) {
         if (err.detail === undefined) err.detail = signal;
         throw err;
@@ -161,23 +167,50 @@ function markWebMediaFailure(playInfo) {
 }
 
 /** 仅保留短期成功结果；重复点击共享请求，失败后立即允许重试。 */
-async function cachedRequest(key, ttl, load, { force = false } = {}) {
+async function cachedRequest(key, ttl, load, { force = false, signal } = {}) {
+  throwIfAborted(signal);
   const cached = responseCache.get(key);
   if (!force && cached && cached.expires > Date.now()) return cached.value;
   responseCache.delete(key);
-  if (!force && pendingRequests.has(key)) return pendingRequests.get(key);
-  const request = Promise.resolve().then(load).then(value => {
-    // A forced lookup owns the cache even if an older request finishes later.
-    if (pendingRequests.get(key) === request) {
+  let job = !force && pendingRequests.get(key);
+  if (!job) {
+    job = { controller: new AbortController(), consumers: 0, pending: true };
+    job.promise = Promise.resolve().then(() => {
+      throwIfAborted(job.controller.signal);
+      return load(job.controller.signal);
+    });
+    job.promise.then(() => { job.pending = false; }, () => { job.pending = false; });
+    pendingRequests.set(key, job);
+  }
+  job.consumers++;
+  let released = false, abort;
+  const release = () => {
+    if (released) return;
+    released = true;
+    if (--job.consumers === 0) {
+      if (pendingRequests.get(key) === job) pendingRequests.delete(key);
+      if (job.pending) job.controller.abort();
+    }
+  };
+  try {
+    const value = await new Promise((resolve, reject) => {
+      abort = () => { release(); reject(abortError(signal)); };
+      signal?.addEventListener('abort', abort, { once: true });
+      if (signal?.aborted) abort();
+      job.promise.then(resolve, reject);
+    });
+    throwIfAborted(signal);
+    throwIfAborted(job.controller.signal);
+    // Only a live consumer of the newest request may publish a cache entry.
+    if (pendingRequests.get(key) === job) {
       responseCache.set(key, { value, expires: Date.now() + ttl });
       if (responseCache.size > 128) responseCache.delete(responseCache.keys().next().value);
     }
     return value;
-  }).finally(() => {
-    if (pendingRequests.get(key) === request) pendingRequests.delete(key);
-  });
-  pendingRequests.set(key, request);
-  return request;
+  } finally {
+    signal?.removeEventListener('abort', abort);
+    release();
+  }
 }
 
 /** MP4 直链：去掉 HTML 转义并剥掉 Range 头，让 CDN 回整段 */
@@ -192,6 +225,7 @@ function normalizeVideoUrl(raw) {
 
 /** 拉取官网页面 HTML */
 async function fetchSiteHtml(url, timeout = 30000, signal, { trustedOfficialDns = false } = {}) {
+  throwIfAborted(signal);
   let guarded = {};
   if (trustedOfficialDns) {
     try {
@@ -213,6 +247,7 @@ async function fetchSiteHtml(url, timeout = 30000, signal, { trustedOfficialDns 
     maxRedirects: 5,
     signal,
   });
+  throwIfAborted(signal);
   return typeof res.data === 'string' ? res.data : JSON.stringify(res.data);
 }
 
@@ -272,15 +307,17 @@ function parseEpisodeListHtml(html, seriesId) {
  * 因此不需要 spade_a / 解密这一步。
  * sid 已知时用 /player/{sid}/{vid}；未知时退回 /player/_/{vid} 再自行解析。
  */
-async function fetchPlayUrlFromWeb(vid, sid, onFailure) {
+async function fetchPlayUrlFromWeb(vid, sid, onFailure, signal) {
   const candidates = [];
   if (sid) candidates.push(`${SITE_ORIGIN}/player/${encodeURIComponent(sid)}/${encodeURIComponent(vid)}`);
   candidates.push(`${SITE_ORIGIN}/player/_/${encodeURIComponent(vid)}`);
 
   let lastErr = null;
   for (const url of candidates) {
+    throwIfAborted(signal);
     try {
-      const html = await fetchSiteHtml(url, 4000);
+      const html = await fetchSiteHtml(url, 4000, signal);
+      throwIfAborted(signal);
       const router = require('./catalog').readRouterData(html);
       const data = router.loaderData?.['player_(series_id)/(vid)/page'];
       const actualSid = String(data?.series_id || '');
@@ -315,6 +352,8 @@ async function fetchPlayUrlFromWeb(vid, sid, onFailure) {
         return { url: videoUrl.href, spadeA: null, codec: '', source: 'web', vid: String(vid), userAgent: WEB_UA, referer: WEB_REFERER };
       }
     } catch (e) {
+      throwIfAborted(signal);
+      if (signal && e.code === 'ERR_CANCELED') throw abortError();
       lastErr = e;
     }
   }
@@ -626,6 +665,7 @@ function parseModelVideo(vm) {
  */
 async function fetchPlayUrlSingle(vid, sid, options = {}) {
   try {
+    throwIfAborted(options.signal);
     const quality = normalizeDownloadQuality(options.quality);
     if (String(vid).startsWith('reelshort:') || String(sid).startsWith('reelshort:')) return require('./reelshort').fetchPlayUrlSingle(vid, sid);
     if (String(vid).startsWith('dramabox:') || String(sid).startsWith('dramabox:')) return require('./dramabox').fetchPlayUrlSingle(vid, sid, options);
@@ -635,18 +675,22 @@ async function fetchPlayUrlSingle(vid, sid, options = {}) {
     const skipWeb = (failedWebMedia.get(String(vid)) || 0) > Date.now();
     const allowLowerQuality = options.allowLowerQuality === true && quality !== 'auto';
     const cacheKey = `play:${sid || ''}:${vid}${quality === 'auto' ? '' : `:${quality}`}${skipWeb ? ':fallback' : ''}${allowLowerQuality ? ':lower-quality' : ''}`;
-    const result = await cachedRequest(cacheKey, 30000, () => quality === 'auto'
-      ? fetchPlayUrlFresh(vid, sid, skipWeb)
-      : require('./app-source').fetchAppPlayUrl(String(vid), { quality, allowLowerQuality }).catch(error => {
+    const result = await cachedRequest(cacheKey, 30000, signal => quality === 'auto'
+      ? fetchPlayUrlFresh(vid, sid, skipWeb, signal)
+      : require('./app-source').fetchAppPlayUrl(String(vid), { quality, allowLowerQuality, signal }).catch(error => {
+        throwIfAborted(signal);
         if (error.code === 'ERR_CANCELED') throw error;
         throw unavailableSources([sourceFailure('app', error)], allowLowerQuality ? 'auto' : quality);
       }), options);
+    throwIfAborted(options.signal);
     // Last-resort web recovery must not replace App priority during the penalty window.
     if (skipWeb && result.source === 'web' && responseCache.get(cacheKey)?.value === result) responseCache.delete(cacheKey);
     return result;
   } catch (error) {
+    if (options.signal?.aborted) error = abortError(options.signal);
     if (error.code === 'ERR_CANCELED') return { url: null, spadeA: null, codec: null, error: '已取消 App 片源请求', code: 'ERR_CANCELED' };
     return { url: null, spadeA: null, codec: null, error: error.message,
+      ...(error.code === 'ETIMEDOUT' ? { code: error.code } : {}),
       ...(error.code === 'SOURCE_UNAVAILABLE' ? { code: error.code, sources: error.sources } : {}) };
   }
 }
@@ -697,14 +741,19 @@ function unavailableSources(sources, quality = 'auto') {
   return error;
 }
 
-async function fetchPlayUrlFresh(vid, sid, skipWeb = false) {
+async function fetchPlayUrlFresh(vid, sid, skipWeb = false, signal) {
+  throwIfAborted(signal);
   const sources = [];
-  const web = !skipWeb && await fetchPlayUrlFromWeb(vid, sid, error => sources.push(sourceFailure('web', error)));
+  const web = !skipWeb && await fetchPlayUrlFromWeb(vid, sid, error => sources.push(sourceFailure('web', error)), signal);
+  throwIfAborted(signal);
   if (web && web.url) return web;
 
   try {
-    return await require('./app-source').fetchAppPlayUrl(String(vid));
+    const result = await require('./app-source').fetchAppPlayUrl(String(vid), { signal });
+    throwIfAborted(signal);
+    return result;
   } catch (error) {
+    throwIfAborted(signal);
     if (error.code === 'ERR_CANCELED') throw error;
     sources.push(sourceFailure('app', error));
   }
@@ -715,17 +764,21 @@ async function fetchPlayUrlFresh(vid, sid, skipWeb = false) {
     mixed_video_id_map: { "1004": [vid] },
   };
   try {
-    const j = await apiCall("/novel/player/multi_video_model/preload/v1", body, 1, 6000);
+    const j = await apiCall("/novel/player/multi_video_model/preload/v1", body, 1, 6000, 0, signal);
+    throwIfAborted(signal);
     const item = j?.data?.[vid] || {};
     const [url, spadeA, codec] = parseModelVideo(item.video_model);
     if (url) return { url, spadeA, codec, source: 'api', vid: String(vid), userAgent: UA };
     sources.push(sourceFailure('api'));
   } catch (e) {
+    throwIfAborted(signal);
+    if (e.code === 'ERR_CANCELED') throw e;
     sources.push(sourceFailure('api', e));
   }
   // A transient CDN failure changes priority, not permanent source availability.
   if (skipWeb) {
-    const lastWeb = await fetchPlayUrlFromWeb(vid, sid, error => sources.push(sourceFailure('web', error)));
+    const lastWeb = await fetchPlayUrlFromWeb(vid, sid, error => sources.push(sourceFailure('web', error)), signal);
+    throwIfAborted(signal);
     if (lastWeb?.url) return lastWeb;
   }
   throw unavailableSources(sources);

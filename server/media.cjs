@@ -11,6 +11,7 @@ const { readMergeInfo } = require('../src/native/merge-plan');
 const { runMerge, stopMergeChildren, publishMergedOutput } = require('../src/native/merge-runner');
 const { convertBytevc2 } = require('../src/native/bytevc2');
 const { fail, numericId } = require('./storage.cjs');
+const { throwIfAborted } = require('../src/native/request-signal');
 const MAX_BYTES = 1024 * 1024 * 1024;
 const tools = { ffmpeg: process.env.FFMPEG_PATH || '/usr/local/bin/ffmpeg', ffprobe: process.env.FFPROBE_PATH || '/usr/local/bin/ffprobe', librempeg: process.env.LIBREMPEG_PATH || '/usr/local/bin/librempeg' };
 function run(executable, args, signal, timeout = 60000) {
@@ -53,12 +54,14 @@ async function series(id) {
   return { series_id: id, series_title: String(result.series_title || '未命名短剧'), cover: String(result.cover || ''), total: episodes.length, episodes };
 }
 async function download(task, store, signal, update) {
+  throwIfAborted(signal);
   const destination = store.output(task);
   if (fs.existsSync(destination)) { await verify(destination, task.quality, signal); return; }
   const detail = await series(task.seriesId);
   if (!detail.episodes.some(item => item.vid === task.vid && item.vid_index === task.episodeIndex)) throw fail('分集目录已改变，请重新选集');
-  signal.throwIfAborted();
-  const info = await hongguo.fetchPlayUrlSingle(task.vid, task.seriesId, { quality: task.quality });
+  throwIfAborted(signal);
+  const info = await hongguo.fetchPlayUrlSingle(task.vid, task.seriesId, { quality: task.quality, signal });
+  throwIfAborted(signal);
   if (!info?.url || info.locked || info.vid !== task.vid) throw Object.assign(fail(info?.error || '未取得完整可用片源'), { code: info?.code, sources: info?.sources });
   const work = fs.mkdtempSync(path.join(store.directory(task), '.download-'));
   const input = path.join(work, 'input.mp4'), output = path.join(work, 'output.mp4');

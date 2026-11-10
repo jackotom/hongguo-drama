@@ -87,7 +87,7 @@ function fixture({ wrongVid = false, fallback = 'https://vod.snssdk.com/info', m
 
 function nativeFixture() {
   const pending = [];
-  const context = { module: { exports: {} }, Buffer, URL, process: { env: {} },
+  const context = { module: { exports: {} }, Buffer, URL, AbortController, process: { env: {} },
     require: name => name === 'axios' ? { get: () => new Promise(resolve => pending.push(resolve)) }
       : name === './app-source' ? { fetchAppPlayUrl: async () => { throw new Error('Unexpected App lookup in Web cache fixture'); } }
       : require(name.startsWith('.') ? path.join(nativeDir, name) : name),

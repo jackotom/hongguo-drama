@@ -257,7 +257,7 @@ test('hongguo fixed and automatic lookup both preserve cancellation without anot
         let appCalls = 0;
         const module = { exports: {} };
         vm.runInNewContext(fs.readFileSync(require.resolve('./hongguo'), 'utf8') + '\nfetchPlayUrlFromWeb = async () => null;', {
-            module, Buffer, URL, process: { env: {} }, require(name) {
+            module, Buffer, URL, AbortController, process: { env: {} }, require(name) {
                 if (name === 'axios') return { post: () => assert.fail('cancellation cannot try the old API') };
                 if (name === './app-source') return { fetchAppPlayUrl: async () => {
                     appCalls++;
