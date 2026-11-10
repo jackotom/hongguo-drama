@@ -1,0 +1,401 @@
+import java.io.*;
+import java.net.*;
+import java.nio.charset.StandardCharsets;
+import java.util.*;
+import java.util.concurrent.*;
+import java.util.concurrent.atomic.*;
+import java.util.function.*;
+import java.util.zip.*;
+import java.security.*;
+import javax.crypto.*;
+import javax.crypto.spec.*;
+import java.lang.reflect.*;
+import java.lang.annotation.*;
+
+public class NativeStartupHarness extends HostActivity {
+    /* PRODUCTION_FIELDS */
+    private static final String ORIGIN = "https://app.local";
+    private static final AtomicInteger instances = new AtomicInteger();
+    private final File directory = new File(System.getProperty("t1fixture.dir"), "data" + instances.incrementAndGet());
+    private static final int MEDIA_LIMIT = 64*1024*1024;
+    private WebView web = new WebView();
+    private FrameLayout root = new FrameLayout();
+    private String tvDiagnostics = "";
+    private final Runnable tvStartupTimeout = () -> failTvStartup("startup_timeout");
+    private final Map<String,File> media = new ConcurrentHashMap<>();
+    private Object loginPanel, fullscreen;
+    private final Window window = new Window();
+    private int logins, pipCalls;
+    NativeStartupHarness() { getFilesDir().mkdirs(); new File(getFilesDir(), "downloads").mkdirs(); new File(getCacheDir(), "episodes").mkdirs(); }
+    private boolean tv = true;
+    private final List<Runnable> ui = new CopyOnWriteArrayList<>();
+    private final AtomicInteger opens = new AtomicInteger();
+    private final CountDownLatch networkStarted = new CountDownLatch(1), networkRelease = new CountDownLatch(1);
+    private volatile Connection connection;
+    private boolean isTv() { return tv; }
+    String getPackageName() { return tv ? "io.github.hongguo.tv" : "io.github.hongguo.personal"; }
+    void runOnUiThread(Runnable task) { ui.add(task); }
+    void drainUi() { for (Runnable r : new ArrayList<>(ui)) { ui.remove(r); r.run(); } }
+    void closeLogin() { }
+    void leaveFullscreen() { }
+    void showLogin() { logins++; }
+    Window getWindow() { return window; }
+    PackageManager getPackageManager() { return new PackageManager(); }
+    boolean enterPictureInPictureMode(PictureInPictureParams p) { pipCalls++; return true; }
+    File getFilesDir() { return new File(directory, "files"); }
+    Assets getAssets() { return new Assets(); }
+    boolean isInPictureInPictureMode() { return false; }
+    File getCacheDir() { return new File(directory, "cache"); }
+    HttpURLConnection open(URL url, int timeout) {
+        opens.incrementAndGet(); connection = new Connection(url); return connection;
+    }
+    class Connection extends HttpURLConnection {
+        volatile boolean disconnected;
+        Connection(URL url) { super(url); }
+        public void connect() { }
+        public boolean usingProxy() { return false; }
+        public void disconnect() { disconnected = true; networkRelease.countDown(); }
+        public String getContentType() { return url.getPath().equals("/bad-type") ? "video/mp4" : "image/png"; }
+        public String getContentEncoding() { return null; }
+        public long getContentLengthLong() { return url.getPath().equals("/too-big") ? 3*1024*1024 : 2; }
+        public InputStream getInputStream() {
+            return new ByteArrayInputStream(new byte[]{1,2}) {
+                boolean released;
+                @Override public synchronized int read(byte[] bytes,int off,int len) {
+                    if (url.getPath().equals("/read-hold")) {
+                        networkStarted.countDown();
+                        try { if (!networkRelease.await(3,TimeUnit.SECONDS)) throw new AssertionError("fixture read deadline"); }
+                        catch (InterruptedException e) { Thread.currentThread().interrupt(); }
+                        if (disconnected || released) return -1;
+                    }
+                    return super.read(bytes,off,len);
+                }
+                @Override public void close() { released = true; networkRelease.countDown(); }
+            };
+        }
+        public int getResponseCode() throws IOException {
+            if (!url.getPath().equals("/read-hold")) networkStarted.countDown();
+            if (url.getPath().equals("/hold")) try {
+                if (!networkRelease.await(3, TimeUnit.SECONDS)) throw new IOException("fixture deadline");
+            } catch (InterruptedException e) { Thread.currentThread().interrupt(); throw new IOException("cancelled"); }
+            if (disconnected) throw new IOException("cancelled");
+            return url.getPath().equals("/redirect") ? 302 : 200;
+        }
+    }
+    static class NetworkTrace {
+        long queuedAt; String phase;
+        NetworkTrace(int id) { }
+        void log(String event, long value) { }
+    }
+    /* PRODUCTION_METHODS */
+    /* PRODUCTION_RESUME */
+    /* PRODUCTION_BRIDGE */
+
+    static void check(boolean condition, String message) { if (!condition) throw new AssertionError(message); }
+    static void await(CountDownLatch latch) throws Exception { check(latch.await(2, TimeUnit.SECONDS), "fixture latch timed out"); }
+    void cleanup() { networkRelease.countDown(); workers.shutdownNow(); }
+    static void terminal(String reason) throws Exception {
+        NativeStartupHarness h = new NativeStartupHarness();
+        WebView old = h.web;
+        try {
+            CountDownLatch occupied = new CountDownLatch(3), park = new CountDownLatch(1);
+            for (int i=0;i<3;i++) h.workers.execute(() -> { occupied.countDown(); try { park.await(); } catch (InterruptedException ignored) { } });
+            await(occupied);
+            h.new Bridge().request(1, "ok"); // Real Bridge.request queues behind the parked workers.
+            AtomicBoolean queued = h.requests.get(1);
+            h.new Bridge().tvStartup("ready");
+            h.progress(1, 10, 20); h.reply(1, new JSONObject()); // Queue UI deliveries before failure.
+            h.failTvStartup(reason);
+            check(h.web == null && old.destroyed, "failure must destroy and release the business WebView");
+            check(old.stopped && old.bridgeRemoved && h.root.removed.contains(old), "failure must stop loading, detach the bridge and remove the business view");
+            check(queued.get() && h.requests.isEmpty() && h.connections.isEmpty(), "failure must cancel and clear admitted requests");
+            check(h.workers.isShutdown(), "failure must shut down queued and running workers");
+            check(Button.last.focused && Button.last.click != null, "native exit must remain focused and operable");
+            Thread late = new Thread(() -> h.new Bridge().request(2, "ok")); late.start(); late.join(2000);
+            check(!late.isAlive(), "late request must return");
+            h.new Bridge().tvStartup("ready"); h.progress(1, 20, 20); h.reply(1, new JSONObject()); h.drainUi();
+            check(!h.tvStartupFinished && old.evaluations == 0 && h.opens.get() == 0, "late ready/reply/progress/request must have no business effect");
+            int panels = h.root.additions;
+            h.failTvStartup(reason);
+            check(h.root.additions == panels, "failure must be idempotent");
+            Button.last.click.accept(Button.last); check(h.finished == 1, "exit button must finish");
+            h.onBackPressed(); check(h.finished == 2, "back must finish without evaluating released WebView");
+            h.onPause(); h.onResume(); h.onDestroy(); h.onDestroy();
+            h.new Bridge().request(3, "ok"); h.drainUi();
+            check(old.afterDestroy == 0 && h.opens.get() == 0, "exit and destruction must not reuse released WebView or reopen network");
+        } finally { h.cleanup(); }
+    }
+    static void inFlight() throws Exception {
+        NativeStartupHarness h = new NativeStartupHarness();
+        try {
+            h.new Bridge().request(1, "hold"); await(h.networkStarted);
+            AtomicBoolean running = h.requests.get(1);
+            h.failTvStartup("bundle_error");
+            check(running.get() && h.connection.disconnected, "failure must cancel a running request and disconnect its connection");
+            check(h.workers.awaitTermination(2, TimeUnit.SECONDS), "workers must terminate after cancellation");
+            h.drainUi(); check(h.web == null && h.requests.isEmpty() && h.connections.isEmpty(), "running task cleanup must preserve terminal state");
+        } finally { h.cleanup(); }
+    }
+    static void admissionRace() throws Exception {
+        NativeStartupHarness h = new NativeStartupHarness();
+        try {
+            Thread late;
+            synchronized (h.requestLock) {
+                late = new Thread(() -> h.new Bridge().request(1, "ok")); late.start();
+                h.failTvStartup("startup_timeout");
+            }
+            late.join(2000);
+            check(!late.isAlive() && h.opens.get() == 0 && h.requests.isEmpty(), "admission racing terminal transition must not start network");
+        } finally { h.cleanup(); }
+    }
+    static void beforeConnection() throws Exception {
+        NativeStartupHarness h = new NativeStartupHarness();
+        CountDownLatch parsing = new CountDownLatch(1), resume = new CountDownLatch(1);
+        try {
+            JSONObject.beforeParse = () -> {
+                parsing.countDown();
+                boolean interrupted = false;
+                for (;;) try { resume.await(); break; } catch (InterruptedException ignored) { interrupted = true; }
+                if (interrupted) Thread.currentThread().interrupt();
+            };
+            h.new Bridge().request(1, "preopen"); await(parsing);
+            h.failTvStartup("startup_timeout"); resume.countDown();
+            check(h.workers.awaitTermination(2, TimeUnit.SECONDS), "already-dequeued worker must stop after terminal transition");
+            check(h.opens.get() == 0 && h.connections.isEmpty(), "worker paused before connection must not open network after failure");
+        } finally { JSONObject.beforeParse = null; resume.countDown(); h.cleanup(); }
+    }
+    static void phone() throws Exception {
+        NativeStartupHarness h = new NativeStartupHarness(); h.tv = false;
+        WebView old = h.web;
+        try {
+            h.failTvStartup("startup_timeout");
+            check(h.web == old && !old.destroyed && !h.closed && !h.workers.isShutdown(), "TV failure handler must not change phone state");
+            h.new Bridge().request(1, "ok"); await(h.networkStarted);
+            h.workers.shutdown(); check(h.workers.awaitTermination(2, TimeUnit.SECONDS), "phone request must finish");
+            h.drainUi(); check(h.opens.get() == 1 && old.evaluations == 1, "phone request and response must retain normal behavior");
+            h.onDestroy();
+        } finally { h.cleanup(); }
+    }
+    static void windowAndBridge() throws Exception {
+        NativeStartupHarness h = new NativeStartupHarness();
+        try {
+            Bridge b = h.new Bridge();
+            b.awake(true); h.drainUi(); check(h.window.flags != 0, "fixture must start awake");
+            b.awake(true); b.openAccountLogin();
+            Thread pip = new Thread(() -> b.enterPip(1,1)); pip.start();
+            while (h.ui.size() < 3 && pip.isAlive()) Thread.yield();
+            h.failTvStartup("bundle_error");
+            check(h.window.flags == 0, "failure must release KEEP_SCREEN_ON");
+            int changes = h.window.changes;
+            h.drainUi(); pip.join(2000);
+            check(h.window.flags == 0 && h.window.changes == changes && h.logins == 0 && h.pipCalls == 0, "queued UI bridge operations must not revive failed business");
+            for (Method m : Bridge.class.getDeclaredMethods()) {
+                if (m.getAnnotation(JavascriptInterface.class) == null) continue;
+                Class<?>[] types = m.getParameterTypes(); Object[] values = new Object[types.length];
+                for (int i=0;i<types.length;i++) values[i] = types[i] == boolean.class ? true : types[i] == int.class ? 1 : "ready";
+                try {
+                    Object value = m.invoke(b,values);
+                    check(Arrays.asList("tvStartup","request","cancel","awake","openAccountLogin","enterPip","secureStorageAvailable","mediaSize","clearMedia").contains(m.getName()), "late bridge operation must reject: " + m.getName());
+                    if (m.getReturnType() == boolean.class) check(Boolean.FALSE.equals(value), "closed bridge boolean must be false");
+                } catch (InvocationTargetException e) {
+                    check(e.getCause() instanceof IllegalStateException && "页面业务已结束".equals(e.getCause().getMessage()), "unexpected late bridge effect/error: " + m.getName() + " " + e.getCause());
+                }
+            }
+            h.drainUi(); check(h.window.flags == 0 && h.logins == 0 && h.pipCalls == 0, "all stale bridge calls must remain inert");
+            h.onDestroy(); changes = h.window.changes;
+            b.awake(true); b.openAccountLogin(); h.drainUi();
+            check(h.window.changes == changes && h.logins == 0, "destroyed activity must ignore delayed window/login work");
+            NativeStartupHarness phone = new NativeStartupHarness(); phone.tv = false;
+            try {
+                Bridge pb = phone.new Bridge();
+                pb.awake(true); phone.drainUi(); check(phone.window.flags != 0, "phone awake must still work");
+                pb.awake(false); phone.drainUi(); check(phone.window.flags == 0, "phone release must still work");
+                pb.writePrivate("account.session",Base64.encodeToString(new byte[]{1,2},0));
+                check(Arrays.equals(Base64.decode(pb.readPrivate("account.session"),0),new byte[]{1,2}), "phone private file write/read must still work");
+                pb.deletePrivate("account.session"); check(pb.readPrivate("account.session").isEmpty(), "phone private delete must still work");
+                byte[] container = new byte[16]; System.arraycopy(new byte[]{'f','t','y','p'},0,container,4,4);
+                String token = pb.writeMedia(Base64.encodeToString(container,0));
+                check(Arrays.equals(Base64.decode(pb.readMedia(token),0),container), "phone registered cache write/read must still work");
+                pb.persistMedia(token); check(phone.media.get(token).getParentFile().equals(new File(phone.getFilesDir(),"downloads")), "phone persist must still work");
+                pb.clearMedia(); check(phone.media.containsKey(token), "cache cleanup must preserve persisted files");
+                pb.deleteMedia(token); check(!phone.media.containsKey(token), "phone delete must still work");
+            }
+            finally { phone.cleanup(); }
+        } finally { h.cleanup(); }
+    }
+    static String imageUrl(String path) { return "https://image.fqnovelpic.com/" + path; }
+    static Req imageReq(boolean proxy,String path) { return new Req(proxy ? ORIGIN + "/image?url=" + java.net.URLEncoder.encode(imageUrl(path),StandardCharsets.UTF_8) : imageUrl(path)); }
+    static void images() throws Exception {
+        for (boolean proxy : new boolean[]{false,true}) {
+            NativeStartupHarness race = new NativeStartupHarness();
+            CountDownLatch entered = new CountDownLatch(1), resume = new CountDownLatch(1);
+            AtomicReference<Throwable> raced = new AtomicReference<>();
+            Req original = imageReq(proxy,"ok");
+            Thread beforeConnect = new Thread(() -> {
+                try { race.resource(new Req(original.getUrl().toString()) {
+                    @Override public Uri getUrl() {
+                        entered.countDown(); try { resume.await(); } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
+                        return super.getUrl();
+                    }
+                }); } catch (Throwable e) { raced.set(e); }
+            });
+            try {
+                beforeConnect.start(); await(entered); race.failTvStartup("startup_timeout"); resume.countDown(); beforeConnect.join(2000);
+                check(!beforeConnect.isAlive() && raced.get() != null && race.opens.get() == 0, "image admitted before failure must recheck terminal state at connection registration");
+            } finally { resume.countDown(); race.cleanup(); beforeConnect.join(2000); }
+            NativeStartupHarness late = new NativeStartupHarness();
+            try {
+                late.failTvStartup("startup_timeout");
+                try { late.resource(imageReq(proxy,"ok")); throw new AssertionError("late image must reject"); } catch (IOException | IllegalStateException expected) { }
+                check(late.opens.get() == 0, "late image resource must not open a connection");
+            } finally { late.cleanup(); }
+            for (String path : new String[]{"hold","read-hold"}) {
+                NativeStartupHarness h = new NativeStartupHarness(); AtomicReference<Throwable> result = new AtomicReference<>();
+                Thread image = new Thread(() -> { try { h.resource(imageReq(proxy,path)); } catch (Throwable e) { result.set(e); } });
+                try {
+                    image.start(); await(h.networkStarted);
+                    check(h.connections.containsValue(h.connection), "image connection must be registered for cancellation");
+                    h.failTvStartup("bundle_error"); image.join(2000);
+                    check(h.connection.disconnected && !image.isAlive() && result.get() != null, "in-flight image must cancel in headers and body read");
+                    check(h.connections.isEmpty() && h.resourceStreams.isEmpty(), "cancelled image resources must be released");
+                } finally { h.cleanup(); image.join(2000); }
+            }
+            NativeStartupHarness h = new NativeStartupHarness();
+            try {
+                for (String raw : new String[]{"http://image.fqnovelpic.com/ok", "https://invalid.example/ok"}) {
+                    try { h.resource(new Req(proxy ? ORIGIN + "/image?url=" + java.net.URLEncoder.encode(raw,StandardCharsets.UTF_8) : raw)); throw new AssertionError("image URL boundary must reject"); } catch (IOException expected) { }
+                }
+                check(h.opens.get() == 0, "invalid image URLs must not reach connection creation");
+                for (String path : new String[]{"redirect","bad-type","too-big"}) {
+                    int before = h.opens.get();
+                    try { h.resource(imageReq(proxy,path)); throw new AssertionError("unsafe image must reject"); } catch (IOException expected) { }
+                    check(h.opens.get() == before + 1 && h.connection.disconnected, "image guards must not follow redirects or leak rejected connections");
+                }
+                WebResourceResponse response = h.resource(new Req(ORIGIN + "/app.js"));
+                File binary = new File(h.getCacheDir(), "fixture-stream");
+                java.nio.file.Files.write(binary.toPath(),new byte[]{1,2,3}); h.media.put("fixture-stream",binary);
+                WebResourceResponse local = h.resource(new Req(ORIGIN + "/media/fixture-stream"));
+                h.failTvStartup("startup_timeout");
+                try { response.data.read(); throw new AssertionError("released local asset stream must reject reads"); } catch (IOException expected) { }
+                try { local.data.read(); throw new AssertionError("released local file stream must reject reads"); } catch (IOException expected) { }
+                check(h.resourceStreams.isEmpty(), "all local streams must be closed and unregistered");
+                NativeStartupHarness phone = new NativeStartupHarness(); phone.tv = false;
+                try { check(phone.resource(imageReq(proxy,"ok")).data.read() >= 0, "normal phone image must still work"); } finally { phone.cleanup(); }
+            } finally { h.cleanup(); }
+        }
+        System.out.println("Native images PASS: both paths, admission race, headers/body cancellation, URL/redirect/type/size guards, asset/file streams, phone control");
+    }
+    public static void main(String[] args) throws Exception {
+        if (args.length > 0 && args[0].equals("images")) { images(); return; }
+        windowAndBridge();
+        terminal("startup_timeout"); terminal("bundle_error"); inFlight(); admissionRace(); beforeConnection(); phone();
+        System.out.println("Native behavior PASS: awake release/late UI, all Bridge methods closed, phone file/cache control; timeout, queued/late request, in-flight cancel, callback suppression, exit/destroy, admission race");
+    }
+}
+
+class HostActivity {
+    int finished;
+    void finish() { finished++; }
+    public void onBackPressed() { }
+    protected void onPause() { }
+    protected void onResume() { }
+    protected void onDestroy() { }
+}
+@Retention(RetentionPolicy.RUNTIME) @interface JavascriptInterface { }
+class View { static final int GONE = 8; void setVisibility(int value) { } }
+class WebView extends View {
+    boolean destroyed, stopped, bridgeRemoved; int evaluations, afterDestroy;
+    void alive() { if (destroyed) { afterDestroy++; throw new AssertionError("released WebView accessed"); } }
+    void removeJavascriptInterface(String name) { alive(); bridgeRemoved = true; }
+    void stopLoading() { alive(); stopped = true; }
+    void destroy() { alive(); destroyed = true; }
+    void evaluateJavascript(String script, Consumer<String> callback) { alive(); evaluations++; }
+    void onPause() { alive(); }
+    void onResume() { alive(); }
+}
+class FrameLayout extends View {
+    int additions; final List<View> removed = new ArrayList<>();
+    static class LayoutParams { LayoutParams(int w,int h) { } }
+    void removeCallbacks(Runnable r) { }
+    void addView(View v, LayoutParams p) { additions++; }
+    void removeView(View v) { removed.add(v); }
+}
+class LinearLayout extends View {
+    static final int VERTICAL = 1;
+    LinearLayout(Object context) { }
+    static class LayoutParams { LayoutParams(int w,int h,int weight) { } }
+    void setOrientation(int o) { }
+    void setPadding(int a,int b,int c,int d) { }
+    void setBackgroundColor(int c) { }
+    void addView(View v, LayoutParams p) { }
+    void addView(View v) { }
+}
+class TextView extends View {
+    TextView(Object context) { }
+    void setTextColor(int c) { }
+    void setTextSize(int s) { }
+    void setText(String text) { }
+}
+class Button extends TextView {
+    static Button last; boolean focused; Consumer<View> click;
+    Button(Object context) { super(context); last = this; }
+    void setOnClickListener(Consumer<View> c) { click = c; }
+    void requestFocus() { focused = true; }
+}
+class Color { static final int WHITE = -1; static int rgb(int a,int b,int c) { return 0; } }
+class Base64 {
+    static final int DEFAULT = 0, NO_WRAP = 2;
+    static byte[] decode(String s,int flag) { return java.util.Base64.getDecoder().decode(s); }
+    static String encodeToString(byte[] s,int flag) { return java.util.Base64.getEncoder().encodeToString(s); }
+}
+class JSONArray { JSONArray(Object data) { } int length(){return 0;} JSONArray getJSONArray(int i){return this;} long getLong(int i){return 0;} int getInt(int i){return 0;} String getString(int i){return "";} }
+class JSONObject {
+    static volatile Runnable beforeParse;
+    final Map<String,Object> values = new HashMap<>();
+    JSONObject() { }
+    JSONObject(String raw) {
+        if (raw.equals("preopen") && beforeParse != null) beforeParse.run();
+        values.put("url", "https://hongguoduanju.com/" + raw);
+    }
+    boolean has(String k) { return values.containsKey(k); }
+    JSONObject put(String k,Object v) { values.put(k,v); return this; }
+    boolean optBoolean(String k) { return Boolean.TRUE.equals(values.get(k)); }
+    String optString(String k,String fallback) { return (String)values.getOrDefault(k,fallback); }
+    String getString(String k) { return (String)values.get(k); }
+    int optInt(String k,int fallback) { return fallback; }
+    JSONObject optJSONObject(String k) { return null; }
+    Iterator<String> keys() { return values.keySet().iterator(); }
+    static String quote(String s) { return "\"" + s + "\""; }
+    public String toString() { return "{}"; }
+}
+
+class WindowManager { static class LayoutParams { static final int FLAG_KEEP_SCREEN_ON = 128; } }
+class Window {
+    int flags, changes;
+    void addFlags(int f) { flags |= f; changes++; }
+    void clearFlags(int f) { flags &= ~f; changes++; }
+}
+class Rational { Rational(int a,int b) { } }
+class PictureInPictureParams { static class Builder { Builder setAspectRatio(Rational r){return this;} PictureInPictureParams build(){return new PictureInPictureParams();} } }
+class PackageManager { boolean hasSystemFeature(String f) { return true; } }
+class AtomicFile {
+    final File f; AtomicFile(File f){this.f=f;} File getBaseFile(){return f;}
+    byte[] readFully() throws IOException { return java.nio.file.Files.readAllBytes(f.toPath()); }
+    FileOutputStream startWrite() throws IOException { return new FileOutputStream(f); }
+    void finishWrite(FileOutputStream out) throws IOException { out.close(); }
+    void failWrite(FileOutputStream out) throws IOException { out.close(); }
+}
+class KeyProperties { static final String KEY_ALGORITHM_AES="AES",BLOCK_MODE_GCM="GCM",ENCRYPTION_PADDING_NONE="NoPadding"; static final int PURPOSE_ENCRYPT=1,PURPOSE_DECRYPT=2; }
+class KeyGenParameterSpec implements java.security.spec.AlgorithmParameterSpec {
+    static class Builder { Builder(String name,int p){} Builder setBlockModes(String s){return this;} Builder setEncryptionPaddings(String s){return this;} KeyGenParameterSpec build(){return new KeyGenParameterSpec();} }
+}
+class Uri {
+    final URI uri; private Uri(String s){uri=URI.create(s);} static Uri parse(String s){return new Uri(s);}
+    String getHost(){return uri.getHost();} String getScheme(){return uri.getScheme();} int getPort(){return uri.getPort();} String getPath(){return uri.getPath();}
+    String getQueryParameter(String name){String q=uri.getRawQuery(); if(q==null)return null; for(String item:q.split("&")){String[] p=item.split("=",2);if(p[0].equals(name))return java.net.URLDecoder.decode(p[1],StandardCharsets.UTF_8);}return null;}
+    public String toString(){return uri.toString();}
+}
+interface WebResourceRequest { Uri getUrl(); Map<String,String> getRequestHeaders(); }
+class Req implements WebResourceRequest { final Uri u; Req(String s){u=Uri.parse(s);} public Uri getUrl(){return u;} public Map<String,String> getRequestHeaders(){return Collections.emptyMap();} }
+class WebResourceResponse { final InputStream data; WebResourceResponse(String mime,String encoding,int code,String reason,Map<String,String> headers,InputStream data){this.data=data;} }
+class Assets { InputStream open(String name){return new ByteArrayInputStream(new byte[]{1,2});} }

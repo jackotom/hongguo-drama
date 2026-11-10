@@ -3,6 +3,10 @@ const path = require('node:path');
 const esbuild = require('../node_modules/esbuild');
 const root = __dirname;
 const tv = process.argv.includes('--tv');
+if (tv) {
+  fs.mkdirSync(path.join(root, 'build/tv/assets'), {recursive:true});
+  fs.copyFileSync(path.join(root, 'web/tv-startup.js'), path.join(root, 'build/tv/assets/tv-startup.js'));
+}
 const desktop = fs.readFileSync(path.join(root, '../src/native/hongguo.js'), 'utf8');
 const start = desktop.indexOf('function aes128EcbEncrypt(');
 const end = desktop.indexOf('function decryptMp4File(', start);

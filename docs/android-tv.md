@@ -1,6 +1,59 @@
-# Android TV源码移植
+# Android TV源码移植与6.6 T1兼容预检
 
-用户于2026-11-06要求直接使用项目源码移植Android TV，今后与双Mac、Windows、Linux共用版本一次发行。
+## 当前状态（2026-11-10）
+
+6.6 TV目前只交付本地开发代码。T1启动保护与定向静态检查完成后交Astra审核，不代表T1真机门通过。本轮未构建、安装或公开APK；T5由主控统一构建。现行正式五平台发行包含Docker，TV不属于默认正式发行项。
+
+### 启动保护
+
+- 保持Manifest的`minSdkVersion=29`、DEX最低API29、targetSdk34和现有`chrome100`打包目标。`chrome100`不是已经验证的最低WebView版本，不按版本号直接拒绝设备。
+- 仅TV生成页面先加载独立ES5语法的`tv-startup.js`。确认当前业务必需的JS／CSS能力后，才动态加载`app.js`；只在TV遥控／返回入口已注册后回报`ready`。不改手机页面入口。
+- 检查BigInt／asUintN、AbortController／AbortSignal.timeout、Map／Set／Promise.finally、Object.values、Array.from／includes／flat／flatMap、String.matchAll、globalThis、URL／URLSearchParams、MutationObserver／requestAnimationFrame、DOM焦点相关方法、dialog、localStorage读写、HTML视频API及Grid／Flex／aspect-ratio。存储探针恢复原值，不覆盖收藏或记录。
+- 缺能力时显示具体中文原因；脚本加载、语法解析、同步执行失败也有明确提示。WebView初始化失败、本地页面加载错误、页面进程退出或12秒未收到就绪回执，由原生页面兜底，提供可聚焦的“退出”按钮和返回退出。预检脚本本身无法解析时，仍能触发原生超时提示。
+- TV失败是本次启动的业务终态：撤下并销毁业务WebView、移除Native桥、停止页面加载；标记所有已登记请求取消，关闭连接并停止worker及排队任务。请求准入、连接登记与失败转换共用锁，失败后的旧桥调用不能重新入队；在途worker和UI回调读取关闭状态并停止后续业务。原生退出页仍可操作，手机正常请求路径保持原行为。
+- 终态也覆盖两个海报入口、网络读取及本地资产／媒体流：图片连接使用同一连接表登记，失败主动断开并关闭已登记流，迟到建连再次检查关闭状态。保留HTTPS／来源／类型／2MB限制及禁止图片重定向；锁内不等网络响应。失败释放保亮并关闭登录／全屏业务层，迟到的保亮、登录、画中画和文件／缓存写删均被关闭状态阻止，不能使错误页重新启动业务。
+- 这里只检测启动所需能力。没有增加polyfill、降低minSdk、移植原生播放器或调整媒体／弹幕业务；API存在和脚本就绪均不证明所有业务、解码、遥控流程可用。
+
+### 诊断范围与采集
+
+TV进程以`HongguoTv`标签输出固定格式的`HG:tv:`日志：Android API、系统支持ABI、WebView数字版本、系统声明按键、每个白名单键首次实际收到的按下事件、H.264／HEVC解码器声明和MP4系统播放器解析结果。无设备序列号、型号标识、账号、键盘输入文字、异常原文或媒体地址。只在本机输出，不增加联网或上报。
+
+`key_declared`表示系统按键声明；`key_observed`表示应用收到按下事件，不能证明焦点移动和确认／返回正确。`decoder_*`和`system_player`只表示能力声明／处理入口，不启动播放器、不播放测试媒体；不能当作真实解码成功。`media_capability:unknown`表示查询失败，不把未知记成不支持。
+
+获授权设备连接后由主控采集。只导出专用标签，禁止附带全量logcat、`adb devices -l`或完整系统dump：
+
+```sh
+adb shell getprop ro.build.version.sdk
+adb shell getprop ro.product.cpu.abilist
+adb logcat -d -s HongguoTv:I '*:S'
+```
+
+API低于29时当前APK将被系统拒绝安装，应用内诊断无法运行；先记录上述API／ABI与安装阻断，再由Astra评估。API达到29但WebView初始化失败时，保留原生错误页与可取得的版本信息。不要从HarmonyOS版本推导Android API，也不要为取得回执放宽设备授权或输出设备标识。后续回执须绑定候选APK的SHA256、步骤、启动／遥控结果及限制；本轮尚无APK或设备回执。
+
+### 四设备矩阵
+
+下列型号与系统仅来自既有Issue自报，不是本轮实测；没有已连接ADB设备，四台均为**未测**。
+
+| 目标设备 | 既有自报信息 | API／ABI／WebView现场值 | 启动／实际遥控 | 状态 |
+| --- | --- | --- | --- | --- |
+| 荣耀智慧屏LOK-350 | HarmonyOS 1.0.1.66(SP3)，底层Android未知 | 未读取 | 未执行 | 未测 |
+| SHIELD Pro 2019 | Android TV 11，v8a | 未读取 | 未执行 | 未测 |
+| Philips OLED809／MT9972 | Google TV 14，v7a | 未读取 | 未执行 | 未测 |
+| Google TV Streamer／MT8696 | Google TV 14，v7a | 未读取 | 未执行 | 未测 |
+
+### 荣耀兼容差距单列
+
+| 层次 | 当前代码依赖／处理 | 荣耀证据及待决事项 |
+| --- | --- | --- |
+| 安装／Java API | 当前最低API29；已有WebView桥、SafeBrowsing、当前WebView包查询、AndroidKeyStore、AES与HTTPS；手机版API30输入法分支仍有版本保护 | 实际API未知，不能判定可安装或删掉该目标。若API低于29，先盘点API与打包差距，交Astra决定补丁范围；T1未降低门槛 |
+| JS／CSS | 上述能力探针；现代bundle不能解析时显示脚本错误或原生超时 | 实际WebView未知，不能以HarmonyOS或chrome100目标推定支持；报告首个阻断能力，不伪称完整差距已实测 |
+| 媒体 | 原有完整单集准备、64MB上限；系统H.264／HEVC能力声明仅供诊断，未增加ByteVC2转换 | 实际解码和有效帧均未测；即使启动成功，也需另做真实红果素材静音播放、跳转和连续观看验收 |
+
+T1真机门仍未通过：至少一台Android TV／Google TV实际启动及遥控输入成功，才可判T1真机门通过；不依赖设备回执的独立代码阶段可继续。某台设备受支持还需该设备后续完整流程回执。手机、桌面、静态编译和其他电视结果均不能替代。本任务仍只处理T1，修复后等待Astra复审，不进入T2；所有开放问题修复并审核后才由主控推进构建发布。
+
+## 历史源码移植记录（6.0阶段，不能作为6.6回执）
+
+用户于2026-11-06要求直接使用项目源码移植Android TV。下列旧构建和旧测试只保留历史依据。
 
 ## 实现范围
 
@@ -12,13 +65,13 @@ TV构建入口：`python3 android/build.py --tv`，或`npm --prefix android run 
 
 构建中间文件、APK及回执在`android/build/tv/`，签名材料在已忽略的`android/.private/tv/`，不上传私钥／密码。当前是本地开发签名候选，不代表已经完成正式发行签名管理。保持同包升级须保留签名材料；正式发布前明确并固定发行证书。
 
-## 完成边界
+## 历史完成边界
 
 本轮验证：`npm --prefix android test`共8项通过（6项共享核心、2项TV焦点／媒体按键）；`python3 android/build.py --tv`完成Java编译、DEX、资源打包、APK对齐及开发签名校验，核对独立包名、6.0版本、Android10最低版本、TV入口与不需要触屏声明。首次构建的版本校验拦住了依赖版本覆盖应用版本的变量问题，修复后重建通过。
 
-当前产物：`android/build/tv/hongguo-downloader-6.0-android-tv-dev.apk`，136165字节，SHA256 `d197e4a790dc55984885d244945165b8654006982f2ec9d41968ffccda4da966`。回执`android/build/tv/verification.json`保留`device_tested=false`。自动测试验证算法和桥接边界，未证明实际电视上的方向键、系统倍速选择、输入法、播放解码或缓存清理全流程。
+历史产物：`android/build/tv/hongguo-downloader-6.0-android-tv-dev.apk`，136165字节，SHA256 `d197e4a790dc55984885d244945165b8654006982f2ec9d41968ffccda4da966`。当时回执`android/build/tv/verification.json`保留`device_tested=false`。自动测试验证算法和桥接边界，未证明实际电视上的方向键、系统倍速选择、输入法、播放解码或缓存清理全流程。
 
-当前工作区为6.0，TV候选文件名含`android-tv-dev`。远端6.1已发布，正式TV发行前必须先整合最新冻结源码，不能把当前候选标成6.1或回填已发布6.0。未发布或推送本轮修改，未更换任何正式安装。
+当时TV候选文件名含`android-tv-dev`，不能改标为后续版本或回填已发布版本。该历史记录不代表当前隔离树版本，也不代表6.6已构建、发布或更换正式安装。
 
 继承安卓现有限制：完整单集准备后播放、64MB上限、H.264／HEVC依赖设备解码；没有ByteVC2转换、账号云收藏／预约、NAS或离线下载库。桌面原生能力不能仅靠共享JavaScript自动移植，后续必须逐项完成并按平台说明。
 
