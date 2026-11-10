@@ -1,4 +1,4 @@
-// Hongguo Drama 6.7: desktop runtime; server entry is server/index.cjs.
+// Hongguo Drama 6.8: desktop runtime; server entry is server/index.cjs.
 /**
  * main.js - 红果短剧 6.2 下载器（独立版）主进程
  *
@@ -1066,7 +1066,12 @@ async function executeHongguoDownload(task) {
         if (!completeCache(cached) || rejectedCaches.has(cached)) continue;
         if (cached.filePath) {
           cached.disk.readers = (cached.disk.readers || 0) + 1;
-          try { await fsp.copyFile(cached.filePath, tmpPath); }
+          // macOS copyFile copies birthtime too, invalidating our reserved file's ownership receipt.
+          try {
+            await temporary.checkInput();
+            writer = fs.createWriteStream(tmpPath); task.writer = writer;
+            await pipeline(fs.createReadStream(cached.filePath), writer);
+          }
           finally { cached.disk.readers--; disposeOnlineDisk(cached); }
         } else await fsp.writeFile(tmpPath, cached.buffer, { mode: 0o600 });
         source.token.throwIfRequested();

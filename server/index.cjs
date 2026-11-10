@@ -1,4 +1,4 @@
-// Hongguo Drama 6.7: server entry.
+// Hongguo Drama 6.8: server entry.
 const http = require('node:http');
 const fs = require('node:fs');
 const path = require('node:path');

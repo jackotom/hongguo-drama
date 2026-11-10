@@ -89,6 +89,26 @@ async function realFootageCatalog(browseList) {
   return catalog;
 }
 const checks = [
+  ['disk cache download preserves ownership and allows deleting its record', async () => {
+    const h = fixture();
+    const cache = path.join(h.root, 'cached.mp4');
+    fs.writeFileSync(cache, Buffer.alloc(200000, 9));
+    h.context.diskCachePath = cache;
+    h.run(`onlineCache.set('11:auto', { filePath:diskCachePath, disk:{readers:0}, size:200000,
+      lastUsed:Date.now(), seriesId:'1', vid:'11', source:'hongguo', complete:true });
+      requestMedia = async () => { throw new Error('unexpected duplicate download'); };`);
+    await h.handlers['hongguo-download-batch']({}, payload());
+    await h.run('executeHongguoDownload(downloadTasks[0])');
+    const task = h.saved()[0];
+    assert.equal(task.status, 'completed', task.error);
+    assert.equal(fs.readFileSync(task.savePath)[0], 9);
+    assert.equal(fs.readdirSync(h.root).some(name => name.startsWith('.hongguo-download-')), false);
+    const deleted = await h.handlers['delete-tasks']({}, [task.id], {deleteFiles:false});
+    assert.equal(deleted.success, true, deleted.error);
+    assert.equal(deleted.count, 1);
+    assert.equal(fs.existsSync(task.savePath), true, 'deleting records must preserve the downloaded video');
+    assert.equal(fs.existsSync(cache), true, 'playback cache must remain available');
+  }],
   ['astra receipt is saved before media transfer', async () => {
     const h = fixture(); await h.handlers['hongguo-download-batch']({}, payload());
     let durable = false;

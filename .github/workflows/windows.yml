@@ -1,4 +1,4 @@
-# Hongguo Drama 6.7: desktop, Docker and TV release candidate; publication is coordinated separately.
+# Hongguo Drama 6.8: desktop and Docker candidate; publication is coordinated separately.
 name: Windows x64 release candidate
 on:
   workflow_dispatch:
@@ -151,7 +151,7 @@ jobs:
             dist/*.exe
             dist/*.yml
             dist/*.blockmap
-          key: windows-update-v2-${{ hashFiles('package*.json', 'main.js', 'preload.js', 'index.html', 'vite.config.js', 'src/**', 'build/**', 'scripts/build-ffmpeg-source-win.sh', 'scripts/build-librempeg-source.sh', 'scripts/librempeg-videotoolbox-prototype.patch', 'scripts/setup-software-player.cjs', 'scripts/software-player-assets.json') }}
+          key: windows-update-v2-${{ github.sha }}-${{ hashFiles('package*.json', 'main.js', 'preload.js', 'index.html', 'vite.config.js', 'src/**', 'build/**', 'scripts/build-ffmpeg-source-win.sh', 'scripts/build-librempeg-source.sh', 'scripts/librempeg-videotoolbox-prototype.patch', 'scripts/setup-software-player.cjs', 'scripts/software-player-assets.json') }}
       - shell: pwsh
         if: ${{ inputs.build_only || steps.app-cache.outputs.cache-hit != 'true' }}
         run: |

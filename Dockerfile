@@ -1,4 +1,4 @@
-# Hongguo Drama 6.7: release source.
+# Hongguo Drama 6.8: release source.
 FROM node:22-bookworm-slim
 WORKDIR /app
 ENV NODE_ENV=production PORT=3000 DATA_DIR=/data DOWNLOAD_DIR=/downloads

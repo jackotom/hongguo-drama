@@ -34,7 +34,8 @@ class FakeWindow extends EventEmitter {
     this.fullScreen = false;
     this.calls = [];
     this.dockVisible = true;
-    this.bounds = { width: options.width, height: options.height };
+    this.bounds = { x: options.x || 0, y: options.y || 0, width: options.width, height: options.height };
+    this.frameSize = { width: 0, height: 0 };
     this.normalBounds = { ...this.bounds };
     this.webContents = new EventEmitter();
     this.webContents.mainFrame = {};
@@ -45,10 +46,18 @@ class FakeWindow extends EventEmitter {
   isMaximized() { return this.maximized; }
   isFullScreen() { return this.fullScreen; }
   getBounds() { return { ...this.bounds }; }
+  getSize() { return { width: this.bounds.width, height: this.bounds.height }; }
+  getContentBounds() { return { ...this.bounds, width: this.bounds.width - this.frameSize.width, height: this.bounds.height - this.frameSize.height }; }
+  setBounds(bounds) {
+    this.bounds = { ...this.bounds, ...bounds };
+    this.normalBounds = { ...this.bounds };
+    this.emit('resize');
+  }
+  setAspectRatio(value) { this.calls.push(['setAspectRatio', value]); this.aspectRatio = value; }
   getNormalBounds() { return { ...this.normalBounds }; }
   resizeTo(width, height) {
-    this.normalBounds = { width, height };
-    this.bounds = { width, height };
+    this.bounds = { ...this.bounds, width, height };
+    this.normalBounds = { ...this.bounds };
     this.emit('resize');
   }
   maximizeTo(width, height) {
@@ -102,7 +111,7 @@ function fixture({ store = makeStore(), platform = 'darwin', workArea = { x: -19
     store,
     platform,
     screen: { getDisplayMatching(bounds) {
-      assert.deepEqual(bounds, mainWindow.getBounds(), 'use the display containing the main window');
+      assert.equal(Number.isFinite(bounds.x) && Number.isFinite(bounds.y), true);
       return { workArea };
     } },
     isTrustedUrl(url) {
@@ -125,7 +134,10 @@ function fixture({ store = makeStore(), platform = 'darwin', workArea = { x: -19
     assert.equal(webContents, window.webContents);
     return window;
   };
-  return { mainWindow, request, open, trustedChecks };
+  const sendSize = (size, overrides = {}) => mainWindow.webContents.emit('ipc-message', {
+    sender: mainWindow.webContents, senderFrame: mainWindow.webContents.mainFrame, ...overrides,
+  }, 'floating-player-aspect-ratio', size);
+  return { mainWindow, request, open, trustedChecks, sendSize };
 }
 
 function closeMain(mainWindow) {
@@ -171,11 +183,11 @@ function closeMain(mainWindow) {
     const child = open(finalOptions);
     assert.equal(child.dockVisible, true, 'opening PiP must preserve the Dock icon');
     assert.equal(child.options.type, 'panel', 'macOS PiP must cover fullscreen apps without hiding the Dock');
-    assert.equal(child.options.width, 240);
-    assert.equal(child.options.height, 900);
+    assert.equal(child.options.width, 160);
+    assert.equal(child.options.height, 1008);
     assert.equal(child.options.show, true, 'the player must be shown even when popup options hide it');
-    assert.equal(child.options.x, -256, 'anchor to the right of the opener display work area');
-    assert.equal(child.options.y, 164, 'anchor above the taskbar with a 16px margin');
+    assert.equal(child.options.x, -176, 'anchor to the right of the opener display work area');
+    assert.equal(child.options.y, 56, 'anchor above the taskbar with a 16px margin');
     assert.equal(child.options.frame, true);
     assert.equal(child.options.titleBarStyle, 'default');
     assert.equal(child.options.alwaysOnTop, true);
@@ -193,8 +205,9 @@ function closeMain(mainWindow) {
       ['setVisibleOnAllWorkspaces', true, { visibleOnFullScreen: true, skipTransformProcessType: true }],
       ['setAlwaysOnTop', true],
       ['setMenuBarVisibility', false],
-      ['setMinimumSize', 240, 160],
-      ['setMaximumSize', 900, 900],
+      ['setMinimumSize', 1, 1],
+      ['setMaximumSize', 1888, 1008],
+      ['setMinimumSize', 160, 90],
       ['show'],
       ['focus'],
     ]);
@@ -216,7 +229,7 @@ function closeMain(mainWindow) {
     assert.equal(mainWindow.destroyed, false, 'child close must not close the main window');
 
     const reopened = open({ width: 420, height: 740 });
-    assert.deepEqual(reopened.getBounds(), { width: 520, height: 310 }, 'saved size must override window features');
+    assert.deepEqual(reopened.getSize(), { width: 520, height: 310 }, 'saved size must override window features');
     reopened.close();
     closeMain(mainWindow);
   }
@@ -274,7 +287,7 @@ function closeMain(mainWindow) {
     assert.doesNotThrow(() => child.destroy(), 'renderer close may emit closed after native destruction');
     assert.deepEqual(store.saves.at(-1).floating_player_size, { width: 310, height: 420 });
     const reopened = open();
-    assert.deepEqual(reopened.getBounds(), { width: 310, height: 420 });
+    assert.deepEqual(reopened.getSize(), { width: 310, height: 420 });
     reopened.close();
     closeMain(mainWindow);
   }
@@ -292,7 +305,7 @@ function closeMain(mainWindow) {
     const store = makeStore({ floating_player_size: invalid });
     const { mainWindow, open } = fixture({ store });
     const child = open({ width: 420, height: 740 });
-    assert.deepEqual(child.getBounds(), { width: 420, height: 740 }, `invalid saved size: ${String(invalid)}`);
+    assert.deepEqual(child.getSize(), { width: 420, height: 740 }, `invalid saved size: ${String(invalid)}`);
     child.close();
     closeMain(mainWindow);
   }
@@ -301,7 +314,7 @@ function closeMain(mainWindow) {
     const store = makeStore({ floating_player_size: { width: 100, height: 2000 } });
     const { mainWindow, open } = fixture({ store });
     const child = open({ width: 420, height: 740 });
-    assert.deepEqual(child.getBounds(), { width: 240, height: 900 }, 'saved numeric size must clamp to limits');
+    assert.deepEqual(child.getSize(), { width: 160, height: 1008 }, 'saved numeric size must clamp to display limits');
     child.close();
     closeMain(mainWindow);
   }
@@ -328,7 +341,7 @@ function closeMain(mainWindow) {
       assert.equal(warnings.length > 0, true, 'save failure must be reported');
       child.close();
       const reopened = open({ width: 420, height: 740 });
-      assert.deepEqual(reopened.getBounds(), { width: 500, height: 300 },
+      assert.deepEqual(reopened.getSize(), { width: 500, height: 300 },
         'save failure must retain the current-process size fallback');
       failWrites = false;
       reopened.close();
@@ -342,7 +355,7 @@ function closeMain(mainWindow) {
     const store = makeStore({ floating_player_size: { width: 440, height: 260 } });
     const { mainWindow, open } = fixture({ store });
     const child = open({ width: 420, height: 740 });
-    assert.deepEqual(child.getBounds(), { width: 440, height: 260 });
+    assert.deepEqual(child.getSize(), { width: 440, height: 260 });
     child.resizeTo(600, 320);
     await delay(170);
     child.maximizeTo(1920, 1080);
@@ -358,6 +371,56 @@ function closeMain(mainWindow) {
     child.close();
     assert.deepEqual(store.saves.at(-1).floating_player_size, { width: 600, height: 320 });
     closeMain(mainWindow);
+  }
+
+  {
+    const workArea = { x: -1920, y: 40, width: 1920, height: 1040 };
+    const store = makeStore();
+    const { mainWindow, open, sendSize } = fixture({ store, workArea });
+    const child = open();
+    child.frameSize = { width: 16, height: 30 };
+    const checkRatio = expected => {
+      const content = child.getContentBounds();
+      assert.ok(Math.abs(content.width - content.height * expected) <= 1, 'content ratio must exclude native frame');
+      const bounds = child.getBounds();
+      assert.ok(bounds.x >= workArea.x && bounds.y >= workArea.y);
+      assert.ok(bounds.x + bounds.width <= workArea.x + workArea.width);
+      assert.ok(bounds.y + bounds.height <= workArea.y + workArea.height);
+      assert.equal(child.aspectRatio, expected);
+    };
+    sendSize({ width: 1080, height: 1920 });
+    checkRatio(9 / 16);
+    child.resizeTo(40, 80);
+    checkRatio(9 / 16);
+    assert.equal(child.getContentBounds().width, 160, 'portrait can shrink below old 240px minimum');
+    sendSize({ width: 1920, height: 1080 });
+    checkRatio(16 / 9);
+    child.resizeTo(1500, 865);
+    checkRatio(16 / 9);
+    assert.ok(child.getContentBounds().width > 900, 'resizing is no longer capped at 900px or video resolution');
+    const beforeInvalid = child.getBounds();
+    for (const size of [null, [], {}, { width: '1920', height: 1080 }, { width: Infinity, height: 1080 },
+      { width: -1, height: 1080 }, { width: 50000, height: 1080 }, { width: 1, height: 1920 }]) sendSize(size);
+    for (const overrides of [{ sender: {} }, { senderFrame: {} }, { senderFrame: null }]) sendSize({ width: 1080, height: 1920 }, overrides);
+    mainWindow.url = 'https://untrusted.invalid/';
+    sendSize({ width: 1080, height: 1920 });
+    mainWindow.url = trustedUrl;
+    assert.deepEqual(child.getBounds(), beforeInvalid, 'invalid dimensions and foreign senders cannot resize');
+    // Move to a small display, including a negative origin and a different taskbar.
+    Object.assign(workArea, { x: 100, y: -600, width: 640, height: 480 });
+    child.emit('moved');
+    checkRatio(16 / 9);
+    assert.ok(child.getBounds().width <= 608 && child.getBounds().height <= 448);
+    sendSize({ width: 1080, height: 1920 });
+    checkRatio(9 / 16);
+    const saved = child.getSize();
+    child.close();
+    assert.deepEqual(store.current().floating_player_size, saved);
+    const reopened = open();
+    assert.deepEqual(reopened.getSize(), saved, 'ratio-adjusted outer size survives reopen');
+    reopened.close();
+    closeMain(mainWindow);
+    assert.equal(mainWindow.webContents.listenerCount('ipc-message'), 0, 'parent close removes the narrow channel listener');
   }
 
   {
@@ -383,7 +446,25 @@ function closeMain(mainWindow) {
     /attachFloatingPlayerWindow\(mainWindow, \{\s*BrowserWindow,\s*isTrustedUrl: rendererSecurity\.isTrustedUrl,\s*store,\s*screen,/,
   );
 
-  console.log('PASS floating player window: trust, safety, debounced size persistence, failure fallback, flush and lifecycle');
+  {
+    const { mainWindow, open } = fixture();
+    const child = open();
+    child.frameSize = { width: 16, height: 30 };
+    let deliveries = 0;
+    require('./check-floating-player-host.cjs')((channel, size) => {
+      mainWindow.webContents.emit('ipc-message', {
+        sender: mainWindow.webContents, senderFrame: mainWindow.webContents.mainFrame,
+      }, channel, size);
+      const content = child.getContentBounds();
+      assert.ok(Math.abs(content.width - content.height * size.width / size.height) <= 1,
+        'hook -> actual preload bridge -> trusted native listener must update content ratio');
+      deliveries++;
+    });
+    assert.ok(deliveries >= 3, 'full bridge chain must cover both orientation changes');
+    child.close();
+    closeMain(mainWindow);
+  }
+  console.log('PASS floating player window: dynamic content ratio, frame compensation, shrink/enlarge, display bounds, IPC trust, size memory and lifecycle');
 })().catch(error => {
   console.error(error);
   process.exitCode = 1;

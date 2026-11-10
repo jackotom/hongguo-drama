@@ -13,6 +13,30 @@ export default function useFloatingPlayer(title, onChange, onBeforeMove) {
   latestTitle.current = title;
   const disposing = useRef(false);
   const pendingRestore = useRef(null);
+  const lastAspectRatio = useRef(null);
+
+  const syncAspectRatio = useCallback(event => {
+    if (!popup.current || popup.current.closed) return;
+    const video = host.querySelector('video');
+    if (!video || (event && event.target !== video) || video.readyState === 0) return;
+    const { videoWidth: width, videoHeight: height } = video;
+    if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) return;
+    const ratio = width / height;
+    const send = window.electronAPI?.setFloatingPlayerAspectRatio;
+    if (typeof send === 'function' && ratio !== lastAspectRatio.current) {
+      send(width, height);
+      lastAspectRatio.current = ratio;
+    }
+  }, [host]);
+
+  useEffect(() => {
+    host.addEventListener('loadedmetadata', syncAspectRatio, true);
+    host.addEventListener('resize', syncAspectRatio, true);
+    return () => {
+      host.removeEventListener('loadedmetadata', syncAspectRatio, true);
+      host.removeEventListener('resize', syncAspectRatio, true);
+    };
+  }, [host, syncAspectRatio]);
 
   const moveHost = useCallback(destination => {
     const video = host.querySelector('video');
@@ -52,6 +76,7 @@ export default function useFloatingPlayer(title, onChange, onBeforeMove) {
     const restore = () => {
       if (popup.current !== child) return;
       popup.current = null;
+      lastAspectRatio.current = null;
       if (slot.current) moveHost(slot.current);
       if (!disposing.current) { setFloating(false); onChange?.(false); }
     };
@@ -66,17 +91,18 @@ export default function useFloatingPlayer(title, onChange, onBeforeMove) {
         child.document.head.appendChild(copy);
       }
       const style = child.document.createElement('style');
-      style.textContent = 'html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#000}.player-floating-host{display:block;width:100%;height:100%}.player-floating-host>.player-stage{width:100%;height:100%;max-height:none;aspect-ratio:auto;border-radius:0;margin:0}.player-controls-row{flex-wrap:wrap;gap:4px}.player-controls-volume input{width:48px}';
+      style.textContent = 'html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#000}.player-floating-host{display:block;width:100%;height:100%}.player-floating-host>.player-stage{position:relative;inset:auto;width:100%;height:100%;min-width:0;min-height:0;max-height:none;aspect-ratio:auto;border-radius:0;margin:0}.player-controls-row{flex-wrap:wrap;gap:4px}.player-controls-volume input{width:48px}';
       child.document.head.appendChild(style);
       moveHost(child.document.body);
       setFloating(true);
       onChange?.(true);
+      syncAspectRatio();
       child.focus();
     } catch (error) {
       restore(); child.close();
       throw new Error('悬浮窗初始化失败，请重试', { cause: error });
     }
-  }, [host, onChange, moveHost]);
+  }, [host, onChange, moveHost, syncAspectRatio]);
 
   useEffect(() => {
     if (popup.current && !popup.current.closed) popup.current.document.title = title;

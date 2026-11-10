@@ -1,7 +1,7 @@
 const assert = require('node:assert/strict');
 const { availableRelease } = require('../src/native/app-update');
 
-const ordered = ['1.7', '1.8', '1.9', '1.71', '1.74', '1.75', '1.75.1', '1.76', '1.99', '1.100', '2.0', '2.9', '3.0', '3.1', '3.2', '3.3', '3.4', '3.5', '3.6', '3.7', '3.8', '3.9', '4.0', '4.1', '4.2', '4.3', '4.4', '4.5', '4.6', '4.7', '4.8', '4.9', '5.0', '5.1', '5.2', '5.3', '5.4', '5.5', '5.6', '5.7', '5.8', '5.9', '6.0', '6.1'];
+const ordered = ['1.7', '1.8', '1.9', '1.71', '1.74', '1.75', '1.75.1', '1.76', '1.99', '1.100', '2.0', '2.9', '3.0', '3.1', '3.2', '3.3', '3.4', '3.5', '3.6', '3.7', '3.8', '3.9', '4.0', '4.1', '4.2', '4.3', '4.4', '4.5', '4.6', '4.7', '4.8', '4.9', '5.0', '5.1', '5.2', '5.3', '5.4', '5.5', '5.6', '5.7', '5.8', '5.9', '6.0', '6.1', '6.2', '6.3', '6.4', '6.5', '6.6', '6.7', '6.8'];
 let checks = 0;
 for (let current = 0; current < ordered.length; current++) {
   for (let next = 0; next < ordered.length; next++) {
@@ -22,7 +22,7 @@ for (const flags of [{ prerelease: true }, { draft: true }]) {
 }
 const pkg = require('../package.json');
 const lock = require('../package-lock.json');
-assert.equal(pkg.version, '6.7.0', 'Current source release target must be 6.7.0');
+assert.equal(pkg.version, '6.8.0', 'Current source release target must be 6.8.0');
 assert.equal(lock.version, pkg.version, 'Lockfile version must match the release');
 assert.equal(lock.packages[''].version, pkg.version, 'Lockfile root package must match the release');
 assert.match(pkg.version, /^\d+\.\d+\.0$/, 'Release versions use two public components and an internal zero patch');
@@ -109,7 +109,6 @@ for (const current of ['5.9', '5.9.0']) {
 assert.equal(availableRelease({ tag_name: 'v6.0' }, '5.9.0').version, '6.0');
 assert.equal(availableRelease({ tag_name: 'v6.3' }, '6.2.0').version, '6.3');
 assert.equal(availableRelease({ tag_name: 'v6.3' }, '6.3.0'), null);
-console.log(`PASS ${checks} version pairs, equivalent versions, invalid versions and unpublished releases`);
 
 for (const current of ['6.0', '6.0.0']) for (const tag of ['v6.0', '6.0', 'v6.0.0', '6.0.0']) assert.equal(availableRelease({ tag_name: tag }, current), null);
 
@@ -130,3 +129,12 @@ assert.equal(availableRelease({ tag_name: 'v6.6' }, '6.6.0'), null);
 
 assert.equal(availableRelease({ tag_name: 'v6.7' }, '6.6.0').version, '6.7');
 assert.equal(availableRelease({ tag_name: 'v6.7' }, '6.7.0'), null);
+
+assert.equal(availableRelease({ tag_name: 'v6.8' }, '6.7.0').version, '6.8');
+for (const current of ['6.8', '6.8.0']) {
+  for (const tag of ['v6.8', '6.8', 'v6.8.0', '6.8.0']) {
+    assert.equal(availableRelease({ tag_name: tag }, current), null);
+  }
+}
+
+console.log(`PASS ${checks} version pairs, equivalent versions, invalid versions and unpublished releases`);

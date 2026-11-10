@@ -1,8 +1,8 @@
-# 6.7 unified release.
+# 6.8 release target.
 NOTICE —— 来源与修改说明
 =========================
 
-源码／发行目标：6.6（实际下载与验证状态见 GitHub 发行页）。
+源码／发行目标：6.8（实际下载与验证状态见 GitHub 发行页）。
 
 本软件（红果短剧下载器 / hongguo-downloader）是基于他人开源项目的**修改版本**。
 依照 GNU General Public License v3.0 第 5(a) 条，特此声明如下。
