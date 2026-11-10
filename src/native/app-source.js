@@ -353,7 +353,7 @@ async function requestJson(url, options, deadline, signal) {
         if (response.status !== 200) throw Object.assign(new Error(`App 片源请求失败（HTTP ${response.status}）`), { status: response.status });
         const raw = typeof response.data === 'string' ? response.data : '';
         if (!raw.trim()) {
-            throw Object.assign(new Error('App 接口返回空响应，可能是签名或设备鉴权问题'), {
+            throw Object.assign(new Error('App 接口返回空响应（HTTP 200），原因尚未确认'), {
                 code: 'EMPTY_RESPONSE',
                 status: response.status,
             });

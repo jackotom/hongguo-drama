@@ -19,6 +19,43 @@ function sourceMapping() {
     return context.sourceFailure;
 }
 
+test('empty playback responses retain transport evidence without guessing the cause', async () => {
+    for (const data of ['', ' \r\n\t']) {
+        const api = app(async () => ({ status: 200, headers: { 'x-tt-logid': 'PRIVATE_SENTINEL' }, data }));
+        await assert.rejects(api.requestJson('https://api5-normal-sinfonlineb.fqnovel.com/novel/player/multi_video_model/v1/',
+            { method: 'POST', data: Buffer.from('{}') }, Date.now() + 1000), error => {
+            assert.equal(error.code, 'EMPTY_RESPONSE');
+            assert.equal(error.status, 200);
+            assert.match(error.message, /空响应.*HTTP 200/);
+            assert.match(error.message, /原因尚未确认/);
+            assert.doesNotMatch(error.stack + JSON.stringify(error), /签名|鉴权|请检查网络|PRIVATE_SENTINEL/);
+            return true;
+        });
+    }
+});
+
+test('empty playback responses keep their classification through the public source entry', async () => {
+    const { loadNative } = require('./hongguo-cancellation-fixture.cjs');
+    let registrations = 0, models = 0;
+    const native = loadNative({ axios: async config => {
+        if (new URL(config.url).pathname.includes('device_register')) {
+            registrations++;
+            return response({ device_id: String(100 + registrations), install_id: '456' });
+        }
+        models++;
+        return { status: 200, headers: { 'x-tt-logid': 'PRIVATE_SENTINEL' }, data: '' };
+    } });
+    const result = await native.fetchPlayUrlSingle('11', '22', { quality: '1080p' });
+    assert.equal(result.url, null);
+    assert.equal(result.code, 'SOURCE_UNAVAILABLE');
+    assert.deepEqual(result.sources.map(item => item.code), ['EMPTY_RESPONSE']);
+    assert.match(result.error, /所选清晰度 1080p，未降级/);
+    assert.match(result.error, /空响应.*原因尚未确认/);
+    assert.doesNotMatch(JSON.stringify(result), /签名|鉴权|请检查网络|PRIVATE_SENTINEL/);
+    assert.equal(registrations, 2, 'retain exactly one existing registration recovery');
+    assert.equal(models, 2, 'retain exactly one existing alternate-host attempt');
+});
+
 function app(transport, clock = Date) {
     const module = { exports: {} }, registration = device(clock);
     vm.runInNewContext(fs.readFileSync(require.resolve('./app-source'), 'utf8'), { module, Buffer, URL,
