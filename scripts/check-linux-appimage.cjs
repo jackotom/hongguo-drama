@@ -11,7 +11,7 @@ const pkg = require('../package.json');
   assert.equal(images.length, 1, 'Keep one AppImage candidate in dist');
   const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'hongguo-linux-'));
   const output = path.join(dist, 'linux-verification'); fs.mkdirSync(output, { recursive: true });
-  const result = { version: pkg.version, passed: false, checks: [] };
+  const result = { version: pkg.version, sourceCommit: process.env.GITHUB_SHA, passed: false, checks: [] };
   let child, cdp;
   try {
     const image = path.join(dist, images[0]);

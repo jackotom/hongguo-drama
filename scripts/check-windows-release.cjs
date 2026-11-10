@@ -14,7 +14,7 @@ const profile = path.join(temp, 'profile');
 fs.mkdirSync(out, { recursive: true });
 fs.mkdirSync(profile);
 const skipPlayback = process.argv.includes('--skip-playback');
-const result = { version: pkg.version, hostPlatform: process.platform, hostArch: process.arch, signed: false, playbackTested: false, checks: [] };
+const result = { version: pkg.version, sourceCommit: process.env.GITHUB_SHA, hostPlatform: process.platform, hostArch: process.arch, signed: false, playbackTested: false, checks: [] };
 let child, socket, seq = 0;
 const pending = new Map();
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
@@ -486,6 +486,39 @@ async function realFootage(mediaDir, ffmpeg) {
   assert(await evaluate('getComputedStyle(document.querySelector(".player-controls")).opacity === "1"'), 'Returning to the ordinary landscape player must restore controls');
   result.fullscreenControls = { idleHidden: true, pointerRestores: true, pausedVisible: true, resumedHidden: true, landscapeIdleHidden: true, landscapePointerLeave: pointerLeave, landscapePointerReturnRestores: true };
   result.checks.push('Actual single-file EXE: fullscreen and ordinary landscape idle hide controls; landscape pointer leave hides within one second and return restores; pause keeps visible; resume hides');
+  result.realMedia.playbackStates = [];
+  for (const [index, episode] of episodes.data.episodes.slice(0, 2).entries()) {
+    result.stage = `ten-second-real-playback-${index + 1}`;
+    assert.equal((await evaluate(`window.electronAPI.playSeries({seriesId:${JSON.stringify(sid)}, vidIndex:${index + 1}})`)).success, true);
+    const state = await evaluate(`(async () => {
+      const expected = ${JSON.stringify(episode.fileUrl)};
+      const deadline = performance.now() + 18000;
+      let started = false;
+      while (performance.now() < deadline) {
+        const video = document.querySelector('video');
+        if (video?.currentSrc === expected && video.readyState >= 2) {
+          video.muted = true; video.volume = 0;
+          if (!started) {
+            video.currentTime = 0;
+            await video.play();
+            started = true;
+          } else if (video.currentTime >= 10) {
+            video.pause();
+            return { time: video.currentTime, muted: video.muted, volume: video.volume,
+              paused: video.paused, error: video.error?.message || null,
+              width: video.videoWidth, height: video.videoHeight };
+          }
+        }
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
+      throw new Error('Actual episode did not play for ten seconds');
+    })()`);
+    assert(state.time >= 10 && state.muted && state.volume === 0 && state.paused && !state.error
+      && state.width > 0 && state.height > 0, JSON.stringify(state));
+    result.realMedia.playbackStates.push({ index: result.realMedia.episodes[index].index, ...state });
+  }
+  delete result.stage;
+  result.checks.push('Both real episodes advance at least ten seconds in the actual portable player, muted with zero volume, then pause without media errors');
   result.playbackTested = true;
   result.passed = true;
   console.log('Windows release smoke: PASS (' + result.checks.length + ' checks)');

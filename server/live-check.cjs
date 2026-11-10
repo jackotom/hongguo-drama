@@ -26,9 +26,11 @@ async function main() {
     receipt.steps.push('search');
     const { series } = await api(`/api/series/${candidate.series_id}`);
     if (series.episodes.length < 2) throw new Error('随机剧集少于两集');
-    const offset = crypto.randomInt(series.episodes.length - 1), selected = series.episodes.slice(offset, offset + 2);
+    const offset = crypto.randomInt(Math.min(10, series.episodes.length - 1)), selected = series.episodes.slice(offset, offset + 2);
     receipt.episodes = selected.map(item => ({ vid: item.vid, index: item.vid_index }));
-    const added = await api('/api/downloads', { seriesId: series.series_id, episodeIds: selected.map(item => item.vid), quality: 'auto' });
+    // Verify the repaired App source directly; random web availability is recorded separately.
+    receipt.quality = '1080p';
+    const added = await api('/api/downloads', { seriesId: series.series_id, episodeIds: selected.map(item => item.vid), quality: receipt.quality });
     const wait = async ids => {
       const deadline = Date.now() + 5 * 60000;
       while (Date.now() < deadline) {

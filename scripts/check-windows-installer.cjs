@@ -40,7 +40,7 @@ async function runInstallerCheck() {
   const yaml = require('js-yaml');
   const out = path.join(root, 'dist/windows-verification');
   fs.mkdirSync(out, { recursive: true });
-  const result = { version: pkg.version, signed: false, checks: [], crossVersionUpgradeTested: false, passed: false };
+  const result = { version: pkg.version, sourceCommit: process.env.GITHUB_SHA, signed: false, checks: [], crossVersionUpgradeTested: false, passed: false };
   const temp = fs.mkdtempSync(path.join(require('node:os').tmpdir(), 'hongguo-installer-'));
   const installDir = path.join(temp, 'installed');
   let profile = path.join(temp, 'profile');
