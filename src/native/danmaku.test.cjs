@@ -391,3 +391,128 @@ test('主进程与预加载桥接接入受信任 IPC，且不接受测试注入'
   assert.match(main, /rendererSecurity\.isTrustedSender\(event, mainWindow\)/);
   assert.match(preload, /getEpisodeDanmaku: options => ipcRenderer\.invoke\('get-episode-danmaku', options\)/);
 });
+
+const flushCancellation = () => new Promise(resolve => setImmediate(resolve));
+const responsePage = () => ({ data: JSON.stringify(page({ rows: [comment()] })) });
+
+test('预取消先于缓存、身份、签名和实际窗口请求；无效signal安全拒绝', async () => {
+  let calls = 0;
+  const options = { seriesId: SERIES, vid: VID, ...fixedOptions(async () => { calls++; return responsePage(); }) };
+  await danmaku.fetchDanmaku(options);
+  const controller = new AbortController(); controller.abort();
+  const result = await danmaku.fetchDanmaku({ ...options, signal: controller.signal });
+  assert.equal(result.success, false); assert.match(result.notice, /取消/); assert.equal(calls, 1);
+  danmaku.resetDanmakuCache(); danmaku.setDeviceIdentityFile('/not-used/danmaku.identity');
+  const cancelled = await danmaku.fetchDanmaku({ ...options, signal: controller.signal, now: () => { throw Error('must not sign'); } });
+  assert.match(cancelled.notice, /取消/); assert.equal(calls, 1);
+  await assert.rejects(danmaku.requestWindow({ vid: VID, bookId: SERIES, signal: controller.signal,
+    now: () => { throw Error('must not sign'); } }), { code: 'ERR_CANCELED' });
+  for (const signal of [null, {}, { aborted: false }, true]) {
+    const invalid = await danmaku.fetchDanmaku({ ...options, signal });
+    assert.equal(invalid.success, false); assert.match(invalid.notice, /参数无效/);
+  }
+});
+
+test('调用方abort传到真实transport signal，清监听且取消不污染缓存', async t => {
+  const controller = new AbortController(), listeners = new Set();
+  const add = controller.signal.addEventListener.bind(controller.signal), remove = controller.signal.removeEventListener.bind(controller.signal);
+  t.mock.method(controller.signal, 'addEventListener', (name, fn, options) => { listeners.add(fn); add(name, fn, options); });
+  t.mock.method(controller.signal, 'removeEventListener', (name, fn) => { listeners.delete(fn); remove(name, fn); });
+  let actual, calls = 0;
+  const options = { seriesId: SERIES, vid: VID, ...fixedOptions((_url, _body, config) => {
+    calls++; actual = config.signal;
+    return new Promise((resolve, reject) => actual.addEventListener('abort', () => reject(Object.assign(new Error('cancelled'), {code:'ERR_CANCELED'})), {once:true}));
+  }) };
+  const pending = danmaku.fetchDanmaku({ ...options, signal: controller.signal });
+  assert.equal(actual.aborted, false); controller.abort();
+  assert.equal(actual.aborted, true); assert.match((await pending).notice, /取消/); assert.equal(listeners.size, 0);
+  const retry = await danmaku.fetchDanmaku({ ...options, transport: async () => { calls++; return responsePage(); } });
+  assert.equal(retry.success, true); assert.equal(calls, 2);
+});
+
+test('分页间隔可取消；取消后不发第二页，不缓存已取部分', async t => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  const controller = new AbortController(); let calls = 0;
+  const options = { seriesId: SERIES, vid: VID, ...fixedOptions(async () => {
+    calls++; return { data: JSON.stringify(page({ rows: [comment()], extra: { next_query_danmaku_list_time: 5000 } })) };
+  }) };
+  const pending = danmaku.fetchDanmaku({ ...options, signal: controller.signal });
+  await flushCancellation(); controller.abort();
+  const result = await pending;
+  assert.equal(result.success, false); assert.deepEqual(result.items, []); assert.match(result.notice, /取消/);
+  t.mock.timers.tick(50000); assert.equal(calls, 1);
+  const retry = await danmaku.fetchDanmaku({ ...options, transport: async () => { calls++; return responsePage(); } });
+  assert.equal(retry.success, true); assert.equal(calls, 2);
+});
+
+test('忽略abort的迟到成功不解析、不翻页、不覆盖新缓存', async () => {
+  const controller = new AbortController(); let release;
+  const options = { seriesId: SERIES, vid: VID, ...fixedOptions(() => new Promise(resolve => { release = resolve; })) };
+  const old = danmaku.fetchDanmaku({ ...options, signal: controller.signal }); controller.abort();
+  const fresh = await danmaku.fetchDanmaku({ ...options, fresh: true, transport: async () => responsePage() });
+  let parsed = false;
+  release({ get data() { parsed = true; throw Error('late body must not be parsed'); } });
+  assert.match((await old).notice, /取消/); assert.equal(parsed, false);
+  const hit = await danmaku.fetchDanmaku({ ...options, transport: () => { throw Error('must hit newer cache'); } });
+  assert.deepEqual(hit, fresh);
+});
+
+test('带signal独立在途与取消；无signal仍合并，独立finally不删共享pending', async () => {
+  let sharedRelease, firstRelease, secondRelease, calls = 0;
+  const options = { seriesId: SERIES, vid: VID, ...fixedOptions(() => { calls++; return new Promise(resolve => { sharedRelease = resolve; }); }) };
+  const shared = danmaku.fetchDanmaku(options);
+  const a = new AbortController(), b = new AbortController();
+  const first = danmaku.fetchDanmaku({ ...options, signal: a.signal, transport: () => { calls++; return new Promise(resolve => { firstRelease = resolve; }); } });
+  const second = danmaku.fetchDanmaku({ ...options, signal: b.signal, transport: () => { calls++; return new Promise(resolve => { secondRelease = resolve; }); } });
+  assert.equal(calls, 3); a.abort(); firstRelease(responsePage()); assert.match((await first).notice, /取消/);
+  const joined = danmaku.fetchDanmaku(options); assert.equal(calls, 3);
+  assert.equal(b.signal.aborted, false); secondRelease(responsePage()); assert.equal((await second).success, true);
+  sharedRelease(responsePage()); assert.deepEqual(await joined, await shared); assert.equal(calls, 3);
+});
+
+test('成功窗口移除调用方监听；内部20秒超时仍中止transport且不是调用方取消', async t => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  const controller = new AbortController(); let signal;
+  await danmaku.requestWindow({ vid: VID, bookId: SERIES, signal: controller.signal, ...fixedOptions(async (_url, _body, config) => {
+    signal = config.signal; return responsePage();
+  }) });
+  controller.abort(); t.mock.timers.tick(20000); assert.equal(signal.aborted, false, 'completed window listener/timer must be gone');
+  const active = new AbortController();
+  const task = danmaku.fetchDanmaku({ seriesId: SERIES, vid: VID, signal: active.signal, ...fixedOptions((_url, _body, config) =>
+    new Promise((resolve, reject) => config.signal.addEventListener('abort', () => reject(Object.assign(new Error('timeout'), {code:'ERR_CANCELED'})), {once:true}))) });
+  t.mock.timers.tick(20000);
+  const result = await task; assert.equal(active.signal.aborted, false); assert.match(result.notice, /超时/); assert.doesNotMatch(result.notice, /暂无弹幕|已取消/);
+});
+
+test('T4-R1：完成任务写缓存后、外层await交接前取消返回安全结果并保留好缓存', async () => {
+  const vm = require('node:vm');
+  const { createRequire } = require('node:module');
+  const controller = new AbortController();
+  let writes = 0, calls = 0;
+  class HandoffMap extends Map {
+    set(key, value) {
+      super.set(key, value);
+      if (key === `${SERIES}:${VID}` && value?.result?.success === true) {
+        writes++;
+        // Put abort ahead of the outer await continuation, after the good cache is complete.
+        queueMicrotask(() => controller.abort());
+      }
+      return this;
+    }
+  }
+  const module = { exports: {} }, file = path.join(__dirname, 'danmaku.js');
+  vm.runInNewContext(fs.readFileSync(file, 'utf8'), {
+    module, require: createRequire(file), Buffer, Map: HandoffMap,
+    AbortController, setTimeout, clearTimeout,
+  }, { filename: file });
+  const api = module.exports;
+  api.setDeviceIdentity({ deviceId: '1000000000000000001', installId: '1000000000000000002' });
+  const options = { seriesId: SERIES, vid: VID, ...fixedOptions(async () => { calls++; return responsePage(); }) };
+  const result = await api.fetchDanmaku({ ...options, signal: controller.signal });
+  assert.equal(writes, 1); assert.equal(controller.signal.aborted, true);
+  assert.equal(result.success, false); assert.equal(result.items.length, 0);
+  assert.match(result.notice, /已取消/); assert.doesNotMatch(result.notice, /超时|暂无弹幕/);
+  const cached = await api.fetchDanmaku(options);
+  assert.equal(cached.success, true); assert.equal(cached.items.length, 1);
+  assert.equal(calls, 1); assert.equal(writes, 1);
+});

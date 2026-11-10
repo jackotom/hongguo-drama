@@ -61,6 +61,20 @@ const CACHE_MAX = 64;
 const cache = new Map();
 const pending = new Map();
 
+function throwIfCancelled(signal) {
+  if (signal?.aborted) throw Object.assign(new Error('弹幕请求已取消'), { code: 'ERR_CANCELED' });
+}
+
+function pageGap(signal) {
+  return new Promise((resolve, reject) => {
+    const finish = () => { clearTimeout(timer); signal?.removeEventListener('abort', cancel); };
+    const cancel = () => { finish(); reject(Object.assign(new Error('弹幕请求已取消'), { code: 'ERR_CANCELED' })); };
+    const timer = setTimeout(() => { finish(); resolve(); }, PAGE_GAP_MS);
+    signal?.addEventListener('abort', cancel, { once: true });
+    if (signal?.aborted) cancel();
+  });
+}
+
 // 上游按匿名标识分配弹幕子集，跨重启必须复用同一份本机标识。
 let identity = null;
 let identityFile = null;
@@ -286,7 +300,8 @@ function buildBody(vid, bookId, start, duration) {
  * 时间戳与 nonce 在**同一个函数里**生成并共用：签名是对 query 字符串算的，
  * query 里含 `_rticket`，而 `X-Khronos` 用的是秒。三者不一致就是无效签名。
  */
-async function requestWindow({ vid, bookId, start, duration, transport = axios.post, now = Date.now, random = require('node:crypto').randomBytes }) {
+async function requestWindow({ vid, bookId, start, duration, signal, transport = axios.post, now = Date.now, random = require('node:crypto').randomBytes }) {
+  throwIfCancelled(signal);
   const stampMs = now();
   const stamp = Math.floor(stampMs / 1000);
   const nonce = random(sign.NONCE_BYTES);
@@ -305,14 +320,26 @@ async function requestWindow({ vid, bookId, start, duration, transport = axios.p
     ...sign.signCommentHeaders({ rawQuery, stamp, nonce }),
   };
 
-  const response = await transport(url, JSON.stringify(buildBody(vid, bookId, start, duration)), {
-    headers,
-    timeout: REQUEST_TIMEOUT,
-    signal: AbortSignal.timeout(REQUEST_TIMEOUT),
-    maxRedirects: 0,
-    responseType: 'text',
-    maxContentLength: MAX_RESPONSE_BYTES,
-  });
+  const controller = new AbortController();
+  const cancel = () => controller.abort();
+  const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT);
+  signal?.addEventListener('abort', cancel, { once: true });
+  let response;
+  try {
+    throwIfCancelled(signal);
+    response = await transport(url, JSON.stringify(buildBody(vid, bookId, start, duration)), {
+      headers,
+      timeout: REQUEST_TIMEOUT,
+      signal: controller.signal,
+      maxRedirects: 0,
+      responseType: 'text',
+      maxContentLength: MAX_RESPONSE_BYTES,
+    });
+    throwIfCancelled(signal);
+  } finally {
+    clearTimeout(timer);
+    signal?.removeEventListener('abort', cancel);
+  }
 
   const body = typeof response?.data === 'string' ? response.data : JSON.stringify(response?.data ?? null);
   if (Buffer.byteLength(body) > MAX_RESPONSE_BYTES) throw new Error('弹幕响应过大');
@@ -385,6 +412,7 @@ function present(result, items, limit) {
  * @param {object} options
  * @param {string} options.seriesId 剧集 ID（business_param.book_id）
  * @param {string} options.vid      本集视频 ID（group_id）。两者不同，填错会被上游拒。
+ * @param {AbortSignal} [options.signal] 可选调用方取消；有信号的请求不共享在途任务。
  * @returns {Promise<{success:boolean, source:string, items:Array<{time:number,text:string,color:string,mode:string}>, notice:string, error:string}>}
  *          按时间升序；任何异常都转成 `success:false` + 中文说明，不抛出。
  */
@@ -395,7 +423,10 @@ async function fetchDanmaku(options = {}) {
   const seriesId = typeof options.seriesId === 'string' ? options.seriesId.trim() : '';
   const vid = typeof options.vid === 'string' ? options.vid.trim() : '';
   const limit = options.limit === undefined ? MAX_ITEMS : options.limit;
+  const signal = options.signal;
   if (!Number.isInteger(limit) || limit < 1 || limit > MAX_ITEMS ||
+      (signal !== undefined && (!signal || typeof signal.aborted !== 'boolean' ||
+        typeof signal.addEventListener !== 'function' || typeof signal.removeEventListener !== 'function')) ||
       (options.fresh !== undefined && typeof options.fresh !== 'boolean')) {
     return finalize({ seriesId, vid, items: [], error: '弹幕请求参数无效' });
   }
@@ -408,12 +439,15 @@ async function fetchDanmaku(options = {}) {
     return finalize({ seriesId, vid, items: [], error: '仅红果来源的剧集支持弹幕' });
   }
 
+  const cancelled = () => finalize({ seriesId, vid, items: [], error: '弹幕请求已取消' });
+  if (signal?.aborted) return cancelled();
+
   const cacheKey = `${seriesId}:${vid}`;
   const hit = cache.get(cacheKey);
   // `fresh` 供界面上的"重试"使用：失败结果有 15 秒 TTL，不绕过的话用户点了重试
   // 只会再拿到同一条缓存失败，看起来像按钮没反应。
   if (hit && hit.expires > Date.now() && options.fresh !== true) return present(hit.result, hit.items, limit);
-  if (pending.has(cacheKey)) {
+  if (!signal && pending.has(cacheKey)) {
     const shared = await pending.get(cacheKey);
     return present(shared.result, shared.items, limit);
   }
@@ -429,12 +463,15 @@ async function fetchDanmaku(options = {}) {
 
     try {
       for (let page = 0; page < MAX_PAGES; page++) {
-        if (page > 0) await new Promise(resolve => setTimeout(resolve, PAGE_GAP_MS));
+        throwIfCancelled(signal);
+        if (page > 0) await pageGap(signal);
 
         let payload;
         try {
-          payload = await requestWindow({ vid, bookId: seriesId, start, duration, transport, now, random });
+          payload = await requestWindow({ vid, bookId: seriesId, start, duration, signal, transport, now, random });
+          throwIfCancelled(signal);
         } catch (error) {
+          if (signal?.aborted) throw error;
           // 错误说明要能让用户自己判断：发生了什么、已经试过什么、还能做什么。
           // 首页失败说明源不可用；后续页失败则保留已拿到的部分，不把整集判死。
           // 不透传异常文本：Axios 错误可能携带签名 URL 或设备指纹。
@@ -491,6 +528,8 @@ async function fetchDanmaku(options = {}) {
       failure = '弹幕处理失败，请稍后重试';
     }
 
+    if (signal?.aborted) return { result: cancelled(), items: [] };
+
     collected.sort((a, b) => a.time - b.time);
 
     // 缓存完整结果与完整列表；limit 只在呈现时裁剪，避免缓存被"半截"结果污染。
@@ -504,12 +543,14 @@ async function fetchDanmaku(options = {}) {
     return { result, items: collected };
   })();
 
-  pending.set(cacheKey, task);
+  // Caller-owned cancellation must never attach to or delete a shared desktop request.
+  if (!signal) pending.set(cacheKey, task);
   try {
     const { result, items } = await task;
+    if (signal?.aborted) return cancelled();
     return present(result, items, limit);
   } finally {
-    pending.delete(cacheKey);
+    if (!signal && pending.get(cacheKey) === task) pending.delete(cacheKey);
   }
 }
 

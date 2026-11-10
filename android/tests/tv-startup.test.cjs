@@ -32,7 +32,8 @@ function boot(setup = () => {}) {
     CSS: {supports: () => true},
     HTMLDialogElement: function() {}, HTMLMediaElement: function() {},
     Element: function() {},
-    MutationObserver: function() {}, requestAnimationFrame() {},
+    MutationObserver: function() {}, requestAnimationFrame() {}, ResizeObserver: function() {},
+    matchMedia: () => ({ matches: false, addEventListener() {}, removeEventListener() {} }),
     AbortController, AbortSignal, URL, URLSearchParams,
     localStorage: {setItem() {}, getItem: () => 'ok', removeItem() {}},
     addEventListener: (name, handler) => { errors[name] = handler; },
@@ -45,6 +46,8 @@ function boot(setup = () => {}) {
   context.HTMLDialogElement.prototype.close = () => {};
   context.HTMLMediaElement.prototype.play = () => {};
   context.HTMLMediaElement.prototype.pause = () => {};
+  context.ResizeObserver.prototype.observe = () => {};
+  context.ResizeObserver.prototype.disconnect = () => {};
   context.window = context;
   vm.createContext(context);
   setup(context);
@@ -77,6 +80,24 @@ test('missing required JS capabilities blocks app with a fixed reason', () => {
     const b = boot(setup);
     assert.deepEqual(b.statuses, [reason]);
     assert.equal(b.scripts.length, 0);
+  }
+});
+
+test('T4-R2 missing danmaku layout or media-query APIs blocks bundle with js_dom before ready', () => {
+  for (const [name, setup] of [
+    ['ResizeObserver', c => { c.ResizeObserver = undefined; }],
+    ['ResizeObserver.observe', c => { c.ResizeObserver.prototype.observe = undefined; }],
+    ['ResizeObserver.disconnect', c => { c.ResizeObserver.prototype.disconnect = undefined; }],
+    ['matchMedia', c => { c.matchMedia = undefined; }],
+    ['null MQL', c => { c.matchMedia = () => null; }],
+    ['MQL.addEventListener', c => { c.matchMedia = () => ({ removeEventListener() {} }); }],
+    ['MQL.removeEventListener', c => { c.matchMedia = () => ({ addEventListener() {} }); }],
+  ]) {
+    const b = boot(c => { c.tvKey = () => {}; c.appBack = () => {}; setup(c); });
+    assert.deepEqual(b.statuses, ['js_dom'], name);
+    assert.equal(b.scripts.length, 0, name);
+    assert.match(b.nodes['#content'].textContent, /无法启动/);
+    assert(!b.nodes['#content'].textContent.includes(name));
   }
 });
 

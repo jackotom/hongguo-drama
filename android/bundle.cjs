@@ -36,9 +36,12 @@ const out = path.join(root, 'build'); fs.mkdirSync(out, {recursive:true});
 const generated = path.join(out, 'decrypt.js');
 fs.writeFileSync(generated, `import * as crypto from '../web/crypto.js';\n${decrypt}\nexport { decryptMp4Buffer, decryptSample };\n`);
 esbuild.buildSync({
-  entryPoints: [path.join(root, tv ? 'web/tv.js' : 'web/app.js')], outfile: path.join(root,tv ? 'build/tv/assets/app.js' : 'app/src/main/assets/app.js'),
+  ...(tv ? { stdin: { contents: "import './web/tv.js'; import { connectTvDanmaku } from './web/tv-danmaku.js'; connectTvDanmaku();", resolveDir: root, sourcefile: 'tv-entry.js' } }
+    : { entryPoints: [path.join(root, 'web/app.js')] }),
+  outfile: path.join(root,tv ? 'build/tv/assets/app.js' : 'app/src/main/assets/app.js'),
   bundle: true, format:'iife', platform:'browser', target:'chrome100', minify:true,
   inject:[path.join(root,'web/globals.js')],
-  alias: {'android-decrypt':path.join(root,'build/decrypt.js'), 'node:crypto':path.join(root,'web/crypto.js'), 'node:zlib':path.join(root,'web/zlib.js'), 'axios':path.join(root,'web/axios.cjs')},
+  alias: {'android-decrypt':path.join(root,'build/decrypt.js'), 'node:crypto':path.join(root,'web/crypto.js'), 'node:zlib':path.join(root,'web/zlib.js'), 'axios':path.join(root,'web/axios.cjs'),
+    ...(tv ? {'node:fs':path.join(root,'mobile/fs.cjs'), 'node:path':path.join(root,'mobile/path.cjs')} : {})},
   legalComments:'eof',
 });

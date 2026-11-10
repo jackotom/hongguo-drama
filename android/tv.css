@@ -20,3 +20,9 @@ body.tv-playing button,body.tv-playing select{scroll-margin:8px}
 #tv-episode-dialog .episodes{padding:8px;grid-template-columns:repeat(auto-fill,minmax(62px,1fr));max-height:60vh;overflow:auto;scroll-padding:12px}
 #tv-close-episodes{width:auto;margin:0 0 16px}
 @media(max-height:600px){body{padding-top:8px}header{padding-bottom:8px}dialog{max-height:calc(100vh - 32px)}.search{margin-bottom:8px}}
+
+.video-stage{position:relative}
+.tv-danmaku{position:absolute;inset:0;overflow:hidden;pointer-events:none;z-index:1}
+.tv-danmaku[hidden],.tv-danmaku-status[hidden]{display:none}
+.tv-danmaku-item{position:absolute;left:0;top:0;white-space:nowrap;font-weight:600;line-height:1.3;text-shadow:0 1px 3px #000,1px 0 3px #000;will-change:transform}
+.tv-danmaku-status{position:absolute;left:12px;right:12px;bottom:8px;font-size:16px;color:#e2e6ee;text-shadow:0 1px 3px #000}

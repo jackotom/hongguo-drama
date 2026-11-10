@@ -5,7 +5,7 @@
     js_bigint: 'WebView 缺少 BigInt 整数能力，无法执行现有取源签名。',
     js_abort: 'WebView 缺少 AbortController／AbortSignal.timeout，无法安全取消请求。',
     js_collections: 'WebView 缺少现有程序需要的集合或字符串 API。',
-    js_dom: 'WebView 缺少页面更新或遥控焦点需要的 DOM API。',
+    js_dom: 'WebView 缺少页面更新、遥控焦点或弹幕排版需要的 DOM API。',
     js_dialog: 'WebView 缺少对话框 API，无法正常关闭说明层。',
     js_storage: '本机存储不可用，无法保存收藏与观看记录。',
     js_video: 'WebView 缺少 HTML 视频播放 API。',
@@ -29,8 +29,13 @@
         typeof Array.prototype.flat !== 'function' || typeof Array.prototype.flatMap !== 'function' || typeof String.prototype.matchAll !== 'function') { fail('js_collections'); return; }
     if (typeof globalThis === 'undefined' || typeof URL !== 'function' || typeof URLSearchParams !== 'function' ||
         typeof MutationObserver !== 'function' || typeof requestAnimationFrame !== 'function' ||
+        typeof ResizeObserver !== 'function' || !ResizeObserver.prototype ||
+        typeof ResizeObserver.prototype.observe !== 'function' || typeof ResizeObserver.prototype.disconnect !== 'function' ||
+        typeof window.matchMedia !== 'function' ||
         typeof document.querySelector !== 'function' || typeof Element === 'undefined' || typeof Element.prototype.closest !== 'function' ||
         typeof Element.prototype.after !== 'function' || typeof Element.prototype.scrollIntoView !== 'function') { fail('js_dom'); return; }
+    var mediaQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
+    if (!mediaQuery || typeof mediaQuery.addEventListener !== 'function' || typeof mediaQuery.removeEventListener !== 'function') { fail('js_dom'); return; }
     if (typeof HTMLDialogElement === 'undefined' || typeof HTMLDialogElement.prototype.showModal !== 'function' || typeof HTMLDialogElement.prototype.close !== 'function') { fail('js_dialog'); return; }
     if (!window.CSS || typeof CSS.supports !== 'function' || !CSS.supports('display', 'grid') || !CSS.supports('display', 'flex') || !CSS.supports('aspect-ratio', '3 / 4')) { fail('css_layout'); return; }
     var key = '__hg_tv_preflight__';
