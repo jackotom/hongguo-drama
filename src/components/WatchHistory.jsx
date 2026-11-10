@@ -51,11 +51,8 @@ export default function WatchHistory({ active = true, onNavigate }) {
   const suggestionsByGroup = new Map(groups.map(items => [items, historyGroupSuggestions(items)]));
   const listedRows = groups.flatMap(items => hideLowSeasons && !expanded[items[0].series_id] ? items.slice(0, 1) : items);
   const completedCount = listedRows.filter(row => row.completed === true).length;
-  const visibleRows = listedRows.filter(row => filter === 'all' || (row.completed === true) === (filter === 'completed'));
-  const visibleIds = new Set(visibleRows.map(row => row.series_id));
-  const updatedGroups = new Set(groups.filter(items => suggestionsByGroup.get(items).hasUnreadSequels
-    || items.some(row => visibleIds.has(row.series_id) && row.unreadEpisodes > 0)));
-  visibleRows.sort((a, b) => Number(updatedGroups.has(groupById.get(b.series_id))) - Number(updatedGroups.has(groupById.get(a.series_id))));
+  const visibleRows = listedRows.filter(row => filter === 'all' || (row.completed === true) === (filter === 'completed'))
+    .sort((a, b) => b.updatedAt - a.updatedAt);
 
   const savePreferences = next => {
     setPreferences(next);
@@ -152,7 +149,7 @@ export default function WatchHistory({ active = true, onNavigate }) {
       // An unconfirmed title match must not clear the original show's update markers.
       if (sequel && row.similarSeries?.some(item => item.series_id === sequel.series_id)) return;
       const group = groupById.get(row.series_id) || [row];
-      const acknowledgedRows = sequel || group.find(item => visibleIds.has(item.series_id)) === row
+      const acknowledgedRows = sequel || visibleRows.find(item => groupById.get(item.series_id) === group) === row
         ? group.filter(item => item === row || item.sequels?.some(candidate => !sequel || candidate.series_id === sequel.series_id))
         : [row];
       for (const target of acknowledgedRows) {
@@ -204,7 +201,7 @@ export default function WatchHistory({ active = true, onNavigate }) {
         <span>{t("折叠同剧低季")}</span>
       </label>
     </div>
-    <p className="history-hint">{t("有更新的组优先显示，同组季序不变。")}{t("按当前最后一集的片尾进度判断；隐藏低季后，计数仅代表列表中的季，旧记录可能显示未看完。")}</p>
+    <p className="history-hint">{t("按最近观看时间排序，检查更新不改变观看顺序。同组提醒汇总到首个可见记录。")}{t("按当前最后一集的片尾进度判断；隐藏低季后，计数仅代表列表中的季，旧记录可能显示未看完。")}</p>
     {error && <div className="history-error" role="alert"><span>{t(error)}</span><button className="btn btn-outline btn-sm" onClick={load}>{t("重新加载")}</button></div>}
     {status && <p className="history-hint" role="status">{t(status)}</p>}
     {checking && progress?.total > 0 && <p className="history-hint" role="status">{t("正在检查 ")}{t((progress.checked || 0) + (progress.failed || 0) + (progress.skipped || 0))} / {t(progress.total)}{t(progress.current ? `：${progress.current}` : '')}
@@ -218,7 +215,7 @@ export default function WatchHistory({ active = true, onNavigate }) {
     </div> : <ul className="history-list">{visibleRows.map(row => {
       const group = groupById.get(row.series_id);
       const groupHeadId = group[0].series_id;
-      const isHead = group.find(item => visibleIds.has(item.series_id)) === row;
+      const isHead = visibleRows.find(item => groupById.get(item.series_id) === group) === row;
       const { sequels, similarSeries: similar, hasUnreadSequels } = suggestionsByGroup.get(group);
       const hasUpdates = row.unreadEpisodes > 0 || (isHead && hasUnreadSequels);
       return <li className={`history-row ${!isHead ? 'history-child' : ''}`} key={row.series_id}>

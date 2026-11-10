@@ -18,7 +18,7 @@ import VideoEnhancement, { useVideoEnhancement } from './VideoEnhancement';
 import './Player.css';
 import { Play, Film, Download, Check, RefreshCw, Layers, X, Trash2, ChevronDown, Zap } from './icons';
 
-const localMediaKey = (seriesId, episode) => JSON.stringify([seriesId, episode?.vid, episode?.fileUrl, episode?.fileSize, episode?.taskId]);
+const localMediaKey = (seriesId, episode) => JSON.stringify([seriesId, episode?.vid, episode?.vid_index, episode?.fileUrl, episode?.fileSize, episode?.taskId]);
 // 预取失败后短暂退避，避免 timeupdate 4Hz 反复撞同一个坏节点。
 const PREFETCH_RETRY_MS = 15 * 1000;
 // 播放期间最多预取后续两集；跳到更远时再按新位置补齐。
@@ -197,6 +197,8 @@ function Player({ target, onNavigate, onSeriesSelected, onFloatingChange, active
   const fallbackRef = useRef(null);
   const fallbackAttemptRef = useRef(null);
   const rejectedLocalRef = useRef(null);
+  const grantedLocalRef = useRef(null);
+  const onlineQualityVersion = useRef(0);
 
   const holdVideoFrame = useCallback(() => {
     const media = loadedMediaRef.current;
@@ -285,6 +287,7 @@ function Player({ target, onNavigate, onSeriesSelected, onFloatingChange, active
 
   const resetPlayback = useCallback((autoplay = true, preservePrefetch = false) => {
     fallbackRef.current = null;
+    grantedLocalRef.current = null;
     setPlaybackRequested(true);
     pendingAutoplayRef.current = autoplay && activeRef.current && !bossHiddenRef.current;
     setAutoAdvancing(false);
@@ -398,12 +401,17 @@ function Player({ target, onNavigate, onSeriesSelected, onFloatingChange, active
   }, []);
   const usableLocal = useCallback((ep, seriesId, explicitRetry = false) => ep && !ep.locked && ep.status === 'completed' && ep.fileUrl
     && (explicitRetry || localMediaKey(seriesId, ep) !== rejectedLocalRef.current)
-    && !localQualityError(ep, seriesId), [localQualityError]);
+    && (grantedLocalRef.current === localMediaKey(seriesId, ep) || !localQualityError(ep, seriesId)), [localQualityError]);
+  const canChooseLocal = useCallback((ep, seriesId) => ep?.vid && !ep.locked && ep.status === 'completed'
+    && /^hongguo-local:\/\/f\/[^/?#]+$/.test(ep.fileUrl) && localMediaKey(seriesId, ep) !== rejectedLocalRef.current
+    && !!localQualityError(ep, seriesId), [localQualityError]);
   const localPlaybackError = useCallback((ep, seriesId) => localQualityError(ep, seriesId)
     || (ep.fileUrl ? '本地文件本次加载失败，文件已保留；可重试本集、切换解码方式或使用系统播放器' : '本地文件不可用，请在下载管理检查文件'), [localQualityError]);
 
   const resumeLocal = useCallback((ep, seekTo, autoplay = true) => {
+    const key = localMediaKey(selectedSeriesRef.current, ep), granted = grantedLocalRef.current === key;
     resetPlayback(autoplay);
+    if (granted) grantedLocalRef.current = key;
     onlineSourceRef.current = null;
     setCompatMap(prev => { const next = { ...prev }; delete next[ep.vid_index]; return next; });
     pendingSeekRef.current = seekTo;
@@ -1020,6 +1028,7 @@ function Player({ target, onNavigate, onSeriesSelected, onFloatingChange, active
     (vidIndex, resumeAt, autoplay = true) => {
       const ep = episodes.find((e) => e.vid_index === vidIndex);
       if (!ep || ep.locked) return;
+      grantedLocalRef.current = null;
       prefetchRejectedRef.current = false;
       fallbackAttemptRef.current = null;
       reconnectAttemptRef.current = null;
@@ -1067,6 +1076,8 @@ function Player({ target, onNavigate, onSeriesSelected, onFloatingChange, active
 
   const changeOnlineQuality = (quality) => {
     if (!['auto', '720p', '1080p', 'compat'].includes(quality) || !supportsOnlineQuality) return;
+    onlineQualityVersion.current++;
+    grantedLocalRef.current = null;
     prefetchRejectedRef.current = false;
     const seekTo = currentPosition();
     const autoplay = loadedMediaRef.current ? !loadedMediaRef.current.element.paused : pendingAutoplayRef.current;
@@ -1077,6 +1088,28 @@ function Player({ target, onNavigate, onSeriesSelected, onFloatingChange, active
     reconnectAttemptRef.current = null;
     setCompatMap({});
     if (playbackRequested && current && !current.locked) startOnlinePlay(currentIndex, seekTo, true, autoplay);
+  };
+
+  const chooseLocalPlayback = async () => {
+    const seriesId = String(activeSeriesId), key = localMediaKey(seriesId, current);
+    if (mobile || !playbackError || seriesId !== selectedSeriesRef.current || currentIndex !== stateRef.current.currentIndex
+      || fallbackRef.current?.submitting || !canChooseLocal(current, seriesId)) return;
+    const version = mediaVersion.current, selection = selectionVersion.current, navigation = navigationVersion.current;
+    const qualityVersion = onlineQualityVersion.current;
+    const seekTo = currentPosition();
+    const autoplay = loadedMediaRef.current ? !loadedMediaRef.current.element.paused : pendingAutoplayRef.current;
+    const data = await loadDetail(seriesId);
+    if (!activeRef.current || navigation !== navigationVersion.current || version !== mediaVersion.current || selection !== selectionVersion.current
+      || qualityVersion !== onlineQualityVersion.current) return;
+    const latest = data?.episodes.find(ep => ep.vid_index === currentIndex && ep.vid === current?.vid);
+    if (String(data?.series_id) !== seriesId || !canChooseLocal(latest, seriesId) || localMediaKey(seriesId, latest) !== key) {
+      showToast('本地文件状态已变化，请重新选择');
+      return;
+    }
+    resumeLocal(latest, seekTo, autoplay);
+    // 用户只授权当前登记文件，不改变固定画质偏好，也不解除坏文件拒用。
+    grantedLocalRef.current = key;
+    showToast('已选择播放本集已有本地文件，在线播放清晰度设置不变');
   };
 
   // 找下一集（按集号顺序）
@@ -2032,6 +2065,7 @@ function Player({ target, onNavigate, onSeriesSelected, onFloatingChange, active
             {t(playbackError ? (
               <><Film size={34} /><p role="alert">{t(playbackError)}</p><div className="player-placeholder-actions">
                 <button className="btn btn-primary" onClick={() => retryPlayback()}>{t(current?.status === 'completed' ? '重试本集' : '重试本集（在线播放）')}</button>
+                {!mobile && String(detail?.series_id) === String(activeSeriesId) && !fallbackRef.current?.submitting && canChooseLocal(current, String(activeSeriesId)) && <button className="btn btn-outline" onClick={chooseLocalPlayback}>{t("播放已有本地文件")}</button>}
                 {current?.vid && <button className="btn btn-outline" onClick={() => startOnlinePlay(currentIndex, undefined, true)}>{t("重新连接片源")}</button>}
                 {!mobile && current?.vid && !current.locked && (decodeFailed || current?.status === 'completed') && !fallbackRef.current?.submitting && <button className="btn btn-outline" onClick={() => startCompatPlay(currentIndex, true)}>{t("转码后播放")}</button>}
               </div></>

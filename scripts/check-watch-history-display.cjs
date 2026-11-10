@@ -3,7 +3,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 const { transformSync } = require('esbuild');
-const { listHistory, acknowledge } = require('../src/native/watch-history');
+const { listHistory, recordPlayback, applyEpisodeUpdate, acknowledge } = require('../src/native/watch-history');
 
 const source = transformSync(fs.readFileSync(path.join(__dirname, '../src/components/WatchHistory.jsx'), 'utf8'), {
   loader: 'jsx',
@@ -138,6 +138,7 @@ const text = node => {
   return node.children?.map(text).join('') || '';
 };
 const button = (ui, label) => ui.find(node => node.type === 'button' && text(node) === label);
+const findIn = (node, predicate) => predicate(node) ? node : node?.children?.map(child => findIn(child, predicate)).find(Boolean);
 
 (async () => {
   let currentRows = historyRows();
@@ -189,11 +190,12 @@ const button = (ui, label) => ui.find(node => node.type === 'button' && text(nod
   assert.deepEqual(ui.checkedRequests, [], 'changing the view must not run update checks');
   assert.deepEqual(ui.removals, [], 'changing the view must not remove records');
 
-  // #97: unread groups rise together; their season order and progress filters remain intact.
+  // #131: watch time wins over scan time, update badges and season numbers.
   let priorityRows = [
     { series_id: '1000200', series_title: '最近无更新', updatedAt: 500, completed: false },
     { series_id: '1000211', series_title: '旧剧第一季', family: 'old', season: 1, updatedAt: 400, completed: false, unreadEpisodes: 1 },
-    { series_id: '1000213', series_title: '旧剧第三季', family: 'old', season: 3, updatedAt: 300, completed: true },
+    { series_id: '1000213', series_title: '旧剧第三季', family: 'old', season: 3, updatedAt: 300, completed: true,
+      sequels: [{ series_id: '1000214', series_title: '旧剧第四季' }], unreadSequelIds: ['1000214'] },
     { series_id: '1000220', series_title: '更旧的续作提醒', updatedAt: 200, completed: false,
       sequels: [{ series_id: '1000221', series_title: '未来续作' }], unreadSequelIds: ['1000221'] },
     { series_id: '1000230', series_title: '仅相似提示', updatedAt: 100, completed: false,
@@ -203,25 +205,70 @@ const button = (ui, label) => ui.find(node => node.type === 'button' && text(nod
   await priorityUi.flush();
   const priorityOrder = () => priorityUi.find(node => node.props.className === 'history-list').children
     .filter(node => node?.type === 'li').map(node => node.props.key);
-  assert.deepEqual(priorityOrder(), ['1000213', '1000211', '1000220', '1000200', '1000230'],
-    'episode and sequel updates rise as groups, never as detached child rows');
+  const priorityRow = id => priorityUi.find(node => node.type === 'li' && node.props.key === id);
+  assert.deepEqual(priorityOrder(), ['1000200', '1000211', '1000213', '1000220', '1000230'],
+    'all records follow recent watch time, including a recently rewatched lower season');
+  assert.ok(!priorityRow('1000211').props.className.includes('history-child'), 'the most recently watched visible member leads the group');
+  assert.ok(priorityRow('1000213').props.className.includes('history-child'));
+  assert.ok(text(priorityRow('1000211')).includes('旧剧第四季'), 'the chronological head inherits the higher season\'s sequel hints');
+  assert.ok(!text(priorityRow('1000213')).includes('旧剧第四季'), 'group hints are not duplicated on children');
+  assert.ok(findIn(priorityRow('1000211'), node => node?.props?.className === 'history-dot'), 'a rewatched low season retains its new-episode dot');
+  assert.ok(!findIn(priorityRow('1000213'), node => node?.props?.className === 'history-dot'), 'an external sequel dot moves to the chronological head');
+  assert.match(text(priorityUi.find(node => node.props.className === 'history-container')), /最近观看时间/);
+  assert.ok(!text(priorityUi.find(node => node.props.className === 'history-container')).includes('有更新的组优先显示'));
   priorityUi.find(node => node.type === 'input').props.onChange({ target: { checked: true } });
   await priorityUi.flush();
-  assert.deepEqual(priorityOrder(), ['1000220', '1000200', '1000213', '1000230'],
-    'a hidden child dot must not pin an unmarked visible group');
-  priorityUi.find(node => node.type === 'input').props.onChange({ target: { checked: false } });
+  assert.deepEqual(priorityOrder(), ['1000200', '1000213', '1000220', '1000230'],
+    'folding still shows the highest season, ordered by its own watch time');
+  assert.ok(text(priorityRow('1000213')).includes('旧剧第四季'), 'a folded head retains external sequel hints');
+  assert.ok(findIn(priorityRow('1000213'), node => node?.props?.className === 'history-dot'), 'folding keeps the external sequel dot visible');
+  button(priorityUi, '展开组').props.onClick();
   await priorityUi.flush();
+  assert.deepEqual(priorityOrder(), ['1000200', '1000211', '1000213', '1000220', '1000230'], 'expanding restores chronological order');
   button(priorityUi, '未看完 4').props.onClick();
   await priorityUi.flush();
-  assert.deepEqual(priorityOrder(), ['1000211', '1000220', '1000200', '1000230'],
-    'a progress-filtered child can lead its unread group');
+  assert.deepEqual(priorityOrder(), ['1000200', '1000211', '1000220', '1000230'], 'unfinished records keep chronological order');
+  assert.ok(text(priorityRow('1000211')).includes('旧剧第四季'), 'a filtered higher season still contributes group hints');
+  button(priorityUi, '已看完 1').props.onClick();
+  await priorityUi.flush();
+  assert.deepEqual(priorityOrder(), ['1000213']);
+  assert.ok(!priorityRow('1000213').props.className.includes('history-child'), 'completed filtering promotes its first visible group member');
   button(priorityUi, '全部 5').props.onClick();
+  await priorityUi.flush();
+  // Use the actual update reducer: scans may discover episodes but cannot become watches.
+  priorityRows = priorityRows.map(row => {
+    const series = { total: row.total };
+    const record = recordPlayback(null, series, row.vid_index, 12, row.updatedAt);
+    const scanned = applyEpisodeUpdate(record, series, { total: row.total + 1 }, 1_000_000);
+    assert.equal(scanned.updatedAt, record.updatedAt);
+    return { ...row, updatedAt: scanned.updatedAt, lastCheckedAt: scanned.lastCheckedAt, unreadEpisodes: scanned.unreadEpisodes };
+  }).reverse();
+  priorityUi.triggerUpdated();
+  await priorityUi.flush();
+  assert.deepEqual(priorityOrder(), ['1000200', '1000211', '1000213', '1000220', '1000230'],
+    'an update event with shuffled results and newer scan times must not reorder watching history');
   priorityRows = priorityRows.map(row => ({ ...row, unreadEpisodes: 0, unreadSequelIds: [] }));
   priorityUi.triggerUpdated();
   await priorityUi.flush();
-  assert.deepEqual(priorityOrder(), ['1000200', '1000213', '1000211', '1000220', '1000230'],
-    'cleared updates restore the original recent-watch group order');
+  assert.deepEqual(priorityOrder(), ['1000200', '1000211', '1000213', '1000220', '1000230'], 'clearing update markers also preserves watch order');
   assert.deepEqual(priorityUi.acknowledgements, [], 'sorting must never mark updates as read');
+  assert.deepEqual(priorityUi.removals, [], 'sorting and filtering must never remove history');
+
+  priorityRows = priorityRows.map(row => row.series_id === '1000213' ? { ...row, updatedAt: 600, unreadSequelIds: ['1000214'] } : row);
+  priorityUi.triggerUpdated();
+  await priorityUi.flush();
+  assert.deepEqual(priorityOrder(), ['1000213', '1000200', '1000211', '1000220', '1000230'], 'actually watching a newer season moves only that record to the top');
+  assert.ok(text(priorityRow('1000213')).includes('旧剧第四季'), 'new-season watching transfers group hints to its new chronological head');
+  assert.ok(!text(priorityRow('1000211')).includes('旧剧第四季'));
+
+  priorityRows = priorityRows.map(row => row.series_id === '1000211' ? { ...row, updatedAt: 700 } : row);
+  priorityUi.triggerUpdated();
+  await priorityUi.flush();
+  await findIn(priorityRow('1000211'), node => node?.props?.className === 'history-resume').props.onClick();
+  await priorityUi.flush();
+  assert.deepEqual(priorityUi.acknowledgements, ['1000213', '1000211'], 'continuing a lower chronological head acknowledges the sequel hints it displays');
+  assert.equal(priorityUi.acknowledgedSnapshots.find(item => item.id === '1000213').snapshot.total, 0,
+    'continuing the lower head does not acknowledge another season\'s episode updates');
 
   const preferencesKey = 'hongguo:watch-history-preferences';
   const storage = new Map();
@@ -291,7 +338,6 @@ const button = (ui, label) => ui.find(node => node.type === 'button' && text(nod
   const groupedUi = mount(() => groupRows, groupStorage);
   await groupedUi.flush();
   const groupHead = groupedUi.find(node => node.type === 'li' && text(node).includes('手动剧3'));
-  const findIn = (node, predicate) => predicate(node) ? node : node?.children?.map(child => findIn(child, predicate)).find(Boolean);
   assert.ok(findIn(groupHead, node => node?.props?.className === 'history-time' && text(node).includes('已看完')), 'completion belongs beside the recent-watch time');
   assert.ok(!findIn(groupHead, node => node?.props?.className === 'history-name' && text(node).includes('已看完')));
   findIn(groupHead, node => node?.type === 'button' && text(node) === '独立显示').props.onClick();
@@ -324,8 +370,8 @@ const button = (ui, label) => ui.find(node => node.type === 'button' && text(nod
     { series_id: '1000112', series_title: '春日回声第二季', total: 10 },
   ];
   const originPlayback = {
-    '1000111': { watched: true, vid_index: 10, currentTime: 1, updatedAt: 100, knownTotal: 11, acknowledgedTotal: 10, unreadEpisodes: 1, sequels: [originSequel, laterSequel] },
-    '1000112': { watched: true, vid_index: 1, currentTime: 1, updatedAt: 99, knownTotal: 10, acknowledgedTotal: 10 },
+    '1000111': { watched: true, vid_index: 10, currentTime: 1, updatedAt: 99, knownTotal: 11, acknowledgedTotal: 10, unreadEpisodes: 1, sequels: [originSequel, laterSequel] },
+    '1000112': { watched: true, vid_index: 1, currentTime: 1, updatedAt: 100, knownTotal: 10, acknowledgedTotal: 10 },
   };
   const originUi = mount(() => listHistory(originSeries, originPlayback));
   await originUi.flush();
@@ -360,7 +406,7 @@ const button = (ui, label) => ui.find(node => node.type === 'button' && text(nod
   const externalSequel = { series_id: '1000104', series_title: '春风来信第四季' };
   const fuzzy = { series_id: '1000105', series_title: '春风来信二' };
   const groupedPlayback = Object.fromEntries(groupedSeries.map((item, index) => [item.series_id, {
-    watched: true, vid_index: 1, currentTime: 1, updatedAt: 100 - index,
+    watched: true, vid_index: 1, currentTime: 1, updatedAt: 100 + index,
     completedEpisode: 1, knownTotal: 1, acknowledgedTotal: 1,
     sequels: [...groupedSeries.slice(index + 1), externalSequel],
     seenSequelIds: [externalSequel.series_id], similarSeries: [fuzzy],
@@ -536,7 +582,7 @@ const button = (ui, label) => ui.find(node => node.type === 'button' && text(nod
   assert.ok(!reloadFailedUi.find(node => node.props['aria-label'] === '移除观看记录《春日来信第二季》'),
     'a reload error must not resurrect the removed row');
 
-  console.log('PASS watch history display: #97 group hints/dots, filtered heads, acknowledgement and failure safety; low-season hiding, filters, preferences, removal and stale loads');
+  console.log('PASS watch history display: #131 chronological order, scans and lower-season rewatch; #97 group hints/dots, filtered heads, acknowledgement and failure safety; low-season hiding, filters, preferences, removal and stale loads');
 })().catch(error => {
   console.error(error);
   process.exitCode = 1;

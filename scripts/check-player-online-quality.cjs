@@ -2,12 +2,36 @@
 const assert = require('node:assert/strict');
 const fs = require('node:fs'), path = require('node:path'), vm = require('node:vm');
 const { mount } = require('./check-player-resume.cjs');
+const localFiles = require('../src/native/media-access').createMediaAccess();
 const poll = async ui => { await [...ui.timers.values()].find(t => t.delay === 2000).fn(); await ui.flush(); };
 const select = ui => ui.find(n => n.type === 'select' && n.props['aria-label'] === '在线播放清晰度');
 const alert = ui => ui.find(n => n.props.role === 'alert');
 const text = n => typeof n === 'string' ? n : n?.children?.map(text).join('') || '';
+function localChoiceFixture({ waited = false, actualQuality = '720p', prepare } = {}) {
+  let finished, refresh;
+  const downloads = [], storage = new Map([['hongguo:online-quality', '1080p']]);
+  const episode = { vid: 'v1', vid_index: 1, locked: false, taskId: 't1', fileSize: 200000,
+    status: waited ? 'pending' : 'completed', fileUrl: localFiles.localUrl('/mock/downloaded-1.mp4'), actualQuality };
+  const detail = sid => ({ success: true, data: { series_id: sid, episodes: [
+    { ...episode }, { vid: 'v2', vid_index: 2, status: 'missing' },
+  ] } });
+  const ui = mount({ storage, settings: { cache_next_episode: false },
+    props: { target: { seriesId: 'A', vidIndex: 1, ts: 1 } },
+    prepare: prepare || (async () => ({ success: false, error: '取源失败' })),
+    apiOverrides: {
+      getSeriesEpisodes: sid => refresh ? refresh(sid) : Promise.resolve(detail(sid)),
+      onDownloadCompleted: fn => { finished = fn; return () => {}; },
+      downloadSingleEpisode: async (...args) => { downloads.push(args); return { success: false, error: '不得重复下载完整文件' }; },
+    } });
+  return { ui, episode, downloads, storage, detail,
+    refreshWith: fn => { refresh = fn; },
+    finish: async () => { episode.status = 'completed'; finished?.({ id: 't1' }); await poll(ui); } };
+}
 let failures = 0;
-async function check(name, fn) { try { await fn(); console.log('PASS ' + name); } catch (e) { failures++; console.error('FAIL ' + name + ': ' + e.message); } }
+async function check(name, fn) {
+  if (process.argv[2] && process.argv[2] !== 'main' && !name.includes(process.argv[2])) return;
+  try { await fn(); console.log('PASS ' + name); } catch (e) { failures++; console.error('FAIL ' + name + ': ' + e.message); }
+}
 (async () => {
 if (process.argv[2] !== 'main') {
   await check('old computer choice persists and prefetch uses compatible source selection', async () => {
@@ -223,6 +247,196 @@ if (process.argv[2] !== 'main') {
     assert(ui.button('取消等待'), 'scheduled retry must retain playback intent');
     retryAt=null; error='当前片源没有 1080P，未自动降级'; failed?.({id:'t1'}); await poll(ui);
     assert.equal(ui.button('取消等待'),undefined); assert.match(text(alert(ui)),/当前片源没有 1080P/); ui.unmount();
+  });
+  for (const waited of [false, true]) for (const actualQuality of ['720p', '']) {
+    await check(`local choice requires consent for ${waited ? 'waited' : 'existing'} ${actualQuality || 'unknown'} file`, async () => {
+      const f = localChoiceFixture({ waited, actualQuality }), { ui } = f;
+      try {
+        await ui.flush();
+        assert.equal(ui.prepares[0].quality, '1080p', 'normal fixed quality still tries online first');
+        if (waited) { assert(ui.button('取消等待')); await f.finish(); }
+        assert(alert(ui));
+        assert.match(text(alert(ui)), actualQuality ? /720P.*1080P/ : /尚未确认.*1080P/);
+        assert.notEqual(ui.find(n => n.type === 'video')?.props.src, f.episode.fileUrl, 'never downgrade automatically');
+        assert.equal(f.downloads.length, 0, 'existing or pending tasks must not be resubmitted');
+        const choose = ui.button('播放已有本地文件');
+        assert(choose, 'offer explicit local playback after fixed-quality failure');
+        await choose.props.onClick(); await ui.flush(); ui.metadata();
+        assert.equal(ui.find(n => n.type === 'video')?.props.src, f.episode.fileUrl);
+        assert.equal(alert(ui), undefined);
+        assert.equal(select(ui).props.value, '1080p');
+        assert.equal(f.storage.get('hongguo:online-quality'), '1080p');
+        assert.equal(f.downloads.length, 0);
+        assert.equal(ui.prepares.length, 1, 'choosing local must not reconnect online');
+      } finally { ui.unmount(); }
+    });
+  }
+  await check('local choice restores paused position after an online runtime failure', async () => {
+    let attempts = 0;
+    const f = localChoiceFixture({ prepare: async () => ++attempts === 1
+      ? { success: true, url: 'hongguo-stream://first' } : { success: false, error: '取源失败' } });
+    const { ui } = f;
+    try {
+      await ui.flush(); ui.metadata(); ui.media.currentTime = 27; ui.media.pause();
+      ui.error(2); await ui.flush();
+      assert(ui.button('播放已有本地文件'));
+      await ui.button('播放已有本地文件').props.onClick(); await ui.flush(); ui.metadata();
+      assert.equal(ui.media.currentTime, 27); assert.equal(ui.media.paused, true);
+      assert.equal(f.downloads.length, 0);
+    } finally { ui.unmount(); }
+  });
+  await check('local choice revalidates episode, registration and complete file before granting playback', async () => {
+    for (const change of [
+      { locked: true }, { status: 'downloading' }, { status: 'missing' }, { fileUrl: '' },
+      { fileUrl: 'https://media.example/other.mp4' }, { fileUrl: localFiles.localUrl('/mock/replacement.mp4') },
+      { vid: 'other' }, { vid_index: 2 }, { taskId: 'other' }, { fileSize: 300000 },
+    ]) {
+      const f = localChoiceFixture(), { ui } = f;
+      try {
+        await ui.flush(); const choose = ui.button('播放已有本地文件'); assert(choose);
+        Object.assign(f.episode, change);
+        await choose.props.onClick(); await ui.flush();
+        assert(alert(ui), JSON.stringify(change));
+        assert.match(ui.text(), /本地文件状态已变化/);
+        assert(!ui.find(n => n.props.available === true), 'changed or incomplete file must not be played');
+        assert.equal(f.downloads.length, 0);
+      } finally { ui.unmount(); }
+    }
+    const f = localChoiceFixture();
+    try {
+      await f.ui.flush();
+      f.refreshWith(async () => f.detail('other-series'));
+      await f.ui.button('播放已有本地文件').props.onClick(); await f.ui.flush();
+      assert(alert(f.ui)); assert(!f.ui.find(n => n.props.available === true));
+    } finally { f.ui.unmount(); }
+  });
+  await check('local choice is hidden for locked, incomplete and non-file registrations', async () => {
+    for (const change of [{ locked: true }, { status: 'pending' }, { fileUrl: '' },
+      { fileUrl: 'hongguo-stream://unregistered' }, { fileUrl: 'file:///unregistered.mp4' }]) {
+      const f = localChoiceFixture(); Object.assign(f.episode, change);
+      try { await f.ui.flush(); assert.equal(f.ui.button('播放已有本地文件'), undefined, JSON.stringify(change)); }
+      finally { f.ui.unmount(); }
+    }
+  });
+  await check('late local choice cannot override an episode, series, quality or navigation change', async () => {
+    for (const action of ['episode', 'series', 'quality', 'hide']) {
+      const f = localChoiceFixture(), { ui } = f;
+      try {
+        await ui.flush(); let finish;
+        f.refreshWith(() => new Promise(resolve => { finish = resolve; }));
+        const choosing = ui.button('播放已有本地文件').props.onClick();
+        const complete = finish;
+        f.refreshWith(async sid => f.detail(sid));
+        if (action === 'episode') ui.episode(2);
+        if (action === 'series') { ui.props.target = { seriesId: 'B', vidIndex: 1, ts: 2 }; ui.render(); }
+        if (action === 'quality') select(ui).props.onChange({ target: { value: '720p' } });
+        if (action === 'hide') { ui.props.active = false; ui.render(); }
+        await ui.flush(); const prepares = ui.prepares.length;
+        complete(f.detail('A')); await choosing; await ui.flush();
+        assert.equal(ui.prepares.length, prepares);
+        assert(!ui.text().includes('已选择播放本集已有本地文件'), action);
+        if (action === 'quality') assert.equal(select(ui).props.value, '720p');
+        else assert(!ui.find(n => n.props.available === true), action);
+      } finally { ui.unmount(); }
+    }
+  });
+  await check('local choice grant expires on quality, episode and series changes', async () => {
+    for (const action of ['quality', 'episode', 'series']) {
+      const f = localChoiceFixture(), { ui } = f;
+      try {
+        await ui.flush(); await ui.button('播放已有本地文件').props.onClick(); await ui.flush(); ui.metadata();
+        assert(ui.find(n => n.props.available === true));
+        const before = ui.prepares.length;
+        if (action === 'quality') {
+          select(ui).props.onChange({ target: { value: '720p' } }); await ui.flush();
+          select(ui).props.onChange({ target: { value: '1080p' } });
+        }
+        if (action === 'episode') { ui.episode(2); await ui.flush(); ui.episode(1); }
+        if (action === 'series') {
+          ui.props.target = { seriesId: 'B', vidIndex: 1, ts: 2 }; ui.render(); await ui.flush();
+          ui.props.target = { seriesId: 'A', vidIndex: 1, ts: 3 }; ui.render();
+        }
+        await ui.flush(); assert(ui.prepares.length > before, action);
+        assert.equal(ui.prepares.at(-1).quality, '1080p'); assert(alert(ui));
+        assert(!ui.find(n => n.props.available === true));
+        assert(!f.downloads.some(args => args[1] === 1), 'never redownload the completed episode');
+      } finally { ui.unmount(); }
+    }
+  });
+  await check('local choice grant expires on file changes, stopping and quality changes while locked', async () => {
+    for (const action of ['file', 'stop', 'locked-quality']) {
+      const f = localChoiceFixture(), { ui } = f;
+      try {
+        await ui.flush(); await ui.button('播放已有本地文件').props.onClick(); await ui.flush(); ui.metadata();
+        if (action === 'file') { f.episode.fileUrl = localFiles.localUrl('/mock/replacement.mp4'); await f.finish(); }
+        else if (action === 'locked-quality') {
+          f.episode.locked = true; await f.finish();
+          select(ui).props.onChange({ target: { value: '1080p' } }); await ui.flush();
+          f.episode.locked = false; await f.finish();
+        } else {
+          ui.find(n => n.type === 'video').props.onWaiting(); await ui.flush();
+          ui.button('取消播放').props.onClick(); await ui.flush();
+          await ui.button('重试本集').props.onClick(); await ui.flush();
+        }
+        assert(!ui.find(n => n.props.available === true), action);
+        assert.equal(f.downloads.length, 0);
+        assert.equal(select(ui).props.value, '1080p');
+      } finally { ui.unmount(); }
+    }
+  });
+  await check('local choice never reopens a rejected file or requeues it automatically', async () => {
+    const f = localChoiceFixture(), { ui } = f;
+    try {
+      await ui.flush(); await ui.button('播放已有本地文件').props.onClick(); await ui.flush(); ui.metadata();
+      ui.error(2); await ui.flush(); await poll(ui);
+      assert(alert(ui)); assert.equal(ui.button('播放已有本地文件'), undefined);
+      const prepares = ui.prepares.length;
+      await poll(ui); await poll(ui);
+      assert.equal(ui.prepares.length, prepares); assert.equal(f.downloads.length, 0);
+    } finally { ui.unmount(); }
+  });
+  for (const qualities of [['720p'], ['720p', '1080p']]) {
+    await check(`local choice intent is revoked while locked (${qualities.join(' then ')})`, async () => {
+      const f = localChoiceFixture({ actualQuality: '' }), { ui } = f;
+      try {
+        await ui.flush(); const stale = f.detail('A'); let complete;
+        f.refreshWith(() => new Promise(resolve => { complete = resolve; }));
+        const choosing = ui.button('播放已有本地文件').props.onClick();
+        f.refreshWith(async sid => f.detail(sid));
+        f.episode.locked = true; await f.finish();
+        assert.equal(ui.button('播放已有本地文件'), undefined, 'concurrent refresh must observe the lock');
+        const before = ui.prepares.length;
+        for (const quality of qualities) { select(ui).props.onChange({ target: { value: quality } }); await ui.flush(); }
+        assert.equal(ui.prepares.length, before, 'locked quality changes must not start online playback');
+        complete(stale); await choosing; await ui.flush();
+        assert.equal(select(ui).props.value, qualities.at(-1));
+        assert.equal(ui.prepares.length, before); assert.equal(f.downloads.length, 0);
+        assert(!ui.find(n => n.props.available === true), 'revoked pending consent must not grant playback');
+        assert.notEqual(ui.find(n => n.type === 'video')?.props.src, f.episode.fileUrl);
+        assert(!ui.text().includes('已选择播放本集已有本地文件'), 'revoked consent must not show success');
+      } finally { ui.unmount(); }
+    });
+  }
+  await check('local choice intent still accepts an unchanged selection', async () => {
+    const f = localChoiceFixture({ actualQuality: '' }), { ui } = f;
+    try {
+      await ui.flush(); const snapshot = f.detail('A'); let complete;
+      f.refreshWith(() => new Promise(resolve => { complete = resolve; }));
+      const choosing = ui.button('播放已有本地文件').props.onClick();
+      complete(snapshot); await choosing; await ui.flush();
+      assert(ui.find(n => n.props.available === true));
+      assert.equal(ui.find(n => n.type === 'video')?.props.src, f.episode.fileUrl);
+      assert(ui.text().includes('已选择播放本集已有本地文件'));
+      assert.equal(select(ui).props.value, '1080p');
+      assert.equal(f.downloads.length, 0); assert.equal(ui.prepares.length, 1);
+    } finally { ui.unmount(); }
+  });
+  await check('local choice messages use the existing English translator', async () => {
+    const english = require('../src/i18n/translator.mjs').createTranslator(
+      require('../src/i18n/en.json'), require('../src/i18n/templates.json'));
+    for (const message of ['播放已有本地文件', '本地文件状态已变化，请重新选择', '已选择播放本集已有本地文件，在线播放清晰度设置不变']) {
+      assert.doesNotMatch(english(message), /[\u4e00-\u9fff]/);
+    }
   });
   await check('online selection preserves time through prefetch, reconnect, transcode and episode switch', async()=>{
     const ui=mount({local:true}); await ui.flush(); ui.metadata(); ui.media.currentTime=24;
