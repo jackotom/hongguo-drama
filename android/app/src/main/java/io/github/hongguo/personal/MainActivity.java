@@ -55,9 +55,21 @@ public class MainActivity extends Activity {
     private final ExecutorService workers = Executors.newFixedThreadPool(3);
     private final ConcurrentHashMap<Integer, HttpURLConnection> connections = new ConcurrentHashMap<>();
     private final Map<Integer, AtomicBoolean> requests = new ConcurrentHashMap<>();
+    private final Map<Integer, NetworkTrace> networkTraces = new ConcurrentHashMap<>();
     private final Map<String, File> media = new ConcurrentHashMap<>();
     private final SecureRandom random = new SecureRandom();
     private volatile boolean closed;
+
+    // Only local counters, durations and fixed stages enter diagnostic logs.
+    private static final class NetworkTrace {
+        final int id;
+        final long queuedAt = android.os.SystemClock.elapsedRealtime();
+        volatile String phase = "queued";
+        NetworkTrace(int id) { this.id = id; }
+        void log(String event, long millis) {
+            android.util.Log.i("HongguoNetwork", "HG:net:" + id + ":" + event + ":" + Math.max(0,millis));
+        }
+    }
 
     @SuppressLint({"SetJavaScriptEnabled", "AddJavascriptInterface"})
     @Override public void onCreate(Bundle state) {
@@ -119,6 +131,15 @@ public class MainActivity extends Activity {
         fullscreenCallback = null;
     }
     @Override public boolean dispatchKeyEvent(KeyEvent event) {
+        // WebView consumes fullscreen Back before Activity.onBackPressed.
+        if (fullscreen != null && !getPackageName().equals("io.github.hongguo.tv") && event.getKeyCode() == KeyEvent.KEYCODE_BACK) {
+            android.view.WindowInsets insets = getWindow().getDecorView().getRootWindowInsets();
+            boolean keyboard = android.os.Build.VERSION.SDK_INT >= 30 && insets != null && insets.isVisible(android.view.WindowInsets.Type.ime());
+            if (!keyboard) {
+                if (event.getAction() == KeyEvent.ACTION_UP && !event.isCanceled()) onBackPressed();
+                return true;
+            }
+        }
         if (getPackageName().equals("io.github.hongguo.tv")) {
             String key;
             switch (event.getKeyCode()) {
@@ -136,8 +157,11 @@ public class MainActivity extends Activity {
     }
     @Override public void onBackPressed() {
         if (loginPanel != null) { closeLogin(); return; }
-        if (fullscreen != null) { leaveFullscreen(); return; }
-        web.evaluateJavascript("window.appBack ? window.appBack() : false", result -> { if (!"true".equals(result)) finish(); });
+        if (fullscreen != null && getPackageName().equals("io.github.hongguo.tv")) { leaveFullscreen(); return; }
+        web.evaluateJavascript("window.appBack ? window.appBack() : false", result -> {
+            if ("true".equals(result)) return;
+            if (fullscreen != null) leaveFullscreen(); else finish();
+        });
     }
     @Override protected void onPause() {
         if (!isInPictureInPictureMode()) {
@@ -383,7 +407,12 @@ public class MainActivity extends Activity {
             try (GZIPOutputStream gzip = new GZIPOutputStream(out)) { gzip.write(Base64.decode(data,Base64.DEFAULT)); }
             return Base64.encodeToString(out.toByteArray(),Base64.NO_WRAP);
         }
-        @JavascriptInterface public void cancel(int id) { AtomicBoolean flag = requests.get(id); if (flag != null) flag.set(true); HttpURLConnection c = connections.remove(id); if (c != null) c.disconnect(); }
+        @JavascriptInterface public void cancel(int id) {
+            AtomicBoolean flag = requests.get(id); if (flag != null) flag.set(true);
+            NetworkTrace trace = networkTraces.get(id);
+            if (trace != null) trace.log("cancel_" + trace.phase, android.os.SystemClock.elapsedRealtime() - trace.queuedAt);
+            HttpURLConnection c = connections.remove(id); if (c != null) c.disconnect();
+        }
         @JavascriptInterface public String writeMedia(String data) throws IOException { return store(Base64.decode(data,Base64.DEFAULT),null); }
         @JavascriptInterface public String decryptSamples(String raw,String rawKey,String rawJobs) throws Exception {
             if (raw.length() > (MEDIA_LIMIT + 2L) / 3 * 4 || rawJobs.length() > 16*1024*1024) throw new IOException("视频处理数据过大");
@@ -462,9 +491,14 @@ public class MainActivity extends Activity {
         @JavascriptInterface public void request(int id, String raw) {
             if (closed || raw.length() > 2 * 1024 * 1024) return;
             final AtomicBoolean flag = new AtomicBoolean(false);
+            final NetworkTrace trace = new NetworkTrace(id);
+            networkTraces.put(id,trace); trace.log("queued",0);
             requests.put(id,flag);
             workers.execute(() -> {
                 HttpURLConnection c = null;
+                boolean mediaRedirectRejected = false;
+                final long startedAt = android.os.SystemClock.elapsedRealtime();
+                trace.phase = "starting"; trace.log("start_queue_ms",startedAt - trace.queuedAt);
                 try {
                     if (flag.get()) return;
                     JSONObject options = new JSONObject(raw);
@@ -476,6 +510,8 @@ public class MainActivity extends Activity {
                     int timeout = Math.max(500, Math.min(isMedia ? 30000 : 15000, options.optInt("timeout",15000)));
                     for (int hops = 0; hops < 4; hops++) {
                         if (flag.get() || closed) return;
+                        final long headersStartedAt = android.os.SystemClock.elapsedRealtime();
+                        trace.phase = "connecting"; trace.log("connect",headersStartedAt - startedAt);
                         c = open(url,timeout); c.setRequestMethod(method); connections.put(id,c);
                         if (flag.get()) return;
                         JSONObject headers = options.optJSONObject("headers");
@@ -486,10 +522,29 @@ public class MainActivity extends Activity {
                         }
                         if (method.equals("POST")) { c.setDoOutput(true); byte[] body = Base64.decode(options.optString("body",""),Base64.DEFAULT); if (body.length > 1024*1024) throw new IOException(); try(OutputStream out = c.getOutputStream()) { out.write(body); } }
                         int status = c.getResponseCode();
+                        trace.phase = "headers"; trace.log("http_" + status + "_headers_ms",android.os.SystemClock.elapsedRealtime() - headersStartedAt);
                         if (isMedia) android.util.Log.i("HongguoPlayback", "media:" + url.getHost() + ":" + status);
                         if (status >= 300 && status <= 399 && isMedia) {
                             if (!method.equals("GET")) throw new IOException("片源跳转不受支持");
-                            url = checked(new URL(url,c.getHeaderField("Location")).toString(),false); c.disconnect(); continue;
+                            String location = c.getHeaderField("Location");
+                            URL redirected = null;
+                            try {
+                                redirected = new URL(url,location);
+                                String scheme = "https".equalsIgnoreCase(redirected.getProtocol()) ? "https" : "http".equalsIgnoreCase(redirected.getProtocol()) ? "http" : "other";
+                                boolean sameHost = url.getHost().equalsIgnoreCase(redirected.getHost());
+                                trace.log("redirect_" + scheme + "_sameHost_" + sameHost,hops + 1);
+                                url = checked(redirected.toString(),false);
+                            } catch (Exception redirectError) {
+                                mediaRedirectRejected = true;
+                                String reason = location == null || location.isEmpty() ? "missing_location" : redirected == null ? "invalid_location"
+                                    : !"https".equalsIgnoreCase(redirected.getProtocol()) ? "scheme"
+                                    : redirected.getUserInfo() != null ? "userinfo"
+                                    : redirected.getPort() != -1 && redirected.getPort() != 443 ? "port"
+                                    : redirectError instanceof java.net.URISyntaxException ? "invalid_uri" : "host";
+                                trace.log("redirect_rejected_" + reason,hops + 1);
+                                throw redirectError;
+                            }
+                            c.disconnect(); continue;
                         }
                         JSONObject result = new JSONObject(); result.put("status",status);
                         JSONObject responseHeaders = new JSONObject();
@@ -498,6 +553,8 @@ public class MainActivity extends Activity {
                             if (entry.getKey() != null && entry.getKey().equalsIgnoreCase("Set-Cookie")) responseHeaders.put("set-cookie",new JSONArray(entry.getValue()));
                         }
                         result.put("headers",responseHeaders);
+                        final long bodyStartedAt = android.os.SystemClock.elapsedRealtime();
+                        trace.phase = "reading";
                         if (isMedia) {
                             if (status != 200) {
                                 reply(id,new JSONObject().put("error","视频下载失败（HTTP " + status + "）").put("code","HTTP_" + status));
@@ -512,19 +569,26 @@ public class MainActivity extends Activity {
                         } else {
                             result.put("data", status >= 200 && status < 300 ? new String(read(c,8*1024*1024),StandardCharsets.UTF_8) : "");
                         }
+                        trace.log("body_ms",android.os.SystemClock.elapsedRealtime() - bodyStartedAt);
+                        trace.phase = "delivering";
                         if (!flag.get()) reply(id,result);
                         return;
                     }
                     throw new IOException("片源跳转次数过多");
                 } catch (Exception error) {
+                    trace.log("error_" + trace.phase + "_" + error.getClass().getSimpleName(),android.os.SystemClock.elapsedRealtime() - startedAt);
                     android.util.Log.w("HongguoNetwork", error.getClass().getSimpleName());
                     if (!flag.get() && !closed) try {
                         boolean timed = error instanceof java.net.SocketTimeoutException;
                         String category = error instanceof java.net.UnknownHostException ? "DNS" : error instanceof javax.net.ssl.SSLException ? "TLS" : error instanceof java.net.ConnectException ? "CONNECT" : error instanceof SecurityException ? "PERMISSION" : "NETWORK";
                         String message = error instanceof IOException && error.getMessage() != null && (error.getMessage().startsWith("视频") || error.getMessage().startsWith("文件") || error.getMessage().startsWith("片源")) ? error.getMessage() : timed ? "网络超时，请重试" : "网络请求失败（" + category + "），请检查网络后重试";
-                        reply(id,new JSONObject().put("error",message).put("code",timed ? "ETIMEDOUT" : "ERR_NETWORK"));
+                        reply(id,new JSONObject().put("error",message).put("code",mediaRedirectRejected && getPackageName().equals("io.github.hongguo.personal") ? "MEDIA_REDIRECT_REJECTED" : timed ? "ETIMEDOUT" : "ERR_NETWORK"));
                     } catch (Exception ignored) { }
-                } finally { if (c != null) c.disconnect(); connections.remove(id); requests.remove(id); }
+                } finally {
+                    trace.log(flag.get() ? "cancelled_total_ms" : "done_total_ms",android.os.SystemClock.elapsedRealtime() - trace.queuedAt);
+                    networkTraces.remove(id);
+                    if (c != null) c.disconnect(); connections.remove(id); requests.remove(id);
+                }
             });
         }
     }

@@ -1,0 +1,152 @@
+/* Only the Android entry imports this sheet; shared desktop rules stay intact. */
+html, body, #root { height: 100%; overflow: hidden; }
+body { font-size: 15px; -webkit-tap-highlight-color: transparent; }
+.platform-android .player-video { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+.platform-android { height: 100dvh; padding-top: env(safe-area-inset-top); }
+.platform-android .sidebar, .platform-android .compact-navigation { display: none !important; }
+.platform-android .window-toolbar { min-height: 52px; padding: 0 16px; }
+.platform-android .toolbar-location { display: block !important; font-size: 17px; font-weight: 600; }
+.platform-android .toolbar-caption, .platform-android .pin-toggle, .platform-android .layout-toggle,
+.platform-android .borderless-toggle, .platform-android .player-actions-toggle, .platform-android .toolbar-page-picker { display: none; }
+.platform-android .main-content { padding: 20px 14px 28px; overscroll-behavior: contain; min-height: 0; }
+.platform-android.layout-portrait .main-content[data-page="player"] { overflow-y: auto; padding: 10px 12px 20px; }
+.platform-android .btn, .platform-android .btn-sm, .platform-android .icon-btn,
+.platform-android .btn-chip, .platform-android .ep-chip { min-height: 44px; }
+.platform-android input, .platform-android select, .platform-android textarea { font-size: 16px; }
+.platform-android .input-field { min-height: 44px; }
+.platform-android .browse-grid, .platform-android .poster-skeletons { grid-template-columns: repeat(auto-fill,minmax(min(calc(108px * var(--poster-scale)),100%),1fr)); gap: 20px 10px; }
+.platform-android .browse-card-title { font-size: 14px; }
+.platform-android .browse-header { gap: 14px; margin-bottom: 18px; }
+.platform-android .browse-header-right { flex-wrap: wrap; }
+.platform-android .browse-header-right .source-control { flex: 1; min-width: 110px; max-width: 160px; }
+.platform-android .browse-header-right .source-control select { width: 100%; min-width: 0; }
+.mobile-browse-filters { margin: 0 0 18px; color: var(--text-secondary); }
+.mobile-browse-filters > summary { min-height: 44px; padding: 10px 0; cursor: pointer; font-size: 14px; }
+.mobile-browse-filters[open] > summary { margin-bottom: 12px; }
+.platform-android .browse-cats { flex-wrap: nowrap; overflow-x: auto; overflow-y: hidden; scrollbar-width: none; gap: 20px; margin-bottom: 12px; }
+.platform-android .browse-cats::-webkit-scrollbar { display: none; }
+.platform-android .browse-cat { white-space: nowrap; min-height: 44px; }
+.platform-android .browse-genres { max-height: 36dvh; overflow-y: auto; }
+.platform-android .genre-chip { min-height: 44px; }
+.platform-android .browse-drawer-mask { padding: 0; align-items: flex-end; }
+.platform-android .browse-drawer { width: 100%; max-width: 100%; max-height: 93dvh; border-radius: 18px 18px 0 0; }
+.platform-android .browse-drawer-head, .platform-android .browse-drawer-body, .platform-android .browse-drawer-foot { padding: 16px; }
+.platform-android .browse-drawer-foot { padding-bottom: max(16px,env(safe-area-inset-bottom)); }
+.platform-android .browse-detail-cover { width: 112px; }
+.mobile-drama-description { margin-block: 16px; font-size: 14px; color: var(--text-secondary); }
+.mobile-drama-description summary { min-height: 44px; padding-block: 10px; }
+.mobile-drama-description p { max-height: 28dvh; overflow-y: auto; line-height: 1.8; }
+.mobile-navigation { display: grid; grid-template-columns: repeat(5,1fr); flex-shrink: 0; border-top: 1px solid var(--border); background: var(--bg-elevated); padding: 5px 4px max(6px,env(safe-area-inset-bottom)); }
+.mobile-navigation button { min-width: 0; min-height: 54px; border: 0; background: transparent; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; font-size: 12px; color: var(--text-secondary); }
+.mobile-navigation button[aria-current="page"], .mobile-navigation button[aria-expanded="true"] { color: var(--accent-text); font-weight: 600; }
+.mobile-more-mask { position: fixed; inset: 0; z-index: 150; background: var(--scrim); display: flex; align-items: flex-end; }
+.mobile-more { width: 100%; background: var(--bg-elevated); border-radius: 18px 18px 0 0; padding: 24px 20px max(24px,env(safe-area-inset-bottom)); }
+.mobile-more h2 { font-size: 21px; margin-bottom: 18px; }
+.mobile-more > button { display: flex; align-items: center; gap: 14px; width: 100%; min-height: 52px; border: 0; border-bottom: 1px solid var(--border-muted); background: transparent; text-align: left; }
+.platform-android .player-container { height: auto; min-height: 100%; display: flex; flex-direction: column; }
+.platform-android .player-series-row { order: 0; margin: 0 0 10px; }
+.platform-android .player-series-name { font-size: 16px; line-height: 1.45; font-weight: 600; }
+.platform-android .player-stat { font-size: 12px; }
+.platform-android .player-viewing-layout { order: 1; }
+.platform-android .player-header { order: 3; margin-block: 16px 8px; }
+.platform-android .player-online-quality-row { order: 4; justify-content: flex-start; }
+.platform-android .player-management { order: 5; }
+.platform-android .player-footer { order: 6; }
+.platform-android .series-picker { order: 2; }
+.platform-android .player-viewing-layout { display: flex; flex-direction: column; min-height: 0; flex: none; }
+.platform-android.layout-portrait .player-stage:not(:fullscreen) { width: 100%; height: min(calc(100dvh - 216px),calc((100vw - 24px) * 16 / 9)); min-height: 240px; max-height: none; margin: 0; border-radius: 12px; }
+.platform-android .player-floating-slot, .platform-android .player-floating-host { min-height: 0; flex: none; }
+.platform-android .player-episode-panel { height: auto; max-height: 60dvh; overflow-y: auto; flex: none; position: fixed; inset: auto 0 0; width: 100%; z-index: 101; padding: 18px 16px max(24px,env(safe-area-inset-bottom)); border-radius: 18px 18px 0 0; background: var(--bg-elevated); }
+.mobile-episode-scrim { position: fixed; inset: 0; z-index: 100; border: 0; background: var(--scrim); }
+.mobile-episode-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+.mobile-episode-head h3 { font-size: 19px; }
+.platform-android .episodes-collapsed .player-episode-panel { display: none; }
+.platform-android .player-controls-volume { display: none; }
+.platform-android .player-header, .platform-android .player-series-row, .platform-android .player-header-right, .platform-android .player-management-actions { flex-wrap: wrap; gap: 8px; }
+.platform-android .player-management { margin-top: 20px; }
+.platform-android .player-series-actions { flex-wrap: wrap; }
+.platform-android .player-stage:fullscreen { height: 100dvh; }
+.platform-android .search-result-grid { grid-template-columns: repeat(2,minmax(0,1fr)); }
+.platform-android .history-card { min-width: 0; }
+.platform-android .settings-card { padding: 18px 14px; }
+.platform-android .settings-card p { margin-top: 10px; line-height: 1.8; }
+.platform-android .settings-card h3 { margin-bottom: 16px; }
+.platform-android .proxy-switch-row { min-height: 52px; }
+.platform-android .settings-group { display: block; }
+.platform-android .appearance-zoom { display: none; }
+.platform-android .series-cover { width: 112px; }
+.android-pip .window-toolbar, .android-pip .mobile-navigation { display: none; }
+.android-pip .platform-android.layout-portrait .player-stage:not(:fullscreen) { position: fixed; inset: 0; width: 100vw; height: 100dvh; min-height: 0; margin: 0; border-radius: 0; z-index: 500; }
+.android-pip .player-controls { display: none; }
+@media (orientation: landscape) {
+  .platform-android.layout-portrait .player-stage:not(:fullscreen) { height: 68dvh; }
+  .platform-android .mobile-navigation { padding-block: 0; }
+  .platform-android .mobile-navigation button { min-height: 44px; flex-direction: row; }
+}
+@media (max-width: 350px) { .platform-android .browse-grid { grid-template-columns: repeat(2,minmax(0,1fr)); } }
+
+/* Keep playback actions in thumb reach; secondary tools remain below the video. */
+.platform-android .browse-card-item, .platform-android .search-card-item { display: flex; flex-direction: column; min-width: 0; }
+.platform-android .browse-card, .platform-android .search-card { width: 100%; flex: 1; }
+.mobile-drama-details { min-height: 44px; border: 0; background: transparent; color: var(--text-secondary); text-align: left; padding: 8px 0; font: inherit; font-size: 13px; }
+.mobile-drama-details:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.mobile-drama-details:disabled { opacity: .5; }
+.platform-android .mobile-back { display: none; }
+.platform-android.player-focused .mobile-back { display: inline-flex; }
+.platform-android.player-focused .mobile-navigation { display: none; }
+.platform-android .player-controls-danmaku > button, .platform-android .player-controls-pip { display: none; }
+.platform-android select.player-controls-rate { width: 72px; min-height: 44px; border: 0; border-radius: 6px; color: #fff; background: #292b2e; font-size: 14px; }
+.platform-android .player-controls-menu > button { display: flex; width: 100%; justify-content: flex-start; }
+.platform-android .player-controls-menu select { min-height: 44px; }
+.platform-android .player-controls-time { flex-basis: 100%; order: -1; }
+.platform-android.layout-portrait.player-focused .player-stage:not(:fullscreen) { height: min(calc(100dvh - 172px),calc((100vw - 24px) * 16 / 9)); }
+
+.platform-android.layout-portrait .player-stage:not(:fullscreen) .player-controls-time { flex: 0 0 100%; }
+.platform-android .browse-card { flex: none; }
+
+/* Phone controls: one action row, a separate scrub target, and clear video gestures. */
+.platform-android { padding-inline: env(safe-area-inset-left) env(safe-area-inset-right); }
+.platform-android button, .platform-android summary { touch-action: manipulation; }
+.platform-android .icon-btn { min-width: 44px; }
+.platform-android .player-controls-bar { padding: 12px 8px 8px; pointer-events: none; }
+.platform-android .player-controls-bar > input,
+.platform-android .player-controls-row { pointer-events: auto; }
+.platform-android .controls-hidden .player-controls-bar > input,
+.platform-android .controls-hidden .player-controls-row { pointer-events: none; }
+.platform-android .player-controls-seek { height: 44px; margin: 0; touch-action: none; }
+.platform-android .player-controls-row { display: grid; grid-template-columns: repeat(6,minmax(44px,1fr)); gap: 2px; }
+.platform-android .player-controls-row > .player-controls-time { grid-column: 1 / -1; padding: 0 4px 4px; }
+.platform-android .player-controls button { min-width: 44px; min-height: 48px; }
+.platform-android .player-controls-selection { margin: 0; min-width: 0; }
+.platform-android .player-controls-selection > button { width: 100%; padding-inline: 4px; }
+.platform-android .player-controls-options { position: static; }
+.platform-android .player-controls-options > button { width: 100%; }
+.platform-android select.player-controls-rate { width: 100%; min-width: 0; min-height: 48px; padding-inline: 2px; }
+.platform-android .player-controls-danmaku { display: contents; }
+.platform-android .player-controls-menu { right: 8px; bottom: calc(100% + 4px); width: min(320px,calc(100% - 16px)); padding: 12px; }
+.platform-android .player-controls-popover { right: 8px; width: calc(100% - 16px); padding: 12px; }
+.platform-android .player-popover-heading { gap: 4px; margin-bottom: 8px; }
+.platform-android .player-popover-heading > button { margin-left: auto; padding-inline: 12px; }
+.platform-android .player-controls-menu select { min-height: 48px; }
+.platform-android .player-controls-menu > button { min-height: 48px; font-size: 15px; padding-inline: 10px; }
+.platform-android .player-stage:fullscreen .player-controls-bar { padding: 8px max(16px,env(safe-area-inset-right)) max(8px,env(safe-area-inset-bottom)) max(16px,env(safe-area-inset-left)); }
+.platform-android .player-now-playing { grid-template-columns: 48px minmax(0,1fr) auto; padding: max(8px,env(safe-area-inset-top)) max(12px,env(safe-area-inset-right)) 12px max(8px,env(safe-area-inset-left)); gap: 0 8px; }
+.platform-android .mobile-fullscreen-back { grid-row: 1 / span 2; pointer-events: auto; }
+.platform-android .controls-hidden .mobile-fullscreen-back { pointer-events: none; }
+.platform-android .player-now-title { min-width: 0; }
+.platform-android .player-now-title strong { font-size: 16px; }
+.platform-android .player-now-title > span { font-size: 13px; }
+.platform-android .player-now-meta { grid-column: 2; font-size: 12px; }
+.platform-android .player-clock { grid-column: 3; font-size: 16px; }
+.platform-android .player-episode-panel { max-height: min(72dvh,640px); overscroll-behavior: contain; padding-top: 0; }
+.platform-android .mobile-episode-head { position: sticky; top: 0; z-index: 1; padding-block: 10px; margin-bottom: 8px; background: var(--bg-elevated); }
+.platform-android .player-episodes { grid-template-columns: repeat(auto-fill,minmax(48px,1fr)); gap: 8px; }
+.platform-android .ep-chip { min-height: 48px; }
+.mobile-more { max-height: 85dvh; overflow-y: auto; overscroll-behavior: contain; }
+@media (orientation: landscape) {
+  .platform-android.layout-portrait.player-focused .player-stage:not(:fullscreen) { height: max(220px,calc(100dvh - 128px)); min-height: 0; }
+  .platform-android .player-controls-row { grid-template-columns: 48px 48px minmax(80px,1fr) 64px 64px 48px; }
+  .platform-android .player-controls-row > .player-controls-time { grid-column: 1 / -1; }
+  .platform-android .player-controls-popover { width: min(420px,calc(100% - 16px)); }
+  .platform-android .player-episode-panel { max-height: 85dvh; }
+}

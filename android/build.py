@@ -22,9 +22,7 @@ def run(args, env=None):
 
 def main():
     global BUILD
-    if '--tv' not in sys.argv:
-        raise SystemExit('本发行仅提供TV构建：python3 android/build.py --tv')
-    tv = True
+    tv = '--tv' in sys.argv
     if tv: BUILD = BUILD / 'tv'
     desktop_version = json.loads((ROOT.parent/'package.json').read_text())['version']
     version = desktop_version.removesuffix('.0') if tv else '1.1'
@@ -51,7 +49,6 @@ def main():
     if tv:
         shutil.copytree(ROOT/'app/src/main/assets',assets,dirs_exist_ok=True)
         shutil.copytree(ROOT/'app/src/main/res',resources,dirs_exist_ok=True)
-        (resources/'drawable').mkdir(parents=True,exist_ok=True)
         html = (ROOT/'web/index.html').read_text().replace('红果·自用','红果短剧 TV').replace('个人版 1.1',f'TV候选版 {version}').replace('手机实播兼容性待真机验收','电视实播兼容性待真机验收')
         html = html.replace('红果<span class="brand-dot">·</span>自用','红果<span class="brand-dot">·</span>TV')
         (assets/'index.html').write_text(html)

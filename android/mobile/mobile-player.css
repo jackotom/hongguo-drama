@@ -1,0 +1,92 @@
+/* Android cinema surface. The shared video and playback lifecycle stay mounted. */
+.platform-android.player-focused { background: #101214; }
+.platform-android.player-focused .main-content[data-page="player"] { padding: 0; overflow: hidden; }
+.platform-android .mobile-cinema { height: 100%; min-height: 0; color: #fff; }
+.platform-android .mobile-cinema > .player-header,
+.platform-android .mobile-cinema > .player-series-row,
+.platform-android .mobile-cinema > .player-online-quality-row,
+.platform-android .mobile-cinema > .series-picker,
+.platform-android .mobile-cinema > .player-footer,
+.platform-android .mobile-cinema > .player-management,
+.platform-android .mobile-cinema .player-episode-panel { display: none; }
+.platform-android .mobile-cinema .player-viewing-layout,
+.platform-android .mobile-cinema .player-floating-slot { flex: 1; min-height: 0; height: 100%; }
+.platform-android.layout-portrait.player-focused .mobile-cinema-stage:not(:fullscreen),
+.platform-android .mobile-cinema-stage { width: 100%; height: 100%; min-height: 0; max-height: none; margin: 0; border-radius: 0; background: #101214; }
+.platform-android .mobile-cinema-stage:fullscreen { width: 100vw; height: 100dvh; }
+.platform-android .mobile-cinema-stage .player-video { width: 100%; height: 100%; object-fit: contain; }
+.platform-android .mobile-cinema-stage .player-placeholder { padding: 80px 20px 210px; overflow-y: auto; color: #fff; }
+.platform-android .mobile-cinema-stage .player-placeholder > p { max-width: 34em; overflow-wrap: anywhere; }
+.platform-android .mobile-cinema-stage .player-placeholder-sub { color: #d0d0d0; }
+.platform-android .mobile-cinema-stage .player-placeholder-actions { justify-content: center; gap: 8px; }
+.platform-android .mobile-cinema-stage .player-placeholder button { min-height: 48px; }
+.platform-android .mobile-cinema-stage .player-placeholder .btn-outline { color: #fff; border-color: #777; background: #252729; }
+.platform-android .mobile-player-controls button { min-width: 48px; min-height: 48px; font-size: 15px; touch-action: manipulation; }
+.platform-android .mobile-player-top { position: absolute; inset: 0 0 auto; display: grid; grid-template-columns: 48px minmax(0,1fr) 48px; align-items: center; gap: 8px; padding: 8px max(12px,env(safe-area-inset-right)) 24px max(12px,env(safe-area-inset-left)); background: linear-gradient(#101214e8,transparent); pointer-events: none; }
+.platform-android .mobile-player-top > button { pointer-events: auto; }
+.mobile-player-title { min-width: 0; text-align: center; text-shadow: 0 1px 4px #000; }
+.mobile-player-title strong { display: block; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: 15px; font-weight: 500; }
+.mobile-player-title span { display: block; margin-top: 3px; font-size: 17px; font-weight: 600; }
+.mobile-hold-hint { position: absolute; top: 86px; left: 50%; transform: translateX(-50%); margin: 0; padding: 6px 12px; white-space: nowrap; border-radius: 16px; background: #101214c9; font-size: 13px; pointer-events: none; }
+.mobile-player-bottom { position: absolute; inset: auto 0 0; padding: 24px max(16px,env(safe-area-inset-right)) max(16px,env(safe-area-inset-bottom)) max(16px,env(safe-area-inset-left)); background: linear-gradient(transparent,#101214ed 46%,#101214); pointer-events: none; }
+.mobile-player-transport { display: flex; align-items: center; justify-content: center; gap: clamp(24px,10vw,64px); margin-bottom: 10px; }
+.platform-android .mobile-player-transport button { display: flex; flex-direction: column; gap: 3px; min-width: 56px; padding: 6px; pointer-events: auto; }
+.mobile-player-transport button > span { font-size: 12px; }
+.platform-android .mobile-player-transport .mobile-player-play { width: 60px; height: 60px; border-radius: 50%; background: #c8383d; color: #fff; }
+.mobile-player-progress { position: relative; display: grid; grid-template-columns: auto minmax(48px,1fr) auto; align-items: center; gap: 10px; }
+.mobile-player-progress > span { font-size: 13px; font-variant-numeric: tabular-nums; }
+.platform-android .mobile-player-progress .player-controls-seek { height: 48px; min-width: 0; margin: 0; accent-color: #c8383d; touch-action: none; pointer-events: auto; }
+.mobile-seek-preview { position: absolute; bottom: calc(100% + 4px); left: 50%; transform: translateX(-50%); padding: 7px 12px; border-radius: 8px; background: #101214e8; color: #fff; font-size: 18px; font-variant-numeric: tabular-nums; }
+.mobile-player-actions { display: grid; grid-template-columns: repeat(4,minmax(48px,1fr)); gap: 8px; }
+.platform-android .mobile-player-actions button { padding: 8px 4px; border-radius: 10px; background: #282b2e; color: #fff; pointer-events: auto; }
+.platform-android .mobile-player-controls.controls-hidden .mobile-player-top > button,
+.platform-android .mobile-player-controls.controls-hidden .mobile-player-bottom button,
+.platform-android .mobile-player-controls.controls-hidden .player-controls-seek { pointer-events: none; }
+.mobile-player-sheet-mask { position: absolute; inset: 0; z-index: 20; display: flex; align-items: flex-end; background: #0008; pointer-events: auto; }
+.platform-android .mobile-player-sheet { display: flex; flex-direction: column; width: 100%; min-height: 0; max-height: min(76%,640px); padding: 0 max(16px,env(safe-area-inset-right)) max(20px,env(safe-area-inset-bottom)) max(16px,env(safe-area-inset-left)); border-radius: 20px 20px 0 0; background: #faf9f7; color: #252523; box-shadow: 0 -8px 32px #0003; }
+.mobile-player-sheet-head { display: flex; align-items: center; justify-content: space-between; flex: none; gap: 16px; min-height: 68px; }
+.mobile-player-sheet-head h2 { margin: 0; font-size: 22px; font-weight: 650; }
+.platform-android .mobile-player-sheet-head button { padding-inline: 12px; color: #686661; }
+.mobile-player-sheet-body { min-height: 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: #b5b1ab transparent; }
+.mobile-player-sheet-summary { margin: 0 0 14px; color: #686661; font-size: 14px; }
+.mobile-episode-ranges { display: flex; overflow-x: auto; gap: 8px; margin-bottom: 16px; scrollbar-width: thin; }
+.platform-android .mobile-episode-ranges button { flex-shrink: 0; padding-inline: 16px; border-radius: 10px; background: #eeece9; color: #252523; }
+.platform-android .mobile-episode-ranges button[aria-pressed="true"] { background: #fae9e7; color: #a32a30; }
+.mobile-player-episode-grid { display: grid; grid-template-columns: repeat(5,minmax(48px,1fr)); gap: 8px; padding-bottom: 4px; }
+.platform-android .mobile-player-episode-grid button { display: flex; flex-direction: column; min-height: 58px; padding: 5px 2px; gap: 2px; border-radius: 10px; background: #eeece9; color: #252523; font-size: 17px; font-variant-numeric: tabular-nums; }
+.mobile-player-episode-grid small { min-height: 14px; font-size: 11px; line-height: 14px; }
+.platform-android .mobile-player-episode-grid button[aria-current="true"] { background: #c8383d; color: #fff; }
+.platform-android .mobile-player-episode-grid button:disabled { background: #f1efed; color: #77736c; opacity: 1; }
+.mobile-player-rate-grid { display: grid; grid-template-columns: repeat(4,minmax(48px,1fr)); gap: 10px; padding-bottom: 8px; }
+.platform-android .mobile-player-rate-grid button { background: #eeece9; color: #252523; border-radius: 10px; }
+.platform-android .mobile-player-rate-grid button[aria-pressed="true"] { background: #c8383d; color: #fff; }
+.mobile-player-option-list { display: flex; flex-direction: column; gap: 8px; }
+.platform-android .mobile-player-option-list > button { justify-content: space-between; padding: 12px; border-radius: 10px; background: #eeece9; color: #252523; text-align: left; }
+.platform-android .mobile-player-option-list > button[aria-pressed="true"] { background: #fae9e7; color: #a32a30; }
+.mobile-player-option-list > button > span:last-child:not(:first-child) { font-size: 13px; }
+.mobile-player-option-list label { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 48px; }
+.mobile-player-option-list select { min-height: 48px; max-width: 65%; padding: 8px; border-radius: 8px; background: #fff; color: #252523; border: 1px solid #d6d2cc; }
+.mobile-player-sheet-hint { margin: 14px 0 8px; font-size: 13px; line-height: 1.7; color: #686661; }
+.platform-android .mobile-player-sheet .danmaku-settings { position: static; width: 100%; max-width: none; max-height: none !important; border: 0; box-shadow: none; }
+.platform-android .mobile-player-sheet button:focus-visible,
+.platform-android .mobile-player-sheet select:focus-visible { outline: 2px solid #c8383d; outline-offset: -2px; }
+@media (max-width: 350px) {
+  .mobile-player-episode-grid { grid-template-columns: repeat(4,minmax(48px,1fr)); }
+  .mobile-player-actions { gap: 6px; }
+}
+@media (orientation: landscape) {
+  .mobile-player-top { padding-top: max(4px,env(safe-area-inset-top)); }
+  .mobile-player-title strong { display: inline; margin-right: 10px; }
+  .mobile-player-title span { display: inline; }
+  .mobile-hold-hint { top: 62px; }
+  .mobile-player-bottom { padding-top: 12px; padding-bottom: max(8px,env(safe-area-inset-bottom)); }
+  .mobile-player-transport { margin-bottom: 0; }
+  .platform-android .mobile-player-transport .mobile-player-play { width: 48px; height: 48px; }
+  .mobile-player-transport button > span { display: none; }
+  .mobile-player-actions { max-width: 480px; margin: 0 auto; }
+  .platform-android .mobile-player-sheet { max-height: 92%; }
+  .mobile-player-sheet-head { min-height: 56px; }
+  .mobile-player-episode-grid { grid-template-columns: repeat(auto-fit,minmax(56px,1fr)); }
+  .platform-android .mobile-cinema-stage .player-placeholder { padding: 60px 20px 160px; }
+}
+.android-pip .mobile-player-controls { display: none; }

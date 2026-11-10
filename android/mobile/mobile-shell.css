@@ -1,0 +1,71 @@
+/* Android-only shell; shared data, theme choices and desktop layout remain intact. */
+.platform-android { font-size: 16px; --radius: 12px; --radius-lg: 20px; }
+.platform-android .window-toolbar { min-height: 64px; height: auto; padding: 8px 16px; gap: 8px; border: 0; background: var(--bg-canvas); }
+.platform-android .toolbar-location { flex: 1; min-width: 0; color: var(--text-primary); font-size: 25px; font-weight: 700; }
+.platform-android .mobile-brand { color: var(--primary); }
+.platform-android .toolbar-actions { display: none; }
+.platform-android .mobile-back { display: inline-flex; }
+.platform-android .main-content { padding: 8px 16px 24px; }
+.platform-android .btn, .platform-android .btn-sm, .platform-android .icon-btn,
+.platform-android .btn-chip, .platform-android .ep-chip, .platform-android summary,
+.platform-android input:not([type="checkbox"]):not([type="radio"]), .platform-android select { min-height: 48px; }
+.platform-android button { min-width: 48px; min-height: 48px; }
+.platform-android .btn { font-size: 14px; border-radius: 12px; }
+.platform-android .icon-btn { width: 48px; height: 48px; flex-shrink: 0; }
+.platform-android button:active:not(:disabled) { filter: brightness(.94); }
+.platform-android .mobile-navigation { grid-template-columns: repeat(4,minmax(0,1fr)); background: var(--bg-elevated); padding: 4px 8px max(6px,env(safe-area-inset-bottom)); }
+.platform-android .mobile-navigation button { min-height: 60px; gap: 3px; font-size: 13px; }
+.platform-android .mobile-navigation button[aria-current="page"] { color: var(--accent-text); }
+.platform-android .mobile-navigation button[aria-current="page"] svg { stroke-width: 2.5; }
+.platform-android .mobile-section-tabs { display: flex; gap: 8px; margin: 0 0 20px; padding: 4px; background: var(--bg-inset); border-radius: 12px; }
+.platform-android .mobile-section-tabs button { flex: 1; min-height: 48px; border: 0; border-radius: 9px; background: transparent; font-size: 16px; }
+.platform-android .mobile-section-tabs button[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent-text); font-weight: 600; }
+.platform-android .mobile-section-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.platform-android .mobile-section-heading h2 { font-size: 20px; letter-spacing: 0; }
+.platform-android .mobile-section-heading button { min-height: 48px; padding: 0 8px; border: 0; color: var(--text-secondary); background: transparent; font-size: 14px; }
+.platform-android .mobile-continue { margin: 4px 0 24px; }
+.platform-android .mobile-continue-card { display: flex; align-items: center; gap: 12px; width: 100%; padding: 12px; border: 0; border-radius: 12px; background: var(--bg-inset); text-align: left; }
+.platform-android .mobile-continue-card > img, .platform-android .mobile-continue-cover { width: 54px; height: 70px; object-fit: cover; flex: none; border-radius: 8px; }
+.platform-android .mobile-continue-card > span:nth-child(2) { flex: 1; min-width: 0; }
+.platform-android .mobile-continue-card strong { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; font-size: 16px; line-height: 1.5; }
+.platform-android .mobile-continue-card small { display: block; margin-top: 5px; color: var(--text-secondary); font-size: 13px; }
+.platform-android .mobile-continue-play { display: grid; place-items: center; flex: none; width: 48px; height: 48px; border-radius: 50%; color: white; background: var(--primary); }
+.platform-android .main-content[data-page="history"] .history-header h1, .platform-android .main-content[data-page="calendar"] .release-calendar > header { display: none; }
+.platform-android .main-content[data-page="history"] .history-header { gap: 12px; }
+.platform-android .history-hint { font-size: 13px; }
+.platform-android .history-main, .platform-android .release-row { min-width: 0; }
+.platform-android .history-resume { gap: 12px; padding: 8px 0; }
+.platform-android .history-name { font-size: 16px; }
+.platform-android .history-action { width: 48px; min-height: 48px; overflow: hidden; font-size: 0; justify-content: center; flex-shrink: 0; }
+.platform-android .history-action svg { width: 24px; height: 24px; }
+.platform-android .history-row-actions { flex-direction: row; justify-content: flex-end; }
+.platform-android .release-row { flex-wrap: wrap; padding: 16px 0; }
+.platform-android .release-row-actions { flex-wrap: wrap; width: 100%; justify-content: flex-end; }
+.platform-android .mobile-page-note { color: var(--text-secondary); margin: 0 0 24px; }
+.platform-android .mobile-mine-links { background: var(--bg-elevated); border-radius: 12px; padding: 0 16px; }
+.platform-android .mobile-mine-links > button { display: flex; align-items: center; gap: 14px; width: 100%; min-height: 82px; padding: 12px 0; border: 0; border-bottom: 1px solid var(--border-muted); background: transparent; text-align: left; }
+.platform-android .mobile-mine-links > button:last-child { border-bottom: 0; }
+.platform-android .mobile-mine-links > button > span:nth-child(2) { flex: 1; }
+.platform-android .mobile-mine-links strong, .platform-android .mobile-mine-links small { display: block; }
+.platform-android .mobile-mine-links strong { font-size: 16px; font-weight: 600; }
+.platform-android .mobile-mine-links small { margin-top: 4px; font-size: 13px; color: var(--text-secondary); }
+.platform-android .mobile-help { margin-top: 24px; }
+.platform-android .mobile-help summary { padding-block: 12px; font-weight: 600; }
+.platform-android .mobile-help p, .platform-android .mobile-about { color: var(--text-secondary); font-size: 14px; line-height: 1.8; margin-top: 12px; }
+.platform-android .mobile-about { padding: 20px 0; }
+.platform-android .settings-header { display: none; }
+.platform-android .settings-card { border-radius: 12px; margin-bottom: 16px; }
+.platform-android .settings-group { margin-bottom: 16px; }
+.platform-android .settings-label { font-size: 16px; }
+.platform-android.player-focused:has(.mobile-cinema) .window-toolbar { display: none; }
+.platform-android .hongguo-container .hero-section { padding: 0 0 16px; }
+.platform-android .hongguo-container .hero-text h2 { font-size: 22px; }
+.platform-android .search-card-title { font-size: 16px; }
+@media (orientation: landscape) {
+  .platform-android .mobile-navigation button { min-height: 48px; flex-direction: row; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .platform-android *, .platform-android *::before, .platform-android *::after { scroll-behavior: auto !important; }
+}
+
+.platform-android .mobile-follow-tabs { margin: 0 16px 12px; flex-shrink: 0; }

@@ -1,14 +1,12 @@
 {
-  "name": "hongguo-android-tv",
+  "name": "hongguo-personal-android",
   "private": true,
-  "version": "6.3.0",
+  "version": "1.1.0",
   "license": "GPL-3.0-only",
   "scripts": {
-    "test": "node bundle.cjs --tv && node --test tests/core.test.cjs tests/tv.test.cjs",
-    "build": "python3 build.py --tv",
+    "test": "node bundle.cjs && node --test tests/*.test.cjs",
+    "build": "python3 build.py",
     "build:tv": "python3 build.py --tv"
   },
-  "dependencies": {
-    "buffer": "6.0.3"
-  }
+  "dependencies": { "buffer": "6.0.3" }
 }
