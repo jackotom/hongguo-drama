@@ -28,4 +28,53 @@ function handleMediaKey(video, key, repeat) {
   return true;
 }
 
-module.exports = {nextFocus, handleMediaKey};
+function focusIdentity(el, seriesId = '') {
+  if (!el) return '';
+  const data = el.dataset || {};
+  if (data.vid) return `episode:${seriesId}:${data.vid}`;
+  if (data.series) return `series:${data.series}`;
+  if (data.tab) return `tab:${data.tab}`;
+  if (data.category) return `category:${data.category}`;
+  return el.id ? `id:${el.id}` : '';
+}
+
+function restoreFocusIndex(keys, wanted, previous = []) {
+  const exact = keys.indexOf(wanted);
+  if (exact >= 0) return exact;
+  const old = previous.indexOf(wanted);
+  if (old >= 0) for (let offset = 1; offset < previous.length; offset++) {
+    for (const neighbor of [previous[old + offset],previous[old - offset]]) {
+      const index = keys.indexOf(neighbor);
+      if (index >= 0) return index;
+    }
+  }
+  return keys.length ? 0 : -1;
+}
+
+function keepsInputKey(active, key, composing, keyCode) {
+  const tag = active?.tagName?.toUpperCase();
+  return Boolean(composing || keyCode === 229 || (tag === 'SELECT' && ['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Enter',' ','Escape'].includes(key)) ||
+    (['INPUT','TEXTAREA'].includes(tag) && ['ArrowLeft','ArrowRight'].includes(key)));
+}
+
+function currentVideo(stage) {
+  if (!stage?.isConnected || !stage.dataset.playbackId || !stage.dataset.vid ||
+      !['decoding','playing','paused','ended'].includes(stage.dataset.playbackState)) return null;
+  const video = stage.querySelector('video');
+  return video?.isConnected && video.dataset.playbackId === stage.dataset.playbackId &&
+    video.dataset.vid === stage.dataset.vid ? video : null;
+}
+
+function routeMediaKey(stage, key, repeat, pausePlayback) {
+  if (!stage?.isConnected || !stage.dataset.playbackId || !stage.dataset.vid ||
+      !['preparing','decoding','playing','paused','ended'].includes(stage.dataset.playbackState) ||
+      !['MediaPlayPause','MediaPlay','MediaPause','MediaFastForward','MediaRewind'].includes(key)) return false;
+  if (repeat && !['MediaFastForward','MediaRewind'].includes(key)) return true;
+  const video = currentVideo(stage);
+  // Pause intent must survive preparation even before a video can emit pause.
+  if (key === 'MediaPause' || (!video && key === 'MediaPlayPause')) pausePlayback();
+  else if (video) handleMediaKey(video,key,repeat);
+  return true;
+}
+
+module.exports = {nextFocus, handleMediaKey, focusIdentity, restoreFocusIndex, keepsInputKey, currentVideo, routeMediaKey};

@@ -18,6 +18,12 @@ function read(key) { try { const data = JSON.parse(localStorage.getItem(key) || 
 function write(key, values) { try { localStorage.setItem(key,JSON.stringify(values.slice(0,key === 'favorites' ? 100 : 200))); } catch { message('本机存储已满，记录未保存'); } }
 function message(text, error = false) { const el = document.querySelector('#status'); if (el) { el.textContent = text; el.classList.toggle('error',error); } }
 const historyFor = id => read('history').find(item => item.series_id === id);
+function markView(seriesId = '', ready = false) {
+  content.dispatchEvent?.(new Event('tv-before-render'));
+  content.dataset.tvPage = JSON.stringify([state.tab,state.category,state.keyword,state.page,state.channel,state.websiteOnly,seriesId]);
+  content.dataset.seriesId = seriesId;
+  content.dataset.tvReady = String(ready);
+}
 function savePosition() {
   if (!video || video !== playback?.video || video.dataset.frameReady !== 'true' || !Number.isFinite(video.currentTime)) return;
   const d = playback.detail;
@@ -62,7 +68,8 @@ async function showDiscover() {
   const generation = ++state.generation;
   let websiteFailure = '';
   cancelAll();
-  content.innerHTML = `<form class="search"><input aria-label="搜索短剧" maxlength="80" placeholder="搜索剧名，找到想看的故事" value="${esc(state.keyword)}"><button class="primary">搜索</button></form><div class="categories">${categories.map(([id,label]) => `<button data-category="${id}" class="${state.category === id && !state.keyword ? 'active-choice' : ''}">${label}</button>`).join('')}</div><div class="section-line"><h2>${state.keyword ? '搜索结果' : '发现好剧'}</h2><span>无广告 · 本机自用</span></div><div id="status" class="status">正在加载…</div><section id="results"></section>`;
+  markView();
+  content.innerHTML = `<form class="search"><input id="search-input" aria-label="搜索短剧" maxlength="80" placeholder="搜索剧名，找到想看的故事" value="${esc(state.keyword)}"><button id="search-submit" class="primary">搜索</button></form><div class="categories">${categories.map(([id,label]) => `<button data-category="${id}" class="${state.category === id && !state.keyword ? 'active-choice' : ''}">${label}</button>`).join('')}</div><div class="section-line"><h2>${state.keyword ? '搜索结果' : '发现好剧'}</h2><span>无广告 · 本机自用</span></div><div id="status" class="status">正在加载…</div><section id="results"></section>`;
   content.querySelector('form').onsubmit = event => { event.preventDefault(); state.keyword = content.querySelector('input').value.trim(); state.page = 1; state.channel = 'web'; state.cursors.clear(); showDiscover(); };
   for (const b of content.querySelectorAll('[data-category]')) b.onclick = () => {
     const same = state.category === b.dataset.category && !state.keyword;
@@ -114,17 +121,20 @@ async function showDiscover() {
     content.querySelector('#prev-page').onclick = () => { state.page--; showDiscover(); window.scrollTo(0,0); };
     content.querySelector('#next-page').onclick = () => { state.page++; showDiscover(); window.scrollTo(0,0); };
     bindCards(rows);
+    markView('',true);
   } catch (error) {
     if (generation !== state.generation) return;
     message(websiteFailure ? `官网：${websiteFailure}；App：${error.message}` : error.message,true);
-    const retry = document.createElement('button'); retry.textContent = '重试'; retry.onclick = showDiscover; content.querySelector('#results').append(retry);
-    const source = document.createElement('button'); source.textContent = state.websiteOnly ? '切换App来源' : '仅用官网';
+    const retry = document.createElement('button'); retry.id = 'catalog-retry'; retry.textContent = '重试'; retry.onclick = showDiscover; content.querySelector('#results').append(retry);
+    const source = document.createElement('button'); source.id = 'catalog-source'; source.textContent = state.websiteOnly ? '切换App来源' : '仅用官网';
     source.onclick = () => { state.websiteOnly = !state.websiteOnly; state.channel = state.websiteOnly ? 'web' : 'app'; state.page = 1; state.cursors.clear(); showDiscover(); };
     content.querySelector('#results').append(source);
+    markView('',true);
   }
 }
 function showLocal() {
   const key = state.tab, rows = read(key);
+  markView('',true);
   content.innerHTML = `<div class="section-line"><h1>${key === 'favorites' ? '我的收藏' : '观看记录'}</h1><span>仅本机</span></div><div id="status" class="status">${rows.length ? '' : key === 'favorites' ? '打开剧集，点收藏，喜欢的故事就留在这里。' : '开始观看后，这里会记住你看到哪一集。'}</div>${cards(rows)}`;
   bindCards(rows);
 }
@@ -133,6 +143,7 @@ async function openDetail(item) {
   state.generation++; stop();
   const generation = state.generation;
   state.detail = null; userPaused = false;
+  markView(item.series_id);
   content.innerHTML = '<button class="back" id="back">‹ 返回</button><div id="status" class="status">正在加载分集…</div>';
   content.querySelector('#back').onclick = () => switchTab(state.tab);
   try {
@@ -140,12 +151,21 @@ async function openDetail(item) {
     if (generation !== state.generation) return;
     state.detail = d; state.episode = Math.min(historyFor(d.series_id)?.episode || 0,d.episodes.length-1);
     showDetail(); window.scrollTo(0,0);
-  } catch (error) { if (generation === state.generation) { message(error.message,true); const retry = document.createElement('button'); retry.textContent = '重试'; retry.onclick = () => openDetail(item); content.append(retry); } }
+  } catch (error) {
+    if (generation === state.generation) {
+      message(error.message,true);
+      const retry = document.createElement('button'); retry.id = 'detail-retry'; retry.textContent = '重试';
+      retry.onclick = () => openDetail(item); content.append(retry); markView(item.series_id,true);
+    }
+  }
 }
 function showDetail() {
   const d = state.detail, history = historyFor(d.series_id);
+  markView(d.series_id,true);
   content.innerHTML = `<button class="back" id="back">‹ 返回</button><div class="detail-head">${poster(d)}<div><h1>${esc(d.series_title)}</h1><p>共${d.episodes.length}集</p><button id="favorite"></button></div></div><details><summary>剧情简介</summary><p>${esc(d.description || '暂无简介')}</p></details>${history ? `<button class="resume" id="resume">继续观看 · 第${history.episode+1}集</button>` : ''}<div class="video-stage" id="stage"><div class="status">选一集，开始看。</div></div><div id="status" class="status"></div><div class="player-tools"><button id="previous">上一集</button><button id="retry">播放本集</button><button id="next">下一集</button><select id="speed" aria-label="播放速度"><option value="1">1倍速</option><option value="1.25">1.25倍</option><option value="1.5">1.5倍</option><option value="2">2倍速</option></select></div><p class="hint">先准备完整单集，再播放。移动网络会消耗流量。</p><div class="section-line"><h2>选集</h2><span id="episode-label"></span></div><div class="episodes">${d.episodes.map((e,i) => `<button data-episode="${i}" aria-label="播放第${i+1}集">${i+1}</button>`).join('')}</div>`;
   content.querySelector('#back').onclick = () => switchTab(state.tab);
+  content.querySelector('summary').id = 'synopsis';
+  for (const button of content.querySelectorAll('[data-episode]')) button.dataset.vid = d.episodes[Number(button.dataset.episode)].vid;
   const favorite = content.querySelector('#favorite');
   const mark = () => { const saved = read('favorites').some(row => row.series_id === d.series_id); favorite.textContent = saved ? '已收藏' : '收藏'; favorite.setAttribute('aria-pressed',String(saved)); };
   favorite.onclick = () => { const rows = read('favorites'), saved = rows.some(row => row.series_id === d.series_id); write('favorites',saved ? rows.filter(row => row.series_id !== d.series_id) : [{series_id:d.series_id,series_title:d.series_title,cover:d.cover},...rows]); mark(); }; mark();

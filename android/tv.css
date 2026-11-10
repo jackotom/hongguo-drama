@@ -1,2 +1,22 @@
 /* TV keeps readable controls and a visible focus ring at normal system scaling. */
 :root{font-size:18px}body{padding:20px 36px 0}header{padding:8px 0 20px}header small{font-size:14px}main{max-width:none;padding:0 0 100px}button{min-height:50px}button:focus,input:focus,select:focus,summary:focus{outline:4px solid #ffb7b9;outline-offset:4px;box-shadow:0 0 0 7px #171b25}.grid{grid-template-columns:repeat(6,minmax(0,1fr));gap:24px 18px}.card strong{font-size:17px}.card small{font-size:14px}.poster{aspect-ratio:3/4}.detail-head .poster{width:140px;min-width:140px}.episodes{grid-template-columns:repeat(12,minmax(0,1fr))}nav{padding:10px 36px;left:0;right:0}nav button{flex:0 1 180px}.video-stage video{height:52vh}.hint{font-size:14px}dialog{max-width:700px}dialog p{font-size:17px}#tv-controls{overflow:visible;flex-wrap:wrap}#tv-controls button{flex:1}body.tv-playing{overflow:hidden}.tv-playing .video-stage{position:fixed;inset:0;margin:0;border-radius:0;z-index:30}.tv-playing .video-stage video{height:100vh}.tv-playing #tv-controls{position:fixed;left:36px;right:36px;bottom:16px;z-index:31;background:#171b25e8;padding:12px;border-radius:12px}.tv-playing #tv-controls:focus-within{background:#171b25}.tv-playing nav{visibility:hidden}@media(max-width:1000px){.grid{grid-template-columns:repeat(5,minmax(0,1fr))}.episodes{grid-template-columns:repeat(10,minmax(0,1fr))}}
+
+button,input,select,summary{scroll-margin:12px 10px 100px}
+.grid{grid-template-columns:repeat(auto-fill,minmax(180px,1fr));padding:8px}
+.categories,.player-tools,#tv-controls .row{padding:8px;overflow:visible;flex-wrap:wrap}
+#tv-controls{padding:8px 0;max-width:100%}
+#tv-controls[hidden]{display:none}
+#tv-controls .row>*{min-width:130px}
+#tv-controls .player-tools>*{flex:1 1 130px;min-width:0}
+.video-stage:focus{outline:4px solid #ffb7b9;outline-offset:4px}
+body.tv-playing #content{position:fixed;inset:0;z-index:30;display:flex;flex-direction:column;padding:12px 24px;margin:0;background:#080a0e}
+body.tv-playing #content>:not(.video-stage):not(#tv-controls):not(dialog){display:none}
+body.tv-playing .video-stage{position:relative;inset:auto;flex:1;min-height:0;margin:0;border-radius:0}
+body.tv-playing .video-stage video{height:100%;width:100%;object-fit:contain}
+body.tv-playing #tv-controls{position:static;flex:0 0 auto;padding:4px;margin-top:8px;border-radius:12px;background:#171b25}
+body.tv-playing #tv-controls>*{margin:0}
+body.tv-playing button,body.tv-playing select{scroll-margin:8px}
+#tv-episode-dialog{width:min(900px,calc(100vw - 72px));max-width:calc(100vw - 72px);max-height:calc(100vh - 72px);overflow:auto;padding:24px}
+#tv-episode-dialog .episodes{padding:8px;grid-template-columns:repeat(auto-fill,minmax(62px,1fr));max-height:60vh;overflow:auto;scroll-padding:12px}
+#tv-close-episodes{width:auto;margin:0 0 16px}
+@media(max-height:600px){body{padding-top:8px}header{padding-bottom:8px}dialog{max-height:calc(100vh - 32px)}.search{margin-bottom:8px}}
