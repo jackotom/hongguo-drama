@@ -1,0 +1,80 @@
+name: Verify frozen 6.8 Linux with bounded probe cleanup
+'on':
+  push:
+    branches:
+      - codex/verify-6.8
+    paths:
+      - .github/workflows/verify-linux-6.8.yml
+      - .github/linux-6.8-probe.cjs
+  workflow_dispatch: null
+permissions:
+  contents: read
+env:
+  HONGGUO_SUBJECT_SHA: 647e40d874d54bbaada6243c60e97e848100adf4
+jobs:
+  linux:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 25
+    defaults:
+      run:
+        working-directory: subject
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: 647e40d874d54bbaada6243c60e97e848100adf4
+          path: subject
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          path: harness
+      - name: Verify subject and independent harness identities
+        run: |
+          test "$(git rev-parse HEAD)" = "$HONGGUO_SUBJECT_SHA"
+          test "$(git -C ../harness rev-parse HEAD)" = "$GITHUB_SHA"
+          test "$(node -p "require('./package.json').version")" = '6.8.0'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: subject/package-lock.json
+      - run: sudo apt-get update -qq && sudo apt-get install -y -qq build-essential pkg-config nasm curl git python3 xvfb libgtk-3-0 libnss3 libasound2 libgbm1 libfuse2
+      - uses: actions/cache@v4
+        id: media
+        with:
+          path: ${{ runner.temp }}/linux-media
+          key: linux-x64-media-${{ hashFiles('subject/scripts/build-ffmpeg-source-linux.sh', 'subject/scripts/build-librempeg-source.sh', 'subject/scripts/librempeg-videotoolbox-prototype.patch') }}
+      - if: steps.media.outputs.cache-hit != 'true'
+        run: |
+          bash scripts/build-ffmpeg-source-linux.sh "$RUNNER_TEMP/linux-media/ffmpeg" 4
+          bash scripts/build-librempeg-source.sh "$RUNNER_TEMP/linux-media/librempeg" linux-x64 4
+      - run: |
+          mkdir -p build/ffmpeg/linux-x64
+          cp "$RUNNER_TEMP/linux-media/ffmpeg/artifacts/bin/"* build/ffmpeg/linux-x64/
+          cp "$RUNNER_TEMP/linux-media/librempeg/artifacts/bin/"* build/ffmpeg/linux-x64/
+          npm ci --no-audit --no-fund
+      - run: node scripts/prepare-electron.cjs
+        env:
+          GH_TOKEN: ${{ github.token }}
+      - run: npm run build:linux -- --config.electronDist=.cache/electron
+      - name: Bind package to exact frozen source before acceptance
+        run: |
+          cp "$RUNNER_TEMP/linux-media/ffmpeg/artifacts/"*source.tar.gz "$RUNNER_TEMP/linux-media/librempeg/artifacts/"*source.tar.gz dist/
+          git archive --format=zip --output=dist/hongguo-downloader-6.8-linux-source.zip HEAD
+          printf '%s\n' "$HONGGUO_SUBJECT_SHA" > dist/SOURCE-SHA.txt
+          sha256sum dist/*.AppImage dist/*source.tar.gz dist/*-linux-source.zip dist/SOURCE-SHA.txt > dist/LINUX-SHA256SUMS.txt
+      - name: Real source downloads and muted playback with bounded cleanup
+        timeout-minutes: 10
+        env:
+          HONGGUO_HARNESS_SHA: ${{ github.sha }}
+        run: xvfb-run -a node ../harness/.github/linux-6.8-probe.cjs "$PWD" "$HONGGUO_SUBJECT_SHA"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: linux-appimage-candidate
+          path: |
+            subject/dist/*.AppImage
+            subject/dist/*source.tar.gz
+            subject/dist/*-linux-source.zip
+            subject/dist/SOURCE-SHA.txt
+            subject/dist/LINUX-SHA256SUMS.txt
+            subject/dist/linux-verification/*.json
