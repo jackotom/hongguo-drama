@@ -29,3 +29,12 @@ persistent identity or retained device_token. The same in-memory identity is
 shared by all playback requests in one process. Search/catalogue signatures
 remain unchanged. app-source.js also accepts the current inline video_list
 without requesting the legacy fallback endpoint.
+
+Playback empty-response recovery added 2026-11-10 references the video_tab
+query parameters and nested model response documented in
+tsukiyo-zero/hongguoTV ContentRepository.tabVideoModel, commit
+49532eb2110dcbf66814ca250d43f222e7193895 (GPL-3.0-only), at the same upstream URL.
+app-source.js reuses its existing signing routines for a bodyless GET after
+an empty legacy POST, preserves exact episode matching and accepts both array
+and object rendition lists. No account cookies, tokens or persistent identity
+are added. Validation and scope are recorded in docs/issue-130-video-tab.md.

@@ -138,15 +138,16 @@ function row(definition, width, height, suffix) {
   }, { now: () => clock, getPlaybackDevice: async () => { clock += 7900; return identities[0]; } });
   assert.equal((await slowRegistration.fetchAppPlayUrl(vid)).url, plain.main_url);
   assert.equal(slowCalls, 1);
-  const hosts = [];
+  const routes = [];
   const alternate = load(async config => {
-    hosts.push(new URL(config.url).hostname);
-    if (hosts.length === 1) return { status: 200, headers: {}, data: '' };
+    routes.push([config.method, new URL(config.url).pathname]);
+    if (routes.length === 1) return { status: 200, headers: {}, data: '' };
     assert.equal(config.headers.Connection, 'close');
     return inlineResponse([plain]);
   }, { getPlaybackDevice: async () => identities[0] });
   assert.equal((await alternate.fetchAppPlayUrl(vid)).url, plain.main_url);
-  assert.deepEqual(hosts, ['api5-normal-sinfonlineb.fqnovel.com', 'api5-normal-hl.fqnovel.com']);
+  assert.deepEqual(routes, [['POST', '/novel/player/multi_video_model/v1/'],
+    ['GET', '/reading/bookapi/video_tab/multi_video_model/v1/']]);
   let inlineCalls = 0;
   const direct = load(async config => {
     inlineCalls++;
