@@ -23,20 +23,10 @@
 
 ## 下载与安装
 
-**当前正式版：6.6**（内部`6.6.0`）。跟进播放接口新格式，修正取源签名/客户端参数，完善本地文件播放、观看记录排序与TV操作。**TV版未测试，请用户自行测试**；其他平台本轮同样跳过新的功能/播放/安装/设备测试。详见[6.6说明](docs/release-6.6.md)。
+**6.7 源码／发行目标**（内部`6.7.0`）。合入 #133：旧播放接口空响应时，使用签名 `video_tab` 恢复取源。双Mac、Windows、Linux、Docker统一发行；完整测试和产物状态见[6.7说明](docs/release-6.7.md)。
 
-| 平台 | 下载6.6 | 使用方式 |
-|---|---|---|
-| Apple芯片Mac，macOS 13+ | [DMG](https://github.com/jackotom/hongguo-drama/releases/download/v6.6/Hongguo-6.6-mac-arm64.dmg) | 已签名、公证、装订；本轮未做功能测试 |
-| Intel Mac，macOS 13+ | [DMG](https://github.com/jackotom/hongguo-drama/releases/download/v6.6/Hongguo-6.6-mac-x64.dmg) | 同上；本轮未启动或实机测试 |
-| Windows x64 | [安装版](https://github.com/jackotom/hongguo-drama/releases/download/v6.6/hongguo-downloader-6.6-win-x64-setup.exe) · [便携EXE](https://github.com/jackotom/hongguo-drama/releases/download/v6.6/hongguo-downloader-6.6-win-x64.exe) · [便携ZIP](https://github.com/jackotom/hongguo-drama/releases/download/v6.6/hongguo-downloader-6.6-win-x64.zip) | EXE未签名；保留原资料后升级 |
-| Linux x64 | [AppImage](https://github.com/jackotom/hongguo-drama/releases/download/v6.6/hongguo-downloader-6.6-linux-x64.AppImage) | 赋予执行权限；手动更新，运行未测 |
-| Docker Linux amd64 / NAS | [镜像](https://github.com/jackotom/hongguo-drama/releases/download/v6.6/hongguo-drama-6.6-docker-amd64.tar.gz) · [部署包](https://github.com/jackotom/hongguo-drama/releases/download/v6.6/hongguo-drama-6.6-docker-deploy.zip) | [部署说明](docs/docker.md)；本轮未运行容器 |
-| Android TV / Google TV，API29+ | [TV APK](https://github.com/jackotom/hongguo-drama/releases/download/v6.6/hongguo-downloader-6.6-android-tv-dev.apk) | **TV版未测试，请用户自行测试**；与手机个人版独立 |
+当前正式下载仍见[最新发行页](https://github.com/jackotom/hongguo-drama/releases/latest)。6.7验收齐备后统一公开，草稿不代表发布。TV和手机保持独立，不包含在本轮五类发行产物中。
 
-[6.6发行页](https://github.com/jackotom/hongguo-drama/releases/tag/v6.6) · [SHA256](https://github.com/jackotom/hongguo-drama/releases/download/v6.6/SHA256SUMS.txt) · [精确源码](https://github.com/jackotom/hongguo-drama/releases/download/v6.6/hongguo-drama-6.6-source.zip)
-
-本轮未验证6.5到6.6的安装/应用内更新。升级前备份资料；电视兼容性、解码能力、分集和画质受设备与官方来源限制。手机个人版不在本次发行范围。
 
 <details>
 <summary>6.5 历史下载与升级说明</summary>
@@ -142,6 +132,12 @@ Mac和Windows安装版保留应用内更新入口；完整6.4→6.5自动更新�
 2. 在「发现短剧」浏览，或在「搜索与下载」输入剧名、红果分享链接或剧集 ID。
 3. 打开详情点「立即播放」，也可选择集数与清晰度加入下载队列。
 4. 下次从「我的剧库」或「观看记录」接着看；下载进度、失败重试和整剧合并在「下载管理」。
+
+## 6.7（源码／发行目标）
+
+- 旧POST返回空响应时，第二次请求改用签名GET `video_tab`；精确匹配分集，保留取消、超时、画质和加密安全校验。
+- 回归检查及真实完整下载、解密与成品静音播放分别记录，不沿用6.6免测结论。
+- 双Mac、Windows、Linux、Docker统一版本；最终发行状态见[6.7说明](docs/release-6.7.md)。
 
 ## 6.6
 

@@ -66,17 +66,17 @@ jobs:
         run: node --test server/*.test.cjs
       - name: Build the exact server image
         run: |
-          docker build --platform linux/amd64 --label org.opencontainers.image.version=6.6.0 --label org.opencontainers.image.revision="$GITHUB_SHA" -t hongguo-drama:6.6 .
+          docker build --platform linux/amd64 --label org.opencontainers.image.version=6.7.0 --label org.opencontainers.image.revision="$GITHUB_SHA" -t hongguo-drama:6.7 .
       - name: Run Docker functional acceptance
         if: ${{ !inputs.build_only }}
         run: node scripts/check-docker-release.cjs
       - name: Save the image and corresponding media sources
         run: |
           mkdir -p dist/docker
-          docker save hongguo-drama:6.6 | gzip > dist/docker/hongguo-drama-6.6-docker-amd64.tar.gz
+          docker save hongguo-drama:6.7 | gzip > dist/docker/hongguo-drama-6.7-docker-amd64.tar.gz
           cp "$RUNNER_TEMP/linux-media/ffmpeg/artifacts/"*source.tar.gz "$RUNNER_TEMP/linux-media/librempeg/artifacts/"*source.tar.gz dist/docker/
           cp compose.yaml docs/docker.md dist/docker/
-          git archive --format=zip --output=dist/docker/hongguo-drama-6.6-docker-source.zip HEAD
+          git archive --format=zip --output=dist/docker/hongguo-drama-6.7-docker-source.zip HEAD
           printf '%s\n' "$GITHUB_SHA" > dist/docker/SOURCE-SHA.txt
           (cd dist/docker && sha256sum * > DOCKER-SHA256SUMS.txt)
       - uses: actions/upload-artifact@v4

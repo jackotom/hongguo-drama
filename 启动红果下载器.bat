@@ -1,4 +1,5 @@
 ﻿@echo off
+rem 6.7 unified release.
 rem Hongguo Drama 6.6 source candidate - version metadata: package.json
 chcp 65001 >nul
 cd /d "%~dp0"

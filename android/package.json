@@ -9,5 +9,7 @@
     "build": "python3 build.py",
     "build:tv": "python3 build.py --tv"
   },
-  "dependencies": { "buffer": "6.0.3" }
+  "dependencies": {
+    "buffer": "6.0.3"
+  }
 }

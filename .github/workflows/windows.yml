@@ -1,4 +1,4 @@
-# Hongguo Drama 6.6: desktop, Docker and TV release candidate; publication is coordinated separately.
+# Hongguo Drama 6.7: desktop, Docker and TV release candidate; publication is coordinated separately.
 name: Windows x64 release candidate
 on:
   workflow_dispatch:
@@ -130,9 +130,15 @@ jobs:
           $decoders = (& build/ffmpeg/librempeg.exe -hide_banner -decoders 2>&1 | Out-String)
           if ($LASTEXITCODE -or $decoders -notmatch '(?m)^\s*V\S*\s+bvc2\s') { throw 'ByteVC2 helper decoder verification failed' }
           Write-Output 'PASS Windows x64 ByteVC2 helper starts and exposes bvc2 decoder'
-      - name: Run unit and platform checks
+      - name: Run playback source regression checks
         if: ${{ !inputs.build_only }}
-        run: npm test
+        run: |
+          node --test src/native/app-source-video-tab.test.cjs src/native/app-source-inline-fallback.test.cjs src/native/github-127-diagnostics.test.cjs src/native/github-127-handoff.test.cjs src/native/github-127-transport.test.cjs src/native/hongguo-cancellation.test.cjs src/native/playback-device.test.cjs
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          node scripts/check-app-source.cjs
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          node scripts/check-app-source-recovery.cjs
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
       - name: Check Windows FFmpeg discovery
         if: ${{ !inputs.build_only }}
         run: node scripts/check-ffmpeg-resolution.cjs

@@ -1,3 +1,4 @@
+<!-- 6.7 unified release. -->
 # 红果短剧 6.3 设计资料
 
 `design.json` 保存现有配色、字体、间距和布局约定，`surfaces/` 保存页面设计记录。

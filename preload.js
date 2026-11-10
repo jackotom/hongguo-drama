@@ -1,4 +1,4 @@
-// 红果短剧 6.6：版本及发行状态见 package.json 和 docs/release-6.6.md。
+// 红果短剧 6.7：版本及发行状态见 package.json 和 docs/release-6.6.md。
 // 红果短剧 6.2：桌面桥接入口，发行说明见 docs/release-6.0.md。
 const { contextBridge, ipcRenderer } = require('electron');
 

@@ -1,13 +1,13 @@
-# Docker Web / API（6.6）
+# Docker Web / API（6.7）
 
 用于 fnOS / Linux x64 NAS：浏览器搜索红果短剧、选集批量下载到已挂载 NAS、合并同剧已下载分集。不是桌面 VNC。仅支持红果公开可用片源，不登录账号、不接入其他来源，不绕过锁定或上游拒绝。
 
 ## 部署
 
-镜像仅支持 `linux/amd64`。从正式发行下载 `hongguo-drama-6.6-docker-amd64.tar.gz` 后导入（具体附件名以 Release 为准）：
+镜像仅支持 `linux/amd64`。从正式发行下载 `hongguo-drama-6.7-docker-amd64.tar.gz` 后导入（具体附件名以 Release 为准）：
 
 ```sh
-docker load -i hongguo-drama-6.6-docker-amd64.tar.gz
+docker load -i hongguo-drama-6.7-docker-amd64.tar.gz
 ```
 
 使用仓库 `compose.yaml`。先选择已挂载的 NAS 目录和独立任务目录，确认运行用户对二者具有读写权限。默认 UID/GID 为 `1000:1000`，可通过 `PUID`、`PGID` 指定已有 NAS 用户。不要使用 root 规避权限问题。
@@ -68,7 +68,7 @@ docker compose logs --tail=30
 先按 Linux 发行流程准备并核对 `build/ffmpeg/linux-x64/ffmpeg`、`ffprobe`、`librempeg` 和许可证。组件构建脚本为 `scripts/build-ffmpeg-source-linux.sh` 与 `scripts/build-librempeg-source.sh`，固定源码与对应源码归档沿用发行流程。Dockerfile 不使用发行版 FFmpeg 冒充 ByteVC2 支持。
 
 ```sh
-docker build --platform linux/amd64 -t hongguo-drama:6.6 .
+docker build --platform linux/amd64 -t hongguo-drama:6.7 .
 node --test server/server.test.cjs
 ```
 
@@ -82,7 +82,7 @@ node server/live-check.cjs
 
 从环境读取 `HONGGUO_TOKEN`；脚本随机选真实目录剧集，再搜索、随机选相邻两集、下载、合并、读取成品并计算 SHA256。全程不打开播放器或音频设备；解码检查不等于人工播放验收。回执只记录剧名、公开 ID、相对文件路径和哈希，不记录令牌、签名媒体 URL 或密钥。外部来源失败会明确失败，不以固定测试图或彩条替代。
 
-本次测试证据与正式发布状态以 `docs/release-6.6.md` 为准；本文不单独声明已发布或已完成 fnOS 实机验收。
+本次测试证据与正式发布状态以 `docs/release-6.7.md` 为准；本文不单独声明已发布或已完成 fnOS 实机验收。
 
 ## 本轮后端定向证据
 

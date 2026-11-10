@@ -1,4 +1,5 @@
 @echo off
+rem 6.7 unified release.
 rem Hongguo Drama 6.6 source candidate - version metadata: package.json
 title 红果短剧下载器 - 开发模式
 cd /d "%~dp0"
