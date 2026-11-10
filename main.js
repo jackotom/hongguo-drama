@@ -45,6 +45,7 @@ const { pipeline } = require('node:stream/promises');
 const { randomUUID, createHash } = require('node:crypto');
 
 const hongguo = require('./src/native/hongguo');
+const { boundedSignal, throwIfAborted } = require('./src/native/request-signal');
 const { normalizeDownloadQuality, meetsDownloadQuality } = require('./src/native/download-quality');
 const { decryptInWorker } = require('./src/native/decrypt-worker.cjs');
 const { convertBytevc2 } = require('./src/native/bytevc2');
@@ -2894,15 +2895,23 @@ async function withMediaRecovery(vid, seriesId, options, consume) {
         finally { clearTimeout(timer); }
       }
       cancelled();
-      let info;
+      let info, lookup;
       try {
-        info = !round && options.playInfo || await awaitMediaOperation(hongguo.fetchPlayUrlSingle(vid, seriesId,
-          { quality: options.quality, allowLowerQuality: options.allowLowerQuality, force: options.force || round > 0 }), controller.signal, 30000);
+        info = !round && options.playInfo;
+        if (!info) {
+          lookup = boundedSignal(controller.signal, 30000);
+          info = await awaitMediaOperation(hongguo.fetchPlayUrlSingle(vid, seriesId,
+            { quality: options.quality, allowLowerQuality: options.allowLowerQuality, force: options.force || round > 0, signal: lookup.signal }), lookup.signal);
+          throwIfAborted(lookup.signal);
+        }
       } catch (error) {
         cancelled();
+        if (lookup?.signal.aborted && lookup.signal.reason?.name === 'TimeoutError') error = mediaTransferError('获取片源超时，请稍后重试');
         if (!recoverable(error)) throw error;
         lastError = error;
         continue;
+      } finally {
+        lookup?.dispose();
       }
       cancelled();
       if (!info?.url) {
