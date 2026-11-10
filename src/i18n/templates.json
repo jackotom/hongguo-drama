@@ -162,5 +162,14 @@
   "连接超时，请检查代理地址/端口或代理是否可用（耗时 {0}ms）": "Connection timed out. Check the proxy address, port and availability ({0} ms).",
   "无法解析代理地址，请检查主机名（耗时 {0}ms）": "Could not resolve the proxy address. Check the hostname ({0} ms).",
   "代理需要认证，请填写用户名与密码（耗时 {0}ms）": "The proxy requires authentication. Enter its username and password ({0} ms).",
-  "已将 {0} 集加入下载队列": "Queued {0} episodes"
+  "已将 {0} 集加入下载队列": "Queued {0} episodes",
+  "已有本地文件的实际画质尚未确认，无法确认是否满足当前播放画质 {0}；可切换自动画质后重试": "The local file's resolution has not been verified, so it may not meet the selected playback quality of {0}. Switch to Auto quality and retry.",
+  "已有本地文件为 {0}P，不满足当前播放画质 {1}；文件已保留": "The local file is {0}P and does not meet the selected playback quality of {1}. The file has been kept.",
+  "临时文件归属无法确认，已保留 {0} 个文件／目录及任务记录；这些项目未计入可释放空间。": "Ownership of {0} temporary files or directories could not be verified. They and their task records have been kept, and these items are excluded from releasable space.",
+  "本集取源失败（所选清晰度 {0}，未降级）：App：DNS 解析失败，请稍后重试。请重试或在官方 App 确认可播情况。": "Could not retrieve a source for this episode (selected quality: {0}; no downgrade): App: DNS lookup failed. Try again later. Retry, or confirm playback in the official app.",
+  "本集取源失败（所选清晰度 {0}，未降级）：App：匿名播放设备注册失败（DNS 解析失败），请检查网络，10 秒后重试。请重试或在官方 App 确认可播情况。": "Could not retrieve a source for this episode (selected quality: {0}; no downgrade): App: Anonymous playback device registration failed (DNS lookup failed). Check your network and retry in 10 seconds. Retry, or confirm playback in the official app.",
+  "本集取源失败（所选清晰度 {0}，未降级）：App：连接失败，请稍后重试。请重试或在官方 App 确认可播情况。": "Could not retrieve a source for this episode (selected quality: {0}; no downgrade): App: Connection failed. Try again later. Retry, or confirm playback in the official app.",
+  "本集取源失败（所选清晰度 {0}，未降级）：App：匿名播放设备注册失败（连接失败），请检查网络，10 秒后重试。请重试或在官方 App 确认可播情况。": "Could not retrieve a source for this episode (selected quality: {0}; no downgrade): App: Anonymous playback device registration failed (Connection failed). Check your network and retry in 10 seconds. Retry, or confirm playback in the official app.",
+  "本集取源失败（所选清晰度 {0}，未降级）：App：TLS 证书或握手失败，请稍后重试。请重试或在官方 App 确认可播情况。": "Could not retrieve a source for this episode (selected quality: {0}; no downgrade): App: TLS certificate verification or handshake failed. Try again later. Retry, or confirm playback in the official app.",
+  "本集取源失败（所选清晰度 {0}，未降级）：App：匿名播放设备注册失败（TLS 证书或握手失败），请检查网络，10 秒后重试。请重试或在官方 App 确认可播情况。": "Could not retrieve a source for this episode (selected quality: {0}; no downgrade): App: Anonymous playback device registration failed (TLS certificate verification or handshake failed). Check your network and retry in 10 seconds. Retry, or confirm playback in the official app."
 }

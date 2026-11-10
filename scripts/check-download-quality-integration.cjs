@@ -1,12 +1,14 @@
 // Isolated main-process checks: exercise real task/IPC code without user data.
 const assert = require('node:assert/strict');
+const { createTranslator } = require('../src/i18n/translator.mjs');
+const english = createTranslator(require('../src/i18n/en.json'), require('../src/i18n/templates.json'));
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const vm = require('node:vm');
 const { EventEmitter } = require('node:events');
 const { createRequire } = require('node:module');
-const { Readable } = require('node:stream');
+const { Readable, PassThrough } = require('node:stream');
 const { spawnSync } = require('node:child_process');
 const source = path.resolve(__dirname, '../main.js');
 const req = createRequire(source);
@@ -40,6 +42,40 @@ function fixture({ width = 1080, height = 1920, quality = 'auto', realMedia = fa
     setQuality: value => { settings.download_quality = value; } };
 }
 const payload = quality => ({ seriesId: '1', seriesTitle: '测试剧', episodes: [{vid:'11',vid_index:1}], ...(quality ? {quality} : {}) });
+async function bytevc2Fixture(check, { conflict = false, cancel = false, replaceCenc = false } = {}) {
+  const h = fixture(), cp = require('node:child_process'), promises = require('node:fs/promises');
+  const spawn = cp.spawn, open = promises.open;
+  let foreignOutput, spawns = 0, closed = false;
+  promises.open = async (file, flags, ...args) => {
+    if (conflict && flags === 'wx' && (file.endsWith('.decoded') || path.basename(file) === 'decoded.mp4')) {
+      foreignOutput = file; fs.writeFileSync(file, 'unrelated output');
+    }
+    return open(file, flags, ...args);
+  };
+  cp.spawn = (_exe, args) => {
+    spawns++;
+    const child = new EventEmitter(); child.stdout = new PassThrough(); child.stderr = new PassThrough();
+    child.kill = () => { setImmediate(() => { closed = true; child.emit('close', null); }); return true; };
+    queueMicrotask(() => {
+      fs.writeFileSync(args.at(-1), Buffer.alloc(200000));
+      if (replaceCenc) {
+        foreignOutput = args.at(-1);
+        fs.renameSync(foreignOutput, foreignOutput + '.original');
+        fs.writeFileSync(foreignOutput, 'unrelated CENC output');
+        closed = true; child.emit('close', replaceCenc === 'success' ? 0 : 1); return;
+      }
+      if (cancel) h.run("downloadTasks[0].cancelSource.cancel('fixture cancellation')");
+      else { child.stdout.write('out_time_us=12000000\n'); closed = true; child.emit('close', 0); }
+    });
+    return child;
+  };
+  try {
+    h.run("hongguo.fetchPlayUrlSingle = async () => ({url:'https://media.example/video.mp4',codec:'bytevc2',duration:12})");
+    if (replaceCenc) h.run("hongguo.fetchPlayUrlSingle = async () => ({url:'https://media.example/video.mp4',contentKey:Buffer.alloc(16).toString('hex')})");
+    await h.handlers['hongguo-download-batch']({}, payload());
+    await check(h, () => ({ foreignOutput, spawns, closed }));
+  } finally { promises.open = open; cp.spawn = spawn; }
+}
 async function realFootageCatalog(browseList) {
   let catalog = await browseList({ category: 'hot-real-drama' });
   if (!catalog.success && catalog.code === 'APP_TIMEOUT') {
@@ -53,6 +89,91 @@ async function realFootageCatalog(browseList) {
   return catalog;
 }
 const checks = [
+  ['astra receipt is saved before media transfer', async () => {
+    const h = fixture(); await h.handlers['hongguo-download-batch']({}, payload());
+    let durable = false;
+    h.context.testReadStream = () => {
+      const record = h.saved()[0].temporaryDownloads?.[0];
+      durable = record?.owner?.taskId === h.saved()[0].id && record?.files?.['input.enc.tmp']?.ino > 0;
+      return Readable.from([Buffer.alloc(200000)]);
+    };
+    await h.run('executeHongguoDownload(downloadTasks[0])');
+    assert.equal(durable, true, 'ownership must reach task persistence before media bytes');
+    assert.equal(h.saved()[0].status, 'completed');
+  }],
+  ...['plain', 'cache', 'hls'].map(mode => [`astra input ${mode} rejects a source replaced during validation`, async () => {
+    const h = fixture();
+    if (mode === 'cache') await h.handlers['prepare-online-play']({}, { vid:'11', seriesId:'1', prefetch:true });
+    if (mode === 'hls') h.run(`hongguo.fetchPlayUrlSingle = async () => ({url:'https://media.example/hls',format:'hls'});
+      prepareHlsFile = async (_info, output) => fs.writeFileSync(output, Buffer.alloc(200000));`);
+    await h.handlers['hongguo-download-batch']({}, payload());
+    let replaced;
+    h.context.replaceInput = file => {
+      replaced = file;
+      fs.renameSync(file, file + '.original');
+      fs.writeFileSync(file, Buffer.alloc(200000, 7));
+    };
+    h.run(`probeVideoInfo = async (_tool, file) => { replaceInput(file); return testDimensions; };`);
+    await h.run('executeHongguoDownload(downloadTasks[0])');
+    assert.equal(h.saved()[0].status, 'failed', 'a replaced input must not become completed media');
+    assert.equal(fs.existsSync(h.saved()[0].savePath), false);
+    assert.equal(fs.readFileSync(replaced)[0], 7, 'the replacement must remain at its own path');
+    assert.equal(fs.existsSync(replaced + '.original'), true, 'the original must also remain');
+  }]),
+  ['temporary workspace preserves legacy input and decoded conflicts while finishing a download', async () => {
+    await bytevc2Fixture(async (h, state) => {
+      const task = h.saved()[0], legacyInput = task.savePath + '.enc.tmp', legacyOutput = legacyInput + '.decoded';
+      fs.writeFileSync(legacyInput, 'unrelated legacy input'); fs.writeFileSync(legacyOutput, 'unrelated legacy output');
+      await h.run('executeHongguoDownload(downloadTasks[0])');
+      assert.equal(h.saved()[0].status, 'completed', h.saved()[0].error);
+      assert.equal(state().spawns, 1); assert.equal(fs.statSync(task.savePath).size, 200000);
+      assert.equal(fs.readFileSync(legacyInput, 'utf8'), 'unrelated legacy input');
+      assert.equal(fs.readFileSync(legacyOutput, 'utf8'), 'unrelated legacy output');
+      assert.equal(fs.readdirSync(task.customDir).some(name => name.startsWith('.hongguo-download-')), false);
+      assert(h.events.some(e => /视频已下载/.test(e.data.qualityNotice || '')));
+      for (const text of ['视频已下载，等待其他视频转换完成', '视频已下载，正在转换为可播放格式']) {
+        assert.doesNotMatch(english(text), /[\u4e00-\u9fff]/);
+      }
+    });
+  }],
+  ['temporary workspace preserves a raced unknown output instead of deleting it', async () => {
+    await bytevc2Fixture(async (h, state) => {
+      await h.run('executeHongguoDownload(downloadTasks[0])');
+      assert.equal(h.saved()[0].status, 'failed'); assert.equal(state().spawns, 0);
+      assert.ok(state().foreignOutput, 'the real converter must attempt exclusive output creation');
+      assert.equal(fs.readFileSync(state().foreignOutput, 'utf8'), 'unrelated output');
+      assert.equal(fs.existsSync(h.saved()[0].savePath), false);
+      assert(!h.saved()[0].error.includes(h.root), 'public errors must not contain local paths');
+      assert.equal(english(h.saved()[0].error), 'A temporary download file conflicts with another file or has changed. Existing files have been kept. Retry the download.');
+    }, { conflict: true });
+  }],
+  ['temporary workspace waits for a cancelled converter and cleans only its own files', async () => {
+    await bytevc2Fixture(async (h, state) => {
+      const task = h.saved()[0]; fs.writeFileSync(task.savePath + '.enc.tmp.decoded', 'keep legacy');
+      await h.run('executeHongguoDownload(downloadTasks[0])');
+      assert.equal(h.saved()[0].status, 'stopped'); assert.equal(state().closed, true);
+      assert.equal(fs.existsSync(task.savePath), false);
+      assert.equal(fs.readFileSync(task.savePath + '.enc.tmp.decoded', 'utf8'), 'keep legacy');
+      assert.equal(fs.readdirSync(task.customDir).some(name => name.startsWith('.hongguo-download-')), false);
+    }, { cancel: true });
+  }],
+  ['temporary workspace preserves a CENC output replaced during a failed decrypt', async () => {
+    await bytevc2Fixture(async (h, state) => {
+      await h.run('executeHongguoDownload(downloadTasks[0])');
+      assert.equal(h.saved()[0].status, 'failed');
+      assert.equal(fs.readFileSync(state().foreignOutput, 'utf8'), 'unrelated CENC output');
+      assert.equal(fs.existsSync(h.saved()[0].savePath), false);
+      assert(!h.saved()[0].error.includes(h.root));
+    }, { replaceCenc: true });
+  }],
+  ['temporary workspace cannot publish a CENC output replaced during a successful decrypt', async () => {
+    await bytevc2Fixture(async (h, state) => {
+      await h.run('executeHongguoDownload(downloadTasks[0])');
+      assert.equal(h.saved()[0].status, 'failed');
+      assert.equal(fs.readFileSync(state().foreignOutput, 'utf8'), 'unrelated CENC output');
+      assert.equal(fs.existsSync(h.saved()[0].savePath), false);
+    }, { replaceCenc: 'success' });
+  }],
   ['real footage catalog retries one timeout and preserves terminal failures', async () => {
     for (const codes of [['APP_TIMEOUT', null], ['APP_TIMEOUT', 'APP_TIMEOUT'], ['APP_SCHEMA'], ['APP_BUSINESS'], ['APP_NETWORK']]) {
       const calls = [];

@@ -389,10 +389,18 @@ function Player({ target, onNavigate, onSeriesSelected, onFloatingChange, active
     return res.data;
   }, []);
 
-  const usableLocal = useCallback((ep, seriesId) => ep && !ep.locked && ep.status === 'completed' && ep.fileUrl
-    && localMediaKey(seriesId, ep) !== rejectedLocalRef.current
-    && (['auto', 'compat'].includes(stateRef.current.onlineQuality) || /^(xifan|hema|reelshort|dramabox|custom):/.test(seriesId)
-      || Number.parseInt(ep.actualQuality, 10) >= Number.parseInt(stateRef.current.onlineQuality, 10)), []);
+  const localQualityError = useCallback((ep, seriesId) => {
+    const quality = stateRef.current.onlineQuality;
+    if (['auto', 'compat'].includes(quality) || /^(xifan|hema|reelshort|dramabox|custom):/.test(seriesId)) return '';
+    const actual = Number.parseInt(ep?.actualQuality, 10);
+    if (!Number.isFinite(actual)) return `已有本地文件的实际画质尚未确认，无法确认是否满足当前播放画质 ${quality.toUpperCase()}；可切换自动画质后重试`;
+    return actual < Number.parseInt(quality, 10) ? `已有本地文件为 ${actual}P，不满足当前播放画质 ${quality.toUpperCase()}；文件已保留` : '';
+  }, []);
+  const usableLocal = useCallback((ep, seriesId, explicitRetry = false) => ep && !ep.locked && ep.status === 'completed' && ep.fileUrl
+    && (explicitRetry || localMediaKey(seriesId, ep) !== rejectedLocalRef.current)
+    && !localQualityError(ep, seriesId), [localQualityError]);
+  const localPlaybackError = useCallback((ep, seriesId) => localQualityError(ep, seriesId)
+    || (ep.fileUrl ? '本地文件本次加载失败，文件已保留；可重试本集、切换解码方式或使用系统播放器' : '本地文件不可用，请在下载管理检查文件'), [localQualityError]);
 
   const resumeLocal = useCallback((ep, seekTo, autoplay = true) => {
     resetPlayback(autoplay);
@@ -422,6 +430,12 @@ function Player({ target, onNavigate, onSeriesSelected, onFloatingChange, active
       const latest = data?.episodes.find(item => item.vid_index === intent.vidIndex && item.vid === intent.vid);
       if (!latest || latest.locked) throw new Error(latest?.locked ? '该集已锁定，请在来源平台确认' : '无法刷新本集状态，请重试');
       if (usableLocal(latest, intent.seriesId)) { resumeLocal(latest, intent.seekTo, intent.autoplay); return; }
+      if (latest.status === 'completed') {
+        intent.submitting = false;
+        fallbackRef.current = null;
+        setWaitingFor(null); setPlaybackError(localPlaybackError(latest, intent.seriesId));
+        return;
+      }
       const key = `${intent.selection}:${intent.seriesId}:${intent.vid}`;
       if (latest.taskId && ['pending', 'downloading'].includes(latest.status)) {
         intent.submitting = false;
@@ -449,7 +463,7 @@ function Player({ target, onNavigate, onSeriesSelected, onFloatingChange, active
       fallbackRef.current = null;
       setWaitingFor(null); setPlaybackError(`${message}；${error.message}`);
     }
-  }, [currentPosition, resetPlayback, loadDetail, isCurrentFallback, usableLocal, resumeLocal]);
+  }, [currentPosition, resetPlayback, loadDetail, isCurrentFallback, usableLocal, resumeLocal, localPlaybackError]);
 
   const refreshOnlineCacheInfo = useCallback(async () => {
     try {
@@ -644,14 +658,15 @@ function Player({ target, onNavigate, onSeriesSelected, onFloatingChange, active
           && (!ep || ep.locked || (ep.status === 'failed' && !ep.retryAt) || ['stopped', 'cancelled', 'missing', 'completed'].includes(ep.status))) {
           setWaitingFor(null);
           fallbackRef.current = null;
-          setPlaybackError(ep?.error || (ep?.status === 'stopped' || ep?.status === 'cancelled' ? '本集下载已停止，可在下载管理重试'
-            : ep?.status === 'completed' ? '已有本地文件无法播放，请在下载管理检查文件' : '本集下载失败或任务已移除，请在下载管理检查后重试'));
+          setPlaybackError(ep?.status === 'completed' ? localPlaybackError(ep, String(activeSeriesId))
+            : ep?.error || (ep?.status === 'stopped' || ep?.status === 'cancelled' ? '本集下载已停止，可在下载管理重试'
+              : '本集下载失败或任务已移除，请在下载管理检查后重试'));
         }
       }
     }, 2000);
     return () => { clearInterval(timer); unsubscribe.forEach(off => off?.()); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [playbackActive, activeSeriesId, waitingFor, loadDetail, currentPosition, isCurrentFallback, usableLocal, resumeLocal]);
+  }, [playbackActive, activeSeriesId, waitingFor, loadDetail, currentPosition, isCurrentFallback, usableLocal, resumeLocal, localPlaybackError]);
 
   const episodes = detail ? detail.episodes : [];
   const current = useMemo(
@@ -1023,14 +1038,25 @@ function Player({ target, onNavigate, onSeriesSelected, onFloatingChange, active
     [episodes, activeSeriesId, resetPlayback, startOnlinePlay, currentPosition, usableLocal, prunePrefetchAfter, onlineQuality]
   );
 
-  const retryPlayback = async (autoplay = true) => {
+  const retryPlayback = async (autoplay = loadedMediaRef.current ? !loadedMediaRef.current.element.paused : pendingAutoplayRef.current) => {
     const version = mediaVersion.current, selection = selectionVersion.current, navigation = navigationVersion.current;
+    const seekTo = currentPosition();
     let data;
     try { data = await loadDetail(activeSeriesId); } catch (_) {}
     if (!activeRef.current || navigation !== navigationVersion.current || version !== mediaVersion.current || selection !== selectionVersion.current) return;
     prefetchRejectedRef.current = false;
     const latest = data?.episodes.find(ep => ep.vid_index === currentIndex && ep.vid === current?.vid);
-    if (usableLocal(latest, String(activeSeriesId))) { resumeLocal(latest, currentPosition(), autoplay); return; }
+    if (usableLocal(latest, String(activeSeriesId), true)) {
+      rejectedLocalRef.current = null;
+      fallbackAttemptRef.current = null;
+      reconnectAttemptRef.current = null;
+      resumeLocal(latest, seekTo, autoplay);
+      return;
+    }
+    if (latest?.status === 'completed' && !latest.locked) {
+      setPlaybackError(localPlaybackError(latest, String(activeSeriesId)));
+      return;
+    }
     setCompatMap(prev => { const next = { ...prev }; delete next[currentIndex]; return next; });
     if (onlineSourceRef.current === `${activeSeriesId}:${currentIndex}` || current?.status !== 'completed') {
       fallbackAttemptRef.current = null;
@@ -1677,6 +1703,9 @@ function Player({ target, onNavigate, onSeriesSelected, onFloatingChange, active
                 if (loadedMediaRef.current) pendingAutoplayRef.current = !loadedMediaRef.current.element.paused;
                 persistPosition(true); holdVideoFrame(); videoRef.current?.pause(); loadedMediaRef.current = null;
                 setSoftwareDecode(next);
+                if (current?.status === 'completed' && (playbackError || decodeFailed || !usableLocal(current, String(activeSeriesId)))) {
+                  void retryPlayback(pendingAutoplayRef.current);
+                }
                 try { window.localStorage.setItem('hongguo:software-decode', String(next)); }
                 catch { showToast('解码方式已切换，但未能保存'); }
               }}>

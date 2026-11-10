@@ -1,4 +1,5 @@
 const fs = require('node:fs/promises');
+const { removeOwnedFile, isOwnedFile } = require('./download-temporary');
 
 // Downloads and both prefetched episodes share one CPU budget; never restart an active conversion.
 const waiting = [];
@@ -35,7 +36,7 @@ function acquire(signal, cancelToken, getPriority) {
   });
 }
 
-async function convertBytevc2({ executable, input, output, contentKey, duration, signal, cancelToken, onProgress, onPhase, maxBytes = Infinity, getPriority = () => 0 }) {
+async function convertBytevc2({ executable, input, output, contentKey, duration, signal, cancelToken, onProgress, onPhase, onOutputCreated, maxBytes = Infinity, getPriority = () => 0 }) {
   const cancelled = () => signal?.aborted || cancelToken?.reason;
   if (cancelled()) throw abortError();
   if (!executable) throw new Error('未找到内置 ByteVC2 解码组件，请重新下载完整版本后重试');
@@ -46,9 +47,16 @@ async function convertBytevc2({ executable, input, output, contentKey, duration,
   try {
     if (cancelled()) throw abortError();
     onPhase?.('transcoding');
-    const file = await fs.open(output, 'wx', 0o600);
-    await file.close();
+    let identity;
+    const checkOutput = async () => {
+      if (!await isOwnedFile(output, identity)) throw Object.assign(new Error('视频转换临时文件已变化，已有文件已保留，请重试'), { code: 'EEXIST' });
+    };
     try {
+      const file = await fs.open(output, 'wx', 0o600);
+      try {
+        identity = await file.stat();
+        onOutputCreated?.(identity);
+      } finally { await file.close(); }
       if (cancelled()) throw abortError();
       const encoders = process.platform === 'darwin' && process.arch === 'arm64'
         ? ['h264_videotoolbox', 'libx264'] : ['libx264'];
@@ -109,6 +117,7 @@ async function convertBytevc2({ executable, input, output, contentKey, duration,
             if (cancelled()) stop();
           });
           if (cancelled()) throw abortError();
+          await checkOutput();
           const size = (await fs.stat(output)).size;
           if (size >= maxBytes) throw Object.assign(new Error('本集转码后过大，请下载后播放'), { code: 'MEDIA_TOO_LARGE' });
           if (!size || seconds < duration - 1) throw new Error('ByteVC2 转码结果不完整，请重试本集');
@@ -116,12 +125,14 @@ async function convertBytevc2({ executable, input, output, contentKey, duration,
         } catch (error) {
           if (encoder !== 'h264_videotoolbox' || cancelled()
             || !(error.hardwareEncoderFailed || error.code === 'MEDIA_TOO_LARGE')) throw error;
+          await checkOutput();
           await fs.truncate(output, 0);
           onProgress?.(0);
         }
       }
     } catch (error) {
-      await fs.unlink(output).catch(() => {});
+      if (identity) await removeOwnedFile(output, identity).catch(() => {});
+      if (error.code === 'EEXIST') throw Object.assign(new Error('视频转换临时文件发生冲突，已有文件已保留，请重试'), { code: 'EEXIST' });
       throw error;
     }
   } finally { release(); }

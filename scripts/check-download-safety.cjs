@@ -12,29 +12,215 @@ let serial = 0, failures = 0;
 function load(settings = {}, overrides = {}, env = process.env, options = {}) {
   const dir = path.join(root, String(++serial)); fs.mkdirSync(dir);
   const handlers = {}, app = new EventEmitter(), opened = [], proxyCalls = [];
-  let stored = { root: dir, ...settings };
+  let stored = { root: dir, ...settings }, savedTasks = [];
   Object.assign(app, { getVersion: () => 'test', getPath: () => dir, commandLine: { appendSwitch() {} }, requestSingleInstanceLock: () => true, whenReady: () => ({ then() {} }) });
   const electron = {
     app, ipcMain: { handle: (name, fn) => handlers[name] = fn }, protocol: { registerSchemesAsPrivileged() {} },
     shell: { showItemInFolder: target => { opened.push(target); }, openPath: async target => { opened.push(`open:${target}`); return ''; } },
     session: { defaultSession: { setProxy: async options => { proxyCalls.push(options); } } },
   };
-  const store = { getSettings: () => ({ ...stored }), saveTasks() { if (options.failSaveTasks) throw new Error('disk full'); }, saveSeries() {}, saveMergeTasks() {}, saveSettings(next) { stored = { ...next }; } };
+  const store = { getSettings: () => ({ ...stored }), saveTasks(tasks) { if (options.failSaveTasks) throw new Error('disk full'); savedTasks = JSON.parse(JSON.stringify(tasks)); }, saveSeries() {}, saveMergeTasks() {}, saveSettings(next) { stored = { ...next }; } };
   const context = vm.createContext({ require: name => overrides[name] || (name === 'electron' ? electron : name === './src/store' ? store : req(name)), __dirname: path.dirname(source), process: { ...process, env: { ...env } }, console: { log() {}, warn() {}, error() {} }, Buffer, URL, Response, Request, Headers, AbortController, setTimeout, clearTimeout });
   vm.runInContext(fs.readFileSync(source, 'utf8'), context, { filename: source });
   require('./fixtures/trusted-ipc.cjs')(context, handlers);
   const pump = context.pumpQueue;
   context.pumpQueue = () => {}; // Inspect queued destinations without fetching media.
   context.processDownloadQueue = () => {};
-  return { app, context, handlers, dir, pump, opened, proxyCalls, settings: () => stored, run: code => vm.runInContext(code, context), set(name, value) { context.fixture = value; vm.runInContext(`${name} = fixture`, context); } };
+  return { app, context, handlers, dir, pump, opened, proxyCalls, saved: () => JSON.parse(JSON.stringify(savedTasks)), settings: () => stored, run: code => vm.runInContext(code, context), set(name, value) { context.fixture = value; vm.runInContext(`${name} = fixture`, context); } };
 }
 function task(id, dir, status = 'completed', filename = `${id}.mp4`, index = 1) {
   return { id, type: 'hongguo', status, filename, savePath: path.join(dir, filename), customDir: dir, hongguoInfo: { vid: id, series_id: 'S', series_title: 'Short', vid_index: index } };
 }
 function series() { return [{ series_id: 'S', series_title: 'Short', episodes: [{ vid: 'one', vid_index: 1 }, { vid: 'two', vid_index: 2 }] }]; }
 function file(p) { fs.writeFileSync(p, Buffer.alloc(120000)); }
-async function check(name, run) { try { await run(); console.log('PASS ' + name); } catch (error) { failures++; console.error('FAIL ' + name + ': ' + error.message); } }
+async function check(name, run) { if (process.argv[2] && !new RegExp(process.argv[2]).test(name)) return; try { await run(); console.log('PASS ' + name); } catch (error) { failures++; console.error('FAIL ' + name + ': ' + error.message); } }
+async function crashedTemporary(overrides = {}) {
+  const h = load({}, overrides), one = task('one', h.dir, 'downloading');
+  h.set('seriesRegistry', series()); h.set('downloadTasks', [one]);
+  const temporary = await require('../src/native/download-temporary').createDownloadTemporary(h.dir, {
+    owner: { taskId:one.id, seriesId:'S', vid:'one', vidIndex:1, savePath:one.savePath },
+    onChange(record) {
+      one.temporaryDownloads ||= [];
+      if (!one.temporaryDownloads.includes(record)) one.temporaryDownloads.push(record);
+      h.run('saveDownloadTasks()');
+    },
+  });
+  file(temporary.input); await temporary.reserveOutput(); file(temporary.output);
+  h.run('saveDownloadTasks()');
+  const restored = load({ root:h.dir }, overrides); restored.set('seriesRegistry', series());
+  restored.context.crashSnapshot = h.saved();
+  restored.run('store.saveTasks(crashSnapshot); store.getTasks = () => crashSnapshot; loadDownloadTasks();');
+  return { h:restored, temporary, original:h };
+}
 (async () => {
+  for (const [channel, gateAt] of [['delete-task',1], ['delete-episode-file',1], ['delete-series-files',1], ['delete-series-files',2]]) {
+    await check(`astra location snapshot ${channel} retains A after NAS relocation to B (gate ${gateAt})`, async () => {
+      const { h, temporary } = await crashedTemporary();
+      const originalPath = h.run('downloadTasks[0].savePath');
+      const oldFamily = [originalPath, originalPath + '.enc.tmp', originalPath + '.enc.tmp.decoded'];
+      oldFamily.forEach(file);
+      const directoryB = path.join(h.dir,'NAS-B'); fs.mkdirSync(directoryB);
+      h.context.destinationB = { root:fs.realpathSync(directoryB), directory:fs.realpathSync(directoryB), flat:true,
+        device:fs.statSync(directoryB).dev, seriesId:'S', title:'Short', season:1 };
+      const targetB = h.run("path.join(destinationB.directory,nasEpisodeFilename(destinationB,{vid:'one',vid_index:1,title:''}))");
+      const retainedB = targetB + '.enc.tmp'; fs.writeFileSync(retainedB,'keep B');
+      const promises = require('node:fs/promises'), lstat = promises.lstat;
+      let enter, resume, calls = 0, timer;
+      const entered = new Promise(resolve => { enter = resolve; });
+      const released = new Promise(resolve => { resume = resolve; });
+      promises.lstat = async (name, ...args) => {
+        if (name === path.dirname(temporary.input) && ++calls === gateAt) { enter(); await released; }
+        return lstat(name,...args);
+      };
+      const args = channel === 'delete-task' ? ['one',{deleteFiles:true}] : channel === 'delete-episode-file' ? ['S',1] : ['S'];
+      const deletion = h.handlers[channel]({},...args);
+      try {
+        await Promise.race([entered,new Promise((_,reject) => { timer = setTimeout(() => reject(new Error('cleanup gate was not reached')),1000); })]);
+        clearTimeout(timer);
+        h.run(`Object.assign(downloadTasks[0], {savePath:path.join(destinationB.directory,nasEpisodeFilename(destinationB,{vid:'one',vid_index:1,title:''})),
+          customDir:destinationB.directory, filename:nasEpisodeFilename(destinationB,{vid:'one',vid_index:1,title:''}),
+          nasDestination:destinationB, status:'pending', cancelled:false, progress:0}); saveDownloadTasks();`);
+        assert.notEqual(h.run('downloadTasks[0].savePath'),originalPath);
+        resume(); const result = await deletion;
+        for (const name of oldFamily) assert.equal(fs.existsSync(name),true,'old A file family must be preserved after relocation');
+        assert.equal(fs.readFileSync(retainedB,'utf8'),'keep B'); assert.equal(fs.existsSync(targetB),false);
+        assert.equal(h.run('downloadTasks[0].savePath'),targetB); assert.equal(h.run('downloadTasks[0].status'),'pending');
+        assert.equal(h.run('downloadTasks[0].temporaryDownloads.length'),1);
+        assert.equal(h.saved()[0].savePath,targetB); assert.equal(h.saved()[0].temporaryDownloads.length,1);
+        assert.equal(result.success,false); assert.match(result.error || result.warning,/任务保存位置已变化/);
+        assert.equal(result.freed,(gateAt-1)*120000);
+        assert.equal(channel === 'delete-task' ? result.fileCount : result.count,gateAt-1);
+      } finally { clearTimeout(timer); resume(); promises.lstat = lstat; await deletion.catch(() => {}); }
+    });
+  }
+  for (const channel of ['delete-task', 'delete-episode-file', 'delete-series-files']) await check(`astra persisted temporary survives restart and ${channel}`, async () => {
+    const { h, temporary } = await crashedTemporary();
+    const usage = await h.handlers['get-storage-usage']({});
+    assert.equal(usage.totalBytes, 240000, 'crash residue must be counted as releasable storage');
+    assert.equal(usage.totalFiles, 2);
+    const args = channel === 'delete-task' ? ['one', {deleteFiles:true}] : channel === 'delete-episode-file' ? ['S',1] : ['S'];
+    const result = await h.handlers[channel]({}, ...args);
+    assert.equal(result.success, true, result.error); assert.equal(result.freed, 240000);
+    assert.equal(fs.existsSync(path.dirname(temporary.input)), false);
+    assert.equal(h.run('downloadTasks.length'), 0);
+  });
+  await check('astra persisted temporary retains unknown replacements and their recovery record', async () => {
+    const { h, temporary } = await crashedTemporary();
+    fs.renameSync(temporary.input, temporary.input + '.original'); file(temporary.input);
+    const usage = await h.handlers['get-storage-usage']({});
+    assert.equal(usage.totalBytes, 120000); assert.equal(usage.unverifiedItems, 2);
+    assert.equal(usage.unverifiedBytes, 240000); assert.match(usage.warning, /保留/);
+    const result = await h.handlers['delete-task']({}, 'one', {deleteFiles:true});
+    assert.equal(result.success, false); assert.equal(result.freed, 120000);
+    assert.equal(fs.existsSync(temporary.input), true); assert.equal(fs.existsSync(temporary.input + '.original'), true);
+    assert.equal(h.run('downloadTasks.length'), 1); assert.equal(h.saved()[0].temporaryDownloads.length, 1);
+  });
+  await check('astra persisted temporary with unknown directory identity is retained and counted explicitly', async () => {
+    const { h, temporary } = await crashedTemporary();
+    h.run('downloadTasks[0].temporaryDownloads[0].identity.ino = 0');
+    const usage = await h.handlers['get-storage-usage']({});
+    assert.equal(usage.totalBytes, 0); assert.equal(usage.unverifiedItems, 1);
+    assert.equal(usage.unverifiedBytes, null); assert.match(usage.warning, /保留/);
+    const result = await h.handlers['delete-task']({}, 'one', {deleteFiles:true});
+    assert.equal(result.success, false); assert.equal(fs.existsSync(temporary.input), true);
+    assert.equal(h.run('downloadTasks.length'), 1);
+  });
+  await check('astra persisted temporary protects active work and never adopts foreign directories', async () => {
+    const { h, temporary } = await crashedTemporary();
+    h.run("downloadTasks[0].status = 'downloading'");
+    const active = await h.handlers['delete-episode-file']({}, 'S', 1);
+    assert.equal(active.success, false); assert.equal(fs.existsSync(temporary.input), true);
+    h.run("downloadTasks[0].status = 'failed'");
+    const foreign = path.join(path.dirname(path.dirname(temporary.input)), '.hongguo-download-ABCDEF');
+    fs.mkdirSync(foreign); file(path.join(foreign, 'unknown'));
+    const usage = await h.handlers['get-storage-usage']({});
+    assert.equal(usage.totalBytes, 240000); assert.equal(usage.unverifiedItems, 1);
+    const result = await h.handlers['delete-series-files']({}, 'S');
+    assert.equal(result.success, false); assert.equal(fs.existsSync(path.join(foreign, 'unknown')), true);
+    assert.equal(h.run('downloadTasks.length'), 1);
+  });
+  await check('astra persisted temporary migration leaves legacy records without receipts valid', async () => {
+    const h = load(); h.set('seriesRegistry', series()); const one = task('one', h.dir);
+    file(one.savePath + '.enc.tmp'); h.set('downloadTasks', [one]);
+    const usage = await h.handlers['get-storage-usage']({});
+    assert.equal(usage.totalBytes, 120000); assert.equal(usage.unverifiedItems, 0);
+    const result = await h.handlers['delete-task']({}, 'one', {deleteFiles:true});
+    assert.equal(result.success, true); assert.equal(h.run('downloadTasks.length'), 0);
+  });
+  await check('astra persisted temporary stops recovery when a task becomes active during cleanup', async () => {
+    const { h, temporary } = await crashedTemporary();
+    const promises = require('node:fs/promises'), unlink = promises.unlink;
+    let restarted = false, firstRemoved;
+    promises.unlink = async file => {
+      const result = await unlink(file);
+      if (!restarted) { restarted = true; firstRemoved = file; h.run("downloadTasks[0].status = 'pending'"); }
+      return result;
+    };
+    try {
+      const result = await h.handlers['delete-episode-file']({}, 'S', 1);
+      assert.equal(result.success, false);
+      assert.equal(fs.existsSync(firstRemoved === temporary.input ? temporary.output : temporary.input), true, 'active work must not lose its remaining file');
+      assert.equal(h.run('downloadTasks[0].temporaryDownloads.length'), 1);
+    } finally { promises.unlink = unlink; }
+  });
+  await check('astra persisted temporary warning has one complete English template', async () => {
+    const { createTranslator } = require('../src/i18n/translator.mjs');
+    const english = createTranslator(require('../src/i18n/en.json'), require('../src/i18n/templates.json'));
+    const h = load();
+    assert.equal(english(h.context.temporaryWarning(2)), 'Ownership of 2 temporary files or directories could not be verified. They and their task records have been kept, and these items are excluded from releasable space.');
+  });
+  await check('astra persisted temporary keeps legacy recovery association when its directory cannot be listed', async () => {
+    let blocked;
+    const fakeFs = Object.create(fs);
+    fakeFs.readdirSync = (directory, ...args) => {
+      if (directory === blocked) throw Object.assign(new Error('fixture list denied'), {code:'EACCES'});
+      return fs.readdirSync(directory, ...args);
+    };
+    const h = load({}, {fs:fakeFs}); blocked = h.dir;
+    h.set('seriesRegistry', series()); h.set('downloadTasks', [task('one',h.dir)]);
+    const usage = await h.handlers['get-storage-usage']({});
+    assert.equal(usage.unverifiedItems, 1); assert.equal(usage.unverifiedBytes, null);
+    const result = await h.handlers['delete-task']({}, 'one');
+    assert.equal(result.success, false); assert.equal(h.run('downloadTasks.length'), 1);
+  });
+  await check('astra persisted temporary remains reachable after a successful retry', async () => {
+    const { h, temporary } = await crashedTemporary({ './src/native/hongguo':{fetchPlayUrlSingle:async()=>({url:'https://media.example/video'})} });
+    h.context.resolveFfmpeg = () => '/fixture/ffprobe';
+    h.context.probeVideoInfo = async () => ({w:1080,h:1920,duration:12}); h.context.verifyDownloadDecode = async () => {};
+    h.context.requestMedia = async () => ({ headers:{'content-length':'200000'}, data:require('node:stream').Readable.from([Buffer.alloc(200000)]) });
+    await h.handlers['retry-task']({}, 'one');
+    await h.run('executeHongguoDownload(downloadTasks[0])');
+    assert.equal(h.saved()[0].status, 'completed'); assert.equal(h.saved()[0].temporaryDownloads.length, 1);
+    assert.equal(fs.existsSync(temporary.input), true);
+    assert.equal((await h.handlers['get-storage-usage']({})).totalBytes, 440000);
+    const result = await h.handlers['delete-task']({}, 'one', {deleteFiles:true});
+    assert.equal(result.success, true, result.error); assert.equal(result.freed, 440000);
+    assert.equal(fs.existsSync(path.dirname(temporary.input)), false); assert.equal(h.run('downloadTasks.length'), 0);
+  });
+  await check('astra persisted temporary rejects another episode owner without adopting its files', async () => {
+    const { h, temporary } = await crashedTemporary();
+    h.run("downloadTasks[0].temporaryDownloads[0].owner.vid = 'other-episode'");
+    const usage = await h.handlers['get-storage-usage']({});
+    assert.equal(usage.totalBytes, 0); assert.equal(usage.unverifiedItems, 1);
+    const result = await h.handlers['delete-task']({}, 'one', {deleteFiles:true});
+    assert.equal(result.success, false); assert.equal(fs.existsSync(temporary.input), true);
+    assert.equal(fs.existsSync(temporary.output), true); assert.equal(h.run('downloadTasks.length'), 1);
+  });
+  await check('G2 desktop diagnostics translate complete DNS connection and TLS messages', async () => {
+    const { createTranslator } = require('../src/i18n/translator.mjs');
+    const english = createTranslator(require('../src/i18n/en.json'), require('../src/i18n/templates.json'));
+    const native = fs.readFileSync(req.resolve('./src/native/hongguo'), 'utf8'), context = vm.createContext({});
+    vm.runInContext(native.slice(native.indexOf('function sourceFailure('), native.indexOf('async function fetchPlayUrlFresh(')), context);
+    for (const networkFailure of ['DNS','CONNECTION','TLS']) for (const registration of [false,true]) {
+      const failure = registration ? {code:'DEVICE_REGISTRATION_FAILED',registrationFailure:'NETWORK_ERROR',networkFailure}
+        : {code:'ERR_NETWORK',networkFailure};
+      const mapped = context.sourceFailure('app',failure);
+      assert.equal(mapped.code,'NETWORK_ERROR');
+      for (const message of [mapped.message, context.unavailableSources([mapped]).message, context.unavailableSources([mapped],'1080p').message]) {
+        assert.doesNotMatch(english(message), /[\u4e00-\u9fff]/, 'the full diagnostic sentence must translate');
+      }
+    }
+  });
   await check('NAS deletion rejects a changed mount and retains the task and foreign file', async () => {
     for (const channel of ['delete-task', 'delete-tasks', 'delete-series-files', 'delete-all-downloaded', 'delete-episode-file']) {
       const h = load(); h.set('seriesRegistry', series());

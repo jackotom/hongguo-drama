@@ -48,6 +48,7 @@ const hongguo = require('./src/native/hongguo');
 const { normalizeDownloadQuality, meetsDownloadQuality } = require('./src/native/download-quality');
 const { decryptInWorker } = require('./src/native/decrypt-worker.cjs');
 const { convertBytevc2 } = require('./src/native/bytevc2');
+const { createDownloadTemporary, downloadTemporaryOwner, inspectDownloadTemporary, cleanupDownloadTemporary } = require('./src/native/download-temporary');
 const store = require('./src/store');
 const watchHistory = require('./src/native/watch-history');
 const { createAccountService, safeMessage: accountSafeMessage } = require('./src/native/account-session');
@@ -989,7 +990,7 @@ async function executeHongguoDownload(task) {
   const { vid, series_title } = hongguoInfo || {};
   const source = axios.CancelToken.source();
   task.cancelSource = source;
-  let tmpPath, writer;
+  let tmpPath, writer, temporary;
   try {
     task.status = 'downloading'; task.cancelled = false; task.progress = 0; delete task.retryAt;
     delete task.qualityNotice; delete task.actualQuality;
@@ -1043,7 +1044,13 @@ async function executeHongguoDownload(task) {
       saveDownloadTasks(); sendToRenderer('download-completed', { id, path: finalPath });
       return;
     }
-    tmpPath = finalPath + '.enc.tmp';
+    temporary = await createDownloadTemporary(downloadDir, { owner:downloadTemporaryOwner(task), onChange:record => {
+      if (!downloadTasks.includes(task) || task.temporaryDownloads != null && !Array.isArray(task.temporaryDownloads)) throw new Error('任务记录已变化，已保留文件和记录，请重试');
+      task.temporaryDownloads ||= [];
+      if (!task.temporaryDownloads.includes(record)) task.temporaryDownloads.push(record);
+      saveDownloadTasks();
+    } });
+    tmpPath = temporary.input;
     const sourceId = /^custom:[^:]+/.exec(String(vid))?.[0] || /^(xifan|hema|reelshort|dramabox):/.exec(String(vid))?.[1] || 'hongguo';
     const completeCache = cached => cached?.complete && cached.vid === String(vid) && cached.source === sourceId
       && cached.seriesId === String(hongguoInfo?.series_id || '') && cached.size > 0
@@ -1064,11 +1071,11 @@ async function executeHongguoDownload(task) {
         source.token.throwIfRequested();
         try { task.actualQuality = await verifyDownloadQuality(tmpPath, quality, false, true, source.token); }
         catch (_) {
-          fs.unlinkSync(tmpPath);
           source.token.throwIfRequested();
           rejectedCaches.add(cached);
           continue;
         }
+        await temporary.checkInput();
         source.token.throwIfRequested();
         checkCustomAccess(vid);
         publishDownloadFile(tmpPath, finalPath);
@@ -1109,6 +1116,7 @@ async function executeHongguoDownload(task) {
       if (playInfo.format === 'hls') {
         await prepareHlsFile(playInfo,tmpPath,{cancelToken:source.token,onProgress:received => { task.receivedBytes = received; sendToRenderer('download-progress',{id,progress:0,receivedBytes:received,totalBytes:0}); }});
         task.actualQuality = await verifyReceived(tmpPath);
+        await temporary.checkInput();
         source.token.throwIfRequested(); checkCustomAccess(vid);
         publishDownloadFile(tmpPath,finalPath);
         return;
@@ -1132,41 +1140,46 @@ async function executeHongguoDownload(task) {
       source.token.throwIfRequested();
       if (!received || (totalLength && received !== totalLength)) throw mediaTransferError('视频下载不完整，请重试');
       if (playInfo.contentKey || playInfo.codec === 'bytevc2') {
-        const decodedPath = tmpPath + '.decoded';
+        const decodedPath = temporary.output;
         try {
           if (playInfo.codec === 'bytevc2') {
             const notice = task.qualityNotice;
             const progress = (seconds, phase = 'transcoding') => {
               task.progress = Math.min(99, Math.floor(seconds / playInfo.duration * 100));
-              task.qualityNotice = phase === 'queued' ? '等待其他视频转换完成' : '正在转换为可播放格式';
+              task.qualityNotice = phase === 'queued' ? '视频已下载，等待其他视频转换完成' : '视频已下载，正在转换为可播放格式';
               sendToRenderer('download-progress', { id, progress: task.progress, qualityNotice: task.qualityNotice });
             };
             try {
               await convertBytevc2({ executable: resolveFfmpeg('librempeg'), input: tmpPath, output: decodedPath,
                 contentKey: playInfo.contentKey, duration: playInfo.duration, cancelToken: source.token, onProgress: progress,
-                onPhase: phase => progress(0, phase) });
+                onPhase: phase => progress(0, phase), onOutputCreated: temporary.outputCreated });
             } finally { task.qualityNotice = notice || ''; }
-          } else await decryptContentKeyFile(tmpPath, decodedPath, playInfo.contentKey, { cancelToken: source.token });
+          } else {
+            await temporary.reserveOutput();
+            await decryptContentKeyFile(tmpPath, decodedPath, playInfo.contentKey, { cancelToken: source.token, cleanupOutput: temporary.removeOutput });
+          }
           task.actualQuality = await verifyReceived(decodedPath);
+          await temporary.checkOutput();
           source.token.throwIfRequested();
           publishDownloadFile(decodedPath, finalPath);
-        } finally { try { fs.unlinkSync(decodedPath); } catch (_) {} }
-        fs.unlinkSync(tmpPath);
+        } finally { await temporary.removeOutput(); }
       } else if (playInfo.spadeA) {
         const key = hongguo.deriveKey(playInfo.spadeA);
         if (!key) throw new Error('Key 派生失败');
         // Decrypt to another temporary file; never expose partial data as a completed MP4.
-        const decodedPath = tmpPath + '.decoded';
+        const decodedPath = temporary.output;
         try {
+          await temporary.reserveOutput();
           await decryptInWorker({ srcPath: tmpPath, dstPath: decodedPath, key }, { cancelToken: source.token });
           task.actualQuality = await verifyReceived(decodedPath);
+          await temporary.checkOutput();
           source.token.throwIfRequested();
           publishDownloadFile(decodedPath, finalPath);
         }
-        finally { try { fs.unlinkSync(decodedPath); } catch (_) {} }
-        fs.unlinkSync(tmpPath);
+        finally { await temporary.removeOutput(); }
       } else {
         task.actualQuality = await verifyReceived(tmpPath);
+        await temporary.checkInput();
         source.token.throwIfRequested();
         publishDownloadFile(tmpPath, finalPath);
       }
@@ -1178,7 +1191,6 @@ async function executeHongguoDownload(task) {
     saveDownloadTasks(); sendToRenderer('download-completed', { id, path: finalPath, actualQuality: task.actualQuality, qualityNotice: task.qualityNotice || '' });
   } catch (error) {
     if (writer && !writer.destroyed) writer.destroy();
-    if (tmpPath) { try { fs.unlinkSync(tmpPath); } catch (_) {} }
     let paused = [];
     task.qualityNotice = '';
     // A retry may already be queued; the cancelled old run must not overwrite it.
@@ -1189,7 +1201,7 @@ async function executeHongguoDownload(task) {
       }
     } else {
       const retries = task.sourceRetries || 0;
-      task.status = 'failed'; task.error = error.message; task.endTime = Date.now();
+      task.status = 'failed'; task.error = error.code === 'EEXIST' ? '下载临时文件发生冲突或已变化，已有文件已保留，请重试' : error.message; task.endTime = Date.now();
       if (/^\d{1,30}$/.test(String(vid)) && isDownloadSourceRejection(error)) paused = pausePendingHongguoTasks();
       else if (retries < SOURCE_RETRY_DELAYS.length && isDeferrableSourceError(task, error)) {
         const delays = error.code === 'SOURCE_UNAVAILABLE' || [404, 410].includes(error.mediaStatus)
@@ -1205,6 +1217,13 @@ async function executeHongguoDownload(task) {
     saveDownloadTasks();
     for (const task of paused) clearSourceRetry(task);
   } finally {
+    if (temporary) {
+      const result = await temporary.cleanup().catch(() => null);
+      if (result?.missing) {
+        task.temporaryDownloads = task.temporaryDownloads.filter(record => record !== temporary.record);
+        try { saveDownloadTasks(); } catch (_) { /* The stored receipt remains recoverable on restart. */ }
+      }
+    }
     if (task.cancelSource === source) delete task.cancelSource;
     if (task.writer === writer) delete task.writer;
   }
@@ -2318,6 +2337,61 @@ function episodeFilePaths(file) {
   return [file, file + '.enc.tmp', file + '.enc.tmp.decoded'];
 }
 
+function taskTemporaryRecords(task) {
+  return task.temporaryDownloads == null ? [] : Array.isArray(task.temporaryDownloads) ? task.temporaryDownloads : [task.temporaryDownloads];
+}
+
+function untrackedTemporaryDirectories(directory) {
+  const recorded = new Set(downloadTasks.flatMap(task => taskTemporaryRecords(task).map(record => record?.directory)));
+  try { return fs.readdirSync(directory).filter(name => /^\.hongguo-download-[A-Za-z0-9]{6}$/.test(name))
+    .map(name => path.join(directory, name)).filter(file => !recorded.has(file)); }
+  catch (error) { return error.code === 'ENOENT' ? [] : [directory]; }
+}
+
+function hasPendingTemporaries(task) {
+  return taskTemporaryRecords(task).length > 0 || !!task.savePath && untrackedTemporaryDirectories(path.dirname(task.savePath)).length > 0;
+}
+
+function temporaryWarning(count) {
+  return count ? `临时文件归属无法确认，已保留 ${count} 个文件／目录及任务记录；这些项目未计入可释放空间。` : undefined;
+}
+
+function taskTemporaryState(task, record) {
+  if (record?.directory && downloadTasks.some(other => other !== task && taskTemporaryRecords(other).some(item => item?.directory === record.directory))) {
+    return { files:[], unverifiedItems:1, unverifiedBytes:null, missing:false, directoryVerified:false };
+  }
+  return inspectDownloadTemporary(record, downloadTemporaryOwner(task));
+}
+
+async function cleanupTaskTemporaries(tasks, extraDirectory) {
+  let count = 0, freed = 0, failed = 0, retained = 0, changed = false;
+  const previous = [];
+  for (const task of tasks) {
+    if (isTaskInFlight(task)) continue;
+    const removed = new Set(), owner = downloadTemporaryOwner(task);
+    for (const record of [...taskTemporaryRecords(task)]) {
+      const state = taskTemporaryState(task, record);
+      const canRemove = () => downloadTasks.includes(task) && !isTaskInFlight(task) && task.savePath === owner.savePath && taskTemporaryRecords(task).includes(record);
+      const result = state.directoryVerified || state.missing ? await cleanupDownloadTemporary(record, owner, canRemove)
+        : { ...state, count:0, freed:0, failed:0 };
+      count += result.count; freed += result.freed; failed += result.failed;
+      if (result.missing) removed.add(record);
+      else retained += Math.max(1, result.files.length + result.unverifiedItems);
+    }
+    if (removed.size) {
+      previous.push([task, task.temporaryDownloads]);
+      task.temporaryDownloads = taskTemporaryRecords(task).filter(record => !removed.has(record)); changed = true;
+    }
+  }
+  const parents = new Set([extraDirectory, ...tasks.map(task => task.savePath && path.dirname(task.savePath))].filter(Boolean));
+  retained += new Set([...parents].flatMap(untrackedTemporaryDirectories)).size;
+  if (changed) {
+    try { saveDownloadTasks(); }
+    catch (_) { for (const [task, records] of previous) task.temporaryDownloads = records; failed++; retained++; }
+  }
+  return { count, freed, failed:failed + retained, warning:temporaryWarning(retained) };
+}
+
 function ownsEpisodeFiles(file, owners) {
   const paths = new Set(episodeFilePaths(file));
   return !downloadTasks.some(task => paths.has(task.savePath) && !owners.includes(task))
@@ -2410,6 +2484,7 @@ function collectSeriesEpisodeFiles(seriesId, seriesTitle) {
 
   return {
     dir, sharedDirectory, episodeNames, episodePaths, temporaryPaths, mergedPaths, concatPaths, scanFailed,
+    downloadTemporaries:tasks.flatMap(task => taskTemporaryRecords(task).map(record => ({ task, record }))),
     ordered: [...byIndex.values()].sort((a, b) => a.vid_index - b.vid_index),
   };
 }
@@ -3064,7 +3139,7 @@ function registerLocalProtocol() {
 }
 
 /** App CENC uses native FFmpeg for both senc and saiz/saio layouts. Never log key/args. */
-async function decryptContentKeyFile(input, output, contentKey, { signal, cancelToken } = {}) {
+async function decryptContentKeyFile(input, output, contentKey, { signal, cancelToken, cleanupOutput = () => fsp.unlink(output) } = {}) {
   if (typeof contentKey !== 'string' || !/^[a-f\d]{32}$/i.test(contentKey)) throw new Error('片源解密密钥格式无效');
   if (signal?.aborted) throw new Error('已取消媒体解密');
   cancelToken?.throwIfRequested();
@@ -3105,7 +3180,7 @@ async function decryptContentKeyFile(input, output, contentKey, { signal, cancel
     cancelToken?.throwIfRequested();
     if ((await fsp.stat(output)).size === 0) throw new Error('媒体解密没有生成可用文件');
   } catch (error) {
-    try { await fsp.unlink(output); } catch (_) {}
+    await cleanupOutput().catch(() => {});
     throw error;
   }
 }
@@ -4703,9 +4778,13 @@ async function validateNasDeletion(tasks) {
 }
 
 async function removeEpisodeFiles(paths, owners) {
-  let freed = 0, failed = 0, count = 0, warning;
-  try { const checkCurrent = await validateNasDeletion(owners); checkCurrent(); }
+  let freed = 0, failed = 0, count = 0, warning, checkCurrent;
+  try { checkCurrent = await validateNasDeletion(owners); checkCurrent(); }
   catch (error) { return { count, freed, failed, warning: error.message }; }
+  const temporary = await cleanupTaskTemporaries(owners);
+  count += temporary.count; freed += temporary.freed; failed += temporary.failed; warning = temporary.warning;
+  try { checkCurrent(); }
+  catch (error) { return { count, freed, failed, warning:error.message }; }
   for (const file of new Set(paths.filter(Boolean))) {
     const family = episodeFilePaths(file);
     if (!ownsEpisodeFiles(file, owners) || family.some(isFileInUse)
@@ -4745,13 +4824,15 @@ function isFileInUse(file) {
 }
 
 function removeFinishedRecords(seriesId, saveChanges = false) {
-  const ids = downloadTasks.filter(task => (seriesId == null || String(task.hongguoInfo?.series_id) === String(seriesId)) && !isTaskInFlight(task) && task.status === 'completed' && task.savePath && episodeFilePaths(task.savePath).every(file => !fs.existsSync(file))).map(task => task.id);
+  const ids = downloadTasks.filter(task => (seriesId == null || String(task.hongguoInfo?.series_id) === String(seriesId)) && !isTaskInFlight(task) && !hasPendingTemporaries(task)
+    && (task.status === 'completed' || Array.isArray(task.temporaryDownloads) && task.temporaryDownloads.length === 0)
+    && task.savePath && episodeFilePaths(task.savePath).every(file => !fs.existsSync(file))).map(task => task.id);
   if (ids.length || saveChanges) dropTaskRecords(ids);
 }
 
 /** 删掉一组任务记录（从内存与队列中移除） */
 function dropTaskRecords(ids) {
-  const set = new Set(ids.filter(id => !downloadTasks.some(task => task.id === id && isTaskInFlight(task))));
+  const set = new Set(ids.filter(id => !downloadTasks.some(task => task.id === id && (isTaskInFlight(task) || hasPendingTemporaries(task)))));
   const previousTasks = downloadTasks, previousQueue = downloadQueue;
   downloadTasks = downloadTasks.filter((t) => !set.has(t.id));
   downloadQueue = downloadQueue.filter((t) => !set.has(t.id));
@@ -4786,6 +4867,8 @@ async function deleteTaskRecords(taskIds, options) {
         if (result.warning) { warnings.push(result.warning); errors.push(result.warning); }
         if (result.failed) { errors.push('部分文件删除失败，对应任务记录已保留'); continue; }
         if (result.warning) continue;
+      } else if (hasPendingTemporaries(task)) {
+        errors.push(temporaryWarning(1)); continue;
       }
       removed.push(id);
     } catch (error) { errors.push(error.message); }
@@ -4824,6 +4907,10 @@ async function deleteSeriesFiles(seriesId, options) {
     checkCurrent();
     const cancelledRetries = cancelScheduledRetries(downloadTasks.filter(task => String(task.hongguoInfo?.series_id) === sid));
     let count = 0, freed = 0, failed = files.scanFailed;
+    const temporary = await cleanupTaskTemporaries(downloadTasks.filter(task => String(task.hongguoInfo?.series_id) === sid), dir);
+    count += temporary.count; freed += temporary.freed; failed += temporary.failed;
+    try { checkCurrent(); }
+    catch (error) { return { success:false, count, freed, failed, error:error.message }; }
     for (const file of paths) {
       if (isFileInUse(file)) continue;
       try {
@@ -4838,7 +4925,7 @@ async function deleteSeriesFiles(seriesId, options) {
     try { if (dir && fs.existsSync(dir) && fs.readdirSync(dir).length === 0) fs.rmdirSync(dir); } catch (_) {}
     try { removeFinishedRecords(sid, cancelledRetries); }
     catch (error) { return { success: false, count, freed, failed, error: `文件清理已执行；任务记录保存失败，原记录已保留：${error.message}${cancelledRetries ? '；自动重试取消状态未保存' : ''}` }; }
-    return { success: failed === 0, count, freed, failed, error: failed ? '部分文件删除失败，对应记录已保留' : undefined };
+    return { success: failed === 0, count, freed, failed, warning:temporary.warning, error: temporary.warning || (failed ? '部分文件删除失败，对应记录已保留' : undefined) };
   } catch (error) {
     return { success: false, error: error.message };
   }
@@ -4861,7 +4948,7 @@ async function deleteEpisodeFile(seriesId, vidIndex) {
     const cancelledRetries = cancelScheduledRetries(tasks);
     const result = await removeEpisodeFiles(paths, tasks);
     const ids = tasks.filter(task => task.savePath && ownsEpisodeFiles(task.savePath, tasks)
-      && episodeFilePaths(task.savePath).every(file => !fs.existsSync(file))).map(task => task.id);
+      && !hasPendingTemporaries(task) && episodeFilePaths(task.savePath).every(file => !fs.existsSync(file))).map(task => task.id);
     try { if (ids.length || cancelledRetries) dropTaskRecords(ids); }
     catch (error) { return { ...result, success: false, error: `文件清理已执行；任务记录保存失败，原记录已保留：${error.message}${cancelledRetries ? '；自动重试取消状态未保存' : ''}` }; }
     return { ...result, success: result.failed === 0 && !result.warning,
@@ -4931,6 +5018,8 @@ ipcMain.handle('get-storage-usage', async () => {
     const series = [];
     let totalBytes = 0;
     let totalFiles = 0;
+    let unverifiedItems = 0, unverifiedBytes = 0;
+    const seenTemporaries = new Set();
     for (const target of deletionTargets()) {
       const entry = seriesRegistry.find(item => String(item.series_id) === target.series_id);
       const owned = collectSeriesEpisodeFiles(target.series_id, target.series_title || entry?.series_title || '');
@@ -4946,6 +5035,22 @@ ipcMain.handle('get-storage-usage', async () => {
           if (owned.mergedPaths.has(file)) merged++;
         } catch (_) {}
       }
+      if (!merging) for (const { task, record } of owned.downloadTemporaries) {
+        if (isTaskInFlight(task)) continue;
+        const key = record?.directory || record;
+        if (key && seenTemporaries.has(key)) continue;
+        if (key) seenTemporaries.add(key);
+        const state = taskTemporaryState(task, record);
+        bytes += state.files.reduce((sum, file) => sum + file.size, 0); files += state.files.length;
+        unverifiedItems += state.unverifiedItems;
+        unverifiedBytes = state.unverifiedBytes === null || unverifiedBytes === null ? null : unverifiedBytes + state.unverifiedBytes;
+      }
+      for (const directory of new Set([owned.dir, ...downloadTasks.filter(task => String(task.hongguoInfo?.series_id) === target.series_id)
+        .map(task => task.savePath && path.dirname(task.savePath))].filter(Boolean))) {
+        for (const file of untrackedTemporaryDirectories(directory)) if (!seenTemporaries.has(file)) {
+          seenTemporaries.add(file); unverifiedItems++; unverifiedBytes = null;
+        }
+      }
       totalBytes += bytes;
       totalFiles += files;
       series.push({
@@ -4958,7 +5063,9 @@ ipcMain.handle('get-storage-usage', async () => {
       });
     }
     series.sort((a, b) => b.bytes - a.bytes);
-    return { success: true, totalBytes, totalFiles, series };
+    const warning = temporaryWarning(unverifiedItems);
+    if (warning) sendToRenderer('storage-error', { error:warning });
+    return { success: true, totalBytes, totalFiles, series, unverifiedItems, unverifiedBytes, warning };
   } catch (error) {
     return { success: false, error: error.message };
   }

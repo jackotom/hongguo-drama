@@ -1,15 +1,17 @@
 // In-memory Player behavior only; no real media, network, or user files.
 const assert = require('node:assert/strict');
+const { createTranslator } = require('../src/i18n/translator.mjs');
+const english = createTranslator(require('../src/i18n/en.json'), require('../src/i18n/templates.json'));
 const { mount } = require('./check-player-resume.cjs');
 const defer = () => { let resolve; const promise = new Promise(done => { resolve = done; }); return { promise, resolve }; };
 const source = ui => ui.find(n => n.type === 'video').props.src;
 const alert = ui => ui.find(n => n.props.role === 'alert');
 const poll = async ui => { ui.changed(); await [...ui.timers.values()].find(t => t.delay === 2000).fn(); await ui.flush(); };
-function fixture({ prepare, transcode, enqueue, quality = '720p', initial = 'missing' } = {}) {
+function fixture({ prepare, transcode, enqueue, quality = '720p', initial = 'missing', storage, actualQuality } = {}) {
   const states = new Map([['A:1', initial]]), downloads = [], stops = [];
   let changed;
   const props = { target: { seriesId: 'A', vidIndex: 1, ts: 1 } };
-  const ui = mount({ props, transcode, prepare: prepare || (async () => ({ success: false, error: '本集取源失败' })),
+  const ui = mount({ props, transcode, storage, prepare: prepare || (async () => ({ success: false, error: '本集取源失败' })),
     settings: { download_quality: quality, cache_next_episode: false },
     apiOverrides: {
       onDownloadQueueChanged: fn => { changed = fn; return () => {}; },
@@ -17,7 +19,7 @@ function fixture({ prepare, transcode, enqueue, quality = '720p', initial = 'mis
       getSeriesEpisodes: async sid => ({ success: true, data: { series_id: sid, total: 2,
         episodes: [1, 2].map(index => { const status = states.get(`${sid}:${index}`) || 'missing'; return {
           vid: `${sid}-${index}`, vid_index: index, status, taskId: status === 'missing' ? null : `task-${sid}-${index}`,
-          ...(status === 'completed' ? { fileUrl: `file:///${sid}-${index}.mp4`, savePath: `/${sid}-${index}.mp4` } : {}),
+          ...(status === 'completed' ? { fileUrl: `file:///${sid}-${index}.mp4`, savePath: `/${sid}-${index}.mp4`, actualQuality } : {}),
         }; }),
       } }),
       downloadSingleEpisode: async (sid, index, quality) => {
@@ -148,16 +150,48 @@ function fixture({ prepare, transcode, enqueue, quality = '720p', initial = 'mis
     assert.equal(source(f.ui), 'file:///A-1.mp4'); assert.equal(f.ui.media.currentTime, 29);
     assert.equal(f.ui.media.paused, true); f.ui.unmount();
   });
-  await test('known bad local media is not selected again after online fallback fails', async () => {
+  await test('local recovery gives explicit retry one fresh local attempt without downloading again', async () => {
     const f = fixture({ initial: 'completed', enqueue: async () => ({ success: false, error: '已有文件保留' }) });
-    await f.ui.flush(); f.ui.metadata(); f.ui.media.currentTime = 18; f.ui.error(2); await f.ui.flush();
+    await f.ui.flush(); f.ui.metadata(); f.ui.media.currentTime = 18; f.ui.media.pause(); f.ui.error(2); await f.ui.flush();
     await poll(f.ui); assert(alert(f.ui)); assert.equal(f.ui.media.paused, true);
+    assert.equal(english(alert(f.ui).children.join('')), 'The local file could not be loaded on this attempt. It has been kept. Retry this episode, switch decoders, or use the system player.');
+    assert.equal(f.downloads.length, 0, 'automatic recovery must not resubmit a completed file');
     const before = f.ui.prepares.length; await f.ui.button('重试本集').props.onClick(); await f.ui.flush();
-    assert.deepEqual(f.ui.prepares.slice(before).map(p => p.quality), ['1080p', '720p', 'auto']);
-    assert.equal(f.downloads.length, 2, 'an explicit retry can resubmit a previously rejected download');
-    const selectedAt = f.ui.prepares.length; f.ui.episode(1); await f.ui.flush();
-    assert.deepEqual(f.ui.prepares.slice(selectedAt).map(p => p.quality), ['1080p', '720p', 'auto'],
-      'explicit selection must not strand playback on a rejected local file'); f.ui.unmount();
+    assert.equal(source(f.ui), 'file:///A-1.mp4'); f.ui.metadata();
+    assert.equal(f.ui.media.currentTime, 18); assert.equal(f.ui.media.paused, true);
+    assert.equal(f.ui.prepares.length, before); assert.equal(f.downloads.length, 0);
+    f.ui.error(2); await f.ui.flush(); await poll(f.ui);
+    const attempts = f.ui.prepares.length;
+    await poll(f.ui); await poll(f.ui);
+    assert.equal(f.ui.prepares.length, attempts, 'polling must not reset a rejected file');
+    assert(alert(f.ui)); assert.equal(f.downloads.length, 0); f.ui.unmount();
+  });
+  await test('local recovery decoder switch restores local paused position after a rejected load', async () => {
+    const f = fixture({ initial: 'completed' }); await f.ui.flush(); f.ui.metadata();
+    f.ui.media.currentTime = 26; f.ui.media.pause(); f.ui.error(2); await f.ui.flush(); await poll(f.ui);
+    const before = f.ui.prepares.length;
+    f.ui.find(n => n.props['aria-label'] === '解码方式').props.onChange({ target: { value: 'software' } });
+    await f.ui.flush(); f.ui.metadata();
+    assert.equal(source(f.ui), 'file:///A-1.mp4'); assert.equal(alert(f.ui), undefined);
+    assert.equal(f.ui.media.currentTime, 26); assert.equal(f.ui.media.paused, true);
+    assert.equal(f.ui.prepares.length, before); assert.equal(f.downloads.length, 0); f.ui.unmount();
+  });
+  for (const actualQuality of ['720p', undefined]) await test(`local recovery explains fixed quality mismatch (${actualQuality || 'unknown'}) without redownloading`, async () => {
+    const f = fixture({ initial: 'downloading', actualQuality,
+      storage: new Map([['hongguo:online-quality', '1080p']]) });
+    await f.ui.flush(); assert(f.ui.button('取消等待'));
+    f.states.set('A:1', 'completed'); await poll(f.ui);
+    assert(alert(f.ui)); assert(f.ui.text().includes('1080P'));
+    assert(f.ui.text().includes(actualQuality ? '720P' : '尚未确认'));
+    assert(!f.ui.text().includes('已有本地文件无法播放'));
+    const translated = english(alert(f.ui).children.join(''));
+    assert.doesNotMatch(translated, /[\u4e00-\u9fff]/);
+    assert(translated.includes('1080P'));
+    assert(translated.includes(actualQuality ? '720P' : 'not been verified'));
+    const before = f.ui.prepares.length;
+    await f.ui.button('重试本集').props.onClick(); await f.ui.flush();
+    assert.notEqual(source(f.ui), 'file:///A-1.mp4');
+    assert.equal(f.ui.prepares.length, before); assert.equal(f.downloads.length, 0); f.ui.unmount();
   });
   process.exitCode = failures ? 1 : 0;
 })();
