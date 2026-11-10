@@ -1,5 +1,7 @@
 # 同步发行规则
 
+6.7已于2026-11-11 00:03:04（Asia/Shanghai）正式公开并设Latest，内部6.7.0、桌面构建6.7.1，冻结源码`43c7b4c8fa98df3b1b7902713788641f9d325e2b`。双Mac、Windows x64、Linux x64 AppImage、Docker amd64五类共25附件，远端大小与SHA256及更新清单已核对。双Mac签名、公证、装订；Windows两集各10秒静音实播及安装/重装/升级资料保留、Linux两集CPU静音播放、Docker两集1080P下载合并/认证/重启持久化通过。Windows EXE未签名，Intel Mac仅Rosetta；未替换本机正式安装，TV和手机不随本次发行。 详见[6.7记录](release-6.7.md)。
+
 6.6已于2026-11-10 21:06:07（Asia/Shanghai）公开并设Latest，内部6.6.0、桌面构建6.6.1，冻结源码`d0410c8ef7b02a087f5c16eb026e0ece61454115`。双Mac、Windows、Linux、Docker与TV共26附件；双Mac新签名/公证/装订，Windows EXE未签名。本轮按用户要求未进行新的功能、界面、播放、安装升级、单元或设备测试；**TV版未测试，请用户自行测试**。不把构建成功或此前开发检查当作实播恢复证明，未替换本机正式安装。 详见[6.6记录](release-6.6.md)。
 
 ## 6.6本轮授权例外
