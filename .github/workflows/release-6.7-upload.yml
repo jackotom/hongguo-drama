@@ -4,10 +4,13 @@ on:
 permissions:
   actions: read
   contents: write
+concurrency:
+  group: release-6.7-transport
+  cancel-in-progress: false
 jobs:
   upload:
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4

@@ -50,6 +50,7 @@ if tag['type'] == 'tag':
     tag = api('repos/jackotom/hongguo-drama/git/tags/' + tag['sha'])['object']
 assert tag['type'] == 'commit' and tag['sha'] == plan['sourceCommit']
 initial = rows()
+assert 'SHA256SUMS.txt' in initial and matches(initial['SHA256SUMS.txt'], plan['assets']['SHA256SUMS.txt'])
 candidates = {}
 
 for platform, names in plan['remoteArtifacts'].items():
