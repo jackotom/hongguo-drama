@@ -1,4 +1,4 @@
-// Hongguo Drama 6.5: desktop runtime; server entry is server/index.cjs.
+// Hongguo Drama 6.6: desktop runtime; server entry is server/index.cjs.
 /**
  * main.js - 红果短剧 6.2 下载器（独立版）主进程
  *

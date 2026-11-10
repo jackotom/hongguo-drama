@@ -1,3 +1,9 @@
+# 6.6本轮发行范围
+
+双Mac、Windows x64、Linux x64 AppImage、Docker amd64、TV APK同一Release；按2026-11-10用户明确指令不做新的功能/界面/安装/播放/真机测试。**TV版未测试，请用户自行测试**。此前验收记录均不自动继承。实际发布状态见[6.6说明](release-6.6.md)。
+
+---
+
 # 五平台同步发布规则
 
 6.5已于2026-11-09 18:50:43（Asia/Shanghai）正式公开并设Latest，内部6.5.0、桌面构建6.5.1，冻结源码`b99555519d97065b16753cd66326eb62894ec34a`。双Mac、Windows、Linux AppImage、Docker五类产物统一发行，25附件远端大小与SHA256、更新清单和精确源码已核对。双Mac签名、公证、装订；Windows播放/安装/升级与Linux真实静音播放、Docker真实下载合并及重启持久化通过；#124实际鼠标唤醒、真实续播、手动暂停和重启记忆通过。Windows EXE未签名，x64 Mac仅Rosetta，未验飞牛硬件；未替换本机正式安装。 见[6.5说明](release-6.5.md)。

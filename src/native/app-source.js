@@ -6,6 +6,7 @@
 // bounded HTTPS transport; exact episode matching; supported codec selection.
 // Crypto tables and SDK protocol constants below are not user credentials.
 const crypto = require('node:crypto');
+const { gzipSync } = require('node:zlib');
 const { registerPlaybackDevice } = require('./playback-device');
 const { abortError, throwIfAborted, boundedSignal, networkFailure } = require('./request-signal');
 const sm3 = require('./sm3');
@@ -16,7 +17,6 @@ const PROCESS_STARTED = Date.now();
 const VIDEO_API = 'https://api5-normal-sinfonlineb.fqnovel.com/novel/player/multi_video_model/v1/';
 const SEARCH_API = 'https://api5-normal-sinfonlinea.fqnovel.com/reading/bookapi/search/tab/v';
 const VIDEO_UA = 'com.phoenix.read/71332 (Linux; U; Android 16; zh_CN; 25053RT47C; Build/BP2A.250605.031.A3; Cronet/TTNetVersion:04657795 2026-01-23 QuicVersion:c67e9834 2025-09-08)';
-const PLAYBACK_UA = 'com.phoenix.read/71532 (Linux; U; Android 9; SM-N9860; Build/PQ3A.190705.10241111;tt-ok/3.12.13.20)';
 const SEARCH_UA = 'com.phoenix.read/72232 (Linux; U; Android 16; zh_CN; 25053RT47C; Build/BP2A.250605.031.A3)';
 const DEVICE = {
     ac: 'wifi', channel: 'update_64', aid: '8662', app_name: 'novelread',
@@ -26,6 +26,9 @@ const DEVICE = {
     update_version_code: '71332', host_abi: 'arm64-v8a', dragon_device_type: 'phone', pv_player: '71332',
     compliance_status: '0', need_personal_recommend: '1', player_so_load: '1', is_android_pad_screen: '0',
 };
+const PLAYBACK_DEVICE = { ...DEVICE, version_code: '74332', version_name: '7.4.3.32',
+    manifest_version_code: '74332', update_version_code: '74332', pv_player: '74332' };
+const PLAYBACK_UA = VIDEO_UA.replace(DEVICE.version_code, PLAYBACK_DEVICE.version_code);
 function str(value, fallback = '') { return String(value == null ? fallback : value).trim(); }
 function cleanUrl(value) { return str(value).replace(/\\\//g, '/').replace(/\\u0026/g, '&').replace(/&amp;/g, '&'); }
 function jsonBody(value) { try { return JSON.parse(value); } catch { return null; } }
@@ -135,9 +138,9 @@ function helios(khronos) {
 
 function branchOf(url, body, khronos) { const bodyMd5 = body ? crypto.createHash('md5').update(body).digest() : Buffer.alloc(16); const q = sm3(url.split('?')[1]); const iv = getIv(getIv(getIv(0x20230928, q), bodyMd5), le32(khronos)); const low = iv & 15; return low - (((low * 171) >> 9) * 3); }
 function playbackRequest(payload, identity, host = new URL(VIDEO_API).hostname) {
-    const body = Buffer.from(payload);
+    const body = gzipSync(Buffer.from(payload));
     const khronos = Math.floor(Date.now() / 1000), ticketBase = Date.now();
-    const device = { ...DEVICE, ...identity };
+    const device = { ...PLAYBACK_DEVICE, ...identity };
     let query, url, requestTicket;
     for (let n = 0; n < 128; n += 1) {
         requestTicket = ticketBase + n;
@@ -148,10 +151,13 @@ function playbackRequest(payload, identity, host = new URL(VIDEO_API).hostname) 
     }
     return { url, body, headers: {
         'User-Agent': PLAYBACK_UA, Accept: 'application/json; charset=utf-8,application/x-protobuf',
-        'Content-Type': 'application/json; charset=UTF-8',
+        'Content-Type': 'application/json; charset=UTF-8', 'Content-Encoding': 'gzip',
         'x-ss-req-ticket': String(requestTicket), 'sdk-version': '2', 'x-xs-from-web': '0',
+        'passport-sdk-version': '5051452',
+        'x-ss-stub': md5(body), 'x-ss-dp': String(device.aid),
         'x-khronos': String(khronos),
         'x-gorgon': xGorgon(query, body, khronos, Math.floor(Math.random() * 65536)),
+        // Vendor timestamp placeholders, not cryptographic Ladon/Argus signatures.
         'x-ladon': be32(khronos).toString('base64'), 'x-argus': le32(khronos).toString('base64'),
         'x-helios': helios(khronos), 'x-medusa': buildMedusa(url, body, khronos, device), 'x-tt-dt': '',
         'x-tt-store-region': 'cn', 'x-tt-store-region-src': 'did',

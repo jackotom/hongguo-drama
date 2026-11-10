@@ -7,6 +7,7 @@ const crypto = require('node:crypto');
 const { execFileSync, spawn, spawnSync } = require('node:child_process');
 const root = path.resolve(__dirname, '..');
 const output = path.join(root, 'dist/docker');
+const image = `hongguo-drama:${require('../package.json').version.replace(/\.0$/, '')}`;
 const name = `hongguo-65-acceptance-${process.pid}`;
 const token = crypto.randomBytes(32).toString('hex');
 const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'hongguo-65-'));
@@ -32,7 +33,7 @@ async function main() {
     fs.chownSync(path.join(temp, dir), process.getuid(), process.getgid());
   }
   docker('run', '-d', '--name', name, '--user', `${process.getuid()}:${process.getgid()}`, '--cap-drop=ALL', '--security-opt=no-new-privileges',
-    '-p', '127.0.0.1::3000', '-e', `HONGGUO_TOKEN=${token}`, '-v', `${temp}/data:/data`, '-v', `${temp}/downloads:/downloads`, 'hongguo-drama:6.5');
+    '-p', '127.0.0.1::3000', '-e', `HONGGUO_TOKEN=${token}`, '-v', `${temp}/data:/data`, '-v', `${temp}/downloads:/downloads`, image);
   base = `http://${docker('port', name, '3000/tcp')}`;
   await ready();
   assert.equal((await request('/api/tasks', {}, false)).status, 401);
@@ -59,7 +60,7 @@ async function main() {
   await ready();
   const after = await (await request('/api/tasks')).json();
   assert.deepEqual(after, before, 'Completed task state must survive a container restart');
-  const info = JSON.parse(docker('image', 'inspect', 'hongguo-drama:6.5'))[0];
+  const info = JSON.parse(docker('image', 'inspect', image))[0];
   const result = { passed: true, version: require('../package.json').version, sourceCommit: process.env.GITHUB_SHA,
     execution: 'Linux x64 Docker', authentication: true, realSearchDownloadMerge: true, restartPersistence: true,
     imageId: info.Id, imageArchitecture: info.Architecture, imageRevision: info.Config.Labels['org.opencontainers.image.revision'] };

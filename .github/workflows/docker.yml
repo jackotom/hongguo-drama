@@ -1,6 +1,15 @@
 name: Docker server candidate
 on:
   workflow_dispatch:
+    inputs:
+      source_sha:
+        description: Full frozen source SHA (required for build_only; must match the dispatched ref)
+        type: string
+        default: ''
+      build_only:
+        description: Build and archive only; skip all functional, media, unit and platform acceptance checks
+        type: boolean
+        default: false
   push:
     branches: ['codex/release-6.5']
 permissions:
@@ -11,6 +20,22 @@ jobs:
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.source_sha || github.sha }}
+      - name: Verify frozen source identity
+        shell: bash
+        env:
+          SOURCE_SHA: ${{ inputs.source_sha || github.sha }}
+          DISPATCH_SHA: ${{ github.sha }}
+          BUILD_ONLY: ${{ inputs.build_only || false }}
+          REQUESTED_SHA: ${{ inputs.source_sha }}
+        run: |
+          if [[ "$BUILD_ONLY" == true && ! "$REQUESTED_SHA" =~ ^[0-9a-f]{40}$ ]]; then
+            echo 'build_only requires a full frozen source_sha' >&2
+            exit 1
+          fi
+          test "$(git rev-parse HEAD)" = "$SOURCE_SHA"
+          test "$SOURCE_SHA" = "$DISPATCH_SHA"
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
@@ -21,7 +46,12 @@ jobs:
         with:
           path: ${{ runner.temp }}/linux-media
           key: linux-x64-media-${{ hashFiles('scripts/build-ffmpeg-source-linux.sh', 'scripts/build-librempeg-source.sh', 'scripts/librempeg-videotoolbox-prototype.patch') }}
-      - if: steps.media.outputs.cache-hit != 'true'
+      - name: Restore pinned 6.5 tools without executing the image or binaries
+        if: ${{ inputs.build_only && steps.media.outputs.cache-hit != 'true' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 scripts/reuse-release-media.py linux-x64 "$RUNNER_TEMP/linux-media"
+      - if: ${{ !inputs.build_only && steps.media.outputs.cache-hit != 'true' }}
         run: |
           bash scripts/build-ffmpeg-source-linux.sh "$RUNNER_TEMP/linux-media/ffmpeg" 4
           bash scripts/build-librempeg-source.sh "$RUNNER_TEMP/linux-media/librempeg" linux-x64 4
@@ -30,18 +60,25 @@ jobs:
           cp "$RUNNER_TEMP/linux-media/ffmpeg/artifacts/bin/"* build/ffmpeg/linux-x64/
           cp "$RUNNER_TEMP/linux-media/librempeg/artifacts/bin/"* build/ffmpeg/linux-x64/
       - run: npm ci --no-audit --no-fund --ignore-scripts
-      - run: node scripts/check-linux-media.cjs
-      - run: node --test server/*.test.cjs
-      - name: Build and verify the exact server image
+      - if: ${{ !inputs.build_only }}
+        run: node scripts/check-linux-media.cjs
+      - if: ${{ !inputs.build_only }}
+        run: node --test server/*.test.cjs
+      - name: Build the exact server image
         run: |
-          docker build --label org.opencontainers.image.revision="$GITHUB_SHA" -t hongguo-drama:6.5 .
-          node scripts/check-docker-release.cjs
-      - name: Save the verified image and corresponding media sources
+          docker build --platform linux/amd64 --label org.opencontainers.image.version=6.6.0 --label org.opencontainers.image.revision="$GITHUB_SHA" -t hongguo-drama:6.6 .
+      - name: Run Docker functional acceptance
+        if: ${{ !inputs.build_only }}
+        run: node scripts/check-docker-release.cjs
+      - name: Save the image and corresponding media sources
         run: |
           mkdir -p dist/docker
-          docker save hongguo-drama:6.5 | gzip > dist/docker/hongguo-drama-6.5-docker-amd64.tar.gz
+          docker save hongguo-drama:6.6 | gzip > dist/docker/hongguo-drama-6.6-docker-amd64.tar.gz
           cp "$RUNNER_TEMP/linux-media/ffmpeg/artifacts/"*source.tar.gz "$RUNNER_TEMP/linux-media/librempeg/artifacts/"*source.tar.gz dist/docker/
           cp compose.yaml docs/docker.md dist/docker/
+          git archive --format=zip --output=dist/docker/hongguo-drama-6.6-docker-source.zip HEAD
+          printf '%s\n' "$GITHUB_SHA" > dist/docker/SOURCE-SHA.txt
+          (cd dist/docker && sha256sum * > DOCKER-SHA256SUMS.txt)
       - uses: actions/upload-artifact@v4
         if: always()
         with:

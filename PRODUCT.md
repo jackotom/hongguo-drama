@@ -1,5 +1,7 @@
 # 红果短剧
 
+6.6发行目标：修正播放POST格式与签名绑定，整合本地恢复、观看记录排序及TV功能；本轮明确同批提供双Mac、Windows、Linux、Docker和TV。按用户要求跳过新功能/界面/安装/播放/真机测试，TV版未测试，请用户自行测试。尚未发布，不沿用6.5包的验收结论。
+
 6.5已于2026-11-09 18:50:43（Asia/Shanghai）正式公开并设Latest，内部6.5.0、桌面构建6.5.1，冻结源码`b99555519d97065b16753cd66326eb62894ec34a`。双Mac、Windows、Linux AppImage、Docker五类产物统一发行，25附件远端大小与SHA256、更新清单和精确源码已核对。双Mac签名、公证、装订；Windows播放/安装/升级与Linux真实静音播放、Docker真实下载合并及重启持久化通过；#124实际鼠标唤醒、真实续播、手动暂停和重启记忆通过。Windows EXE未签名，x64 Mac仅Rosetta，未验飞牛硬件；未替换本机正式安装。 见[6.5说明](docs/release-6.5.md)。
 
 6.5功能：Docker Web UI/API、NAS下载与合并，窗口内全屏、重复弹幕聚合及自定义小窗唤醒区域。Docker替代TV，五平台统一发行。状态见docs/release-6.5.md。

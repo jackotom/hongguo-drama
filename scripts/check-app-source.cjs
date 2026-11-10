@@ -1,5 +1,6 @@
 const assert = require('node:assert/strict');
 const crypto = require('node:crypto');
+const zlib = require('node:zlib');
 const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
@@ -39,13 +40,13 @@ function fixture({ wrongVid = false, fallback = 'https://vod.snssdk.com/info', m
     assert.ok(config.signal);
     assert.equal(config.responseType, 'text');
     if (config.method === 'POST') {
-      assert.match(config.headers['User-Agent'], /^com\.phoenix\.read\/71532 /);
+      assert.match(config.headers['User-Agent'], /^com\.phoenix\.read\/74332 /);
       const query = new URL(config.url).searchParams;
       const timestamp = Number(config.headers['x-khronos']);
       assert.equal(query.get('ts'), String(timestamp));
       assert.equal(query.get('_rticket'), config.headers['x-ss-req-ticket']);
       assert.ok(Buffer.isBuffer(config.data));
-      assert.deepEqual(JSON.parse(config.data).mixed_video_id_map['1004'], ['11']);
+      assert.deepEqual(JSON.parse(config.headers['Content-Encoding'] === 'gzip' ? zlib.gunzipSync(config.data) : config.data).mixed_video_id_map['1004'], ['11']);
       assert.equal(context.branchOf(config.url, config.data, timestamp), 0);
       const raw = Buffer.from(config.headers['x-gorgon'], 'hex');
       assert.equal(raw.length, 26);
@@ -74,6 +75,7 @@ function fixture({ wrongVid = false, fallback = 'https://vod.snssdk.com/info', m
       if (name === './sm3') return require(path.join(nativeDir, 'sm3'));
       if (name === './download-quality') return require(path.join(nativeDir, 'download-quality'));
       if (name === './request-signal') return require(path.join(nativeDir, 'request-signal'));
+      if (name === 'node:zlib') return zlib;
       if (name === 'node:crypto') return { ...crypto, createHash(name, ...args) {
         assert.notEqual(name.toLowerCase(), 'sm3', 'must not depend on OpenSSL SM3');
         return crypto.createHash(name, ...args);

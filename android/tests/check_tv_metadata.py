@@ -42,7 +42,7 @@ def metadata(tv, package=None):
 
 tv = metadata(True)
 assert (tv['version'], tv['version_code'], tv['tv_version']) == ('6.6', 60600, '6.6.0')
-assert tv['desktop_version'] == '6.5.0'
+assert tv['desktop_version'] == '6.6.0'
 assert tv['package_name'] == 'io.github.hongguo.tv'
 assert tv['BUILD'] == ROOT / 'build/tv'
 previous = 0
@@ -74,7 +74,7 @@ for state, filename in [(tv, 'hongguo-downloader-6.6-android-tv-dev.apk'), (phon
     assert output.name == filename
     state.update(output=SimpleNamespace(name=output.name, stat=lambda: SimpleNamespace(st_size=123)), checksum='test-only')
     result = eval(compile(ast.Expression(receipt), str(build_file), 'eval'), state)
-    assert result['source_version'] == '6.5.0'
+    assert result['source_version'] == '6.6.0'
     assert result['version'] == state['version'] and result['candidate'] is state['tv']
     assert result['package'] == state['package_name']
     if state['tv']:
@@ -82,4 +82,4 @@ for state, filename in [(tv, 'hongguo-downloader-6.6-android-tv-dev.apk'), (phon
     else:
         assert 'tv_version' not in result and 'version_code' not in result
 
-print(f'PASS: TV 6.6/code60600; source 6.5.0; 7 monotonic versions; {len(invalid) + 1} invalid inputs fail before BUILD/SDK; phone 1.1/code2; APK names and receipts; no build')
+print(f'PASS: TV 6.6/code60600; source 6.6.0; 7 monotonic versions; {len(invalid) + 1} invalid inputs fail before BUILD/SDK; phone 1.1/code2; APK names and receipts; no build')

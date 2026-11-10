@@ -3,6 +3,7 @@ const { test } = require('node:test');
 const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
+const zlib = require('node:zlib');
 
 const success = { device_id: '123', install_id: '456' };
 function device(clock = Date) {
@@ -212,7 +213,7 @@ test('canceling one lookup leaves another lookup and shared search/account regis
             return playResponse();
         }
         independentSignal = config.signal;
-        const requested = JSON.parse(config.data).mixed_video_id_map['1004'][0];
+        const requested = JSON.parse(config.headers['Content-Encoding'] === 'gzip' ? zlib.gunzipSync(config.data) : config.data).mixed_video_id_map['1004'][0];
         return response({ data: { [requested]: { video_model: playModel } } });
     });
     const shared = await api.getPlaybackDevice(api.requestJson);

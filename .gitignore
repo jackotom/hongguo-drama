@@ -1,4 +1,4 @@
-# 红果短剧 6.5 源码候选：公开源码排除依赖、构建产物与本地运行资料。
+# 红果短剧 6.6 源码候选：公开源码排除依赖、构建产物与本地运行资料。
 /*-small.png
 
 # 依赖
@@ -99,3 +99,5 @@ backups/
 
 # Recreated and hash-checked by setup:software.
 /public/software/
+
+/.superpowers/
