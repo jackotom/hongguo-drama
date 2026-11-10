@@ -638,12 +638,14 @@ async function fetchPlayUrlSingle(vid, sid, options = {}) {
     const result = await cachedRequest(cacheKey, 30000, () => quality === 'auto'
       ? fetchPlayUrlFresh(vid, sid, skipWeb)
       : require('./app-source').fetchAppPlayUrl(String(vid), { quality, allowLowerQuality }).catch(error => {
+        if (error.code === 'ERR_CANCELED') throw error;
         throw unavailableSources([sourceFailure('app', error)], allowLowerQuality ? 'auto' : quality);
       }), options);
     // Last-resort web recovery must not replace App priority during the penalty window.
     if (skipWeb && result.source === 'web' && responseCache.get(cacheKey)?.value === result) responseCache.delete(cacheKey);
     return result;
   } catch (error) {
+    if (error.code === 'ERR_CANCELED') return { url: null, spadeA: null, codec: null, error: '已取消 App 片源请求', code: 'ERR_CANCELED' };
     return { url: null, spadeA: null, codec: null, error: error.message,
       ...(error.code === 'SOURCE_UNAVAILABLE' ? { code: error.code, sources: error.sources } : {}) };
   }
@@ -652,14 +654,20 @@ async function fetchPlayUrlSingle(vid, sid, options = {}) {
 function sourceFailure(source, error) {
   const message = String(error?.message || '');
   const code = String(error?.code || '');
+  if (code === 'ERR_CANCELED') return { source, code, message: '已取消 App 片源请求' };
+  const networkDetails = { DNS: 'DNS 解析失败', CONNECTION: '连接失败', TLS: 'TLS 证书或握手失败' };
+  const network = typeof error?.networkFailure === 'string' && Object.hasOwn(networkDetails, error.networkFailure)
+    ? { networkFailure: error.networkFailure } : {};
   if (code === 'DEVICE_REGISTRATION_FAILED') {
     const reason = String(error.registrationFailure || '');
     const descriptions = { TIMEOUT: '请求超时', NETWORK_ERROR: '网络连接失败', EMPTY_RESPONSE: '上游返回空响应',
       INVALID_RESPONSE: '上游未返回有效设备编号', BUSINESS_REJECTED: '上游拒绝注册', SECURITY_BLOCKED: '注册请求被安全校验阻止' };
-    const detail = Object.hasOwn(descriptions, reason) ? descriptions[reason]
+    const detail = reason === 'NETWORK_ERROR' && network.networkFailure ? networkDetails[network.networkFailure]
+      : Object.hasOwn(descriptions, reason) ? descriptions[reason]
       : /^HTTP_[3-5]\d{2}$/.test(reason) ? `HTTP ${reason.slice(5)}` : '';
     const transient = /^(?:TIMEOUT|NETWORK_ERROR|HTTP_(?:408|5\d\d))$/.test(reason);
     return { source, code: /^(?:TIMEOUT|NETWORK_ERROR|HTTP_[3-5]\d{2})$/.test(reason) ? reason : code,
+      ...(reason === 'NETWORK_ERROR' ? network : {}),
       message: `匿名播放设备注册失败${detail ? `（${detail}）` : ''}${transient ? '，请检查网络，10 秒后重试' : '；本机冷却 10 秒后可手动重试，上游何时恢复暂无法确认'}` };
   }
   const status = Number(error?.status || error?.response?.status || message.match(/HTTP\s+(\d{3})/)?.[1]);
@@ -669,7 +677,8 @@ function sourceFailure(source, error) {
     return { source, code: 'EMPTY_RESPONSE', message: '播放接口空响应，可能是签名或设备鉴权问题' };
   }
   if (['ECONNABORTED', 'ETIMEDOUT', 'TIMEOUT'].includes(code) || /超时|timeout/i.test(message)) return { source, code: 'TIMEOUT', message: '请求超时' };
-  if (['ENOTFOUND', 'EAI_AGAIN', 'ECONNRESET', 'ECONNREFUSED', 'EHOSTUNREACH', 'ENETUNREACH', 'EPIPE', 'ERR_NETWORK', 'ERR_CANCELED'].includes(code)) return { source, code: 'NETWORK_ERROR', message: '网络连接失败，请稍后重试' };
+  if (network.networkFailure || ['ENOTFOUND', 'EAI_AGAIN', 'ECONNRESET', 'ECONNREFUSED', 'EHOSTUNREACH', 'ENETUNREACH', 'EPIPE', 'ERR_NETWORK'].includes(code)) return { source, code: 'NETWORK_ERROR', ...network,
+    message: network.networkFailure ? `${networkDetails[network.networkFailure]}，请稍后重试` : '网络连接失败，请稍后重试' };
   if (code === 'PREVIEW_ONLY') return { source, code, message: '网页仅提供预览，未作为完整片源' };
   if (code === 'QUALITY_UNAVAILABLE') return { source, code, message: ['720p', '1080p'].includes(error?.quality)
     ? `本集暂无尺寸可确认且满足 ${error.quality} 的 H.264/HEVC 片源，未降级` : '未取得满足所选清晰度的片源，未降级' };
@@ -696,6 +705,7 @@ async function fetchPlayUrlFresh(vid, sid, skipWeb = false) {
   try {
     return await require('./app-source').fetchAppPlayUrl(String(vid));
   } catch (error) {
+    if (error.code === 'ERR_CANCELED') throw error;
     sources.push(sourceFailure('app', error));
   }
 

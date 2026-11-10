@@ -7,6 +7,7 @@
 // Crypto tables and SDK protocol constants below are not user credentials.
 const crypto = require('node:crypto');
 const { registerPlaybackDevice } = require('./playback-device');
+const { abortError, throwIfAborted, boundedSignal, networkFailure } = require('./request-signal');
 const sm3 = require('./sm3');
 const { normalizeDownloadQuality, meetsDownloadQuality } = require('./download-quality');
 const localId = () => String(1000000000000000n + BigInt('0x' + crypto.randomBytes(6).toString('hex')));
@@ -320,6 +321,7 @@ async function requestJson(url, options, deadline, signal) {
     const requestOptions = { ...options };
     delete requestOptions.preserveLargeIntegerFields;
     for (let redirects = 0; redirects < 4; redirects++) {
+        throwIfAborted(signal);
         url = checkedUrl(url, ['fqnovel.com', 'snssdk.com']);
         const timeout = deadline - Date.now();
         if (timeout <= 0) throw Object.assign(new Error('App 片源请求超时'), { code: 'ETIMEDOUT' });
@@ -332,11 +334,16 @@ async function requestJson(url, options, deadline, signal) {
                 validateStatus: () => true,
             });
         } catch (error) {
-            const code = signal.aborted ? 'ETIMEDOUT' : ['ECONNABORTED', 'ETIMEDOUT', 'ENOTFOUND', 'EAI_AGAIN',
-                'ECONNRESET', 'ECONNREFUSED', 'EHOSTUNREACH', 'ENETUNREACH', 'EPIPE', 'ERR_CANCELED'].includes(error.code) ? error.code : 'ERR_NETWORK';
+            if (signal?.aborted) throw abortError(signal);
+            if (error?.code === 'ERR_CANCELED') throw abortError();
+            const detail = networkFailure(error?.code);
+            const code = detail || ['ECONNABORTED', 'ETIMEDOUT'].includes(error?.code) ? error.code : 'ERR_NETWORK';
             throw Object.assign(new Error(['ECONNABORTED', 'ETIMEDOUT'].includes(code)
-                ? 'App 片源请求超时' : 'App 片源网络请求失败，请稍后重试'), { code });
+                ? 'App 片源请求超时' : 'App 片源网络请求失败，请稍后重试'), { code,
+                ...(detail && code !== 'ECONNABORTED' ? { networkFailure: detail } : {}),
+            });
         }
+        throwIfAborted(signal);
         if ([301, 302, 303, 307, 308].includes(response.status)) {
             // Do not resend a signed body to a redirect destination.
             if (requestOptions.method === 'POST' || !response.headers.location) throw Object.assign(new Error('App 接口发生不支持的跳转'), { code: 'SECURITY_BLOCKED' });
@@ -349,7 +356,6 @@ async function requestJson(url, options, deadline, signal) {
             throw Object.assign(new Error('App 接口返回空响应，可能是签名或设备鉴权问题'), {
                 code: 'EMPTY_RESPONSE',
                 status: response.status,
-                logid: response.headers?.['x-tt-logid'] || '',
             });
         }
         const normalized = preserveFields?.length ? preserveLargeJsonIntegers(raw, preserveFields) : raw;
@@ -361,6 +367,7 @@ async function requestJson(url, options, deadline, signal) {
 }
 
 async function fetchAppPlayUrl(vid, options = {}) {
+    throwIfAborted(options.signal);
     normalizeDownloadQuality(options.quality); // Validate before registration or network I/O.
     vid = String(vid || '');
     if (!/^\d{1,30}$/.test(vid)) throw new Error('分集编号无效');
@@ -369,58 +376,80 @@ async function fetchAppPlayUrl(vid, options = {}) {
         mixed_video_id_map: { '1004': [vid] },
     });
     // Playback identities can be single-use; search/account retain their shared device.
-    let identity = await registerPlaybackDevice(requestJson);
+    let identity = await registerPlaybackDevice(requestJson, { signal: options.signal });
+    throwIfAborted(options.signal);
     // Registration has its own 8s budget; it must not consume the model request budget.
     const deadline = Date.now() + 12000;
-    const signal = AbortSignal.timeout(12000);
-    let response;
-    for (let attempt = 0; attempt < 2; attempt++) {
-        const signed = playbackRequest(payload, identity, attempt ? 'api5-normal-hl.fqnovel.com' : new URL(VIDEO_API).hostname);
-        if (attempt) signed.headers.Connection = 'close';
-        try {
-            response = await requestJson(signed.url, { method: 'POST', headers: signed.headers, data: signed.body }, deadline, signal);
-            break;
-        } catch (error) {
-            if (attempt || error.code !== 'EMPTY_RESPONSE' || deadline - Date.now() < 1000) throw error;
-            // Keep one alternate-host attempt even when a fresh registration fails.
-            if (deadline - Date.now() >= 8000) {
-                try { identity = await registerPlaybackDevice(requestJson); }
-                catch (_) { /* Keep the previously registered identity for the alternate route. */ }
-            }
-            if (deadline - Date.now() < 500) throw error;
-            await new Promise(resolve => setTimeout(resolve, 300));
-        }
-    }
-    if (Number(response.Code || response.code || 0) !== 0) throw Object.assign(new Error('App 接口暂未提供本集播放信息'), { code: 'BUSINESS_REJECTED' });
-    const entry = response.data?.[vid];
-    const model = typeof entry?.video_model === 'string' ? jsonBody(entry.video_model) : entry?.video_model;
-    if (!model) throw Object.assign(new Error('App 接口未返回所选分集，已停止取址'), { code: entry?.video_model ? 'INVALID_RESPONSE' : 'MISSING_MODEL' });
-    const inline = Array.isArray(model.video_list) && model.video_list.length > 0;
-    const readFallback = async () => {
-        const fallback = parseFallback(model.fallback_api);
-        if (!fallback) throw Object.assign(new Error('App 接口未返回本集片源地址'), { code: 'MISSING_MODEL' });
-        const outer = await requestJson(fallback, { headers: { 'User-Agent': VIDEO_UA } }, deadline, signal);
-        if ([outer, outer.video_info].some(value => Number(value?.Code || value?.code || 0) !== 0)) {
-            throw Object.assign(new Error('App 接口暂未提供本集播放信息'), { code: 'BUSINESS_REJECTED' });
-        }
-        return outer?.video_info?.data;
-    };
-    if (!inline) return parseAppPlayModel(await readFallback(), vid, options, false);
+    const request = boundedSignal(options.signal, 12000);
+    const { signal } = request;
     try {
-        return parseAppPlayModel(model, vid, options, true);
-    } catch (error) {
-        // Only absent encryption metadata enables this recovery path; the fallback
-        // must independently pass identity, duration, encryption and URL validation.
-        const duration = Number(model.video_duration);
-        if (!error.incompleteEncryptionMetadata || typeof model.video_id !== 'string' || !model.video_id.trim() || !Number.isFinite(duration) || duration <= 0
-            || !error.minimumPixels || !model.fallback_api) throw error;
-        const info = await readFallback();
-        const fallbackDuration = Number(info?.video_duration);
-        if (info?.video_id !== model.video_id || !Number.isFinite(fallbackDuration) || fallbackDuration <= 0
-            || Math.abs(fallbackDuration - duration) > 0.5) {
-            throw Object.assign(new Error('备用片源编号或完整时长无法确认，已停止取址'), { code: 'INVALID_RESPONSE' });
+        let response;
+        for (let attempt = 0; attempt < 2; attempt++) {
+            throwIfAborted(signal);
+            const signed = playbackRequest(payload, identity, attempt ? 'api5-normal-hl.fqnovel.com' : new URL(VIDEO_API).hostname);
+            if (attempt) signed.headers.Connection = 'close';
+            try {
+                response = await requestJson(signed.url, { method: 'POST', headers: signed.headers, data: signed.body }, deadline, signal);
+                throwIfAborted(signal);
+                break;
+            } catch (error) {
+                throwIfAborted(signal);
+                if (error.code === 'ERR_CANCELED') throw error;
+                if (attempt || error.code !== 'EMPTY_RESPONSE' || deadline - Date.now() < 1000) throw error;
+                // Keep one alternate-host attempt even when a fresh registration fails.
+                if (deadline - Date.now() >= 8000) {
+                    try { identity = await registerPlaybackDevice(requestJson, { signal }); }
+                    catch (registrationError) {
+                        throwIfAborted(signal);
+                        if (registrationError.code === 'ERR_CANCELED') throw registrationError;
+                        // Keep the previous identity for a non-cancellation registration failure.
+                    }
+                }
+                throwIfAborted(signal);
+                if (deadline - Date.now() < 500) throw error;
+                await new Promise(resolve => setTimeout(resolve, 300));
+                throwIfAborted(signal);
+            }
         }
-        return parseAppPlayModel(info, vid, options, false, true, error.minimumPixels);
+        if (Number(response.Code || response.code || 0) !== 0) throw Object.assign(new Error('App 接口暂未提供本集播放信息'), { code: 'BUSINESS_REJECTED' });
+        const entry = response.data?.[vid];
+        const model = typeof entry?.video_model === 'string' ? jsonBody(entry.video_model) : entry?.video_model;
+        if (!model) throw Object.assign(new Error('App 接口未返回所选分集，已停止取址'), { code: entry?.video_model ? 'INVALID_RESPONSE' : 'MISSING_MODEL' });
+        const inline = Array.isArray(model.video_list) && model.video_list.length > 0;
+        const readFallback = async () => {
+            const fallback = parseFallback(model.fallback_api);
+            if (!fallback) throw Object.assign(new Error('App 接口未返回本集片源地址'), { code: 'MISSING_MODEL' });
+            const outer = await requestJson(fallback, { headers: { 'User-Agent': VIDEO_UA } }, deadline, signal);
+            throwIfAborted(signal);
+            if ([outer, outer.video_info].some(value => Number(value?.Code || value?.code || 0) !== 0)) {
+                throw Object.assign(new Error('App 接口暂未提供本集播放信息'), { code: 'BUSINESS_REJECTED' });
+            }
+            return outer?.video_info?.data;
+        };
+        if (!inline) {
+            const info = await readFallback();
+            throwIfAborted(signal);
+            return parseAppPlayModel(info, vid, options, false);
+        }
+        try {
+            return parseAppPlayModel(model, vid, options, true);
+        } catch (error) {
+            // Only absent encryption metadata enables this recovery path; the fallback
+            // must independently pass identity, duration, encryption and URL validation.
+            const duration = Number(model.video_duration);
+            if (!error.incompleteEncryptionMetadata || typeof model.video_id !== 'string' || !model.video_id.trim() || !Number.isFinite(duration) || duration <= 0
+                || !error.minimumPixels || !model.fallback_api) throw error;
+            const info = await readFallback();
+            throwIfAborted(signal);
+            const fallbackDuration = Number(info?.video_duration);
+            if (info?.video_id !== model.video_id || !Number.isFinite(fallbackDuration) || fallbackDuration <= 0
+                || Math.abs(fallbackDuration - duration) > 0.5) {
+                throw Object.assign(new Error('备用片源编号或完整时长无法确认，已停止取址'), { code: 'INVALID_RESPONSE' });
+            }
+            return parseAppPlayModel(info, vid, options, false, true, error.minimumPixels);
+        }
+    } finally {
+        request.dispose();
     }
 }
 

@@ -16,7 +16,7 @@ function load(clock = Date, fresh = false) {
     vm.runInNewContext(source, {
         module, Buffer, AbortSignal, Date: clock,
         require(name) {
-            assert.ok(['node:crypto', 'node:zlib'].includes(name), 'no transport or persistence dependencies');
+            assert.ok(['node:crypto', 'node:zlib', './request-signal'].includes(name), 'no transport or persistence dependencies');
             return require(name);
         },
         console: { log() { assert.fail('no logging'); }, warn() { assert.fail('no logging'); }, error() { assert.fail('no logging'); } },

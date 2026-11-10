@@ -18,6 +18,7 @@ function load(axios, { realDevice = false, getPlaybackDevice, registerPlaybackDe
       if (name === 'node:crypto') return crypto;
       if (name === './sm3') return require('../src/native/sm3');
       if (name === './download-quality') return require('../src/native/download-quality');
+      if (name === './request-signal') return require('../src/native/request-signal');
       if (name === './playback-device') return getPlaybackDevice || registerPlaybackDevice ? {
         getPlaybackDevice: getPlaybackDevice || (async () => ({ device_id: '1000000000000001', iid: '1000000000000002', cdid: 'fixture' })),
         registerPlaybackDevice: registerPlaybackDevice || (async () => ({ device_id: '1000000000000001', iid: '1000000000000002', cdid: 'fixture' })),
