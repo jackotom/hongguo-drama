@@ -115,18 +115,27 @@ async function realFootage(mediaDir, ffmpeg) {
   const start = Math.floor(Math.random() * Math.min(10, series.episodes.length - 1));
   const episodes = series.episodes.slice(start, start + 2), samples = [];
   for (const [index, episode] of episodes.entries()) {
-    const info = await native.fetchPlayUrlSingle(episode.vid, series.series_id, { force: true });
-    assert(info.url, 'Real Hongguo episode source unavailable; do not substitute footage');
+    const info = await native.fetchPlayUrlSingle(episode.vid, series.series_id, { force: true, quality: '1080p' });
+    assert(info.url, 'Real Hongguo episode source unavailable: ' + JSON.stringify(info.sources?.map(({source,code}) => ({source,code}))));
     const encrypted = path.join(mediaDir, `original-${index}.mp4`);
     try {
-      const response = await require('axios').get(info.url, {
-        ...require('../src/native/web-media-guard').webMediaRequestOptions(info.url),
-        headers: { 'User-Agent': info.userAgent || native.UA, Referer: native.VIDEO_REFERER },
+      const config = {
+        ...(info.source === 'web' ? require('../src/native/web-media-guard').webMediaRequestOptions(info.url) : {}),
+        headers: { 'User-Agent': info.userAgent || native.UA, 'Accept-Encoding': 'identity',
+          ...((info.referer || info.source === 'web') ? { Referer: info.referer || native.WEB_REFERER } : {}) },
         responseType: 'arraybuffer', timeout: 60000, maxContentLength: 128 * 1024 * 1024,
-      });
+      };
+      let response;
+      try { response = await require('axios').get(info.url, config); }
+      catch (error) {
+        if (info.source !== 'app' || error.response?.status !== 403) throw error;
+        // Match the application's bounded CDN Referer fallback.
+        config.headers.Referer = native.VIDEO_REFERER;
+        response = await require('axios').get(info.url, config);
+      }
       assert(response.data.byteLength > 0);
       fs.writeFileSync(encrypted, response.data);
-    } catch (_) { throw new Error('Real Hongguo acceptance video download failed; no media URL logged'); }
+    } catch (error) { throw new Error('Real Hongguo acceptance download failed (' + (Number(error.response?.status) || error.code || 'unknown') + '); no media URL logged'); }
     const sample = path.join(mediaDir, `windows-sample-${index + 1}.mp4`);
     const key = info.contentKey || (info.spadeA ? native.deriveKey(info.spadeA)?.toString('hex') : '');
     const decoded = spawnSync(ffmpeg, ['-y', '-v', 'error', ...(key ? ['-decryption_key', key] : []),
