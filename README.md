@@ -2,7 +2,7 @@
   <img src="build/icon.png" alt="红果短剧桌面版图标" width="112" height="112">
 </p>
 
-<h1 align="center">红果短剧 · 桌面与NAS</h1>
+<h1 align="center">红果短剧 · 桌面、NAS与TV</h1>
 
 <p align="center">发现好剧，接着上次看。搜索、播放、下载、追剧与合并导出，在一个桌面应用里完成。</p>
 
@@ -23,9 +23,25 @@
 
 ## 下载与安装
 
-**6.6 发行目标（尚未发布）**：先修正播放模型请求格式、签名正文和客户端参数，整合本地文件播放恢复、观看记录排序及 TV 遥控/官方弹幕。双 Mac、Windows、Linux、Docker 与 TV 同批准备。按本轮用户要求不进行新的功能、界面、安装、播放或真机测试；**TV版未测试，请用户自行测试**。旧开发检查不能代替最终包验收，详情见[6.6发行记录](docs/release-6.6.md)。下表仍为当前已发布的6.5下载。
+**当前正式版：6.6**（内部`6.6.0`）。跟进播放接口新格式，修正取源签名/客户端参数，完善本地文件播放、观看记录排序与TV操作。**TV版未测试，请用户自行测试**；其他平台本轮同样跳过新的功能/播放/安装/设备测试。详见[6.6说明](docs/release-6.6.md)。
 
-**当前正式版：6.5**（内部`6.5.0`）。新增Docker Web/API与NAS批量下载合并，小窗自定义唤醒区域、窗口内全屏和重复弹幕聚合。双Mac、Windows、Linux、Docker同版发布，Docker替代TV。详见[6.5说明](docs/release-6.5.md)。
+| 平台 | 下载6.6 | 使用方式 |
+|---|---|---|
+| Apple芯片Mac，macOS 13+ | [DMG](https://github.com/jackotom/hongguo-drama/releases/download/v6.6/Hongguo-6.6-mac-arm64.dmg) | 已签名、公证、装订；本轮未做功能测试 |
+| Intel Mac，macOS 13+ | [DMG](https://github.com/jackotom/hongguo-drama/releases/download/v6.6/Hongguo-6.6-mac-x64.dmg) | 同上；本轮未启动或实机测试 |
+| Windows x64 | [安装版](https://github.com/jackotom/hongguo-drama/releases/download/v6.6/hongguo-downloader-6.6-win-x64-setup.exe) · [便携EXE](https://github.com/jackotom/hongguo-drama/releases/download/v6.6/hongguo-downloader-6.6-win-x64.exe) · [便携ZIP](https://github.com/jackotom/hongguo-drama/releases/download/v6.6/hongguo-downloader-6.6-win-x64.zip) | EXE未签名；保留原资料后升级 |
+| Linux x64 | [AppImage](https://github.com/jackotom/hongguo-drama/releases/download/v6.6/hongguo-downloader-6.6-linux-x64.AppImage) | 赋予执行权限；手动更新，运行未测 |
+| Docker Linux amd64 / NAS | [镜像](https://github.com/jackotom/hongguo-drama/releases/download/v6.6/hongguo-drama-6.6-docker-amd64.tar.gz) · [部署包](https://github.com/jackotom/hongguo-drama/releases/download/v6.6/hongguo-drama-6.6-docker-deploy.zip) | [部署说明](docs/docker.md)；本轮未运行容器 |
+| Android TV / Google TV，API29+ | [TV APK](https://github.com/jackotom/hongguo-drama/releases/download/v6.6/hongguo-downloader-6.6-android-tv-dev.apk) | **TV版未测试，请用户自行测试**；与手机个人版独立 |
+
+[6.6发行页](https://github.com/jackotom/hongguo-drama/releases/tag/v6.6) · [SHA256](https://github.com/jackotom/hongguo-drama/releases/download/v6.6/SHA256SUMS.txt) · [精确源码](https://github.com/jackotom/hongguo-drama/releases/download/v6.6/hongguo-drama-6.6-source.zip)
+
+本轮未验证6.5到6.6的安装/应用内更新。升级前备份资料；电视兼容性、解码能力、分集和画质受设备与官方来源限制。手机个人版不在本次发行范围。
+
+<details>
+<summary>6.5 历史下载与升级说明</summary>
+
+**历史正式版：6.5**（内部`6.5.0`）。新增Docker Web/API与NAS批量下载合并，小窗自定义唤醒区域、窗口内全屏和重复弹幕聚合。双Mac、Windows、Linux、Docker同版发布，Docker替代TV。详见[6.5说明](docs/release-6.5.md)。
 
 | 平台 | 下载6.5 | 使用方式 |
 |---|---|---|
@@ -40,6 +56,9 @@
 小窗唤醒区域入口：**设置 → 小窗模式：隐藏后唤醒区域**；也可在小窗顶部点击“设置唤醒区域”。支持拖动、缩放、百分比及全窗/右侧窄条预设。
 
 Mac和Windows安装版保留应用内更新入口；完整6.4→6.5自动更新尚未实测，也可退出旧程序后手动安装。便携版请保留同目录data资料。Docker需备份任务和视频目录后重新导入/创建容器；不会自动配置公网访问。媒体可用范围和画质仍由来源平台决定。
+
+
+</details>
 
 <details>
 <summary>6.4 历史下载与升级说明</summary>
@@ -750,7 +769,7 @@ https://github.com/user-attachments/assets/b95f4f60-b57c-495f-a30e-62ac2b0bda11
 
 ## 版本与验证范围
 
-当前正式版为6.5。双Mac签名、公证、装订；Windows、Linux、Docker真实流程与小窗原生鼠标验收通过，完整边界见[6.5回执](docs/release-6.5.md)。以下保留历史版本记录，不作为本版验收证据。
+当前正式版为6.6。双Mac新签名、公证、装订；本轮其他功能/安装/播放/设备测试按用户要求未执行，TV未测试。完整边界见[6.6回执](docs/release-6.6.md)。以下保留历史版本记录，不作为本版验收证据。
 
 4.1（内部 `4.1.0`，标签 `v4.1`）已正式发布，包含内置来源全局开关与文字导出。文字导出候选阶段的整剧验证结果为 80 个视频 `completed`、合计 `241881712` 字节；弹幕 80 份、386 条，其中 3 份为空；评论 25 份、307 条；剧评 1 份、4 条。另 55 集评论本次来源未开放，未生成空文件或误取其他集，网络与写盘实际失败为 0。该整剧原始资料随旧工作区回收而丢失，数值来自此前已观察的聊天回执，不作为本轮重新下载或播放的证据。加入来源开关后重新构建三端，204 项单元、91 项平台检查、Windows 安装及升级检查通过；Mac 完成签名、公证及装订，16 项附件摘要与大小一致。详见 [4.1 说明](docs/release-4.1.md)。
 
