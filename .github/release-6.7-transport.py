@@ -40,7 +40,7 @@ def verify(path, expected):
 def download(asset_id, destination, expected):
     destination.parent.mkdir(parents=True, exist_ok=True)
     with destination.open('wb') as stream:
-        subprocess.run(['gh', 'api', f'repos/jackotom/hongguo-drama/releases/assets/{asset_id}', '-H', 'Accept: application/octet-stream'], stdout=stream, check=True)
+        subprocess.run(['gh', 'api', f'repos/jackotom/hongguo-drama/releases/assets/{asset_id}', '-H', 'Accept: application/octet-stream', '--allow-escape-sequences'], stdout=stream, check=True)
     verify(destination, expected)
     return destination
 
