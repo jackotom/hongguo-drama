@@ -31,7 +31,8 @@ test('registration diagnostics preserve timeout cancellation and expose only app
 
   const media = await esbuild.build({ entryPoints: [path.join(__dirname, '../mobile/media.js')], bundle: true, platform: 'browser', format: 'cjs', write: false, logLevel: 'silent', plugins: [{ name: 'isolated-registration', setup(build) {
     build.onLoad({ filter: /native\/app-source\.js$/ }, () => ({ contents: 'export const fetchAppPlayUrl = async () => { throw globalThis.registrationError; };', loader: 'js' }));
-    build.onLoad({ filter: /build\/mobile-decrypt\.js$/ }, () => ({ contents: 'export const decryptMp4Buffer = () => { throw new Error("unexpected decode"); };', loader: 'js' }));
+    build.onResolve({ filter: /^android-decrypt$/ }, () => ({ path: 'decoder', namespace: 'isolated-decoder' }));
+    build.onLoad({ filter: /.*/, namespace: 'isolated-decoder' }, () => ({ contents: 'export const decryptMp4Buffer = () => { throw new Error("unexpected decode"); };', loader: 'js' }));
   } }] });
   vm.runInNewContext(media.outputFiles[0].text, context);
   for (const reason of ['TIMEOUT', 'private-unapproved-reason']) {

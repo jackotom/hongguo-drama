@@ -1,17 +1,14 @@
 import './globals.js';
-import { Buffer } from 'buffer/';
-import request, { cancelAll } from './transport.js';
-import { website, readRouter, parseDetail, parsePublicPlay } from './public.js';
-import { fetchAppPlayUrl } from '../../src/native/app-source.js';
+import { cancelAll } from './transport.js';
+import { website, readRouter, parseDetail } from './public.js';
+import { prepareTvMedia } from './media.js';
 import { browseList } from '../../src/native/hongguo-app-catalog.js';
 import { searchApp } from '../../src/native/hongguo-app-search.js';
-import { decryptMp4Buffer } from '../build/decrypt.js';
 
-const SITE = 'https://hongguoduanju.com';
 const content = document.querySelector('#content');
 const categories = [['real-drama','真人剧'],['comic-drama','漫剧'],['ai-drama','AI剧']];
 const state = {tab:'discover',category:'real-drama',page:1,keyword:'',detail:null,episode:0,generation:0,channel:'web',websiteOnly:false,cursors:new Map()};
-let video, playAbort, lastSaved = 0;
+let video, playback, lastSaved = 0, userPaused = false;
 const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const picture = value => {
   try { const u = new URL(value); return u.protocol === 'https:' ? `/image?url=${encodeURIComponent(u.href)}` : ''; } catch { return ''; }
@@ -22,15 +19,26 @@ function write(key, values) { try { localStorage.setItem(key,JSON.stringify(valu
 function message(text, error = false) { const el = document.querySelector('#status'); if (el) { el.textContent = text; el.classList.toggle('error',error); } }
 const historyFor = id => read('history').find(item => item.series_id === id);
 function savePosition() {
-  if (!video || !state.detail || !Number.isFinite(video.currentTime)) return;
-  const d = state.detail;
-  const row = {series_id:d.series_id,series_title:d.series_title,cover:d.cover,episode:state.episode,position:video.currentTime,time:Date.now()};
+  if (!video || video !== playback?.video || video.dataset.frameReady !== 'true' || !Number.isFinite(video.currentTime)) return;
+  const d = playback.detail;
+  const row = {series_id:d.series_id,series_title:d.series_title,cover:d.cover,episode:playback.index,position:video.currentTime,time:Date.now()};
   write('history',[row,...read('history').filter(item => item.series_id !== d.series_id)]);
 }
+function releaseMedia(media) {
+  if (!media) return;
+  if (media.url?.startsWith('blob:')) URL.revokeObjectURL(media.url);
+  try { Native.deleteMedia(media.token); } catch { console.info('HG:media:cleanup_failed'); }
+}
 function stop() {
-  savePosition(); playAbort?.abort(); cancelAll();
-  if (video) { video.pause(); video.removeAttribute('src'); video.load(); video = null; }
-  Native.awake(false); Native.clearMedia();
+  savePosition();
+  const previous = playback; playback = null;
+  previous?.controller.abort(); clearTimeout(previous?.timer); previous?.dispose?.();
+  cancelAll();
+  if (video) { video.pause(); video.removeAttribute('src'); video.load(); video.remove(); video = null; }
+  releaseMedia(previous?.media);
+  if (previous) previous.stage.dataset.playbackState = 'idle';
+  // TV has one preparation owner; cancel before sweeping any unclaimed native token.
+  try { Native.awake(false); Native.clearMedia(); } catch { console.info('HG:media:cleanup_failed'); }
 }
 function switchTab(tab) {
   state.generation++; stop(); state.tab = tab; state.detail = null;
@@ -124,7 +132,7 @@ async function openDetail(item) {
   if (!item || !/^\d{1,30}$/.test(item.series_id)) return;
   state.generation++; stop();
   const generation = state.generation;
-  state.detail = null;
+  state.detail = null; userPaused = false;
   content.innerHTML = '<button class="back" id="back">‹ 返回</button><div id="status" class="status">正在加载分集…</div>';
   content.querySelector('#back').onclick = () => switchTab(state.tab);
   try {
@@ -161,59 +169,125 @@ async function play(index) {
   if (!d || index < 0 || index >= d.episodes.length) return;
   state.generation++; stop();
   const generation = state.generation; state.episode = index; updateEpisode();
-  const controller = playAbort = new AbortController();
-  const stage = content.querySelector('#stage');
+  const controller = new AbortController(), stage = content.querySelector('#stage');
+  const session = playback = { controller, generation, detail:d, index, stage };
+  const owns = () => playback === session && state.generation === generation;
+  stage.dataset.playbackId = String(generation); stage.dataset.vid = d.episodes[index].vid;
+  stage.dataset.playbackState = 'preparing';
   stage.innerHTML = '<div class="status">正在获取本集片源…</div>'; message('');
   content.querySelector('#retry').textContent = '重新准备';
+  const fail = text => {
+    if (!owns()) return;
+    stop(); stage.dataset.playbackState = 'error';
+    stage.innerHTML = '<div class="status">本集暂时无法播放，可重试或换集。</div>';
+    message(text,true);
+  };
+  session.timer = setTimeout(() => controller.abort(Object.assign(new Error('准备超时'), {name:'TimeoutError'})),90000);
   try {
-    let source;
-    try { source = await fetchAppPlayUrl(d.episodes[index].vid,{quality:'auto'}); }
-    catch (error) {
-      console.warn('HG:source-error:' + (error.code || error.name));
-      if (generation !== state.generation || ['BUSINESS_REJECTED','DEVICE_REGISTRATION_FAILED'].includes(error.code)) throw error;
-      source = parsePublicPlay(await website(`/player/${d.series_id}/${d.episodes[index].vid}`,controller.signal),d.series_id,d.episodes[index].vid);
+    const media = await prepareTvMedia(d.series_id,d.episodes[index].vid,controller.signal,(phase,stats={}) => {
+      if (!owns() || controller.signal.aborted) return;
+      const text = phase === 'registration-retry' ? '注册暂时失败，10秒后重试一次…'
+        : phase === 'decrypting' ? '正在处理视频…' : phase === 'downloading'
+          ? `正在准备完整单集${stats.total > 0 ? ` · ${Math.min(100,Math.round(stats.received/stats.total*100))}%` : ''}，可返回取消…`
+          : '正在获取本集片源…';
+      if (stage.firstElementChild) stage.firstElementChild.textContent = text;
+    });
+    clearTimeout(session.timer);
+    if (!owns() || controller.signal.aborted) {
+      releaseMedia(media);
+      if (owns()) fail('准备超时，请重试或换集。');
+      return;
     }
-    if (generation !== state.generation) return;
-    console.info('HG:source:' + source.codec + ':' + (source.contentKey ? 'encrypted' : 'clear'));
-    if (!['h264','avc','avc1','hevc','h265','hvc1','hev1'].includes(source.codec)) throw new Error('本集编码暂不支持，请换集或使用官方App');
-    stage.firstElementChild.textContent = '正在准备完整单集，可返回取消…';
-    const timer = setTimeout(() => controller.abort(),90000);
-    let response;
-    try {
-      response = await request({url:source.url,headers:{'User-Agent':source.userAgent || 'Mozilla/5.0',Referer:SITE+'/'},media:true,encrypted:!!source.contentKey,timeout:30000,signal:controller.signal});
-    } finally { clearTimeout(timer); }
-    if (generation !== state.generation) return;
-    let token = response.token;
-    if (source.contentKey) {
-      stage.firstElementChild.textContent = '正在处理视频…';
-      await new Promise(resolve => setTimeout(resolve,30));
-      if (generation !== state.generation) return;
-      // shortcut: whole-episode processing is capped at 64MB; use a native streaming parser before increasing it.
-      const plain = decryptMp4Buffer(Buffer.from(response.data,'base64'),Buffer.from(source.contentKey,'hex'));
-      token = Native.writeMedia(plain.toString('base64'));
-    }
-    if (generation !== state.generation) return;
-    video = document.createElement('video'); video.controls = true; video.playsInline = true; video.preload = 'auto';
-    video.src = `/media/${token}`;
-    video.playbackRate = Number(content.querySelector('#speed').value);
-    const saved = historyFor(d.series_id);
-    video.onloadedmetadata = () => { if (saved?.episode === index && saved.position > 0 && saved.position < video.duration - 2) video.currentTime = saved.position; video.play().catch(() => message('点播放按钮开始观看')); };
-    video.ontimeupdate = () => { if (Date.now()-lastSaved > 4000) { savePosition(); lastSaved = Date.now(); } };
-    video.onpause = () => { savePosition(); Native.awake(false); };
-    video.onplay = () => Native.awake(true);
-    video.onended = () => { savePosition(); if (index+1 < d.episodes.length) play(index+1); else message('本剧已看完'); };
-    video.onerror = () => message('系统播放器无法解码本集，可换集或重试。ByteVC2暂不支持。',true);
-    stage.replaceChildren(video);
-    message(`第${index+1}集已准备${source.quality ? ' · '+source.quality : ''}`);
+    session.media = media;
+    const v = document.createElement('video'); video = session.video = v;
+    v.controls = true; v.playsInline = true; v.preload = 'auto';
+    v.dataset.vid = d.episodes[index].vid; v.dataset.playbackId = String(generation); v.dataset.frameReady = 'false';
+    v.playbackRate = Number(content.querySelector('#speed').value);
+    stage.dataset.playbackState = 'decoding';
+    const current = () => owns() && video === v;
+    const frameReady = () => v.dataset.frameReady === 'true';
+    session.clearFrameWait = () => { clearTimeout(session.frameTimer); session.frameTimer = null; };
+    const armFrameWait = () => {
+      if (!frameReady() && !userPaused && !document.hidden && session.frameTimer == null) {
+        const timer = setTimeout(() => {
+          if (session.frameTimer !== timer) return;
+          session.frameTimer = null;
+          if (current() && !frameReady() && !userPaused && !document.hidden) fail('系统播放器未能解码本集，可重试或换集。');
+        },12000);
+        session.frameTimer = timer;
+      }
+    };
+    const acceptFrame = () => {
+      if (!current() || v.readyState < 2 || v.videoWidth <= 0 || v.videoHeight <= 0 || v.seeking) return;
+      v.dataset.frameReady = 'true'; session.clearFrameWait();
+      const playing = !v.paused && !userPaused && !document.hidden;
+      stage.dataset.playbackState = playing ? 'playing' : 'paused'; Native.awake(playing);
+      message(`第${index+1}集${playing ? '正在播放' : '已准备，按确认键播放'}${media.quality ? ' · '+media.quality : ''}`);
+    };
+    let frameId, metadataApplied = false;
+    session.dispose = () => {
+      session.clearFrameWait();
+      if (frameId != null) v.cancelVideoFrameCallback?.(frameId);
+      for (const name of ['onloadedmetadata','onloadeddata','onseeked','ontimeupdate','onpause','onplay','onended','onerror']) v[name] = null;
+    };
+    const frame = () => {
+      frameId = null;
+      if (!current()) return;
+      acceptFrame();
+      if (!frameReady()) frameId = v.requestVideoFrameCallback(frame);
+    };
+    if (typeof v.requestVideoFrameCallback === 'function') frameId = v.requestVideoFrameCallback(frame);
+    const begin = async () => {
+      if (!current() || userPaused || document.hidden) return;
+      armFrameWait();
+      try {
+        await v.play();
+        if (current() && (userPaused || document.hidden)) v.pause();
+      } catch {
+        if (!current()) return;
+        session.clearFrameWait(); message('按确认键播放本集');
+      }
+    };
+    v.onloadedmetadata = () => {
+      if (!current() || metadataApplied) return;
+      metadataApplied = true;
+      const saved = historyFor(d.series_id);
+      if (saved?.episode === index && saved.position > 0 && saved.position < v.duration - 2) v.currentTime = saved.position;
+      begin();
+    };
+    v.onloadeddata = v.onseeked = () => { if (typeof v.requestVideoFrameCallback !== 'function') acceptFrame(); };
+    v.ontimeupdate = () => { if (current() && Date.now()-lastSaved > 4000) { savePosition(); lastSaved = Date.now(); } };
+    v.onpause = () => {
+      if (!current()) return;
+      if (!v.ended) userPaused = true;
+      session.clearFrameWait(); savePosition(); Native.awake(false);
+      stage.dataset.playbackState = frameReady() ? 'paused' : 'decoding';
+    };
+    v.onplay = () => {
+      if (!current() || v.paused) return;
+      if (document.hidden) { userPaused = true; v.pause(); return; }
+      userPaused = false;
+      if (frameReady()) { stage.dataset.playbackState = 'playing'; Native.awake(true); }
+      else armFrameWait();
+    };
+    v.onended = () => {
+      if (!current()) return;
+      savePosition(); Native.awake(false); stage.dataset.playbackState = 'ended';
+      if (!userPaused && !document.hidden && index+1 < d.episodes.length) play(index+1);
+      else message(index+1 < d.episodes.length ? '本集已结束' : '本剧已看完');
+    };
+    v.onerror = () => fail('系统播放器无法解码本集，可换集或重试。ByteVC2暂不支持。');
+    stage.replaceChildren(v); v.src = media.url; armFrameWait();
   } catch (error) {
-    if (generation !== state.generation) return;
-    stage.innerHTML = '<div class="status">本集暂时无法播放。</div>';
-    message(error.message || '片源不可用，请重试',true); Native.awake(false);
+    clearTimeout(session.timer);
+    if (!owns()) return;
+    fail(controller.signal.reason?.name === 'TimeoutError' ? '准备超时，请重试或换集。' : error.message || '片源不可用，请重试');
   }
 }
-window.pausePlayback = () => { video?.pause(); savePosition(); };
+window.pausePlayback = () => { userPaused = true; playback?.clearFrameWait?.(); video?.pause(); savePosition(); Native.awake(false); };
 window.appBack = () => { if (state.detail || content.querySelector('#back')) { switchTab(state.tab); return true; } if (state.tab !== 'discover') { switchTab('discover'); return true; } return false; };
 document.addEventListener('visibilitychange',() => { if (document.hidden) window.pausePlayback(); });
+window.addEventListener('pagehide',() => { state.generation++; stop(); });
 document.querySelectorAll('[data-tab]').forEach(button => button.onclick = () => switchTab(button.dataset.tab));
 document.querySelector('#about').onclick = () => document.querySelector('#info').showModal();
 document.querySelector('#close-info').onclick = () => document.querySelector('#info').close();

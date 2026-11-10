@@ -860,7 +860,7 @@ public class MainActivity extends Activity {
                         boolean timed = error instanceof java.net.SocketTimeoutException;
                         String category = error instanceof java.net.UnknownHostException ? "DNS" : error instanceof javax.net.ssl.SSLException ? "TLS" : error instanceof java.net.ConnectException ? "CONNECT" : error instanceof SecurityException ? "PERMISSION" : "NETWORK";
                         String message = error instanceof IOException && error.getMessage() != null && (error.getMessage().startsWith("视频") || error.getMessage().startsWith("文件") || error.getMessage().startsWith("片源")) ? error.getMessage() : timed ? "网络超时，请重试" : "网络请求失败（" + category + "），请检查网络后重试";
-                        reply(id,new JSONObject().put("error",message).put("code",mediaRedirectRejected && getPackageName().equals("io.github.hongguo.personal") ? "MEDIA_REDIRECT_REJECTED" : timed ? "ETIMEDOUT" : "ERR_NETWORK"));
+                        reply(id,new JSONObject().put("error",message).put("code",mediaRedirectRejected && (getPackageName().equals("io.github.hongguo.personal") || isTv()) ? "MEDIA_REDIRECT_REJECTED" : timed ? "ETIMEDOUT" : "ERR_NETWORK"));
                     } catch (Exception ignored) { }
                 } finally {
                     trace.log(flag.get() ? "cancelled_total_ms" : "done_total_ms",android.os.SystemClock.elapsedRealtime() - trace.queuedAt);
