@@ -35,7 +35,7 @@ async function verify(file, quality, signal, expectedDuration = 0) {
 }
 function mediaGuard(value) {
   const url = new URL(value);
-  const domains = ['qznovelvod.com', 'fqnovelvod.com', 'douyinvod.com', 'bytecdn.cn', 'bytecdn.com', 'ibytedtos.com'];
+  const domains = ['qznovelvod.com', 'fqnovelvod.com', 'douyinvod.com', 'bytecdn.cn', 'bytecdn.com', 'ibytedtos.com', 'bdcgslb.com'];
   if (url.protocol !== 'https:' || url.username || url.password || (url.port && url.port !== '443') || !domains.some(domain => url.hostname === domain || url.hostname.endsWith(`.${domain}`))) throw fail('片源不属于允许的官方 HTTPS CDN');
   const guarded = webMediaRequestOptions(value);
   const redirect = guarded.beforeRedirect;

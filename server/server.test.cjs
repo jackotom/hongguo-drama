@@ -52,9 +52,12 @@ test('rejects destination symlinks and never overwrites a conflicting file', asy
   assert.throws(() => app.store.output(task), /符号链接/);
 });
 test('CDN guard blocks arbitrary destinations and redirect escapes', () => {
-  for (const url of ['http://v.qznovelvod.com/a.mp4', 'https://127.0.0.1/a', 'https://example.org/a', 'https://qznovelvod.com.evil.org/a', 'https://user:pass@v.qznovelvod.com/a']) assert.throws(() => mediaGuard(url));
+  for (const url of ['http://v.qznovelvod.com/a.mp4', 'https://127.0.0.1/a', 'https://example.org/a', 'https://qznovelvod.com.evil.org/a', 'https://v.bdcgslb.com.evil.org/a', 'http://v.bdcgslb.com/a', 'https://user:pass@v.qznovelvod.com/a']) assert.throws(() => mediaGuard(url));
   const guard = mediaGuard('https://v.qznovelvod.com/a');
   assert.equal(guard.proxy, false);
+  assert.doesNotThrow(() => guard.beforeRedirect({}, { headers: { location: 'https://v.bdcgslb.com/video.mp4' } }, { url: 'https://v.qznovelvod.com/a' }));
+  const redirected = mediaGuard('https://v.bdcgslb.com/video.mp4');
+  assert.throws(() => redirected.beforeRedirect({}, { headers: { location: 'https://127.0.0.1/' } }, { url: 'https://v.bdcgslb.com/video.mp4' }));
   assert.throws(() => guard.beforeRedirect({}, { headers: { location: 'https://127.0.0.1/' } }, { url: 'https://v.qznovelvod.com/a' }));
 });
 test('cancel state is persisted before abort and late completion cannot revive it', async t => {
