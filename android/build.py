@@ -4,6 +4,7 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import re
 import secrets
 import shutil
 import subprocess
@@ -12,6 +13,15 @@ import zipfile
 
 ROOT = Path(__file__).resolve().parent
 BUILD = ROOT / 'build'
+
+def tv_version_metadata(candidate):
+    if not isinstance(candidate, str) or not re.fullmatch(r'(0|[1-9][0-9]{0,5})\.(0|[1-9][0-9]?)\.(0|[1-9][0-9]?)', candidate):
+        raise SystemExit('android/package.json 的 tvVersion 必须为三段数字版本（如 6.6.0），无前导零，次版本和补丁号须在 0–99 内')
+    major, minor, patch = map(int, candidate.split('.'))
+    version_code = major * 10000 + minor * 100 + patch
+    if not 0 < version_code <= 2100000000:
+        raise SystemExit('TV versionCode 必须在 Android 允许的 1–2100000000 内')
+    return candidate.removesuffix('.0'), version_code
 
 def run(args, env=None):
     result = subprocess.run([str(a) for a in args], cwd=ROOT, env=env, text=True, capture_output=True)
@@ -25,8 +35,8 @@ def main():
     tv = '--tv' in sys.argv
     if tv: BUILD = BUILD / 'tv'
     desktop_version = json.loads((ROOT.parent/'package.json').read_text())['version']
-    version = desktop_version.removesuffix('.0') if tv else '1.1'
-    version_code = int(desktop_version.split('.')[0]) * 10000 + int(desktop_version.split('.')[1]) * 100 if tv else 2
+    tv_version = json.loads((ROOT/'package.json').read_text()).get('tvVersion') if tv else None
+    version, version_code = tv_version_metadata(tv_version) if tv else ('1.1', 2)
     package_name = 'io.github.hongguo.tv' if tv else 'io.github.hongguo.personal'
     sdk = Path(os.environ.get('ANDROID_HOME', '/opt/homebrew/share/android-commandlinetools'))
     java = Path(os.environ.get('JAVA_HOME', '/opt/homebrew/opt/openjdk@21/libexec/openjdk.jdk/Contents/Home'))
@@ -101,7 +111,7 @@ def main():
     checksum = hashlib.sha256(output.read_bytes()).hexdigest()
     if tv and ("leanback-launchable-activity:" not in package or "uses-feature-not-required: name='android.hardware.touchscreen'" not in package):
         raise SystemExit('TV入口或无触屏声明缺失')
-    (BUILD/'verification.json').write_text(json.dumps({'file':output.name,'sha256':checksum,'bytes':output.stat().st_size,'package':package_name,'version':version,'minSdk':29,'targetSdk':34,'signature_verified':True,'device_tested':False,'source_version':desktop_version,'candidate':tv},ensure_ascii=False,indent=2)+'\n')
+    (BUILD/'verification.json').write_text(json.dumps({'file':output.name,'sha256':checksum,'bytes':output.stat().st_size,'package':package_name,'version':version,'minSdk':29,'targetSdk':34,'signature_verified':True,'device_tested':False,'source_version':desktop_version,'candidate':tv,**({'tv_version':tv_version,'version_code':version_code} if tv else {})},ensure_ascii=False,indent=2)+'\n')
     (BUILD/'signature.txt').write_text(signature)
     print(f'APK构建与签名校验通过：{output.name} ({output.stat().st_size} bytes)')
     print(f'SHA256 {checksum}')
