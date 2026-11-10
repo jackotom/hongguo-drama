@@ -1,6 +1,15 @@
 name: Linux x64 AppImage candidate
 on:
   workflow_dispatch:
+    inputs:
+      source_sha:
+        description: Full frozen source SHA (required for build_only; must match the dispatched ref)
+        type: string
+        default: ''
+      build_only:
+        description: Build and archive only; skip all functional, media, unit and platform acceptance checks
+        type: boolean
+        default: false
   push:
     branches: ['codex/features-6.1']
 permissions:
@@ -11,6 +20,22 @@ jobs:
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.source_sha || github.sha }}
+      - name: Verify frozen source identity
+        shell: bash
+        env:
+          SOURCE_SHA: ${{ inputs.source_sha || github.sha }}
+          DISPATCH_SHA: ${{ github.sha }}
+          BUILD_ONLY: ${{ inputs.build_only || false }}
+          REQUESTED_SHA: ${{ inputs.source_sha }}
+        run: |
+          if [[ "$BUILD_ONLY" == true && ! "$REQUESTED_SHA" =~ ^[0-9a-f]{40}$ ]]; then
+            echo 'build_only requires a full frozen source_sha' >&2
+            exit 1
+          fi
+          test "$(git rev-parse HEAD)" = "$SOURCE_SHA"
+          test "$SOURCE_SHA" = "$DISPATCH_SHA"
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
@@ -21,7 +46,12 @@ jobs:
         with:
           path: ${{ runner.temp }}/linux-media
           key: linux-x64-media-${{ hashFiles('scripts/build-ffmpeg-source-linux.sh', 'scripts/build-librempeg-source.sh', 'scripts/librempeg-videotoolbox-prototype.patch') }}
-      - if: steps.media.outputs.cache-hit != 'true'
+      - name: Restore pinned 6.5 tools without executing the image or binaries
+        if: ${{ inputs.build_only && steps.media.outputs.cache-hit != 'true' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 scripts/reuse-release-media.py linux-x64 "$RUNNER_TEMP/linux-media"
+      - if: ${{ !inputs.build_only && steps.media.outputs.cache-hit != 'true' }}
         run: |
           bash scripts/build-ffmpeg-source-linux.sh "$RUNNER_TEMP/linux-media/ffmpeg" 4
           bash scripts/build-librempeg-source.sh "$RUNNER_TEMP/linux-media/librempeg" linux-x64 4
@@ -29,13 +59,27 @@ jobs:
           mkdir -p build/ffmpeg/linux-x64
           cp "$RUNNER_TEMP/linux-media/ffmpeg/artifacts/bin/"* build/ffmpeg/linux-x64/
           cp "$RUNNER_TEMP/linux-media/librempeg/artifacts/bin/"* build/ffmpeg/linux-x64/
-      - run: npm ci --no-audit --no-fund
+      - if: ${{ !inputs.build_only }}
+        run: npm ci --no-audit --no-fund
+      - if: ${{ inputs.build_only }}
+        run: npm ci --no-audit --no-fund --ignore-scripts
       - run: node scripts/prepare-electron.cjs
         env:
           GH_TOKEN: ${{ github.token }}
-      - run: npm run build:linux -- --config.electronDist=.cache/electron
+      - if: ${{ !inputs.build_only }}
+        run: npm run build:linux -- --config.electronDist=.cache/electron
+      - name: Build AppImage without functional or media checks
+        if: ${{ inputs.build_only }}
+        run: npm run build:react && npx electron-builder --linux AppImage --x64 --publish never --config.electronDist=.cache/electron
       - run: cp "$RUNNER_TEMP/linux-media/ffmpeg/artifacts/"*source.tar.gz "$RUNNER_TEMP/linux-media/librempeg/artifacts/"*source.tar.gz dist/
-      - run: xvfb-run -a node scripts/check-linux-appimage.cjs
+      - if: ${{ !inputs.build_only }}
+        run: xvfb-run -a node scripts/check-linux-appimage.cjs
+      - name: Archive frozen source and asset digests
+        run: |
+          version=$(node -p "require('./package.json').version.replace(/\.0$/, '')")
+          git archive --format=zip --output="dist/hongguo-downloader-$version-linux-source.zip" HEAD
+          printf '%s\n' "$GITHUB_SHA" > dist/SOURCE-SHA.txt
+          sha256sum dist/*.AppImage dist/*source.tar.gz dist/*-linux-source.zip dist/SOURCE-SHA.txt > dist/LINUX-SHA256SUMS.txt
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -43,4 +87,7 @@ jobs:
           path: |
             dist/*.AppImage
             dist/*source.tar.gz
+            dist/*-linux-source.zip
+            dist/SOURCE-SHA.txt
+            dist/LINUX-SHA256SUMS.txt
             dist/linux-verification/*.json

@@ -1,26 +1,47 @@
-# Hongguo Drama 6.5: five-platform release candidate; publication is coordinated separately.
+# Hongguo Drama 6.6: desktop, Docker and TV release candidate; publication is coordinated separately.
 name: Windows x64 release candidate
 on:
   workflow_dispatch:
     inputs:
+      source_sha:
+        description: Full frozen source SHA (required for build_only; must match the dispatched ref)
+        type: string
+        default: ''
       skip_playback:
         description: Skip player playback when the required acceptance footage is unavailable
         type: boolean
         default: false
       build_only:
-        description: Build release assets without running unit, platform, installer, or upgrade acceptance checks
+        description: Build and archive only; skip all functional, media, unit and platform acceptance checks
         type: boolean
         default: false
   push:
     branches: ['windows/**']
 permissions:
   contents: read
+  actions: read
 jobs:
   media:
     runs-on: ubuntu-24.04
     timeout-minutes: 40
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.source_sha || github.sha }}
+      - name: Verify frozen source identity
+        shell: bash
+        env:
+          SOURCE_SHA: ${{ inputs.source_sha || github.sha }}
+          DISPATCH_SHA: ${{ github.sha }}
+          BUILD_ONLY: ${{ inputs.build_only || false }}
+          REQUESTED_SHA: ${{ inputs.source_sha }}
+        run: |
+          if [[ "$BUILD_ONLY" == true && ! "$REQUESTED_SHA" =~ ^[0-9a-f]{40}$ ]]; then
+            echo 'build_only requires a full frozen source_sha' >&2
+            exit 1
+          fi
+          test "$(git rev-parse HEAD)" = "$SOURCE_SHA"
+          test "$SOURCE_SHA" = "$DISPATCH_SHA"
       - uses: actions/cache@v4
         id: media-cache
         with:
@@ -31,11 +52,20 @@ jobs:
         with:
           path: ${{ runner.temp }}/librempeg/artifacts
           key: windows-librempeg-${{ hashFiles('scripts/build-librempeg-source.sh', 'scripts/librempeg-videotoolbox-prototype.patch') }}
-      - if: steps.media-cache.outputs.cache-hit != 'true' || steps.librempeg-cache.outputs.cache-hit != 'true'
+      - name: Restore pinned historical Windows media without executing binaries
+        if: ${{ inputs.build_only && (steps.media-cache.outputs.cache-hit != 'true' || steps.librempeg-cache.outputs.cache-hit != 'true') }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python3 scripts/reuse-release-media.py win-x64 "$RUNNER_TEMP/windows-reuse"
+          mkdir -p "$RUNNER_TEMP/media" "$RUNNER_TEMP/librempeg"
+          cp -R "$RUNNER_TEMP/windows-reuse/ffmpeg/." "$RUNNER_TEMP/media/"
+          cp -R "$RUNNER_TEMP/windows-reuse/librempeg/." "$RUNNER_TEMP/librempeg/"
+      - if: ${{ !inputs.build_only && (steps.media-cache.outputs.cache-hit != 'true' || steps.librempeg-cache.outputs.cache-hit != 'true') }}
         run: sudo apt-get update -qq && sudo apt-get install -y -qq gcc-mingw-w64-x86-64 make pkg-config
-      - if: steps.media-cache.outputs.cache-hit != 'true'
+      - if: ${{ !inputs.build_only && steps.media-cache.outputs.cache-hit != 'true' }}
         run: bash scripts/build-ffmpeg-source-win.sh "$RUNNER_TEMP/media" 4
-      - if: steps.librempeg-cache.outputs.cache-hit != 'true'
+      - if: ${{ !inputs.build_only && steps.librempeg-cache.outputs.cache-hit != 'true' }}
         run: bash scripts/build-librempeg-source.sh "$RUNNER_TEMP/librempeg" win-x64 4
       - name: Combine unchanged FFmpeg and matching ByteVC2 helper artifacts
         run: |
@@ -59,11 +89,30 @@ jobs:
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.source_sha || github.sha }}
+      - name: Verify frozen source identity
+        shell: bash
+        env:
+          SOURCE_SHA: ${{ inputs.source_sha || github.sha }}
+          DISPATCH_SHA: ${{ github.sha }}
+          BUILD_ONLY: ${{ inputs.build_only || false }}
+          REQUESTED_SHA: ${{ inputs.source_sha }}
+        run: |
+          if [[ "$BUILD_ONLY" == true && ! "$REQUESTED_SHA" =~ ^[0-9a-f]{40}$ ]]; then
+            echo 'build_only requires a full frozen source_sha' >&2
+            exit 1
+          fi
+          test "$(git rev-parse HEAD)" = "$SOURCE_SHA"
+          test "$SOURCE_SHA" = "$DISPATCH_SHA"
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
           cache: npm
-      - run: npm ci --no-audit --no-fund
+      - if: ${{ !inputs.build_only }}
+        run: npm ci --no-audit --no-fund
+      - if: ${{ inputs.build_only }}
+        run: npm ci --no-audit --no-fund --ignore-scripts
       - run: node scripts/prepare-electron.cjs
         env:
           GH_TOKEN: ${{ github.token }}
@@ -71,10 +120,11 @@ jobs:
         with:
           name: windows-media
           path: media
-      - name: Prepare bundled FFmpeg before tests
+      - name: Prepare bundled FFmpeg
         shell: pwsh
         run: Copy-Item media/bin/* build/ffmpeg/ -Force
       - name: Verify the new ByteVC2 helper starts and contains its decoder
+        if: ${{ !inputs.build_only }}
         shell: pwsh
         run: |
           $decoders = (& build/ffmpeg/librempeg.exe -hide_banner -decoders 2>&1 | Out-String)
@@ -87,6 +137,7 @@ jobs:
         if: ${{ !inputs.build_only }}
         run: node scripts/check-ffmpeg-resolution.cjs
       - uses: actions/cache/restore@v4
+        if: ${{ !inputs.build_only }}
         id: app-cache
         with:
           path: |
@@ -96,7 +147,7 @@ jobs:
             dist/*.blockmap
           key: windows-update-v2-${{ hashFiles('package*.json', 'main.js', 'preload.js', 'index.html', 'vite.config.js', 'src/**', 'build/**', 'scripts/build-ffmpeg-source-win.sh', 'scripts/build-librempeg-source.sh', 'scripts/librempeg-videotoolbox-prototype.patch', 'scripts/setup-software-player.cjs', 'scripts/software-player-assets.json') }}
       - shell: pwsh
-        if: steps.app-cache.outputs.cache-hit != 'true'
+        if: ${{ inputs.build_only || steps.app-cache.outputs.cache-hit != 'true' }}
         run: |
           npm run build:portable -- --config.electronDist=.cache/electron
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
@@ -105,7 +156,7 @@ jobs:
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
       - uses: actions/cache/save@v4
-        if: steps.app-cache.outputs.cache-hit != 'true'
+        if: ${{ !inputs.build_only && steps.app-cache.outputs.cache-hit != 'true' }}
         with:
           path: |
             dist/win-unpacked
@@ -139,6 +190,7 @@ jobs:
           Copy-Item dist/*.blockmap dist/windows-release/
           Copy-Item media/*corresponding-source.tar.gz dist/windows-release/
           git archive --format=zip --output="dist/windows-release/hongguo-downloader-$version-windows-source.zip" HEAD
+          git rev-parse HEAD | Set-Content -Encoding utf8 dist/windows-release/SOURCE-SHA.txt
           Get-FileHash dist/windows-release/* -Algorithm SHA256 | ForEach-Object { "$($_.Hash.ToLower())  $([IO.Path]::GetFileName($_.Path))" } | Set-Content -Encoding utf8 dist/windows-release/WINDOWS-SHA256SUMS.txt
       - uses: actions/upload-artifact@v4
         with:
