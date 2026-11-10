@@ -19,6 +19,13 @@ import './Player.css';
 import { Play, Film, Download, Check, RefreshCw, Layers, X, Trash2, ChevronDown, Zap } from './icons';
 
 const localMediaKey = (seriesId, episode) => JSON.stringify([seriesId, episode?.vid, episode?.fileUrl, episode?.fileSize, episode?.taskId]);
+// 在线片源与重新下载都给不出所选画质时，回退播放已有完整本地文件的提示。
+const localFallbackNotice = (actualQuality, wantedQuality) => {
+  const pixels = Number.parseInt(actualQuality, 10), wanted = Number.parseInt(wantedQuality, 10);
+  return Number.isFinite(pixels) && Number.isFinite(wanted) && pixels < wanted
+    ? `本集在线片源不可用，已改为播放本地${pixels}P文件（所选${wanted}P）`
+    : '本集在线片源不可用，已改为播放本地文件';
+};
 // 预取失败后短暂退避，避免 timeupdate 4Hz 反复撞同一个坏节点。
 const PREFETCH_RETRY_MS = 15 * 1000;
 // 播放期间最多预取后续两集；跳到更远时再按新位置补齐。
@@ -197,6 +204,8 @@ function Player({ target, onNavigate, onSeriesSelected, onFloatingChange, active
   const fallbackRef = useRef(null);
   const fallbackAttemptRef = useRef(null);
   const rejectedLocalRef = useRef(null);
+  // 在线片源不可用时授权回退播放的本地文件（仅限该集该文件；切集、换剧或改画质即失效）。
+  const grantedLocalRef = useRef(null);
 
   const holdVideoFrame = useCallback(() => {
     const media = loadedMediaRef.current;
@@ -316,6 +325,7 @@ function Player({ target, onNavigate, onSeriesSelected, onFloatingChange, active
     resetPlayback();
     pendingSeekRef.current = seekTo;
     setWaitingFor(null);
+    grantedLocalRef.current = null;
     setPlaybackError(message);
   };
 
@@ -391,7 +401,7 @@ function Player({ target, onNavigate, onSeriesSelected, onFloatingChange, active
 
   const usableLocal = useCallback((ep, seriesId) => ep && !ep.locked && ep.status === 'completed' && ep.fileUrl
     && localMediaKey(seriesId, ep) !== rejectedLocalRef.current
-    && (['auto', 'compat'].includes(stateRef.current.onlineQuality) || /^(xifan|hema|reelshort|dramabox|custom):/.test(seriesId)
+    && (grantedLocalRef.current === localMediaKey(seriesId, ep) || ['auto', 'compat'].includes(stateRef.current.onlineQuality) || /^(xifan|hema|reelshort|dramabox|custom):/.test(seriesId)
       || Number.parseInt(ep.actualQuality, 10) >= Number.parseInt(stateRef.current.onlineQuality, 10)), []);
 
   const resumeLocal = useCallback((ep, seekTo, autoplay = true) => {
@@ -416,10 +426,11 @@ function Player({ target, onNavigate, onSeriesSelected, onFloatingChange, active
       selection: selectionVersion.current, media: mediaVersion.current, seekTo, autoplay, submitting: true };
     fallbackRef.current = intent;
     setPlaybackError(message);
+    let latest = null;
     try {
       const data = await loadDetail(intent.seriesId);
       if (!isCurrentFallback(intent)) return;
-      const latest = data?.episodes.find(item => item.vid_index === intent.vidIndex && item.vid === intent.vid);
+      latest = data?.episodes.find(item => item.vid_index === intent.vidIndex && item.vid === intent.vid) || null;
       if (!latest || latest.locked) throw new Error(latest?.locked ? '该集已锁定，请在来源平台确认' : '无法刷新本集状态，请重试');
       if (usableLocal(latest, intent.seriesId)) { resumeLocal(latest, intent.seekTo, intent.autoplay); return; }
       const key = `${intent.selection}:${intent.seriesId}:${intent.vid}`;
@@ -447,9 +458,19 @@ function Player({ target, onNavigate, onSeriesSelected, onFloatingChange, active
       if (!isCurrentFallback(intent)) return;
       intent.submitting = false;
       fallbackRef.current = null;
-      setWaitingFor(null); setPlaybackError(`${message}；${error.message}`);
+      setWaitingFor(null);
+      // 重新下载被已有低画质完整文件挡住（或重复提交被拒）时，播放这份文件而不是报错。
+      if (latest && latest.vid === intent.vid && latest.vid_index === intent.vidIndex
+        && latest.status === 'completed' && latest.fileUrl && !latest.locked
+        && localMediaKey(intent.seriesId, latest) !== rejectedLocalRef.current) {
+        grantedLocalRef.current = localMediaKey(intent.seriesId, latest);
+        resumeLocal(latest, intent.seekTo, intent.autoplay);
+        showToast(localFallbackNotice(latest.actualQuality, stateRef.current.onlineQuality));
+        return;
+      }
+      setPlaybackError(`${message}；${error.message}`);
     }
-  }, [currentPosition, resetPlayback, loadDetail, isCurrentFallback, usableLocal, resumeLocal]);
+  }, [currentPosition, resetPlayback, loadDetail, isCurrentFallback, usableLocal, resumeLocal, showToast]);
 
   const refreshOnlineCacheInfo = useCallback(async () => {
     try {
@@ -640,12 +661,24 @@ function Player({ target, onNavigate, onSeriesSelected, onFloatingChange, active
           const sameEpisode = wf === stateRef.current.currentIndex;
           const seekTo = recovery ? recovery.seekTo : sameEpisode ? currentPosition() : 0;
           resumeLocal(ep, seekTo, recovery ? recovery.autoplay : !sameEpisode || !loadedMediaRef.current?.element.paused);
+        } else if (!submitting && !recovery?.submitting && ep && ep.status === 'completed' && ep.fileUrl && !ep.locked
+          && (!recovery || ep.vid === recovery.vid)
+          && localMediaKey(String(activeSeriesId), ep) !== rejectedLocalRef.current) {
+          // 下载以更低画质收场（或画质未验证）而达不到所选在线画质：直接播放这份完整文件，
+          // 不再以「请在下载管理检查文件」收场——文件本身是完好的。
+          setWaitingFor(null);
+          fallbackRef.current = null;
+          grantedLocalRef.current = localMediaKey(String(activeSeriesId), ep);
+          showToast(localFallbackNotice(ep.actualQuality, stateRef.current.onlineQuality));
+          const sameEpisode = wf === stateRef.current.currentIndex;
+          resumeLocal(ep, recovery ? recovery.seekTo : sameEpisode ? currentPosition() : 0,
+            recovery ? recovery.autoplay : !sameEpisode || !loadedMediaRef.current?.element.paused);
         } else if (stateRef.current.waitingFor != null && !submitting && !recovery?.submitting
           && (!ep || ep.locked || (ep.status === 'failed' && !ep.retryAt) || ['stopped', 'cancelled', 'missing', 'completed'].includes(ep.status))) {
           setWaitingFor(null);
           fallbackRef.current = null;
           setPlaybackError(ep?.error || (ep?.status === 'stopped' || ep?.status === 'cancelled' ? '本集下载已停止，可在下载管理重试'
-            : ep?.status === 'completed' ? '已有本地文件无法播放，请在下载管理检查文件' : '本集下载失败或任务已移除，请在下载管理检查后重试'));
+            : ep?.status === 'completed' ? '本集本地文件在应用内播放失败，可重试本集或转码后播放' : '本集下载失败或任务已移除，请在下载管理检查后重试'));
         }
       }
     }, 2000);
@@ -1008,6 +1041,7 @@ function Player({ target, onNavigate, onSeriesSelected, onFloatingChange, active
       prefetchRejectedRef.current = false;
       fallbackAttemptRef.current = null;
       reconnectAttemptRef.current = null;
+      grantedLocalRef.current = null;
       if (!usableLocal(ep, String(activeSeriesId))) {
         startOnlinePlay(vidIndex, resumeAt, false, autoplay);
         return;
@@ -1049,6 +1083,7 @@ function Player({ target, onNavigate, onSeriesSelected, onFloatingChange, active
     try { window.localStorage.setItem('hongguo:online-quality', quality); } catch { showToast('本次清晰度已切换，但未能保存'); }
     fallbackAttemptRef.current = null;
     reconnectAttemptRef.current = null;
+    grantedLocalRef.current = null;
     setCompatMap({});
     if (playbackRequested && current && !current.locked) startOnlinePlay(currentIndex, seekTo, true, autoplay);
   };
@@ -1378,6 +1413,7 @@ function Player({ target, onNavigate, onSeriesSelected, onFloatingChange, active
     prefetchRejectedRef.current = false;
     fallbackAttemptRef.current = null;
     rejectedLocalRef.current = null;
+    grantedLocalRef.current = null;
     onSeriesSelected?.(String(sid));
     pendingTargetRef.current = null;
     reconnectAttemptRef.current = null;

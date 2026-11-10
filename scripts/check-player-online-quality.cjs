@@ -224,6 +224,61 @@ if (process.argv[2] !== 'main') {
     retryAt=null; error='当前片源没有 1080P，未自动降级'; failed?.({id:'t1'}); await poll(ui);
     assert.equal(ui.button('取消等待'),undefined); assert.match(text(alert(ui)),/当前片源没有 1080P/); ui.unmount();
   });
+  await check('completed lower-quality file plays after the waited download ends, instead of a check-downloads error', async () => {
+    // 已有所选画质的下载被来源降档成交整的 720P 文件：等待应直接播放该文件。
+    let completed = { status: 'pending', progress: 5, taskId: 't1' }, finished;
+    const ui = mount({ storage: new Map([['hongguo:online-quality', '1080p']]),
+      props: { target: { seriesId: 'A', vidIndex: 1, ts: 1 } },
+      prepare: async () => ({ success: false, error: '取源失败' }),
+      apiOverrides: {
+        getSeriesEpisodes: async () => ({ success: true, data: { series_id: 'A', episodes: [
+          { vid: 'v1', vid_index: 1, locked: false, retryAt: null, error: '',
+            ...(completed.status === 'completed' ? { fileUrl: 'file:///downloaded-1.mp4', actualQuality: '720p' } : {}),
+            ...completed } ] } }),
+        onDownloadCompleted: fn => { finished = fn; return () => {}; },
+      } });
+    try {
+      await ui.flush();
+      assert(ui.button('取消等待'), 'fixed 1080p must keep waiting while the task runs');
+      completed = { status: 'completed', progress: 100, taskId: 't1', fileUrl: 'file:///downloaded-1.mp4', actualQuality: '720p' };
+      finished?.({ id: 't1' }); await poll(ui);
+      assert.equal(ui.find(n => n.type === 'video')?.props.src, 'file:///downloaded-1.mp4', 'the completed file must play');
+      assert.match(ui.text(), /720P.*1080P|1080P.*720P/, 'the quality difference must be announced');
+      assert.equal(alert(ui), undefined, 'a complete file must not dead-end as a check-downloads error');
+    } finally { ui.unmount(); }
+  });
+  await check('download rejection by an existing lower-quality file still plays that file', async () => {
+    const downloads = [];
+    const ui = mount({ local: true, localQuality: '720p', storage: new Map([['hongguo:online-quality', '1080p']]),
+      prepare: async () => ({ success: false, error: '取源失败' }),
+      apiOverrides: { downloadSingleEpisode: async (...p) => { downloads.push(p); return { success: false, error: '已有本地文件实际为 720P（1280×720），不满足 1080P；文件已保留，如需重新下载请先自行移除本地文件' }; } } });
+    try {
+      await ui.flush(); await ui.flush();
+      assert.equal(downloads.at(-1)?.[2], '1080p');
+      assert.equal(ui.find(n => n.type === 'video')?.props.src, 'file:///mock-1.mp4', 'the existing file must keep playing');
+      assert.match(ui.text(), /已改为播放本地/);
+      assert.equal(alert(ui), undefined, 'a playable file must not end as an error');
+    } finally { ui.unmount(); }
+  });
+  await check('once-failed local file reports in-app playback failure and manual retry replays it', async () => {
+    const ui = mount({ local: true, localQuality: '1080p',
+      prepare: async () => ({ success: false, error: '取源失败' }),
+      transcode: async () => ({ success: false, error: '转码失败' }),
+      apiOverrides: { downloadSingleEpisode: async () => ({ success: true }) } });
+    try {
+      await ui.flush(); ui.metadata();
+      assert.equal(ui.find(n => n.type === 'video')?.props.src, 'file:///mock-1.mp4');
+      ui.error(3); await ui.flush();
+      assert(ui.button('取消等待'), 'recovery waits for the requeued download');
+      await poll(ui);
+      assert.match(text(alert(ui)), /本地文件在应用内播放失败/, 'the message must name the in-app playback failure');
+      assert(!/下载管理检查文件/.test(text(alert(ui))), 'must not claim the complete file needs checking in Downloads');
+      assert.equal(ui.button('取消等待'), undefined, 'the rejected file must not auto-resume as local playback');
+      const before = ui.prepares.length;
+      ui.button('重试本集').props.onClick(); await ui.flush();
+      assert.ok(ui.prepares.length > before, 'manual retry must keep recovering online, not replay the rejected file');
+    } finally { ui.unmount(); }
+  });
   await check('online selection preserves time through prefetch, reconnect, transcode and episode switch', async()=>{
     const ui=mount({local:true}); await ui.flush(); ui.metadata(); ui.media.currentTime=24;
     assert(select(ui),'independent online quality selector required');

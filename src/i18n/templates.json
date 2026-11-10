@@ -13,6 +13,7 @@
   "刷新完成：来源返回的短剧及顺序未变化（{0} 部）。": "Refreshed: source titles and order unchanged ({0} dramas).",
   "刷新完成：片单已更新（{0} 部）。": "Refreshed: list updated ({0} dramas).",
   "已加入下载队列：{0} 集": "Queued {0} episodes",
+  "本集在线片源不可用，已改为播放本地{0}P文件（所选{1}P）": "Online source for this episode is unavailable, so the local {0}p file is playing (selected {1}p).",
   "{0} 集": "{0} episodes",
   "详情与下载：{0}": "Details & download: {0}",
   "第 {0} 集": "Episode {0}",
