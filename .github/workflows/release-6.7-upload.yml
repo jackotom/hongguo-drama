@@ -1,0 +1,71 @@
+name: Upload verified 6.7 artifacts
+on:
+  workflow_dispatch:
+permissions:
+  actions: read
+  contents: write
+jobs:
+  upload:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: windows-release-candidate
+          run-id: 42837198838
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: transport/windows
+      - uses: actions/download-artifact@v4
+        with:
+          name: docker-server-candidate
+          run-id: 42837196496
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: transport/docker
+      - name: Upload exact verified bytes to the existing draft
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import concurrent.futures, hashlib, json, subprocess
+          plan = json.loads(Path('.github/release-6.7-transport.json').read_text())
+          def api(endpoint):
+              return json.loads(subprocess.check_output(['gh', 'api', endpoint]))
+          rid = plan['releaseId']
+          def draft():
+              release = api(f'repos/jackotom/hongguo-drama/releases/{rid}')
+              assert release['draft'] and release['tag_name'] == 'v6.7'
+          draft()
+          files = []
+          for platform in ['windows', 'docker']:
+              root = Path('transport') / platform
+              assert (root / 'SOURCE-SHA.txt').read_text().strip() == plan['sourceCommit']
+              for name, expected in plan['assets'].items():
+                  path = root / name
+                  if not path.is_file():
+                      continue
+                  assert path.stat().st_size == expected['size']
+                  assert hashlib.sha256(path.read_bytes()).hexdigest() == expected['sha256']
+                  files.append((path, expected))
+          assert len(files) == 5
+          def upload(item):
+              path, expected = item
+              draft()
+              rows = api(f'repos/jackotom/hongguo-drama/releases/{rid}/assets?per_page=100')
+              hits = [row for row in rows if row['name'] == path.name]
+              if hits:
+                  assert len(hits) == 1
+                  if hits[0]['state'] == 'uploaded':
+                      assert hits[0]['size'] == expected['size'] and hits[0]['digest'] == 'sha256:' + expected['sha256']
+                  return
+              result = subprocess.run(['gh', 'release', 'upload', 'v6.7', '--repo', 'jackotom/hongguo-drama', str(path)])
+              if result.returncode:
+                  rows = api(f'repos/jackotom/hongguo-drama/releases/{rid}/assets?per_page=100')
+                  assert any(row['name'] == path.name for row in rows), 'No local or remote uploader owns this asset'
+              print('TRANSFERRED OR ALREADY OWNED ' + path.name, flush=True)
+          with concurrent.futures.ThreadPoolExecutor(max_workers=4) as pool:
+              list(pool.map(upload, files))
+          draft()
+          print('Transport finished; release remains draft and requires final digest verification')
+          PY

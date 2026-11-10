@@ -1,0 +1,26 @@
+{
+  "sourceCommit": "43c7b4c8fa98df3b1b7902713788641f9d325e2b",
+  "releaseId": 440494074,
+  "assets": {
+    "hongguo-downloader-6.7-win-x64.exe": {
+      "size": 114183872,
+      "sha256": "c804a1c75ef12d22e4fc7def8d317e7f472bebfeb3e54666496d83038849c330"
+    },
+    "hongguo-downloader-6.7-win-x64.zip": {
+      "size": 114195748,
+      "sha256": "ba11298c7ccfe3574ec5e4302be3d6f23e4125f73c73504a1ddc35801464cb03"
+    },
+    "hongguo-downloader-6.7-win-x64-setup.exe.blockmap": {
+      "size": 145427,
+      "sha256": "c679150226e11050aa460434836e1c911c36d02970d59ec5b3566c07dab72001"
+    },
+    "latest.yml": {
+      "size": 377,
+      "sha256": "23f3817d039addd773461a0f6b0be17c338e3c368eb88df3ff465797eb86f5f8"
+    },
+    "hongguo-drama-6.7-docker-amd64.tar.gz": {
+      "size": 107344622,
+      "sha256": "4dda3f216a505b58a8e68f1cce2a5eb4c36009a1f16232dbdaa7d457a1de63a2"
+    }
+  }
+}
