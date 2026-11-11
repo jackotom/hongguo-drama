@@ -1,0 +1,610 @@
+{
+  "version": "6.8.0",
+  "buildVersion": "6.8.2",
+  "sourceCommit": "e06828f0c81392fb572a5feda6cec54dba643251",
+  "releaseId": 441048199,
+  "assets": {
+    "Hongguo-6.8-mac-arm64.dmg": {
+      "size": 178741123,
+      "sha256": "cc12684f51f990d046bf97bdfdaa5e2b08a14b2e0173e0fe96bf1503619f9ecc"
+    },
+    "Hongguo-6.8-mac-x64.dmg": {
+      "size": 189033950,
+      "sha256": "8d6a0b4e8845f452bda67bfd07a8f6ce9b0bc15efe7a80773f3d212519e117d1"
+    },
+    "SHA256SUMS.txt": {
+      "size": 2633,
+      "sha256": "ec95b9736a5d57e3f9d3910fc2a3d46f9d1a2a6c1ec50a563d03b6d80ce4fe09"
+    },
+    "ffmpeg-9.0.2-x264-b35605a-corresponding-source.tar.gz": {
+      "size": 13122060,
+      "sha256": "bfcac890fe098e27bd1cdc4209837377ecaae3bea4fc5b1ea197ec4ab1c2b2e9"
+    },
+    "ffmpeg-9.0.2-x264-b35605a-linux-x64-corresponding-source.tar.gz": {
+      "size": 13170076,
+      "sha256": "4a0a2e6a761fc26aefb5ee4d3609ff98daa93108534f8d25990698eb83eb2ab4"
+    },
+    "ffmpeg-9.0.2-x264-b35605a-win-x64-corresponding-source.tar.gz": {
+      "size": 13202581,
+      "sha256": "422dcb4a4eb22119400740bee19cf84d8e2925f90f31fd1d8c32f545ea162d9e"
+    },
+    "ffmpeg-9.0.2-x264-b35605a-x64-corresponding-source.tar.gz": {
+      "size": 13122451,
+      "sha256": "ad68bf181e6bcc8609bcfad68a4a1c071b046af7743fd21b4e645132080eba60"
+    },
+    "hongguo-downloader-6.8-linux-x64.AppImage": {
+      "size": 159952593,
+      "sha256": "62bbed7a7c5a53e137a79b8816ae0951488d58383824d1f269c80752738a6dc9"
+    },
+    "hongguo-downloader-6.8-mac-arm64.zip": {
+      "size": 161045844,
+      "sha256": "7c3e56bbb9c67e778495d1068ae11e7ac8f121d192d9176edbbeac11a53a690e"
+    },
+    "hongguo-downloader-6.8-mac-x64.zip": {
+      "size": 169289040,
+      "sha256": "f50d87f7d2c224f1e48d3c6738cc8d93d54524dde1e3c863aabf012134b4cdaa"
+    },
+    "hongguo-downloader-6.8-win-x64-setup.exe": {
+      "size": 137796702,
+      "sha256": "db2b067c2a183142e3994cf252fd75ab02048f50b1b8de4c9239b0b4f602c0b3"
+    },
+    "hongguo-downloader-6.8-win-x64-setup.exe.blockmap": {
+      "size": 145433,
+      "sha256": "03dabe034ef94432aca87b83eddb46080a46382192968344594b3f109d23be71"
+    },
+    "hongguo-downloader-6.8-win-x64.exe": {
+      "size": 114183343,
+      "sha256": "ca0043f1391a5b894ee0795d8b0d442f50b02522231c81487270348468b76b23"
+    },
+    "hongguo-downloader-6.8-win-x64.zip": {
+      "size": 114194188,
+      "sha256": "2ef3e2886fa2e9108e380cb49b4455955eebd48bfd0e9b1e14617cb808453f73"
+    },
+    "hongguo-downloader-6.8-windows-source.zip": {
+      "size": 5554357,
+      "sha256": "f9fd63ea82a21e780da64b7160a5fb16f85f9d3db7cdc2a6d3535295ca388195"
+    },
+    "hongguo-drama-6.8-docker-amd64.tar.gz": {
+      "size": 107350644,
+      "sha256": "9cceffb25d494545a243c7b55c129664aff06214dd6b22f670d0150844d3bf04"
+    },
+    "hongguo-drama-6.8-docker-deploy.zip": {
+      "size": 27919,
+      "sha256": "969ad4d3cdcf1f1ef57be5853a082e84aee99905dc7245a7bfea0aa83a6bea25"
+    },
+    "hongguo-drama-6.8-source.zip": {
+      "size": 5554357,
+      "sha256": "f9fd63ea82a21e780da64b7160a5fb16f85f9d3db7cdc2a6d3535295ca388195"
+    },
+    "latest-mac.yml": {
+      "size": 557,
+      "sha256": "4e44a639377b629756ede509094abd2d08d763677e6f9a6b0ace4255af359162"
+    },
+    "latest.yml": {
+      "size": 377,
+      "sha256": "197e4cefb63256ae27128baa021d9d848a16983c133ee463ce3cbc3ec8340981"
+    },
+    "libmedia-1.3.1-152f629-corresponding-source.tar.gz": {
+      "size": 190808102,
+      "sha256": "148b3101c2909359a0cece00a0a735a76e3c1410f858bcb5e4f1d88935baa887"
+    },
+    "librempeg-cb1f8f3-x264-b35605a-arm64-corresponding-source.tar.gz": {
+      "size": 19877495,
+      "sha256": "fc32fa63d652a351b0f5242d141801be2f671dcb02b3c60719997dcdd33e002f"
+    },
+    "librempeg-cb1f8f3-x264-b35605a-linux-x64-corresponding-source.tar.gz": {
+      "size": 19876967,
+      "sha256": "d4c67f5fda33c0deb5d6969574e8f215e434a79570c45b45aed0cb3e326609e1"
+    },
+    "librempeg-cb1f8f3-x264-b35605a-win-x64-corresponding-source.tar.gz": {
+      "size": 19876967,
+      "sha256": "d4c67f5fda33c0deb5d6969574e8f215e434a79570c45b45aed0cb3e326609e1"
+    },
+    "librempeg-cb1f8f3-x264-b35605a-x64-corresponding-source.tar.gz": {
+      "size": 19877495,
+      "sha256": "fc32fa63d652a351b0f5242d141801be2f671dcb02b3c60719997dcdd33e002f"
+    }
+  },
+  "remoteArtifacts": {
+    "windows": [
+      "hongguo-downloader-6.8-win-x64.exe",
+      "hongguo-downloader-6.8-win-x64.zip",
+      "hongguo-downloader-6.8-win-x64-setup.exe",
+      "hongguo-downloader-6.8-win-x64-setup.exe.blockmap",
+      "latest.yml",
+      "ffmpeg-9.0.2-x264-b35605a-win-x64-corresponding-source.tar.gz",
+      "librempeg-cb1f8f3-x264-b35605a-win-x64-corresponding-source.tar.gz"
+    ],
+    "linux": [
+      "hongguo-downloader-6.8-linux-x64.AppImage",
+      "librempeg-cb1f8f3-x264-b35605a-linux-x64-corresponding-source.tar.gz",
+      "ffmpeg-9.0.2-x264-b35605a-linux-x64-corresponding-source.tar.gz"
+    ],
+    "docker": [
+      "hongguo-drama-6.8-docker-amd64.tar.gz"
+    ]
+  },
+  "priorMediaAssets": {
+    "libmedia-1.3.1-152f629-corresponding-source.tar.gz": 732025227,
+    "librempeg-cb1f8f3-x264-b35605a-arm64-corresponding-source.tar.gz": 732025268,
+    "ffmpeg-9.0.2-x264-b35605a-corresponding-source.tar.gz": 731836483,
+    "ffmpeg-9.0.2-x264-b35605a-x64-corresponding-source.tar.gz": 731843840,
+    "librempeg-cb1f8f3-x264-b35605a-x64-corresponding-source.tar.gz": 732025856
+  },
+  "localParts": {
+    "Hongguo-6.8-mac-arm64.dmg": [
+      {
+        "name": "_hg68-e06828f-cc12684f51f9-000.part",
+        "size": 8388608,
+        "sha256": "a389d6e531c6b24440fcf01129271ec64b2152230cf96d56b83bbdd60cafa2e2"
+      },
+      {
+        "name": "_hg68-e06828f-cc12684f51f9-001.part",
+        "size": 8388608,
+        "sha256": "7536eac077c9e5954b5ab15666d5e82daca6e3ccadbc1862638e4d4d3ef72116"
+      },
+      {
+        "name": "_hg68-e06828f-cc12684f51f9-002.part",
+        "size": 8388608,
+        "sha256": "5456dc67427ecfc7ea94a21677ec66b7d14faf4405551d277fc7d9fd3d93cf7d"
+      },
+      {
+        "name": "_hg68-e06828f-cc12684f51f9-003.part",
+        "size": 8388608,
+        "sha256": "9de06852c8de79fafb1c5b57a112166a81f6b8b64d9e01543ce0d2912c25b456"
+      },
+      {
+        "name": "_hg68-e06828f-cc12684f51f9-004.part",
+        "size": 8388608,
+        "sha256": "e9d40608ce8e0da00408b86076020643a56563628b993ee27318bd0af811b696"
+      },
+      {
+        "name": "_hg68-e06828f-cc12684f51f9-005.part",
+        "size": 8388608,
+        "sha256": "abe4eb1ef9b832b1b0b29bbf6336151f7498e8b8cc32e548f9400974ba3282bb"
+      },
+      {
+        "name": "_hg68-e06828f-cc12684f51f9-006.part",
+        "size": 8388608,
+        "sha256": "9624400e59b7fa88080e2e5935cad27b016c3514cc754a868ee9caa8fba13a53"
+      },
+      {
+        "name": "_hg68-e06828f-cc12684f51f9-007.part",
+        "size": 8388608,
+        "sha256": "98e7f5645881de65feaaaf3044ab3f3419fc995417400a9094cd69c235c76b6d"
+      },
+      {
+        "name": "_hg68-e06828f-cc12684f51f9-008.part",
+        "size": 8388608,
+        "sha256": "c441dda9dd13470e07d82c8049f9f2e8826c9f358bf58886a6988614aea27446"
+      },
+      {
+        "name": "_hg68-e06828f-cc12684f51f9-009.part",
+        "size": 8388608,
+        "sha256": "925433b8389821926dd914a8ffd303ad8ac01cfc2683407bbc862e7bc368079d"
+      },
+      {
+        "name": "_hg68-e06828f-cc12684f51f9-010.part",
+        "size": 8388608,
+        "sha256": "de4a6e1b832bde9eabadb3f9b81db3d5ce681562432969865898e238fe735772"
+      },
+      {
+        "name": "_hg68-e06828f-cc12684f51f9-011.part",
+        "size": 8388608,
+        "sha256": "4f3972a0e7bb37f4023576343ff39dcb4d8097bee650b0b7ec73a9aba4a79d51"
+      },
+      {
+        "name": "_hg68-e06828f-cc12684f51f9-012.part",
+        "size": 8388608,
+        "sha256": "00233b4a3e459a7d92f6c4a7dad5de1975be11d177c8a5d92110a805e91edef7"
+      },
+      {
+        "name": "_hg68-e06828f-cc12684f51f9-013.part",
+        "size": 8388608,
+        "sha256": "5e40e34f159d4e5aa8c8ab80a8d221ca9c5d4f1b6e52a28a68ea4c9461fd8e8c"
+      },
+      {
+        "name": "_hg68-e06828f-cc12684f51f9-014.part",
+        "size": 8388608,
+        "sha256": "7b57941767245f443ecf8b75d02462b1b603ebaaf391859a985279898114d145"
+      },
+      {
+        "name": "_hg68-e06828f-cc12684f51f9-015.part",
+        "size": 8388608,
+        "sha256": "2afb4bbc08f5aa852d518cc7f1348dd7a150966aea5d963afdaf48e10f519dd0"
+      },
+      {
+        "name": "_hg68-e06828f-cc12684f51f9-016.part",
+        "size": 8388608,
+        "sha256": "0e1b8b50ec0c6015a2b49c447c3a962b89e69ca4cece261b7164aba1d901e2ae"
+      },
+      {
+        "name": "_hg68-e06828f-cc12684f51f9-017.part",
+        "size": 8388608,
+        "sha256": "ec7a10f5d4cb70f7e9cf5e13942478599909d1cacb6941f249c87972eb0023df"
+      },
+      {
+        "name": "_hg68-e06828f-cc12684f51f9-018.part",
+        "size": 8388608,
+        "sha256": "1286acf323415c246c6ee1fc1d2304ee03798b230d0e10ffd507767b1ac71462"
+      },
+      {
+        "name": "_hg68-e06828f-cc12684f51f9-019.part",
+        "size": 8388608,
+        "sha256": "ad87847066aa401f3c8db29ff4967beed7332ff804e6dc2cb9f7380fcaf156e1"
+      },
+      {
+        "name": "_hg68-e06828f-cc12684f51f9-020.part",
+        "size": 8388608,
+        "sha256": "e10598d2091567d9aa668d3fa2ca928b6fcf956197cb8def3777088ebd00b659"
+      },
+      {
+        "name": "_hg68-e06828f-cc12684f51f9-021.part",
+        "size": 2580355,
+        "sha256": "ac0c990f4cf9c86371493fdd785ad51291d22066179d11909b50c96eb68ba55b"
+      }
+    ],
+    "Hongguo-6.8-mac-x64.dmg": [
+      {
+        "name": "_hg68-e06828f-8d6a0b4e8845-000.part",
+        "size": 8388608,
+        "sha256": "e2d7661e73c90d9f884f3d9444ab6d51c388150fb4ae1ac733756baa9477b2f7"
+      },
+      {
+        "name": "_hg68-e06828f-8d6a0b4e8845-001.part",
+        "size": 8388608,
+        "sha256": "38a154f421f5f5e2229873d7f1c04592dbb8d855b152eb0a2e5171291be7fbb9"
+      },
+      {
+        "name": "_hg68-e06828f-8d6a0b4e8845-002.part",
+        "size": 8388608,
+        "sha256": "46afd8be0c36001732c601a2679d47549576c5e4c8cd1a2efaa698982a93e9c1"
+      },
+      {
+        "name": "_hg68-e06828f-8d6a0b4e8845-003.part",
+        "size": 8388608,
+        "sha256": "1d0de4863b42153fed572069e537c80fdb75beeb1692b9087b1a8b4cfbd6f57a"
+      },
+      {
+        "name": "_hg68-e06828f-8d6a0b4e8845-004.part",
+        "size": 8388608,
+        "sha256": "7d313ba5c11648900fc1bf5a372823d63cde72c02e0d381eff317f479ed8f2f6"
+      },
+      {
+        "name": "_hg68-e06828f-8d6a0b4e8845-005.part",
+        "size": 8388608,
+        "sha256": "aea691ec3bd9d5632c5871144cf60191ab28c81a15ffe3c12967701ab4af2f0c"
+      },
+      {
+        "name": "_hg68-e06828f-8d6a0b4e8845-006.part",
+        "size": 8388608,
+        "sha256": "ed789cc5c6e0b0284a197ecfca7e224107358b00bee186f58718c6be3f0227b3"
+      },
+      {
+        "name": "_hg68-e06828f-8d6a0b4e8845-007.part",
+        "size": 8388608,
+        "sha256": "1a3ad55aff91a2599279b4375c71f710b445a62f405b691d6ef97a0c5359d9cb"
+      },
+      {
+        "name": "_hg68-e06828f-8d6a0b4e8845-008.part",
+        "size": 8388608,
+        "sha256": "5ae84f6f99798417194731e022a68715943d10f1785c90fce95c7bb5f79dfa90"
+      },
+      {
+        "name": "_hg68-e06828f-8d6a0b4e8845-009.part",
+        "size": 8388608,
+        "sha256": "9a0b9b0ea5d281b516d61a250211450ed367748d72a10a08105e336cc464e095"
+      },
+      {
+        "name": "_hg68-e06828f-8d6a0b4e8845-010.part",
+        "size": 8388608,
+        "sha256": "97e9b68145676cfb315cb2c218d8ae7625a1b61d2b0307291d9f292e5837bab5"
+      },
+      {
+        "name": "_hg68-e06828f-8d6a0b4e8845-011.part",
+        "size": 8388608,
+        "sha256": "d1c5617ae6bdf790f359bedec34380b8f184119e361722a80d44a321991f5f9f"
+      },
+      {
+        "name": "_hg68-e06828f-8d6a0b4e8845-012.part",
+        "size": 8388608,
+        "sha256": "0340995469c197fdde6989726238bc2912f5c839e2926ac31dc2ad57ac238f54"
+      },
+      {
+        "name": "_hg68-e06828f-8d6a0b4e8845-013.part",
+        "size": 8388608,
+        "sha256": "7e0cd888a167b6561f062ef752f634735638f4518bbe10af8d40acc9e852ae24"
+      },
+      {
+        "name": "_hg68-e06828f-8d6a0b4e8845-014.part",
+        "size": 8388608,
+        "sha256": "7b23d2f4af5d4cb391e1dc221936f5dd078e7d5fec8f1c15e67d6f04cb2b3ac1"
+      },
+      {
+        "name": "_hg68-e06828f-8d6a0b4e8845-015.part",
+        "size": 8388608,
+        "sha256": "cfd6d79d96dc7d1431e46bc728d8e0ee2c0576e9a0bbf0e14c5500164b485dcd"
+      },
+      {
+        "name": "_hg68-e06828f-8d6a0b4e8845-016.part",
+        "size": 8388608,
+        "sha256": "d9d69955dcc04017b4995bcfbb6d3e35bbe7f5d0bb16962627dcb247e9aa0f8b"
+      },
+      {
+        "name": "_hg68-e06828f-8d6a0b4e8845-017.part",
+        "size": 8388608,
+        "sha256": "09d89473bb008156f1d8153f48e7b1cdfc03b114bde67edee98664966c707b42"
+      },
+      {
+        "name": "_hg68-e06828f-8d6a0b4e8845-018.part",
+        "size": 8388608,
+        "sha256": "0790d2861d93f9b7be56da393145917b27c59562fd5bce1b61176190f24d18c9"
+      },
+      {
+        "name": "_hg68-e06828f-8d6a0b4e8845-019.part",
+        "size": 8388608,
+        "sha256": "77e05cc9d945db323bf63f389c7201a60c2e0bf94910efbd0c0bb5657708339c"
+      },
+      {
+        "name": "_hg68-e06828f-8d6a0b4e8845-020.part",
+        "size": 8388608,
+        "sha256": "aeb2a4613030d66664ba4766c5aecf2061a2fdc828651c20adce10c48f6fffa9"
+      },
+      {
+        "name": "_hg68-e06828f-8d6a0b4e8845-021.part",
+        "size": 8388608,
+        "sha256": "760d6aca89ea2da1673c2f685dbdf69252f731766eab62a452e95e7880bc872a"
+      },
+      {
+        "name": "_hg68-e06828f-8d6a0b4e8845-022.part",
+        "size": 4484574,
+        "sha256": "529b2a91b00a2bc2824027d2e8cc9cfa39a155ffe7855d81e949f35c0a8d9e77"
+      }
+    ],
+    "hongguo-downloader-6.8-mac-arm64.zip": [
+      {
+        "name": "_hg68-e06828f-7c3e56bbb9c6-000.part",
+        "size": 8388608,
+        "sha256": "5bb96b4d659ef7ec344f4ce393157b2892eb96a3e0bdd2d32b723a1ce2af22bd"
+      },
+      {
+        "name": "_hg68-e06828f-7c3e56bbb9c6-001.part",
+        "size": 8388608,
+        "sha256": "b371d5617246da70e6f57254d7eb07171a447410bc4b4d19f102cfb42bbd1086"
+      },
+      {
+        "name": "_hg68-e06828f-7c3e56bbb9c6-002.part",
+        "size": 8388608,
+        "sha256": "6199ba09b6b0496fb9e341310b5c74df5484860805a5f5e72bbab0c71612aaed"
+      },
+      {
+        "name": "_hg68-e06828f-7c3e56bbb9c6-003.part",
+        "size": 8388608,
+        "sha256": "0678be23ca53d296a9d7e27474f00057a0551e116535f225ff96aeded816a117"
+      },
+      {
+        "name": "_hg68-e06828f-7c3e56bbb9c6-004.part",
+        "size": 8388608,
+        "sha256": "757d4a25a164c8adabf0723892468aa1786336a7895fccdc7591a572c2183ac7"
+      },
+      {
+        "name": "_hg68-e06828f-7c3e56bbb9c6-005.part",
+        "size": 8388608,
+        "sha256": "b483bf4832dd541befc2fb00242a3147409056dcf21b6cfaacf09f5d686fc43e"
+      },
+      {
+        "name": "_hg68-e06828f-7c3e56bbb9c6-006.part",
+        "size": 8388608,
+        "sha256": "adae9c59b6f0e44991eca763b24c50c34d621594499011b77f5ddbb07097d737"
+      },
+      {
+        "name": "_hg68-e06828f-7c3e56bbb9c6-007.part",
+        "size": 8388608,
+        "sha256": "1a899724a4db574a0ebd68cc9900de26ba1427222eefc35756e4c95aa7a82088"
+      },
+      {
+        "name": "_hg68-e06828f-7c3e56bbb9c6-008.part",
+        "size": 8388608,
+        "sha256": "a3cd370caaf4407075e182e80a813e32f7366798482d8fbbc92288a671e58d1a"
+      },
+      {
+        "name": "_hg68-e06828f-7c3e56bbb9c6-009.part",
+        "size": 8388608,
+        "sha256": "57b22acd7855458c0ea91fa18b523db9c7d8f0ea41a0bdb7ad6b58d0eeaa14fa"
+      },
+      {
+        "name": "_hg68-e06828f-7c3e56bbb9c6-010.part",
+        "size": 8388608,
+        "sha256": "a11987de2cba5d2aa4da8f0d0da3d042e05ff79bd080bb09f3750d4fa84c76b0"
+      },
+      {
+        "name": "_hg68-e06828f-7c3e56bbb9c6-011.part",
+        "size": 8388608,
+        "sha256": "8f04c7101a19920f8de4b7545bcadd8ec4b42785d02d8f06af4a3a640b0802cf"
+      },
+      {
+        "name": "_hg68-e06828f-7c3e56bbb9c6-012.part",
+        "size": 8388608,
+        "sha256": "65a0319fc7580862d8a42b679c5cf5f370c3be7b74d2ff9992c61d66e64f53c8"
+      },
+      {
+        "name": "_hg68-e06828f-7c3e56bbb9c6-013.part",
+        "size": 8388608,
+        "sha256": "37a13771a38988e8b60454cf45f4a1bbca1c696908c0c88516d6ae7a4b56b7c4"
+      },
+      {
+        "name": "_hg68-e06828f-7c3e56bbb9c6-014.part",
+        "size": 8388608,
+        "sha256": "15b2137bf3791facbe1d0c846ec291cde1168651bee43d203f4f0c9288b90d7c"
+      },
+      {
+        "name": "_hg68-e06828f-7c3e56bbb9c6-015.part",
+        "size": 8388608,
+        "sha256": "c63c08973be0b5c0bc44a2125ae2f995d3c4a58415a7b2586bd31f1168d1e10b"
+      },
+      {
+        "name": "_hg68-e06828f-7c3e56bbb9c6-016.part",
+        "size": 8388608,
+        "sha256": "fe8b7eb6cc10f6eba2359ba3a6082e3355eb08833d2f31fdf5cec6e305df28bf"
+      },
+      {
+        "name": "_hg68-e06828f-7c3e56bbb9c6-017.part",
+        "size": 8388608,
+        "sha256": "f1f9b67498ce0de2f8e19a4925d00b644510693792957abc40ca72cc5a02014e"
+      },
+      {
+        "name": "_hg68-e06828f-7c3e56bbb9c6-018.part",
+        "size": 8388608,
+        "sha256": "151594450f1bebf6f82e685896f0c130859b170fdaafcc916e28af9d8bc19c8a"
+      },
+      {
+        "name": "_hg68-e06828f-7c3e56bbb9c6-019.part",
+        "size": 1662292,
+        "sha256": "f724679d69a7d627dd2eb1ef48c010fc1f7cd6a9af404e681889336e3e7398b5"
+      }
+    ],
+    "hongguo-downloader-6.8-mac-x64.zip": [
+      {
+        "name": "_hg68-e06828f-f50d87f7d2c2-000.part",
+        "size": 8388608,
+        "sha256": "ee3547d9a8e7341a9ddaa86e7e2545f32242a31ce07a89ce5aa3c67d04b80439"
+      },
+      {
+        "name": "_hg68-e06828f-f50d87f7d2c2-001.part",
+        "size": 8388608,
+        "sha256": "6b4077a85c49b338c2000e44f2e2c773730ef1f19bcb65bbc7deb262a7516ebc"
+      },
+      {
+        "name": "_hg68-e06828f-f50d87f7d2c2-002.part",
+        "size": 8388608,
+        "sha256": "98297f94547f7a3835ba2ddc53d384fc338414faa2d0a09405322f4ae17739c6"
+      },
+      {
+        "name": "_hg68-e06828f-f50d87f7d2c2-003.part",
+        "size": 8388608,
+        "sha256": "e3b715933704ee52b3df64f20289ab75cf0e9f546b029236b36a1cad8c8751dc"
+      },
+      {
+        "name": "_hg68-e06828f-f50d87f7d2c2-004.part",
+        "size": 8388608,
+        "sha256": "0cb502a7374fc1e0241a77dcc5c87bb0c5a3b89bdefdac7ea6972d525b839950"
+      },
+      {
+        "name": "_hg68-e06828f-f50d87f7d2c2-005.part",
+        "size": 8388608,
+        "sha256": "c4c2844a2c242dea8813c1f3a7322f897a8185492bbe001cf8c54c80c8422e8d"
+      },
+      {
+        "name": "_hg68-e06828f-f50d87f7d2c2-006.part",
+        "size": 8388608,
+        "sha256": "ea3d27e58735f40dcd4448fa048c03dfaf615de462d7f70fed1add5f6f22a994"
+      },
+      {
+        "name": "_hg68-e06828f-f50d87f7d2c2-007.part",
+        "size": 8388608,
+        "sha256": "adf339fd1dc0f066d5ef04284a75f10664180c2d390ebe9a2f6c3554f1102258"
+      },
+      {
+        "name": "_hg68-e06828f-f50d87f7d2c2-008.part",
+        "size": 8388608,
+        "sha256": "b9c5dd30cca32c28c510855617c79a6fdb55fa9dab0e2277682986be5c366d1f"
+      },
+      {
+        "name": "_hg68-e06828f-f50d87f7d2c2-009.part",
+        "size": 8388608,
+        "sha256": "53b9de59bd44b092f26d2c03c46a12e0c54c5aad4dac53c5d0539b4a245a1c54"
+      },
+      {
+        "name": "_hg68-e06828f-f50d87f7d2c2-010.part",
+        "size": 8388608,
+        "sha256": "99e6538c0d8434bf911643383eb2e38e56dc11e8dd68a216b0d4553d71c06df4"
+      },
+      {
+        "name": "_hg68-e06828f-f50d87f7d2c2-011.part",
+        "size": 8388608,
+        "sha256": "a894965aa60b5504422622be70d036ddba89691b51eb0b7e79c1a92f1a4f59c2"
+      },
+      {
+        "name": "_hg68-e06828f-f50d87f7d2c2-012.part",
+        "size": 8388608,
+        "sha256": "7b361dcc39fb2ed8e35c2c1da271d8d32b37eabdcf03fc8b3526a16a83d4cd0c"
+      },
+      {
+        "name": "_hg68-e06828f-f50d87f7d2c2-013.part",
+        "size": 8388608,
+        "sha256": "37714e2f3073868d50c3b111d92ac704371944f70bdd3aa05a94c488c1ae3a37"
+      },
+      {
+        "name": "_hg68-e06828f-f50d87f7d2c2-014.part",
+        "size": 8388608,
+        "sha256": "cf3caed1e2368ad88af27b5f0a08f744de6c220723665fbeadcb187cacb8a146"
+      },
+      {
+        "name": "_hg68-e06828f-f50d87f7d2c2-015.part",
+        "size": 8388608,
+        "sha256": "8953b23ad947162b07fc7c07b3b3f7bcf92266c8fd33347ba297d84b882984e3"
+      },
+      {
+        "name": "_hg68-e06828f-f50d87f7d2c2-016.part",
+        "size": 8388608,
+        "sha256": "e14a59cd6a2948d9234cab18a37b1b15902061858f9708d06c40619ddc848f09"
+      },
+      {
+        "name": "_hg68-e06828f-f50d87f7d2c2-017.part",
+        "size": 8388608,
+        "sha256": "38722e5996320817cbfa3b01340ac8acd89e397323f928619f3d9d744137965a"
+      },
+      {
+        "name": "_hg68-e06828f-f50d87f7d2c2-018.part",
+        "size": 8388608,
+        "sha256": "81182ea35255f0a77d20f4e561abecf49012b4342ccce841e6256c3713cdf92f"
+      },
+      {
+        "name": "_hg68-e06828f-f50d87f7d2c2-019.part",
+        "size": 8388608,
+        "sha256": "961b9cdfb15cb84720a04dbce8ffd7b83327d70a5b5a722f9ffa130ff709c8f3"
+      },
+      {
+        "name": "_hg68-e06828f-f50d87f7d2c2-020.part",
+        "size": 1516880,
+        "sha256": "c036478bd7f302ea6feb5ca672adb453714bb2362bd63f75e78fc927a9bc36b2"
+      }
+    ],
+    "hongguo-downloader-6.8-windows-source.zip": [
+      {
+        "name": "_hg68-e06828f-f9fd63ea82a2-000.part",
+        "size": 5554357,
+        "sha256": "f9fd63ea82a21e780da64b7160a5fb16f85f9d3db7cdc2a6d3535295ca388195"
+      }
+    ],
+    "hongguo-drama-6.8-docker-deploy.zip": [
+      {
+        "name": "_hg68-e06828f-969ad4d3cdcf-000.part",
+        "size": 27919,
+        "sha256": "969ad4d3cdcf1f1ef57be5853a082e84aee99905dc7245a7bfea0aa83a6bea25"
+      }
+    ],
+    "hongguo-drama-6.8-source.zip": [
+      {
+        "name": "_hg68-e06828f-f9fd63ea82a2-000.part",
+        "size": 5554357,
+        "sha256": "f9fd63ea82a21e780da64b7160a5fb16f85f9d3db7cdc2a6d3535295ca388195"
+      }
+    ],
+    "latest-mac.yml": [
+      {
+        "name": "_hg68-e06828f-4e44a639377b-000.part",
+        "size": 557,
+        "sha256": "4e44a639377b629756ede509094abd2d08d763677e6f9a6b0ace4255af359162"
+      }
+    ]
+  },
+  "ciRuns": {
+    "windows": 42931168506,
+    "linux": 42931202649,
+    "docker": 42931168638
+  },
+  "uploadPlanSha256": "988a958032068b85ad11f99d4b2d6a7a0d6f62119b84099b3cb6d893d3277367",
+  "uniqueChunkCount": 89,
+  "interruptedAssetIds": {}
+}

@@ -1,0 +1,44 @@
+name: Upload verified 6.8 artifacts
+on:
+  workflow_dispatch:
+  push:
+    branches: ['codex/transport-6.8']
+    paths: ['.github/release-6.8-transport.py', '.github/release-6.8-transport.json', '.github/workflows/release-6.8-upload.yml']
+permissions:
+  actions: read
+  contents: write
+concurrency:
+  group: release-6.8-transport
+  cancel-in-progress: false
+jobs:
+  upload:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: windows-release-candidate
+          run-id: 42931168506
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: transport/windows
+      - uses: actions/download-artifact@v4
+        with:
+          name: linux-appimage-candidate
+          run-id: 42931202649
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: transport/linux
+      - uses: actions/download-artifact@v4
+        with:
+          name: docker-server-candidate
+          run-id: 42931168638
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: transport/docker
+      - name: Reassemble exact signed files and finish the existing draft
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: python3 .github/release-6.8-transport.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-6.8-transport-verification
+          path: transport-result.json
