@@ -606,5 +606,11 @@
   },
   "uploadPlanSha256": "988a958032068b85ad11f99d4b2d6a7a0d6f62119b84099b3cb6d893d3277367",
   "uniqueChunkCount": 89,
-  "interruptedAssetIds": {}
+  "interruptedAssetIds": {
+    "ffmpeg-9.0.2-x264-b35605a-corresponding-source.tar.gz": 733658680,
+    "ffmpeg-9.0.2-x264-b35605a-linux-x64-corresponding-source.tar.gz": 733658771,
+    "ffmpeg-9.0.2-x264-b35605a-win-x64-corresponding-source.tar.gz": 733658682,
+    "Hongguo-6.8-mac-arm64.dmg": 733658772,
+    "Hongguo-6.8-mac-x64.dmg": 733658773
+  }
 }
