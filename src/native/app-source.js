@@ -11,6 +11,7 @@ const { gzipSync } = require('node:zlib');
 const { registerPlaybackDevice } = require('./playback-device');
 const { abortError, throwIfAborted, boundedSignal, networkFailure } = require('./request-signal');
 const sm3 = require('./sm3');
+const { headers: playbackSignatureHeaders } = require('./player-signature');
 const { normalizeDownloadQuality, meetsDownloadQuality } = require('./download-quality');
 const localId = () => String(1000000000000000n + BigInt('0x' + crypto.randomBytes(6).toString('hex')));
 const PROCESS_NONCE = crypto.randomBytes(18).toString('base64url');
@@ -142,35 +143,24 @@ function helios(khronos) {
 
 function branchOf(url, body, khronos) { const bodyMd5 = body ? crypto.createHash('md5').update(body).digest() : Buffer.alloc(16); const q = sm3(url.split('?')[1]); const iv = getIv(getIv(getIv(0x20230928, q), bodyMd5), le32(khronos)); const low = iv & 15; return low - (((low * 171) >> 9) * 3); }
 function playbackRequest(payload, identity, videoId = '') {
-    // video_tab parameters follow tsukiyo-zero/hongguoTV's ContentRepository.tabVideoModel
-    // (GPL-3.0-only). A bodyless GET must sign sixteen zero bytes, not MD5(empty).
+    // Bind Argus/Ladon to the exact query and compressed bytes sent on the wire.
     const body = videoId ? null : gzipSync(Buffer.from(payload));
-    const khronos = Math.floor(Date.now() / 1000), ticketBase = Date.now();
+    const requestTicket = Date.now(), khronos = Math.floor(requestTicket / 1000);
     const device = { ...(videoId ? VIDEO_TAB_DEVICE : PLAYBACK_DEVICE), ...identity };
     const values = videoId ? { video_id: videoId, video_id_type: '0', device_level: '1',
         need_all_video_definition: '1', need_mp4_align: '0', use_os_player: '0',
         video_platform: '1024', source: '0', from_video_id: '' } : {};
-    let query, url, requestTicket;
-    for (let n = 0; n < 128; n += 1) {
-        requestTicket = ticketBase + n;
-        query = pythonUrlEncode({ ...device, ...values, ts: String(khronos), _rticket: String(requestTicket) });
-        url = `${videoId ? VIDEO_TAB_API : VIDEO_API}?${query}`;
-        if (branchOf(url, body, khronos) === 0) break;
-        if (n === 127) throw new Error('无法生成播放请求签名');
-    }
+    const query = pythonUrlEncode({ ...device, ...values, ts: String(khronos), _rticket: String(requestTicket) });
+    const url = `${videoId ? VIDEO_TAB_API : VIDEO_API}?${query}`;
     const headers = {
         'User-Agent': VIDEO_UA.replace(DEVICE.version_code, device.version_code), Accept: 'application/json; charset=utf-8,application/x-protobuf',
-        'x-ss-req-ticket': String(requestTicket), 'sdk-version': '2', 'x-xs-from-web': '0',
+        'sdk-version': '2', 'x-xs-from-web': '0',
         'passport-sdk-version': videoId ? '50561' : '5051452', 'x-ss-dp': String(device.aid),
-        'x-khronos': String(khronos),
-        'x-gorgon': xGorgon(query, body, khronos, Math.floor(Math.random() * 65536)),
-        // Vendor timestamp placeholders, not cryptographic Ladon/Argus signatures.
-        'x-ladon': be32(khronos).toString('base64'), 'x-argus': le32(khronos).toString('base64'),
-        'x-helios': helios(khronos), 'x-medusa': buildMedusa(url, body, khronos, device), 'x-tt-dt': '',
+        ...playbackSignatureHeaders(query, body, requestTicket), 'x-tt-dt': '',
         'x-tt-store-region': 'cn', 'x-tt-store-region-src': 'did',
     };
     if (body) Object.assign(headers, { 'Content-Type': 'application/json; charset=UTF-8',
-        'Content-Encoding': 'gzip', 'x-ss-stub': md5(body) });
+        'Content-Encoding': 'gzip' });
     else headers['x-tt-request-tag'] = 't=0;n=0';
     return { url, body, headers, method: videoId ? 'GET' : 'POST' };
 }

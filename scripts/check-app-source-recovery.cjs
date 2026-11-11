@@ -16,6 +16,7 @@ function load(axios, { realDevice = false, getPlaybackDevice, registerPlaybackDe
     exports: module.exports,
     require(name) {
       if (name === 'node:crypto') return crypto;
+      if (name === './player-signature') return require('../src/native/player-signature');
       if (name === './sm3') return require('../src/native/sm3');
       if (name === './download-quality') return require('../src/native/download-quality');
       if (name === './request-signal') return require('../src/native/request-signal');
@@ -152,8 +153,9 @@ function row(definition, width, height, suffix) {
   const direct = load(async config => {
     inlineCalls++;
     assert.equal(new URL(config.url).searchParams.get('device_id'), '1000000000000001');
-    assert.ok(config.headers['x-medusa']);
-    assert.ok(config.headers['x-gorgon']);
+    assert.ok(config.headers['x-argus']);
+    assert.ok(config.headers['x-ladon']);
+    assert.equal(config.headers['x-gorgon'], undefined);
     assert.equal(config.headers.Cookie, undefined);
     return inlineResponse([plain]);
   });
