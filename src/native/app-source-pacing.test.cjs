@@ -16,7 +16,9 @@ function fixture(reply, registrationError) {
         require(name) {
             if (name === './playback-device') return { registerPlaybackDevice: async () => {
                 registrations.push(now);
-                if (registrations.length === 1 && registrationError) throw registrationError;
+                const error = typeof registrationError === 'function' ? registrationError(registrations.length)
+                    : registrations.length === 1 ? registrationError : undefined;
+                if (error) throw error;
                 return { device_id: '1000000000000001', iid: '1000000000000002', cdid: 'fixture' };
             } };
             if (name === 'node:timers/promises') return { setTimeout: (ms, value, { signal } = {}) => new Promise((resolve, reject) => {
@@ -86,6 +88,49 @@ test('empty current responses wait one second before the single existing legacy 
     await f.advance(999); assert.equal(f.calls.length, 1, '300ms recovery still bursts the API');
     await f.advance(1); await result;
     assert.equal(f.calls.length, 2); assert.equal(f.calls[1].method, 'POST');
+});
+
+for (const registrationFailure of ['HTTP_403', 'HTTP_429', 'BUSINESS_REJECTED']) {
+    test(`a renewal ${registrationFailure} stops legacy recovery and already queued requests`, async () => {
+        const refusal = Object.assign(new Error('registration refused'), { code: 'DEVICE_REGISTRATION_FAILED', registrationFailure });
+        const f = fixture((config, count) => count === 1 ? { status: 200, headers: {}, data: '' } : success(config),
+            attempt => attempt === 2 ? refusal : undefined);
+        const first = f.fetch().then(value => ({ value }), error => ({ error }));
+        const queued = f.fetch('12').then(value => ({ value }), error => ({ error }));
+        await turn(); await f.advance(1000);
+        assert.equal((await first).error, refusal, 'renewal refusal must reach the source queue unchanged');
+        assert.equal((await queued).error, refusal);
+        assert.equal(f.registrations.length, 2, 'queued work must not register after the refusal');
+        assert.equal(f.calls.length, 1, 'legacy recovery must not send the previous identity after a refusal');
+    });
+}
+
+for (const registrationFailure of ['TIMEOUT', 'NETWORK_ERROR', 'HTTP_500']) {
+    test(`a renewal ${registrationFailure} retains the bounded legacy recovery`, async () => {
+        const failure = Object.assign(new Error('registration unavailable'), { code: 'DEVICE_REGISTRATION_FAILED', registrationFailure });
+        const f = fixture((config, count) => count === 1 ? { status: 200, headers: {}, data: '' } : success(config),
+            attempt => attempt === 2 ? failure : undefined);
+        const result = f.fetch(); await turn(); await f.advance(1000);
+        assert.equal((await result).url, 'https://qznovelvod.com/fixture.mp4');
+        assert.equal(f.registrations.length, 2); assert.equal(f.calls.length, 2);
+        assert.equal(f.calls[1].method, 'POST');
+        assert.equal(new URL(f.calls[1].url).searchParams.get('device_id'), new URL(f.calls[0].url).searchParams.get('device_id'));
+    });
+}
+
+test('cancelling renewal skips legacy recovery and leaves a later request available', async () => {
+    const controller = new AbortController();
+    const f = fixture((config, count) => count === 1 ? { status: 200, headers: {}, data: '' } : success(config), attempt => {
+        if (attempt === 2) {
+            controller.abort();
+            return Object.assign(new Error('cancelled'), { code: 'ERR_CANCELED' });
+        }
+    });
+    await assert.rejects(f.fetch('11', { signal: controller.signal }), { code: 'ERR_CANCELED' });
+    assert.equal(f.calls.length, 1); assert.equal(f.registrations.length, 2);
+    const later = f.fetch(); await turn(); await f.advance(1000);
+    assert.equal((await later).url, 'https://qznovelvod.com/fixture.mp4');
+    assert.equal(f.calls.length, 2); assert.equal(f.registrations.length, 3);
 });
 
 test('explicit rejection remains terminal and releases the queue for an independent later action', async () => {

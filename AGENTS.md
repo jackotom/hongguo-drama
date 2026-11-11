@@ -221,3 +221,8 @@
 - 不替换正式安装、不回复或关闭Issue、不包含TV和手机。状态见 `docs/release-6.9.md`。
 
 - 6.9已于2026-11-11 19:04:15（Asia/Shanghai）正式公开并设Latest，内部6.9.0、桌面构建6.9.4，冻结源码`b364419c2b81da3a7e28fd637011aaff9b8acf2c`。双Mac、Windows x64、Linux x64 AppImage、Docker amd64五类共25份正式附件，远端大小／SHA256、两份更新清单及总校验清单已回读核对；119个本轮临时分段已全部清理，10个匿名下载入口及完整总清单核对通过。双Mac已签名、公证、装订；Windows EXE未签名、App真实下载队列未测，Intel仅Rosetta；保留两项基线断言失败。未替换本机正式安装，TV与手机独立。正式回执见 `docs/release-6.9.md`；发布后的文档提交不改变冻结标签与安装包。
+
+## 7.0 统一发行目标（2026-11-11）
+
+- 用户明确授权将两处恢复修复打包公开7.0，双Mac、Windows、Linux AppImage、Docker五类同源齐备后一次Release，Mac本轮新签名／公证／装订。内部7.0.0、构建7.0.1。
+- 不替换本机正式安装、不回复或关闭Issue，不含手机或TV。不沿用6.9原包或旧平台回执。状态与边界见`docs/release-7.0.md`。

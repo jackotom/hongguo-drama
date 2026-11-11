@@ -450,7 +450,9 @@ async function fetchAppPlayUrlFresh(vid, options) {
                     catch (registrationError) {
                         throwIfAborted(signal);
                         if (registrationError.code === 'ERR_CANCELED') throw registrationError;
-                        // Keep the previous identity for a non-cancellation registration failure.
+                        if (registrationError.code === 'DEVICE_REGISTRATION_FAILED'
+                            && ['BUSINESS_REJECTED', 'HTTP_403', 'HTTP_429'].includes(registrationError.registrationFailure)) throw registrationError;
+                        // Keep the previous identity for other registration failures.
                     }
                 }
                 throwIfAborted(signal);

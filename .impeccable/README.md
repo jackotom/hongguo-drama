@@ -1,4 +1,4 @@
-<!-- 6.9 desktop/Docker release; this directory keeps its existing scope. -->
+<!-- 7.0 desktop/Docker release; this directory keeps its existing scope. -->
 <!-- 6.7 unified release. -->
 # 红果短剧 6.3 设计资料
 

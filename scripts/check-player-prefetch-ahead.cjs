@@ -54,6 +54,58 @@ const flushWithoutBuffering = async ui => {
     }
   });
 
+  await test('empty App models stop foreground quality retries and allow an explicit retry', async () => {
+    for (const failure of [{ code: 'EMPTY_RESPONSE' },
+      { code: 'SOURCE_UNAVAILABLE', sources: [{ source: 'app', code: 'EMPTY_RESPONSE' }] }]) {
+      let available = false;
+      const ui = mount({ settings: { cache_next_episode: false },
+        props: { target: { seriesId: 'A', vidIndex: 1, ts: 1 } },
+        prepare: async () => available ? { success: true, url: 'hongguo-stream://recovered' }
+          : { success: false, error: 'empty model', ...failure } });
+      try {
+        await ui.flush();
+        assert.deepEqual(ui.prepares.map(item => item.quality), ['1080p'], 'changing quality cannot repair an empty model');
+        assert.ok(!ui.text().includes('正在尝试'), 'an empty model must not announce a lower quality');
+        available = true;
+        assert(ui.button('重试本集'), 'retain the explicit online retry');
+        await ui.button('重试本集').props.onClick(); await ui.flush();
+        assert.deepEqual(ui.prepares.map(item => item.quality), ['1080p', '1080p']);
+        assert.equal(ui.find(node => node.type === 'video').props.src, 'hongguo-stream://recovered');
+      } finally { ui.unmount(); }
+    }
+  });
+
+  await test('empty App prefetch models use one attempt per cooldown and remain recoverable', async () => {
+    let now = Date.now(), available = false;
+    const ui = await openEpisode({ now: () => now, prepare: async payload => !payload.prefetch || available
+      ? { success: true, url: `hongguo-stream://${payload.vidIndex}` }
+      : { success: false, code: 'SOURCE_UNAVAILABLE', sources: [{ source: 'app', code: 'EMPTY_RESPONSE' }] } });
+    try {
+      assert.deepEqual(prefetches(ui).map(item => item.quality), ['1080p']);
+      now += 14999; tick(ui, 1); await ui.flush();
+      assert.equal(prefetches(ui).length, 1, 'timeupdate must respect the existing cooldown');
+      available = true;
+      now += 1; tick(ui, 1); await ui.flush();
+      assert.deepEqual(prefetches(ui).map(item => item.quality), ['1080p', '1080p']);
+      ui.episode(2); await ui.flush();
+      assert.equal(ui.find(node => node.type === 'video').props.src, 'hongguo-stream://2');
+      assert.equal(ui.prepares.filter(item => item.vidIndex === 2).length, 2, 'reuse the recovered prefetch');
+    } finally { ui.unmount(); }
+  });
+
+  await test('a website-only empty result does not stop an independent App quality attempt', async () => {
+    const ui = mount({ settings: { cache_next_episode: false },
+      props: { target: { seriesId: 'A', vidIndex: 1, ts: 1 } },
+      prepare: async payload => payload.quality === '1080p'
+        ? { success: false, code: 'SOURCE_UNAVAILABLE', sources: [{ source: 'web', code: 'EMPTY_RESPONSE' }] }
+        : { success: true, url: 'hongguo-stream://720p' } });
+    try {
+      await ui.flush();
+      assert.deepEqual(ui.prepares.map(item => item.quality), ['1080p', '720p']);
+      assert.equal(ui.find(node => node.type === 'video').props.src, 'hongguo-stream://720p');
+    } finally { ui.unmount(); }
+  });
+
   await test('every prefetch quality attempt carries only cloneable IPC fields', async () => {
     const payloads = [], cloneErrors = [];
     const ui = await openEpisode({ apiOverrides: { prepareOnlinePlay: async payload => {

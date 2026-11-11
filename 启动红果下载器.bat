@@ -1,6 +1,6 @@
 ﻿@echo off
-rem 6.9 release target.
-rem Hongguo Drama 6.9 source candidate - version metadata: package.json
+rem 7.0 release target.
+rem Hongguo Drama 7.0 source candidate - version metadata: package.json
 chcp 65001 >nul
 cd /d "%~dp0"
 if exist "dist\win-unpacked\红果短剧.exe" (

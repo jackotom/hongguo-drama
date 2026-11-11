@@ -29,7 +29,10 @@ const playbackQualities = (quality, seriesId) => quality === 'auto' && !/^(xifan
 const rejectsPlaybackSource = result => /^(?:DEVICE_REGISTRATION_FAILED|BUSINESS_REJECTED|SECURITY_BLOCKED)$/.test(result?.code || '')
   || Array.isArray(result?.sources) && result.sources.some(item => item.source === 'app'
     && /^(?:DEVICE_REGISTRATION_FAILED|HTTP_(?:403|429)|BUSINESS_REJECTED|SECURITY_BLOCKED)$/.test(item.code));
-const stopsQualityFallback = result => result?.cancelled === true || result?.code === 'ERR_CANCELED' || rejectsPlaybackSource(result);
+// Every quality asks for the same complete model; a different tier cannot repair an empty response.
+const stopsQualityFallback = result => result?.cancelled === true || result?.code === 'ERR_CANCELED' || rejectsPlaybackSource(result)
+  || result?.code === 'EMPTY_RESPONSE' || Array.isArray(result?.sources)
+    && result.sources.some(item => item.source === 'app' && item.code === 'EMPTY_RESPONSE');
 const PLAYBACK_PREFERENCES_KEY = 'hongguo:playback-preferences';
 const readPlaybackPreferences = () => {
   let saved;
