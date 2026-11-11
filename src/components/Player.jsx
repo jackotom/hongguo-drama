@@ -180,6 +180,7 @@ function Player({ target, onNavigate, onSeriesSelected, onFloatingChange, active
   const selectedSeriesRef = useRef('');
   const selectionVersion = useRef(0);
   const onlineRequestRef = useRef(null);
+  const onlineQualityRef = useRef(null);
   const prefetchRef = useRef([]);
   const prefetchFailureRef = useRef(new Map());
   // Keep explicit rejection latched through automatic reconnects; navigation and manual retry may clear it.
@@ -302,6 +303,7 @@ function Player({ target, onNavigate, onSeriesSelected, onFloatingChange, active
     clearTimeout(decodeTimer.current);
     cancelCompat();
     releaseOnline();
+    onlineQualityRef.current = null;
     if (preservePrefetch === false) releasePrefetch();
     setOnlineVid(null);
     setOnlineUrl('');
@@ -788,7 +790,7 @@ function Player({ target, onNavigate, onSeriesSelected, onFloatingChange, active
       const ep = episodes.find((e) => e.vid_index === vidIndex);
       if (!ep || ep.locked) return;
       const request = { requestId: crypto.randomUUID(), seriesId: String(activeSeriesId), vidIndex,
-        quality: onlineRequestRef.current?.playbackQuality || (onlineQuality === 'compat' ? 'auto' : onlineQuality), version: mediaVersion.current };
+        quality: onlineQualityRef.current?.playbackQuality || (onlineQuality === 'compat' ? 'auto' : onlineQuality), version: mediaVersion.current };
       if (compatRequestRef.current?.version === request.version && compatRequestRef.current?.vidIndex === vidIndex) return;
       autoCompatAttemptRef.current = { version: request.version, force };
       pendingSeekRef.current = currentPosition();
@@ -991,6 +993,8 @@ function Player({ target, onNavigate, onSeriesSelected, onFloatingChange, active
         request.streamId = res.streamId;
         request.codec = res.codec;
         request.prepared = true;
+        // Compatibility playback releases the stream, but still owns its quality recovery step.
+        onlineQualityRef.current = request;
         if (!usedPrefetch && !res.cached) setMediaBuffering(true);
         setOnlineUrl(res.url);
         setOnlineProgress(null);
@@ -1008,7 +1012,7 @@ function Player({ target, onNavigate, onSeriesSelected, onFloatingChange, active
     const key = `${activeSeriesId}:${currentIndex}`;
     if (stateRef.current.onlineQuality === 'auto' && !/^(xifan|hema|reelshort|dramabox|custom):/.test(activeSeriesId)
       && onlineSourceRef.current === key) {
-      const next = (onlineRequestRef.current?.qualityIndex ?? 0) + 1;
+      const next = (onlineQualityRef.current?.qualityIndex ?? 0) + 1;
       if (!current?.vid || current.locked || next >= AUTO_ONLINE_QUALITIES.length) return false;
       showToast(`正在自动切换到${AUTO_ONLINE_QUALITIES[next] === 'auto' ? '兼容片源' : AUTO_ONLINE_QUALITIES[next].toUpperCase()}…`);
       startOnlinePlay(currentIndex, currentPosition(), true,

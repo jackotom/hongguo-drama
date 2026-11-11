@@ -1,6 +1,6 @@
 services:
   hongguo:
-    image: hongguo-drama:6.8
+    image: hongguo-drama:6.9
     platform: linux/amd64
     user: "${PUID:-1000}:${PGID:-1000}"
     ports:

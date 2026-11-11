@@ -8,6 +8,7 @@
 // Crypto tables and SDK protocol constants below are not user credentials.
 const crypto = require('node:crypto');
 const { gzipSync } = require('node:zlib');
+const { setTimeout: delay } = require('node:timers/promises');
 const { registerPlaybackDevice } = require('./playback-device');
 const { abortError, throwIfAborted, boundedSignal, networkFailure } = require('./request-signal');
 const sm3 = require('./sm3');
@@ -15,6 +16,9 @@ const { normalizeDownloadQuality, meetsDownloadQuality } = require('./download-q
 const localId = () => String(1000000000000000n + BigInt('0x' + crypto.randomBytes(6).toString('hex')));
 const PROCESS_NONCE = crypto.randomBytes(18).toString('base64url');
 const PROCESS_STARTED = Date.now();
+let playbackQueue = Promise.resolve();
+let playbackReadyAt = 0;
+let playbackRejection = null;
 const VIDEO_API = 'https://api5-normal-sinfonlineb.fqnovel.com/novel/player/multi_video_model/v1/';
 const VIDEO_TAB_API = 'https://api5-normal-sinfonlineb.fqnovel.com/reading/bookapi/video_tab/multi_video_model/v1/';
 const SEARCH_API = 'https://api5-normal-sinfonlinea.fqnovel.com/reading/bookapi/search/tab/v';
@@ -388,6 +392,39 @@ async function fetchAppPlayUrl(vid, options = {}) {
     normalizeDownloadQuality(options.quality); // Validate before registration or network I/O.
     vid = String(vid || '');
     if (!/^\d{1,30}$/.test(vid)) throw new Error('分集编号无效');
+    // Playback, prefetch and downloads share one paced turn, including registration.
+    const previousRejection = playbackRejection;
+    const pending = playbackQueue.then(async () => {
+        throwIfAborted(options.signal);
+        if (playbackRejection !== previousRejection) throw playbackRejection;
+        const wait = playbackReadyAt - Date.now();
+        if (wait > 0) {
+            try { await delay(wait, undefined, { signal: options.signal }); }
+            catch (error) { throwIfAborted(options.signal); throw error; }
+        }
+        throwIfAborted(options.signal);
+        try { return await fetchAppPlayUrlFresh(vid, options); }
+        catch (error) {
+            // An explicit refusal also stops work queued before it was received.
+            if ([403, 429].includes(error.status) || error.code === 'BUSINESS_REJECTED' || error.code === 'DEVICE_REGISTRATION_FAILED'
+                && ['BUSINESS_REJECTED', 'HTTP_403', 'HTTP_429'].includes(error.registrationFailure)) playbackRejection = error;
+            throw error;
+        }
+        finally { playbackReadyAt = Date.now() + 1000; }
+    });
+    playbackQueue = pending.catch(() => {});
+    if (!options.signal) return pending;
+    let cancel;
+    try {
+        return await Promise.race([pending, new Promise((resolve, reject) => {
+            cancel = () => reject(abortError(options.signal));
+            options.signal.addEventListener('abort', cancel, { once: true });
+            if (options.signal.aborted) cancel();
+        })]);
+    } finally { options.signal.removeEventListener('abort', cancel); }
+}
+
+async function fetchAppPlayUrlFresh(vid, options) {
     const payload = JSON.stringify({
         biz_param: { detail_page_version: 0, device_level: 3, disable_digg_stat: false, need_all_video_definition: true, need_mp4_align: false, use_os_player: false, use_server_dns: false, video_platform: 1024 },
         mixed_video_id_map: { '1004': [vid] },
@@ -425,8 +462,9 @@ async function fetchAppPlayUrl(vid, options = {}) {
                     }
                 }
                 throwIfAborted(signal);
-                if (deadline - Date.now() < 500) throw error;
-                await new Promise(resolve => setTimeout(resolve, 300));
+                if (deadline - Date.now() < 1500) throw error;
+                try { await delay(1000, undefined, { signal }); }
+                catch (waitError) { throwIfAborted(signal); throw waitError; }
                 throwIfAborted(signal);
             }
         }

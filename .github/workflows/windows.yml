@@ -1,4 +1,4 @@
-# Hongguo Drama 6.8: desktop and Docker candidate; publication is coordinated separately.
+# Hongguo Drama 6.9: desktop and Docker candidate; publication is coordinated separately.
 name: Windows x64 release candidate
 on:
   workflow_dispatch:

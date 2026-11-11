@@ -1,4 +1,4 @@
-// Hongguo Drama 6.8: desktop runtime; server entry is server/index.cjs.
+// Hongguo Drama 6.9: desktop runtime; server entry is server/index.cjs.
 /**
  * main.js - 红果短剧 6.2 下载器（独立版）主进程
  *
@@ -700,18 +700,29 @@ function visibleSeries() {
 // 会让一次调用只启动一个任务、并一直阻塞到该任务结束，
 // 导致并发数恒为 1（无论 max_concurrent 设为多少）。
 // 现在由 runTask 自行在结束时回调 pumpQueue，调度器只负责按并发上限派发。
+let hongguoDownloadReadyAt = 0;
+let downloadQueueTimer = null;
 function pumpQueue() {
+  clearTimeout(downloadQueueTimer);
+  downloadQueueTimer = null;
   if (quitCleanup) return;
   downloadQueue = downloadQueue.filter(task => task.status === 'pending');
   for (const task of downloadQueue) repairTaskDestination(task);
+  const cooldown = hongguoDownloadReadyAt - Date.now();
   while (activeDownloads < MAX_CONCURRENT_DOWNLOADS) {
-    const index = downloadQueue.findIndex(task => !runningDownloads.has(task.id) && !runningDownloadPaths.has(task.savePath));
+    const index = downloadQueue.findIndex(task => !runningDownloads.has(task.id) && !runningDownloadPaths.has(task.savePath)
+      && (cooldown <= 0 || !/^\d{1,30}$/.test(String(task.hongguoInfo?.vid || ''))));
     if (index < 0) break;
     const [task] = downloadQueue.splice(index, 1);
     runningDownloads.add(task.id);
     runningDownloadPaths.add(task.savePath);
     activeDownloads++;
     downloadRuns.set(task.id, runTask(task));
+  }
+  if (activeDownloads < MAX_CONCURRENT_DOWNLOADS && cooldown > 0
+    && downloadQueue.some(task => /^\d{1,30}$/.test(String(task.hongguoInfo?.vid || '')))) {
+    downloadQueueTimer = setTimeout(pumpQueue, cooldown);
+    downloadQueueTimer.unref?.();
   }
 }
 
@@ -722,6 +733,7 @@ async function runTask(task) {
   } catch (error) {
     console.error('[Download Queue] 下载失败:', error);
   } finally {
+    if (/^\d{1,30}$/.test(String(task.hongguoInfo?.vid || ''))) hongguoDownloadReadyAt = Date.now() + 1000;
     activeDownloads--;
     runningDownloads.delete(task.id);
     runningDownloadPaths.delete(destination);
@@ -851,6 +863,8 @@ function pauseAllTasks() {
   downloadQueue = [];
   try { saveDownloadTasks(); }
   catch (error) { restoreQueueTasks(snapshot); throw error; }
+  clearTimeout(downloadQueueTimer);
+  downloadQueueTimer = null;
   for (const task of tasks) {
     clearSourceRetry(task);
     try { task.cancelSource?.cancel('用户一键暂停'); } catch (_) {}

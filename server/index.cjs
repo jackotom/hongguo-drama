@@ -1,4 +1,4 @@
-// Hongguo Drama 6.8: server entry.
+// Hongguo Drama 6.9: server entry.
 const http = require('node:http');
 const fs = require('node:fs');
 const path = require('node:path');
@@ -22,13 +22,18 @@ function createApp({ token, dataRoot, downloadRoot, media = defaultMedia, search
   if (typeof token !== 'string' || token.length < 32 || token.length > 256 || /\s/.test(token)) throw fail('必须配置 32 至 256 字符的 HONGGUO_TOKEN，不得含空白');
   const digest = crypto.createHash('sha256').update(`Bearer ${token}`).digest();
   const store = new Storage(dataRoot, downloadRoot);
-  let active, stopped = false, reading = 0, shuttingDown;
+  let active, stopped = false, reading = 0, shuttingDown, nextDownloadAt = 0, downloadTimer;
   const controllerById = new Map();
   const authorized = request => crypto.timingSafeEqual(digest, crypto.createHash('sha256').update(String(request.headers.authorization || '')).digest());
   function drain() {
     if (active || stopped) return;
     const task = store.tasks.find(item => item.status === 'queued');
     if (!task) return;
+    if (task.type === 'download' && nextDownloadAt > Date.now()) {
+      clearTimeout(downloadTimer);
+      downloadTimer = setTimeout(drain, nextDownloadAt - Date.now());
+      return;
+    }
     const controller = new AbortController();
     controllerById.set(task.id, controller);
     try { store.update(task, { status: 'running', error: '', progress: 0 }); } catch { stopped = true; return; }
@@ -49,7 +54,10 @@ function createApp({ token, dataRoot, downloadRoot, media = defaultMedia, search
           for (const pending of store.tasks.filter(item => item.type === 'download' && item.status === 'queued')) Object.assign(pending, { status: 'interrupted', error: '来源拒绝请求，已暂停队列；请稍后手动重试' });
           store.save();
         }
-      } finally { controllerById.delete(task.id); active = null; if (!stopped) setImmediate(drain); }
+      } finally {
+        if (task.type === 'download') nextDownloadAt = Date.now() + 1000;
+        controllerById.delete(task.id); active = null; if (!stopped) setImmediate(drain);
+      }
     })().catch(() => { stopped = true; });
   }
   const server = http.createServer(async (request, response) => {
@@ -150,6 +158,7 @@ function createApp({ token, dataRoot, downloadRoot, media = defaultMedia, search
   async function close() {
     if (shuttingDown) return shuttingDown;
     stopped = true;
+    clearTimeout(downloadTimer);
     shuttingDown = (async () => {
       try {
         for (const task of store.tasks.filter(item => item.status === 'running')) store.update(task, { status: 'interrupted', error: '服务已停止，请手动重试' });

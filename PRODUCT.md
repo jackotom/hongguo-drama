@@ -1,3 +1,4 @@
+<!-- 6.9 release target; current published release remains documented below until publication. -->
 <!-- 6.8 release target. -->
 # 红果短剧
 

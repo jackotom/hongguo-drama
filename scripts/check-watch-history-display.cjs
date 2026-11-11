@@ -257,13 +257,16 @@ const findIn = (node, predicate) => predicate(node) ? node : node?.children?.map
   priorityRows = priorityRows.map(row => row.series_id === '1000213' ? { ...row, updatedAt: 600, unreadSequelIds: ['1000214'] } : row);
   priorityUi.triggerUpdated();
   await priorityUi.flush();
-  assert.deepEqual(priorityOrder(), ['1000213', '1000200', '1000211', '1000220', '1000230'], 'actually watching a newer season moves only that record to the top');
+  assert.deepEqual(priorityOrder(), ['1000213', '1000211', '1000200', '1000220', '1000230'],
+    '#137: the most recently watched group leads, with its seasons contiguous instead of indented under an unrelated drama');
   assert.ok(text(priorityRow('1000213')).includes('旧剧第四季'), 'new-season watching transfers group hints to its new chronological head');
   assert.ok(!text(priorityRow('1000211')).includes('旧剧第四季'));
 
   priorityRows = priorityRows.map(row => row.series_id === '1000211' ? { ...row, updatedAt: 700 } : row);
   priorityUi.triggerUpdated();
   await priorityUi.flush();
+  assert.deepEqual(priorityOrder(), ['1000211', '1000213', '1000200', '1000220', '1000230'],
+    'rewatching a lower season promotes its group while preserving the seasons together');
   await findIn(priorityRow('1000211'), node => node?.props?.className === 'history-resume').props.onClick();
   await priorityUi.flush();
   assert.deepEqual(priorityUi.acknowledgements, ['1000213', '1000211'], 'continuing a lower chronological head acknowledges the sequel hints it displays');
@@ -582,7 +585,7 @@ const findIn = (node, predicate) => predicate(node) ? node : node?.children?.map
   assert.ok(!reloadFailedUi.find(node => node.props['aria-label'] === '移除观看记录《春日来信第二季》'),
     'a reload error must not resurrect the removed row');
 
-  console.log('PASS watch history display: #131 chronological order, scans and lower-season rewatch; #97 group hints/dots, filtered heads, acknowledgement and failure safety; low-season hiding, filters, preferences, removal and stale loads');
+  console.log('PASS watch history display: #137 contiguous seasons; #131 recent groups, scans and lower-season rewatch; #97 group hints/dots, filtered heads, acknowledgement and failure safety; low-season hiding, filters, preferences, removal and stale loads');
 })().catch(error => {
   console.error(error);
   process.exitCode = 1;

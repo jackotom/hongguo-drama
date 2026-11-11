@@ -42,6 +42,22 @@ test('persistent queue survives restart; running tasks require explicit retry', 
   const loaded = new Storage(path.join(root, 'data'), path.join(root, 'downloads'));
   assert.equal(loaded.tasks[0].status, 'interrupted'); assert.equal(loaded.tasks[1].status, 'queued');
 });
+test('downloads wait one second after completion and shutdown cancels queued wakeups', async t => {
+  let calls = 0;
+  const { app, api } = await setup(t, { media: { series: async () => detail, download: async () => { calls++; } } });
+  await api('/api/downloads', { seriesId: '123', episodeIds: ['456', '789'] });
+  t.mock.timers.enable({ apis: ['setTimeout', 'Date'], now: 10000 });
+  const turn = () => new Promise(resolve => setImmediate(resolve));
+  try {
+    app.drain(); await turn(); await turn();
+    assert.equal(calls, 1, 'the next download must not start immediately');
+    t.mock.timers.tick(999); await turn(); assert.equal(calls, 1);
+    t.mock.timers.tick(1); await turn(); await turn(); assert.equal(calls, 2);
+    app.store.add([makeTask({ type: 'download', seriesId: '123', vid: '999', episodeIndex: 3, quality: 'auto' })]);
+    app.drain(); await app.close();
+    t.mock.timers.tick(1000); await turn(); assert.equal(calls, 2, 'shutdown must not start another download');
+  } finally { t.mock.timers.reset(); }
+});
 test('rejects destination symlinks and never overwrites a conflicting file', async t => {
   const { app, api, root } = await setup(t);
   const added = await api('/api/downloads', { seriesId: '123', episodeIds: ['456'] });

@@ -231,6 +231,23 @@ if (process.argv[2] !== 'main') {
       assert.equal(ui.prepares.at(-1).quality, '720p'); assert.equal(ui.transcodes.length, 0);
     } finally { ui.unmount(); }
   });
+  for (const local of [false, true]) await check(`compatible media keeps its quality step and exhausts recovery once (${local ? 'local first' : 'online'})`, async () => {
+    let downloads = 0;
+    const ui = mount({ local, props: { target: { seriesId: 'A', vidIndex: 1, ts: 1 } }, settings: { cache_next_episode: false },
+      apiOverrides: { downloadSingleEpisode: async () => { downloads++; return { success: false, error: 'download unavailable' }; } } });
+    try {
+      await ui.flush(); ui.metadata(); ui.media.currentTime = 21; ui.media.pause();
+      for (let attempt = 0; attempt < 18; attempt++) {
+        ui.error(3); await ui.flush(); ui.metadata();
+      }
+      assert.deepEqual(ui.prepares.map(p => p.quality), ['1080p', '720p', 'auto'], 'decoder recovery must reach the final tier without repeating 720P');
+      assert.deepEqual(ui.transcodes.map(p => p.quality), [...(local ? ['auto', 'auto'] : []), '1080p', '1080p', '720p', '720p', 'auto', 'auto'], 'a forced compatibility rebuild must retain the selected tier');
+      assert.equal(downloads, 0, 'a persistent decoder failure must stop for explicit recovery');
+      assert(ui.button('重试本集'));
+      assert.equal(ui.media.paused, true);
+      assert.equal(ui.media.currentTime, 21);
+    } finally { ui.unmount(); }
+  });
   await check('third-party online playback never requests unsupported 1080 or 720 tiers', async () => {
     const ui = mount({ props: { target: { seriesId: 'xifan:A', vidIndex: 1, ts: 1 } }, seriesId: 'xifan:A' });
     try { await ui.flush(); assert.deepEqual(ui.prepares.map(p => p.quality), ['auto']); }

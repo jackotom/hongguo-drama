@@ -49,10 +49,13 @@ export default function WatchHistory({ active = true, onNavigate }) {
   const groups = groupHistory(rows, decisions);
   const groupById = new Map(groups.flatMap(items => items.map(row => [row.series_id, items])));
   const suggestionsByGroup = new Map(groups.map(items => [items, historyGroupSuggestions(items)]));
-  const listedRows = groups.flatMap(items => hideLowSeasons && !expanded[items[0].series_id] ? items.slice(0, 1) : items);
+  const listedGroups = groups.map(items => hideLowSeasons && !expanded[items[0].series_id] ? items.slice(0, 1) : items);
+  const listedRows = listedGroups.flat();
   const completedCount = listedRows.filter(row => row.completed === true).length;
-  const visibleRows = listedRows.filter(row => filter === 'all' || (row.completed === true) === (filter === 'completed'))
-    .sort((a, b) => b.updatedAt - a.updatedAt);
+  const visibleRows = listedGroups.map(items => items
+    .filter(row => filter === 'all' || (row.completed === true) === (filter === 'completed'))
+    .sort((a, b) => b.updatedAt - a.updatedAt))
+    .filter(items => items.length).sort((a, b) => b[0].updatedAt - a[0].updatedAt).flat();
 
   const savePreferences = next => {
     setPreferences(next);
