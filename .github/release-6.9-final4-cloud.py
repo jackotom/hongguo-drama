@@ -99,7 +99,8 @@ def api(endpoint, method='GET', destination=None):
     command = ['gh', 'api', '--method', method, endpoint]
     if destination is not None:
         require(method == 'GET', 'Binary API operation must be read only')
-        command += ['-H', 'Accept: application/octet-stream']
+        media = 'application/vnd.github+json' if endpoint.startswith(f'repos/{REPO}/actions/artifacts/') else 'application/octet-stream'
+        command += ['-H', 'Accept: ' + media]
         with destination.open('xb') as stream:
             process = subprocess.run(command, stdout=stream, stderr=subprocess.PIPE)
         require(process.returncode == 0, 'GitHub binary read failed')
