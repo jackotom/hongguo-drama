@@ -1,0 +1,203 @@
+name: Verify frozen 6.8 Windows with observed native close
+'on':
+  push:
+    branches:
+      - codex/verify-6.8
+    paths:
+      - .github/workflows/verify-windows-6.8.yml
+      - .github/windows-6.8-probe.cjs
+  workflow_dispatch: {}
+permissions:
+  contents: read
+  actions: read
+jobs:
+  media:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: 647e40d874d54bbaada6243c60e97e848100adf4
+      - name: Verify frozen source identity
+        shell: bash
+        env:
+          SOURCE_SHA: 647e40d874d54bbaada6243c60e97e848100adf4
+          DISPATCH_SHA: ${{ github.sha }}
+          BUILD_ONLY: ${{ inputs.build_only || false }}
+          REQUESTED_SHA: ${{ inputs.source_sha }}
+        run: |
+          if [[ "$BUILD_ONLY" == true && ! "$REQUESTED_SHA" =~ ^[0-9a-f]{40}$ ]]; then
+            echo 'build_only requires a full frozen source_sha' >&2
+            exit 1
+          fi
+          test "$(git rev-parse HEAD)" = "$SOURCE_SHA"
+          test "$SOURCE_SHA" = "$HONGGUO_SUBJECT_SHA"
+      - uses: actions/cache@v4
+        id: media-cache
+        with:
+          path: ${{ runner.temp }}/media/artifacts
+          key: windows-media-${{ hashFiles('scripts/build-ffmpeg-source-win.sh') }}
+      - uses: actions/cache@v4
+        id: librempeg-cache
+        with:
+          path: ${{ runner.temp }}/librempeg/artifacts
+          key: windows-librempeg-${{ hashFiles('scripts/build-librempeg-source.sh', 'scripts/librempeg-videotoolbox-prototype.patch') }}
+      - name: Restore pinned historical Windows media without executing binaries
+        if: ${{ inputs.build_only && (steps.media-cache.outputs.cache-hit != 'true' || steps.librempeg-cache.outputs.cache-hit != 'true') }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python3 scripts/reuse-release-media.py win-x64 "$RUNNER_TEMP/windows-reuse"
+          mkdir -p "$RUNNER_TEMP/media" "$RUNNER_TEMP/librempeg"
+          cp -R "$RUNNER_TEMP/windows-reuse/ffmpeg/." "$RUNNER_TEMP/media/"
+          cp -R "$RUNNER_TEMP/windows-reuse/librempeg/." "$RUNNER_TEMP/librempeg/"
+      - if: ${{ !inputs.build_only && (steps.media-cache.outputs.cache-hit != 'true' || steps.librempeg-cache.outputs.cache-hit != 'true') }}
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq gcc-mingw-w64-x86-64 make pkg-config
+      - if: ${{ !inputs.build_only && steps.media-cache.outputs.cache-hit != 'true' }}
+        run: bash scripts/build-ffmpeg-source-win.sh "$RUNNER_TEMP/media" 4
+      - if: ${{ !inputs.build_only && steps.librempeg-cache.outputs.cache-hit != 'true' }}
+        run: bash scripts/build-librempeg-source.sh "$RUNNER_TEMP/librempeg" win-x64 4
+      - name: Combine unchanged FFmpeg and matching ByteVC2 helper artifacts
+        run: |
+          mkdir -p "$RUNNER_TEMP/media-combined"
+          cp -R "$RUNNER_TEMP/media/artifacts/." "$RUNNER_TEMP/media-combined/"
+          cp -R "$RUNNER_TEMP/librempeg/artifacts/." "$RUNNER_TEMP/media-combined/"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-media
+          path: ${{ runner.temp }}/media-combined/
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: windows-media-errors
+          path: |
+            ${{ runner.temp }}/media/logs/
+            ${{ runner.temp }}/librempeg/logs/
+  windows:
+    needs: media
+    runs-on: windows-2022
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: 647e40d874d54bbaada6243c60e97e848100adf4
+      - name: Verify frozen source identity
+        shell: bash
+        env:
+          SOURCE_SHA: 647e40d874d54bbaada6243c60e97e848100adf4
+          DISPATCH_SHA: ${{ github.sha }}
+          BUILD_ONLY: ${{ inputs.build_only || false }}
+          REQUESTED_SHA: ${{ inputs.source_sha }}
+        run: |
+          if [[ "$BUILD_ONLY" == true && ! "$REQUESTED_SHA" =~ ^[0-9a-f]{40}$ ]]; then
+            echo 'build_only requires a full frozen source_sha' >&2
+            exit 1
+          fi
+          test "$(git rev-parse HEAD)" = "$SOURCE_SHA"
+          test "$SOURCE_SHA" = "$HONGGUO_SUBJECT_SHA"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - if: ${{ !inputs.build_only }}
+        run: npm ci --no-audit --no-fund
+      - if: ${{ inputs.build_only }}
+        run: npm ci --no-audit --no-fund --ignore-scripts
+      - run: node scripts/prepare-electron.cjs
+        env:
+          GH_TOKEN: ${{ github.token }}
+      - uses: actions/download-artifact@v4
+        with:
+          name: windows-media
+          path: media
+      - name: Prepare bundled FFmpeg
+        shell: pwsh
+        run: Copy-Item media/bin/* build/ffmpeg/ -Force
+      - name: Verify the new ByteVC2 helper starts and contains its decoder
+        if: ${{ !inputs.build_only }}
+        shell: pwsh
+        run: |
+          $decoders = (& build/ffmpeg/librempeg.exe -hide_banner -decoders 2>&1 | Out-String)
+          if ($LASTEXITCODE -or $decoders -notmatch '(?m)^\s*V\S*\s+bvc2\s') { throw 'ByteVC2 helper decoder verification failed' }
+          Write-Output 'PASS Windows x64 ByteVC2 helper starts and exposes bvc2 decoder'
+      - name: Run playback source regression checks
+        if: ${{ !inputs.build_only }}
+        run: |
+          node --test src/native/app-source-video-tab.test.cjs src/native/app-source-inline-fallback.test.cjs src/native/github-127-diagnostics.test.cjs src/native/github-127-handoff.test.cjs src/native/github-127-transport.test.cjs src/native/hongguo-cancellation.test.cjs src/native/playback-device.test.cjs
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          node scripts/check-app-source.cjs
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          node scripts/check-app-source-recovery.cjs
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+      - name: Check Windows FFmpeg discovery
+        if: ${{ !inputs.build_only }}
+        run: node scripts/check-ffmpeg-resolution.cjs
+      - uses: actions/cache/restore@v4
+        if: ${{ !inputs.build_only }}
+        id: app-cache
+        with:
+          path: |
+            dist/win-unpacked
+            dist/*.exe
+            dist/*.yml
+            dist/*.blockmap
+          key: windows-update-v2-647e40d874d54bbaada6243c60e97e848100adf4-${{ hashFiles('package*.json', 'main.js', 'preload.js', 'index.html', 'vite.config.js', 'src/**', 'build/**', 'scripts/build-ffmpeg-source-win.sh', 'scripts/build-librempeg-source.sh', 'scripts/librempeg-videotoolbox-prototype.patch', 'scripts/setup-software-player.cjs', 'scripts/software-player-assets.json') }}
+      - shell: pwsh
+        if: ${{ inputs.build_only || steps.app-cache.outputs.cache-hit != 'true' }}
+        run: |
+          npm run build:portable -- --config.electronDist=.cache/electron
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          npx electron-builder --win nsis --x64 --publish never --config.electronDist=.cache/electron
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+      - uses: actions/cache/save@v4
+        if: ${{ !inputs.build_only && steps.app-cache.outputs.cache-hit != 'true' }}
+        with:
+          path: |
+            dist/win-unpacked
+            dist/*.exe
+            dist/*.yml
+            dist/*.blockmap
+          key: ${{ steps.app-cache.outputs.cache-primary-key }}
+      - name: Verify portable, fresh NSIS install, reinstall and real 1.80 upgrade
+        if: ${{ !inputs.build_only }}
+        env:
+          HONGGUO_SKIP_PLAYBACK: false
+        shell: pwsh
+        run: |
+          git fetch --no-tags --depth=1 origin $env:HONGGUO_HARNESS_SHA
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          node -e "require('fs').writeFileSync(process.argv[1],require('child_process').execFileSync('git',['show',process.env.HONGGUO_HARNESS_SHA+':.github/windows-6.8-probe.cjs']))" "$env:RUNNER_TEMP/windows-6.8-probe.cjs"
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          node "$env:RUNNER_TEMP/windows-6.8-probe.cjs" "$PWD" portable
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          node "$env:RUNNER_TEMP/windows-6.8-probe.cjs" "$PWD" installer
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+        timeout-minutes: 10
+      - name: Assemble Windows release assets
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force dist/windows-release | Out-Null
+          $version = (Get-Content package.json | ConvertFrom-Json).version -replace '^(\d+\.\d+)\.0$', '$1'
+          Copy-Item "dist/红果短剧-$version-便携版.exe" "dist/windows-release/hongguo-downloader-$version-win-x64.exe"
+          Compress-Archive -LiteralPath "dist/windows-release/hongguo-downloader-$version-win-x64.exe" -DestinationPath "dist/windows-release/hongguo-downloader-$version-win-x64.zip"
+          Copy-Item "dist/hongguo-downloader-$version-win-x64-setup.exe" dist/windows-release/
+          Copy-Item dist/latest.yml dist/windows-release/
+          Copy-Item dist/*.blockmap dist/windows-release/
+          Copy-Item media/*corresponding-source.tar.gz dist/windows-release/
+          git archive --format=zip --output="dist/windows-release/hongguo-downloader-$version-windows-source.zip" HEAD
+          git rev-parse HEAD | Set-Content -Encoding utf8 dist/windows-release/SOURCE-SHA.txt
+          Get-FileHash dist/windows-release/* -Algorithm SHA256 | ForEach-Object { "$($_.Hash.ToLower())  $([IO.Path]::GetFileName($_.Path))" } | Set-Content -Encoding utf8 dist/windows-release/WINDOWS-SHA256SUMS.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-release-candidate
+          path: dist/windows-release/
+      - uses: actions/upload-artifact@v4
+        if: ${{ always() && !inputs.build_only }}
+        with:
+          name: windows-verification
+          path: dist/windows-verification/
+env:
+  HONGGUO_SUBJECT_SHA: 647e40d874d54bbaada6243c60e97e848100adf4
+  HONGGUO_HARNESS_SHA: ${{ github.sha }}
