@@ -15,6 +15,9 @@ const mode = process.argv[3];
 assert(['portable', 'installer', '--self-test'].includes(mode), 'Usage: node helper.cjs subjectRoot portable|installer|--self-test');
 const sha256 = data => crypto.createHash('sha256').update(data).digest('hex');
 const names = { portable: 'check-windows-release.cjs', installer: 'check-windows-installer.cjs' };
+function validateSourcePaths(changed) {
+  assert(changed.every(name => name === 'build/ffmpeg/LICENSE.md'), 'Product source must match freeze');
+}
 function original(kind) {
   const filename = path.join(root, 'scripts', names[kind]);
   const bytes = fs.readFileSync(filename);
@@ -50,6 +53,10 @@ function transform(kind, source) {
 }
 const successfulExit = child => child.exitCode === 0 && child.signalCode === null;
 if (mode === '--self-test') {
+  validateSourcePaths([]);
+  validateSourcePaths(['build/ffmpeg/LICENSE.md']);
+  assert.throws(() => validateSourcePaths(['main.js']));
+  assert.throws(() => validateSourcePaths(['build/ffmpeg/LICENSE.md', 'src/native/hongguo.js']));
   for (const kind of ['portable', 'installer']) {
     const { source } = original(kind), changed = transform(kind, source);
     new (require('node:vm').Script)(Module.wrap(changed));
@@ -78,13 +85,19 @@ if (mode === '--self-test') {
   assert(!process.argv.includes('--skip-playback') && !process.argv.includes('--config'), 'Acceptance cannot be skipped');
   assert.notEqual(process.env.HONGGUO_SKIP_PLAYBACK, 'true');
   assert.equal(cp.execFileSync('git', ['-C', root, 'rev-parse', 'HEAD'], { encoding: 'utf8' }).trim(), SUBJECT_SHA);
-  assert.equal(cp.execFileSync('git', ['-C', root, 'diff', '--name-only', 'HEAD', '--'], { encoding: 'utf8' }).trim(), '', 'Subject tracked files must match freeze');
+  const changed = cp.execFileSync('git', ['-C', root, 'diff', '--name-only', 'HEAD', '--'], { encoding: 'utf8' }).trim().split(/\r?\n/).filter(Boolean);
+  validateSourcePaths(changed);
+  const stagedLicense = fs.readFileSync(path.join(root, 'build/ffmpeg/LICENSE.md'));
+  const mediaLicense = fs.readFileSync(path.join(root, 'media/bin/LICENSE.md'));
+  assert.equal(sha256(mediaLicense), '2e1d16c72fd74e12063776371da757322f8b77589386532f4fd8634bde7de1af', 'Pinned FFmpeg license must match verified media artifact');
+  assert(stagedLicense.equals(mediaLicense), 'Staged FFmpeg license must equal its media source');
   assert.equal(JSON.parse(fs.readFileSync(path.join(root, 'package.json'))).version, '6.8.0');
   const out = path.join(root, 'dist', 'windows-verification');
   fs.mkdirSync(out, { recursive: true });
   const checker = original(mode);
   const report = { subjectSha: SUBJECT_SHA, harnessSha, helperSha256: sha256(fs.readFileSync(__filename)), mode,
     checkerCheckoutSha256: checker.checkoutSha256, checkerCanonicalSha256: checker.canonicalSha256,
+    stagedResourceChanges: changed, stagedFfmpegLicenseSha256: sha256(stagedLicense),
     payloadUnchanged: null, events: [] };
   const reportFile = path.join(out, `probe-${mode}.json`);
   const redact = value => String(value).replace(/https?:\/\/\S+/g, '[URL omitted]').replace(/[\w.+%-]+@[\w.-]+\.[A-Za-z]{2,}/g, '[email omitted]').replace(/(?:[A-Za-z]:\\Users\\|\/Users\/|\/home\/)[^\s"']+/g, '[machine path omitted]').slice(0, 700);
