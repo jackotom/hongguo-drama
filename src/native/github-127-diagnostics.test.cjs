@@ -256,18 +256,23 @@ test('cancellation mapping preserves ERR_CANCELED instead of retryable NETWORK_E
 
 test('internal registration timeout aborts its transport and retains failure cooldown', async t => {
     t.mock.timers.enable({ apis: ['setTimeout'] });
-    let signal, calls = 0;
+    let signal, calls = 0, enter;
+    const entered = new Promise(resolve => { enter = resolve; });
     const api = app(config => {
-        calls++; signal = config.signal;
+        calls++; signal = config.signal; enter();
         return new Promise((_resolve, reject) => signal.addEventListener('abort', () => reject({ code: 'ERR_CANCELED' }), { once: true }));
     });
     const failed = assert.rejects(api.fetchAppPlayUrl('11'), { code: 'DEVICE_REGISTRATION_FAILED', registrationFailure: 'TIMEOUT' });
+    await entered;
     t.mock.timers.tick(7999);
     assert.equal(signal.aborted, false);
     t.mock.timers.tick(1);
     await failed;
     assert.equal(signal.aborted, true);
-    await assert.rejects(api.fetchAppPlayUrl('11'), { registrationFailure: 'TIMEOUT' });
+    const cooling = assert.rejects(api.fetchAppPlayUrl('11'), { registrationFailure: 'TIMEOUT' });
+    await new Promise(setImmediate);
+    t.mock.timers.tick(1000);
+    await cooling;
     assert.equal(calls, 1);
 });
 
