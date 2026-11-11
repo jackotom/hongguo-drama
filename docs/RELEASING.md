@@ -1,5 +1,7 @@
 # 同步发行规则
 
+6.9已于2026-11-11 19:04:15（Asia/Shanghai）正式公开并设Latest，内部6.9.0、桌面构建6.9.4，冻结源码`b364419c2b81da3a7e28fd637011aaff9b8acf2c`。双Mac、Windows x64、Linux x64 AppImage、Docker amd64五类共25份正式附件，远端大小／SHA256、两份更新清单及总校验清单已回读核对；119个本轮临时分段已全部清理，10个匿名下载入口及完整总清单核对通过。双Mac已签名、公证、装订；Windows EXE未签名、App真实下载队列未测，Intel仅Rosetta；保留两项基线断言失败。未替换本机正式安装，TV与手机独立。 详见[6.9记录](release-6.9.md)。
+
 6.8已于2026-11-11 10:17:07（Asia/Shanghai）正式公开并设Latest，内部6.8.0、桌面构建6.8.2，冻结源码`e06828f0c81392fb572a5feda6cec54dba643251`。双Mac、Windows x64、Linux x64 AppImage、Docker amd64统一共25附件，远端大小／SHA256与更新及总校验清单已回读核对。双Mac本轮新签名、公证、装订；Windows EXE未签名，Intel仅Rosetta。未替换本机正式安装。 详见[6.8记录](release-6.8.md)。
 
 6.7已于2026-11-11 00:03:04（Asia/Shanghai）正式公开并设Latest，内部6.7.0、桌面构建6.7.1，冻结源码`43c7b4c8fa98df3b1b7902713788641f9d325e2b`。双Mac、Windows x64、Linux x64 AppImage、Docker amd64五类共25附件，远端大小与SHA256及更新清单已核对。双Mac签名、公证、装订；Windows两集各10秒静音实播及安装/重装/升级资料保留、Linux两集CPU静音播放、Docker两集1080P下载合并/认证/重启持久化通过。Windows EXE未签名，Intel Mac仅Rosetta；未替换本机正式安装，TV和手机不随本次发行。 详见[6.7记录](release-6.7.md)。
