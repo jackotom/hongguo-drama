@@ -30,6 +30,7 @@ function attachFloatingPlayerWindow(mainWindow, {
     throw new TypeError('attachFloatingPlayerWindow requires a window, BrowserWindow, screen and settings store');
   }
 
+  const mainContents = mainWindow.webContents;
   let floatingWindow = null;
   let finalizeFloatingWindow = null;
   let lastKnownSize = null;
@@ -44,7 +45,7 @@ function attachFloatingPlayerWindow(mainWindow, {
     const ratio = size.width / size.height;
     if (ratio >= 0.1 && ratio <= 10) updateAspectRatio?.(ratio);
   };
-  mainWindow.webContents.on('ipc-message', onAspectRatio);
+  mainContents.on('ipc-message', onAspectRatio);
 
   const loadSavedSize = () => {
     try {
@@ -77,7 +78,7 @@ function attachFloatingPlayerWindow(mainWindow, {
   };
 
   mainWindow.once('closed', () => {
-    mainWindow.webContents.removeListener('ipc-message', onAspectRatio);
+    mainContents.removeListener('ipc-message', onAspectRatio);
     if (floatingWindow && !floatingWindow.isDestroyed()) {
       finalizeFloatingWindow?.();
       floatingWindow.destroy();

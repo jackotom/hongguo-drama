@@ -147,6 +147,18 @@ function closeMain(mainWindow) {
 }
 
 (async () => {
+  for (const withFloating of [false, true]) {
+    const { mainWindow, open } = fixture();
+    const contents = mainWindow.webContents;
+    Object.defineProperty(mainWindow, 'webContents', { get() {
+      if (mainWindow.destroyed) throw new TypeError('Object has been destroyed');
+      return contents;
+    } });
+    const child = withFloating ? open() : null;
+    assert.doesNotThrow(() => closeMain(mainWindow), 'closed must not read a destroyed BrowserWindow getter');
+    assert.equal(contents.listenerCount('ipc-message'), 0);
+    if (child) assert.equal(child.destroyed, true);
+  }
   {
     const store = makeStore({ root: '/keep' });
     const { mainWindow, request, trustedChecks, open } = fixture({ store });
