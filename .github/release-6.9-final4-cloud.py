@@ -5,6 +5,7 @@ import argparse
 import concurrent.futures
 import hashlib
 import json
+import os
 import re
 import stat
 import subprocess
@@ -101,11 +102,17 @@ def api(endpoint, method='GET', destination=None):
         require(method == 'GET', 'Binary API operation must be read only')
         media = 'application/vnd.github+json' if endpoint.startswith(f'repos/{REPO}/actions/artifacts/') else 'application/octet-stream'
         command += ['-H', 'Accept: ' + media]
-        with destination.open('xb') as stream:
-            process = subprocess.run(command, stdout=stream, stderr=subprocess.PIPE)
+        for attempt in range(3):
+            with destination.open('xb') as stream:
+                process = subprocess.run(command, stdout=stream, stderr=subprocess.PIPE,
+                    env={**os.environ, 'GODEBUG': 'http2client=0'})
+            if process.returncode == 0:
+                return None
+            destination.unlink()  # Only this attempt's newly created partial transport file.
+            if attempt < 2:
+                time.sleep(1)
         status = re.findall(rb'HTTP ([0-9]{3})', process.stderr)
-        require(process.returncode == 0, 'GitHub binary read failed: ' + endpoint + '; exit=' + str(process.returncode) + '; HTTP=' + (status[-1].decode() if status else 'unknown'))
-        return None
+        raise ValueError('GitHub binary read failed: ' + endpoint + '; exit=' + str(process.returncode) + '; HTTP=' + (status[-1].decode() if status else 'unknown'))
     result = subprocess.run(command, capture_output=True)
     if method == 'DELETE' and result.returncode and b'HTTP 404' in result.stderr:
         return None
@@ -226,7 +233,7 @@ def main():
     needed = {part['name']: part for name, group in plan['localParts'].items() if name not in rows for part in group}
     def fetch_part(name):
         return download_asset(rows[name], Path('transport/parts') / name, needed[name])
-    with concurrent.futures.ThreadPoolExecutor(max_workers=12) as pool:
+    with concurrent.futures.ThreadPoolExecutor(max_workers=4) as pool:
         list(pool.map(fetch_part, needed))
     for name, group in plan['localParts'].items():
         if name in rows:
@@ -257,19 +264,10 @@ def main():
     require(EXPECTED <= set(rows) and all(matches(rows[name], plan['assets'][name]) for name in EXPECTED), 'Final 25 assets not complete; chunks retained')
     for name in ('latest.yml', 'latest-mac.yml', 'SHA256SUMS.txt'):
         download_asset(rows[name], Path('transport/manifest-readback') / name, plan['assets'][name])
-    for name in sorted(set(rows) & set(parts)):
-        draft()
-        current = remote_rows()
-        check_remote(current, plan, parts)
-        if name not in current:
-            continue
-        require(name.startswith(PREFIX) and matches(current[name], parts[name]), 'Only an exact current-prefix chunk may be deleted')
-        api(f'repos/{REPO}/releases/assets/{current[name]["id"]}', method='DELETE')
-    draft()
-    rows = remote_rows()
-    require(set(rows) == EXPECTED and all(matches(rows[name], plan['assets'][name]) for name in EXPECTED), 'Final draft inventory mismatch')
-    Path('transport-result.json').write_text(json.dumps({'passed': True, 'releaseId': DRAFT_ID, 'sourceCommit': FROZEN, 'version': '6.9.0', 'buildVersion': '6.9.4', 'assetCount': 25, 'temporaryChunksRemoved': True, 'originalCiZipBindingVerified': True, 'manifestsReadBack': True, 'published': False}, indent=2) + '\n')
-    print('PASS exact 25 assets in specified draft; current chunks removed; no publication')
+    require(set(rows) == EXPECTED | set(parts), 'Expected formal assets and current chunks required')
+    Path('transport-result.json').write_text(json.dumps({'reassemblyPassed': True, 'releaseId': DRAFT_ID, 'sourceCommit': FROZEN, 'version': '6.9.0', 'buildVersion': '6.9.4', 'assetCount': 25, 'temporaryChunkCount': len(parts), 'controllerCleanupRequired': True, 'originalCiZipBindingVerified': True, 'manifestsReadBack': True, 'published': False}, indent=2) + '\n')
+    print('PASS exact 25 formal assets and manifests; controller must verify/clean current chunks before publication')
+
 
 
 if __name__ == '__main__':
