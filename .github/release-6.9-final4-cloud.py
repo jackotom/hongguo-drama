@@ -103,7 +103,8 @@ def api(endpoint, method='GET', destination=None):
         command += ['-H', 'Accept: ' + media]
         with destination.open('xb') as stream:
             process = subprocess.run(command, stdout=stream, stderr=subprocess.PIPE)
-        require(process.returncode == 0, 'GitHub binary read failed')
+        status = re.findall(rb'HTTP ([0-9]{3})', process.stderr)
+        require(process.returncode == 0, 'GitHub binary read failed: ' + endpoint + '; exit=' + str(process.returncode) + '; HTTP=' + (status[-1].decode() if status else 'unknown'))
         return None
     result = subprocess.run(command, capture_output=True)
     if method == 'DELETE' and result.returncode and b'HTTP 404' in result.stderr:
