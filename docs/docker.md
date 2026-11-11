@@ -1,10 +1,10 @@
-# Docker Web / API（6.8 开发候选）
+# Docker Web / API（6.8）
 
 用于 fnOS / Linux x64 NAS：浏览器搜索红果短剧、选集批量下载到已挂载 NAS、合并同剧已下载分集。不是桌面 VNC。仅支持红果公开可用片源，不登录账号、不接入其他来源，不绕过锁定或上游拒绝。
 
 ## 部署
 
-镜像仅支持 `linux/amd64`。正式发布后，从发行页下载 `hongguo-drama-6.8-docker-amd64.tar.gz` 后导入（具体附件名以 Release 为准）：
+镜像仅支持 `linux/amd64`。从6.8正式发行页下载 `hongguo-drama-6.8-docker-amd64.tar.gz` 后导入（具体附件名以 Release 为准）：
 
 ```sh
 docker load -i hongguo-drama-6.8-docker-amd64.tar.gz

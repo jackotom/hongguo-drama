@@ -55,7 +55,7 @@ async function mount(file, api, props = {}, storage = null) {
   const localStorage = storage || memoryStorage();
   const fallback = () => Promise.resolve({});
   const window = new EventTarget();
-  const document = { documentElement: { dataset: {} }, hidden: false, fullscreenElement: null, activeElement: null, body: {}, exitFullscreen: async () => {}, querySelector: () => null, querySelectorAll: () => [], addEventListener() {}, removeEventListener() {}, createElement: () => ({ style: {}, setAttribute() {}, appendChild() {} }) };
+  const document = { documentElement: { dataset: {} }, hidden: false, fullscreenElement: null, activeElement: null, body: {}, exitFullscreen: async () => {}, querySelector: () => null, querySelectorAll: () => [], addEventListener() {}, removeEventListener() {}, createElement: () => Object.assign(new EventTarget(), { style: {}, setAttribute() {}, appendChild() {} }) };
   Object.assign(window, {
     document, localStorage, navigator: { platform: 'Linux', userAgent: 'test' },
     electronAPI: new Proxy(api, { get: (obj, key) => (key in obj ? obj[key] : key === 'getMediaSources' ? undefined : typeof key === 'string' && key.startsWith('on') ? () => () => {} : fallback) }),

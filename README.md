@@ -23,9 +23,22 @@
 
 ## 下载与安装
 
-**6.8 源码／发行目标**（内部 `6.8.0`，桌面构建 `6.8.2`）：修复缓存复用下载的临时文件归属误判，小窗按视频比例缩放并限制在当前屏幕内，同时修复验收发现的窗口销毁后清理异常。计划双Mac、Windows、Linux AppImage、Docker五类统一发行；最终验收与签名包核对完成前，下载仍为下方6.7。进度与边界见[6.8说明](docs/release-6.8.md)。
+**当前正式版：6.8**（内部`6.8.0`，桌面构建`6.8.2`）。修复缓存下载误判、画中画等比缩放和原生窗口退出异常。五类平台统一发行，详见[6.8验证与限制](docs/release-6.8.md)。
 
-**当前正式版：6.7**（内部`6.7.0`）。修复6.6播放接口空响应后的取源问题，整合#133签名video_tab方案。双Mac、Windows、Linux和Docker统一发行，详见[6.7验证与限制](docs/release-6.7.md)。
+| 平台 | 下载6.8 | 使用方式 |
+|---|---|---|
+| Apple芯片Mac，macOS 13+ | [DMG](https://github.com/jackotom/hongguo-drama/releases/download/v6.8/Hongguo-6.8-mac-arm64.dmg) | 拖入应用程序；已签名、公证、装订 |
+| Intel Mac，macOS 13+ | [DMG](https://github.com/jackotom/hongguo-drama/releases/download/v6.8/Hongguo-6.8-mac-x64.dmg) | 同上；验收仅Rosetta |
+| Windows x64 | [安装版](https://github.com/jackotom/hongguo-drama/releases/download/v6.8/hongguo-downloader-6.8-win-x64-setup.exe) · [便携EXE](https://github.com/jackotom/hongguo-drama/releases/download/v6.8/hongguo-downloader-6.8-win-x64.exe) · [便携ZIP](https://github.com/jackotom/hongguo-drama/releases/download/v6.8/hongguo-downloader-6.8-win-x64.zip) | 安装版支持应用内更新；EXE未签名 |
+| Linux x64 | [AppImage](https://github.com/jackotom/hongguo-drama/releases/download/v6.8/hongguo-downloader-6.8-linux-x64.AppImage) | 赋予执行权限；手动更新 |
+| Docker Linux amd64 / NAS | [镜像](https://github.com/jackotom/hongguo-drama/releases/download/v6.8/hongguo-drama-6.8-docker-amd64.tar.gz) · [部署包](https://github.com/jackotom/hongguo-drama/releases/download/v6.8/hongguo-drama-6.8-docker-deploy.zip) | 按[部署文档](docs/docker.md)设置令牌与挂载目录 |
+
+[6.8发行页](https://github.com/jackotom/hongguo-drama/releases/tag/v6.8) · [SHA256](https://github.com/jackotom/hongguo-drama/releases/download/v6.8/SHA256SUMS.txt) · [精确源码](https://github.com/jackotom/hongguo-drama/releases/download/v6.8/hongguo-drama-6.8-source.zip)。TV和手机保持独立，不包含在本轮五类产物中。上游部分网页片源仍可能404、只提供预览或超时，不保证所有内容永久可播。
+
+<details>
+<summary>6.7 历史下载与升级说明</summary>
+
+**历史正式版：6.7**（内部`6.7.0`）。修复6.6播放接口空响应后的取源问题，整合#133签名video_tab方案。双Mac、Windows、Linux和Docker统一发行，详见[6.7验证与限制](docs/release-6.7.md)。
 
 | 平台 | 下载6.7 | 使用方式 |
 |---|---|---|
@@ -36,6 +49,8 @@
 | Docker Linux amd64 / NAS | [镜像](https://github.com/jackotom/hongguo-drama/releases/download/v6.7/hongguo-drama-6.7-docker-amd64.tar.gz) · [部署包](https://github.com/jackotom/hongguo-drama/releases/download/v6.7/hongguo-drama-6.7-docker-deploy.zip) | 按[部署文档](docs/docker.md)设置令牌与挂载目录 |
 
 [6.7发行页](https://github.com/jackotom/hongguo-drama/releases/tag/v6.7) · [SHA256](https://github.com/jackotom/hongguo-drama/releases/download/v6.7/SHA256SUMS.txt) · [精确源码](https://github.com/jackotom/hongguo-drama/releases/download/v6.7/hongguo-drama-6.7-source.zip)。TV和手机保持独立，不包含在本轮五类产物中。上游部分网页片源仍可能404、只提供预览或超时，不保证所有内容永久可播。
+
+</details>
 
 <details>
 <summary>6.5 历史下载与升级说明</summary>
@@ -142,11 +157,11 @@ Mac和Windows安装版保留应用内更新入口；完整6.4→6.5自动更新�
 3. 打开详情点「立即播放」，也可选择集数与清晰度加入下载队列。
 4. 下次从「我的剧库」或「观看记录」接着看；下载进度、失败重试和整剧合并在「下载管理」。
 
-## 6.8（源码／发行目标）
+## 6.8
 
 - 修复macOS复制缓存后创建时间改变引起的下载临时文件归属误判，保留画质、取消和安全落盘校验。
 - 自带画中画按视频比例缩放并遵守当前显示器边界，保留暂停与尺寸记忆。
-- 五类产物通过本轮真实静音验收后统一发行；TV和手机不随本轮发布。尚未构建、签名、公证或发布，见[6.8说明](docs/release-6.8.md)。
+- 五类产物已统一正式发布，双Mac已签名、公证和装订。TV和手机不随本轮发布，验收及限制见[6.8说明](docs/release-6.8.md)。
 
 ## 6.7
 
