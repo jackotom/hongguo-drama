@@ -1,0 +1,775 @@
+{
+  "version": "7.0.0",
+  "buildVersion": "7.0.1",
+  "sourceCommit": "3f5927d0d605ff7742fde8cbd1bb92ffe951b080",
+  "releaseId": 441663877,
+  "transport_authorized": true,
+  "assets": {
+    "Hongguo-7.0-mac-arm64.dmg": {
+      "size": 178750492,
+      "sha256": "88dd6e9a754f016e3d5170b028708a24725fb54a556b3945aec599c76ecc14b0"
+    },
+    "Hongguo-7.0-mac-x64.dmg": {
+      "size": 189039926,
+      "sha256": "51fd49528e7acbd33b4f30699b8c727dc23bdeddac973f9cd850890b77d5c290"
+    },
+    "SHA256SUMS.txt": {
+      "size": 2633,
+      "sha256": "4742c3c55c59885cbfa2b2ffa60877991fd44e76ec09cbd7394325ec3b2da864"
+    },
+    "ffmpeg-9.0.2-x264-b35605a-corresponding-source.tar.gz": {
+      "size": 13122060,
+      "sha256": "bfcac890fe098e27bd1cdc4209837377ecaae3bea4fc5b1ea197ec4ab1c2b2e9"
+    },
+    "ffmpeg-9.0.2-x264-b35605a-linux-x64-corresponding-source.tar.gz": {
+      "size": 13170068,
+      "sha256": "42f72ce1e363ea999d3a1523377c8cba6cc5931ae7227f5661f973a85a3a884c"
+    },
+    "ffmpeg-9.0.2-x264-b35605a-win-x64-corresponding-source.tar.gz": {
+      "size": 13202581,
+      "sha256": "422dcb4a4eb22119400740bee19cf84d8e2925f90f31fd1d8c32f545ea162d9e"
+    },
+    "ffmpeg-9.0.2-x264-b35605a-x64-corresponding-source.tar.gz": {
+      "size": 13122451,
+      "sha256": "ad68bf181e6bcc8609bcfad68a4a1c071b046af7743fd21b4e645132080eba60"
+    },
+    "hongguo-downloader-7.0-linux-x64.AppImage": {
+      "size": 159964480,
+      "sha256": "66d8dbfd58ef06336aa2bcdafb4f44f6dee5c50672c7721f0aee0468f3d16c59"
+    },
+    "hongguo-downloader-7.0-mac-arm64.zip": {
+      "size": 161057280,
+      "sha256": "55465c1d85480b8bfca547225f2af2faf1641c9a4ddf322ae78b7abefa8cdb2e"
+    },
+    "hongguo-downloader-7.0-mac-x64.zip": {
+      "size": 169300455,
+      "sha256": "3a2d1ffd1633711f000b9d2b7cce66b15b07f8ec96349f294ac40d1cdcf2f9ac"
+    },
+    "hongguo-downloader-7.0-win-x64-setup.exe": {
+      "size": 137806199,
+      "sha256": "3f82b009106e75ee7b1d9321604714d4b95958d792c48f0f6dad837a8577d936"
+    },
+    "hongguo-downloader-7.0-win-x64-setup.exe.blockmap": {
+      "size": 145278,
+      "sha256": "222699eea468d75d4e6093d63dbfaf98fea31dd9ae188d6ac6cab1fc608edfc2"
+    },
+    "hongguo-downloader-7.0-win-x64.exe": {
+      "size": 114181492,
+      "sha256": "500c62b87d60bcd3bb9949ec7d0a11027df414a922c2b38e600f525a55d93ae3"
+    },
+    "hongguo-downloader-7.0-win-x64.zip": {
+      "size": 114192623,
+      "sha256": "37ba4a6a212d0966de2db9bc2e7e2e292ec8a825c5d890d70372021eb3219f4c"
+    },
+    "hongguo-downloader-7.0-windows-source.zip": {
+      "size": 5583823,
+      "sha256": "9e56af240ae2ac38de52975b8712b9c400f2e8155ea945d26a0f5786f4f15a1f"
+    },
+    "hongguo-drama-7.0-docker-amd64.tar.gz": {
+      "size": 107351409,
+      "sha256": "82fbabf01745a196a84cb4aaf636669551d40d67dc5198476dc5f1eb4c2a40c0"
+    },
+    "hongguo-drama-7.0-docker-deploy.zip": {
+      "size": 28233,
+      "sha256": "bb923695f82a2102cd3e1da663b29050bcbe6fa7c63f3ffe0d58a193b5799933"
+    },
+    "hongguo-drama-7.0-source.zip": {
+      "size": 5583823,
+      "sha256": "9e56af240ae2ac38de52975b8712b9c400f2e8155ea945d26a0f5786f4f15a1f"
+    },
+    "latest-mac.yml": {
+      "size": 557,
+      "sha256": "e46ef960b48766ac39eabf8348d409c77195bb9ce9ccff360662c82bb0034efd"
+    },
+    "latest.yml": {
+      "size": 377,
+      "sha256": "f76a9a10c9ac90747c0c6e15eb52ad3a91c01481d6e510fde45916028a73f8ae"
+    },
+    "libmedia-1.3.1-152f629-corresponding-source.tar.gz": {
+      "size": 190808102,
+      "sha256": "148b3101c2909359a0cece00a0a735a76e3c1410f858bcb5e4f1d88935baa887"
+    },
+    "librempeg-cb1f8f3-x264-b35605a-arm64-corresponding-source.tar.gz": {
+      "size": 19877495,
+      "sha256": "fc32fa63d652a351b0f5242d141801be2f671dcb02b3c60719997dcdd33e002f"
+    },
+    "librempeg-cb1f8f3-x264-b35605a-linux-x64-corresponding-source.tar.gz": {
+      "size": 19876967,
+      "sha256": "d4c67f5fda33c0deb5d6969574e8f215e434a79570c45b45aed0cb3e326609e1"
+    },
+    "librempeg-cb1f8f3-x264-b35605a-win-x64-corresponding-source.tar.gz": {
+      "size": 19876967,
+      "sha256": "d4c67f5fda33c0deb5d6969574e8f215e434a79570c45b45aed0cb3e326609e1"
+    },
+    "librempeg-cb1f8f3-x264-b35605a-x64-corresponding-source.tar.gz": {
+      "size": 19877495,
+      "sha256": "fc32fa63d652a351b0f5242d141801be2f671dcb02b3c60719997dcdd33e002f"
+    }
+  },
+  "remoteArtifacts": {
+    "windows": [
+      "ffmpeg-9.0.2-x264-b35605a-win-x64-corresponding-source.tar.gz",
+      "hongguo-downloader-7.0-win-x64-setup.exe",
+      "hongguo-downloader-7.0-win-x64-setup.exe.blockmap",
+      "hongguo-downloader-7.0-win-x64.exe",
+      "hongguo-downloader-7.0-win-x64.zip",
+      "latest.yml",
+      "librempeg-cb1f8f3-x264-b35605a-win-x64-corresponding-source.tar.gz"
+    ],
+    "linux": [
+      "ffmpeg-9.0.2-x264-b35605a-linux-x64-corresponding-source.tar.gz",
+      "hongguo-downloader-7.0-linux-x64.AppImage",
+      "librempeg-cb1f8f3-x264-b35605a-linux-x64-corresponding-source.tar.gz"
+    ],
+    "docker": [
+      "hongguo-drama-7.0-docker-amd64.tar.gz"
+    ]
+  },
+  "priorMediaAssets": {},
+  "interruptedAssetIds": {},
+  "localParts": {
+    "Hongguo-7.0-mac-arm64.dmg": [
+      {
+        "name": "_hg70-3f5927d-88dd6e9a754f016e3d5170b028708a24725fb54a556b3945aec599c76ecc14b0-000.part",
+        "size": 8388608,
+        "sha256": "adba94b8d96135e19f32d6c8708bf474876c6ec36ffc730268a82bc31642aa16"
+      },
+      {
+        "name": "_hg70-3f5927d-88dd6e9a754f016e3d5170b028708a24725fb54a556b3945aec599c76ecc14b0-001.part",
+        "size": 8388608,
+        "sha256": "fbae4b6bff3134d67639b487b7153349ed054851029ccc89422c4ee7605c0d21"
+      },
+      {
+        "name": "_hg70-3f5927d-88dd6e9a754f016e3d5170b028708a24725fb54a556b3945aec599c76ecc14b0-002.part",
+        "size": 8388608,
+        "sha256": "33313317ab1ce96416fb428771fac68ce721fac3a7a850e2590602ae7765ece6"
+      },
+      {
+        "name": "_hg70-3f5927d-88dd6e9a754f016e3d5170b028708a24725fb54a556b3945aec599c76ecc14b0-003.part",
+        "size": 8388608,
+        "sha256": "fbf83e45c18ef271e084322515e89d07ea15ad9d029df094d514c6aeafcf9b33"
+      },
+      {
+        "name": "_hg70-3f5927d-88dd6e9a754f016e3d5170b028708a24725fb54a556b3945aec599c76ecc14b0-004.part",
+        "size": 8388608,
+        "sha256": "a217f5aaddfbbf1c11801e8a9cb0229f5459383f96fc50c0b0e9dcbe85f62756"
+      },
+      {
+        "name": "_hg70-3f5927d-88dd6e9a754f016e3d5170b028708a24725fb54a556b3945aec599c76ecc14b0-005.part",
+        "size": 8388608,
+        "sha256": "d1627197a0026dfebb87b0522e7894269f5b71acbc62d1f8a3dba27fdf06977c"
+      },
+      {
+        "name": "_hg70-3f5927d-88dd6e9a754f016e3d5170b028708a24725fb54a556b3945aec599c76ecc14b0-006.part",
+        "size": 8388608,
+        "sha256": "f2e8c14fd387369f7c576e13ea736d485bfe77129da40a7c714a08a9de1a2307"
+      },
+      {
+        "name": "_hg70-3f5927d-88dd6e9a754f016e3d5170b028708a24725fb54a556b3945aec599c76ecc14b0-007.part",
+        "size": 8388608,
+        "sha256": "4bbb8c6d7452015b318b1fc610f55fe052e51b911c50f1d1e9789de31ba80967"
+      },
+      {
+        "name": "_hg70-3f5927d-88dd6e9a754f016e3d5170b028708a24725fb54a556b3945aec599c76ecc14b0-008.part",
+        "size": 8388608,
+        "sha256": "8f86d4399dda41fd233b625059b85f512a3777a9ae489b2bb765dbdc9328210e"
+      },
+      {
+        "name": "_hg70-3f5927d-88dd6e9a754f016e3d5170b028708a24725fb54a556b3945aec599c76ecc14b0-009.part",
+        "size": 8388608,
+        "sha256": "e08e6a096b47cea5cf94b88dbb6ba7f567cf51f28c4b7c03f6917e011c00b758"
+      },
+      {
+        "name": "_hg70-3f5927d-88dd6e9a754f016e3d5170b028708a24725fb54a556b3945aec599c76ecc14b0-010.part",
+        "size": 8388608,
+        "sha256": "18be9c184af47b8c7e911bc12f5c40405f05f0377674033d4bb71049340f5063"
+      },
+      {
+        "name": "_hg70-3f5927d-88dd6e9a754f016e3d5170b028708a24725fb54a556b3945aec599c76ecc14b0-011.part",
+        "size": 8388608,
+        "sha256": "8d511c2b404d1c9ded822b970f344f2ec1279b12ef5323efafc1ba3e7a1907b5"
+      },
+      {
+        "name": "_hg70-3f5927d-88dd6e9a754f016e3d5170b028708a24725fb54a556b3945aec599c76ecc14b0-012.part",
+        "size": 8388608,
+        "sha256": "cf6911ba9ab4e0b5b3934670c5459272b0a3e0049e230b5f173699ae191fc0f4"
+      },
+      {
+        "name": "_hg70-3f5927d-88dd6e9a754f016e3d5170b028708a24725fb54a556b3945aec599c76ecc14b0-013.part",
+        "size": 8388608,
+        "sha256": "c46f8cdccd96f0c686683f7b75809167f34a26085a462df3b2a61060de83c917"
+      },
+      {
+        "name": "_hg70-3f5927d-88dd6e9a754f016e3d5170b028708a24725fb54a556b3945aec599c76ecc14b0-014.part",
+        "size": 8388608,
+        "sha256": "49eae41a293e858d4ce80cbfec4969310790128e4817e1c1b3fc85cb5a2dce7d"
+      },
+      {
+        "name": "_hg70-3f5927d-88dd6e9a754f016e3d5170b028708a24725fb54a556b3945aec599c76ecc14b0-015.part",
+        "size": 8388608,
+        "sha256": "1b951d76eb525abe91f7e9c2164a77893d1feeb4c1148f5f32c2c37570c94bc9"
+      },
+      {
+        "name": "_hg70-3f5927d-88dd6e9a754f016e3d5170b028708a24725fb54a556b3945aec599c76ecc14b0-016.part",
+        "size": 8388608,
+        "sha256": "6f92a665b0c2976a7dab2a9ec085da145c2d37de3d62e45fc3d883e593eb52b5"
+      },
+      {
+        "name": "_hg70-3f5927d-88dd6e9a754f016e3d5170b028708a24725fb54a556b3945aec599c76ecc14b0-017.part",
+        "size": 8388608,
+        "sha256": "cceb9a78edd4ce06090b524bfab003968d7601b44519340a04a0103a6f2fea92"
+      },
+      {
+        "name": "_hg70-3f5927d-88dd6e9a754f016e3d5170b028708a24725fb54a556b3945aec599c76ecc14b0-018.part",
+        "size": 8388608,
+        "sha256": "fd1b1ef5c86911c598486cc70ad48815a79786ca67a81c46b329d641b3dffad3"
+      },
+      {
+        "name": "_hg70-3f5927d-88dd6e9a754f016e3d5170b028708a24725fb54a556b3945aec599c76ecc14b0-019.part",
+        "size": 8388608,
+        "sha256": "8dfb6bf9f8881749ffb1d3371b1841bebb08dd0eac164d7199dc70da352431ea"
+      },
+      {
+        "name": "_hg70-3f5927d-88dd6e9a754f016e3d5170b028708a24725fb54a556b3945aec599c76ecc14b0-020.part",
+        "size": 8388608,
+        "sha256": "3aee9bf2c1b832b4e012560415e8ddfaf0f26fcd4e8e503dc6984224ddad257d"
+      },
+      {
+        "name": "_hg70-3f5927d-88dd6e9a754f016e3d5170b028708a24725fb54a556b3945aec599c76ecc14b0-021.part",
+        "size": 2589724,
+        "sha256": "007dd6c4bc16379f6c8c587b9083251471b26d4ea5beae1824cd8f626f376996"
+      }
+    ],
+    "Hongguo-7.0-mac-x64.dmg": [
+      {
+        "name": "_hg70-3f5927d-51fd49528e7acbd33b4f30699b8c727dc23bdeddac973f9cd850890b77d5c290-000.part",
+        "size": 8388608,
+        "sha256": "0681f32e5b80bdeb78a1563d1b74a79e7baa7f343d5b91b744ff1f9ef40a64c2"
+      },
+      {
+        "name": "_hg70-3f5927d-51fd49528e7acbd33b4f30699b8c727dc23bdeddac973f9cd850890b77d5c290-001.part",
+        "size": 8388608,
+        "sha256": "8942a7afb45cf0e84288361c67c6731ad6cd48277ee09dd1245929138c201c98"
+      },
+      {
+        "name": "_hg70-3f5927d-51fd49528e7acbd33b4f30699b8c727dc23bdeddac973f9cd850890b77d5c290-002.part",
+        "size": 8388608,
+        "sha256": "e14f6324803734f5af2d550d818819e742ede788aaea043d6c0a6ab8e78f282a"
+      },
+      {
+        "name": "_hg70-3f5927d-51fd49528e7acbd33b4f30699b8c727dc23bdeddac973f9cd850890b77d5c290-003.part",
+        "size": 8388608,
+        "sha256": "ceb31362dd44c9b44a361aea5ce83b26ae58d8d6bf3d18978d0fc33d72cf9df0"
+      },
+      {
+        "name": "_hg70-3f5927d-51fd49528e7acbd33b4f30699b8c727dc23bdeddac973f9cd850890b77d5c290-004.part",
+        "size": 8388608,
+        "sha256": "c855758698aaca26a07a76ce7e3405835d368de9e6a96ba30b9e58cf8f9518e9"
+      },
+      {
+        "name": "_hg70-3f5927d-51fd49528e7acbd33b4f30699b8c727dc23bdeddac973f9cd850890b77d5c290-005.part",
+        "size": 8388608,
+        "sha256": "50b98569894980054f61ffdf80b783272c5302e0f79b550a8040492ac2413b01"
+      },
+      {
+        "name": "_hg70-3f5927d-51fd49528e7acbd33b4f30699b8c727dc23bdeddac973f9cd850890b77d5c290-006.part",
+        "size": 8388608,
+        "sha256": "afd1e42fe0d89ca20a41a441fd558d4be42091cbddba284b8c3f889ff0e9388e"
+      },
+      {
+        "name": "_hg70-3f5927d-51fd49528e7acbd33b4f30699b8c727dc23bdeddac973f9cd850890b77d5c290-007.part",
+        "size": 8388608,
+        "sha256": "2053f803abba0f4d48d8f05257f968552270a11f88228d90fecddb58d97879d5"
+      },
+      {
+        "name": "_hg70-3f5927d-51fd49528e7acbd33b4f30699b8c727dc23bdeddac973f9cd850890b77d5c290-008.part",
+        "size": 8388608,
+        "sha256": "f1d12db40da9a81a9eaa113b177b70553b7ddb155457536c6d19c9b1a7442650"
+      },
+      {
+        "name": "_hg70-3f5927d-51fd49528e7acbd33b4f30699b8c727dc23bdeddac973f9cd850890b77d5c290-009.part",
+        "size": 8388608,
+        "sha256": "355469d95b49bc7abddfad6f91276d20dc685f3075f81142232921e185f01e15"
+      },
+      {
+        "name": "_hg70-3f5927d-51fd49528e7acbd33b4f30699b8c727dc23bdeddac973f9cd850890b77d5c290-010.part",
+        "size": 8388608,
+        "sha256": "074db90ef150af5680f134fea6bdc1c74c869a49c7652f534a0454ad753e136c"
+      },
+      {
+        "name": "_hg70-3f5927d-51fd49528e7acbd33b4f30699b8c727dc23bdeddac973f9cd850890b77d5c290-011.part",
+        "size": 8388608,
+        "sha256": "e67d481bb95ea15dddfed664b174f80678d03d978d9b5e026d76622c4c4adf31"
+      },
+      {
+        "name": "_hg70-3f5927d-51fd49528e7acbd33b4f30699b8c727dc23bdeddac973f9cd850890b77d5c290-012.part",
+        "size": 8388608,
+        "sha256": "315129b6b39a399dc1f8761191ec9a0cfc9d4e5a28a9f1b9d2c470ae75993036"
+      },
+      {
+        "name": "_hg70-3f5927d-51fd49528e7acbd33b4f30699b8c727dc23bdeddac973f9cd850890b77d5c290-013.part",
+        "size": 8388608,
+        "sha256": "3cbfd1af7545198cc3bf1cc1b833ea8438141f46b42310a7a590a4dd8a25fc07"
+      },
+      {
+        "name": "_hg70-3f5927d-51fd49528e7acbd33b4f30699b8c727dc23bdeddac973f9cd850890b77d5c290-014.part",
+        "size": 8388608,
+        "sha256": "40083a68e2671b48e3e454158c76e51b0cd9f70303104504bbc9964b44bd1d9a"
+      },
+      {
+        "name": "_hg70-3f5927d-51fd49528e7acbd33b4f30699b8c727dc23bdeddac973f9cd850890b77d5c290-015.part",
+        "size": 8388608,
+        "sha256": "30eaebc4d3c2a11996cbafed21d49df4d38ed1114d15ac4c0f6f06107525c60d"
+      },
+      {
+        "name": "_hg70-3f5927d-51fd49528e7acbd33b4f30699b8c727dc23bdeddac973f9cd850890b77d5c290-016.part",
+        "size": 8388608,
+        "sha256": "e2ad6becabc5a25571e8597ac25408ba53543ff1acc5f38aac5fa876261e9a5f"
+      },
+      {
+        "name": "_hg70-3f5927d-51fd49528e7acbd33b4f30699b8c727dc23bdeddac973f9cd850890b77d5c290-017.part",
+        "size": 8388608,
+        "sha256": "b0934f1f04ac9d2431081d9ea63d8de0b234a9b815fedf2847befa50389a09dd"
+      },
+      {
+        "name": "_hg70-3f5927d-51fd49528e7acbd33b4f30699b8c727dc23bdeddac973f9cd850890b77d5c290-018.part",
+        "size": 8388608,
+        "sha256": "e772ca8e85f5814317762ed10abd1c700abf6c5172620aec146850ce969b0193"
+      },
+      {
+        "name": "_hg70-3f5927d-51fd49528e7acbd33b4f30699b8c727dc23bdeddac973f9cd850890b77d5c290-019.part",
+        "size": 8388608,
+        "sha256": "dabd3501ba7e1d08741a0f420e957584ca1994c7ec7f881026ba0ba1727539df"
+      },
+      {
+        "name": "_hg70-3f5927d-51fd49528e7acbd33b4f30699b8c727dc23bdeddac973f9cd850890b77d5c290-020.part",
+        "size": 8388608,
+        "sha256": "1da88b806eba7e01624276be48f885501def4bb563048f875ae75c5ec3c29a55"
+      },
+      {
+        "name": "_hg70-3f5927d-51fd49528e7acbd33b4f30699b8c727dc23bdeddac973f9cd850890b77d5c290-021.part",
+        "size": 8388608,
+        "sha256": "105c114513f42c6cad194fac3405704ec0142cf21793a9263faca75f83913d5e"
+      },
+      {
+        "name": "_hg70-3f5927d-51fd49528e7acbd33b4f30699b8c727dc23bdeddac973f9cd850890b77d5c290-022.part",
+        "size": 4490550,
+        "sha256": "0f1d457666a37d885c8e2bec84895f8dd09d9a2a395d09a43234e906571dba9a"
+      }
+    ],
+    "ffmpeg-9.0.2-x264-b35605a-corresponding-source.tar.gz": [
+      {
+        "name": "_hg70-3f5927d-bfcac890fe098e27bd1cdc4209837377ecaae3bea4fc5b1ea197ec4ab1c2b2e9-000.part",
+        "size": 8388608,
+        "sha256": "1cd77f19bdb1a8fa322a057f150f7ef1481baf40f43317dcf65e6b879f14ac3a"
+      },
+      {
+        "name": "_hg70-3f5927d-bfcac890fe098e27bd1cdc4209837377ecaae3bea4fc5b1ea197ec4ab1c2b2e9-001.part",
+        "size": 4733452,
+        "sha256": "2133354073211209a699f6c880e41c02abca18adab092eefc46163ae97ada07a"
+      }
+    ],
+    "ffmpeg-9.0.2-x264-b35605a-x64-corresponding-source.tar.gz": [
+      {
+        "name": "_hg70-3f5927d-ad68bf181e6bcc8609bcfad68a4a1c071b046af7743fd21b4e645132080eba60-000.part",
+        "size": 8388608,
+        "sha256": "192891fdd0b415861fac99a957dd8bb8f8d8d0bca8584bd8755cc1e3b47d369b"
+      },
+      {
+        "name": "_hg70-3f5927d-ad68bf181e6bcc8609bcfad68a4a1c071b046af7743fd21b4e645132080eba60-001.part",
+        "size": 4733843,
+        "sha256": "3702e1df5a60851c9a9e251061246ffe3e457bcfd0c0aadb2ba0339dd6a7477f"
+      }
+    ],
+    "hongguo-downloader-7.0-mac-arm64.zip": [
+      {
+        "name": "_hg70-3f5927d-55465c1d85480b8bfca547225f2af2faf1641c9a4ddf322ae78b7abefa8cdb2e-000.part",
+        "size": 8388608,
+        "sha256": "c3a6042d858cb4f8704e8683fc98018061978f73a84f9450cba9b9bdd1a2f318"
+      },
+      {
+        "name": "_hg70-3f5927d-55465c1d85480b8bfca547225f2af2faf1641c9a4ddf322ae78b7abefa8cdb2e-001.part",
+        "size": 8388608,
+        "sha256": "0508d2afde144994ca2fc86ced03058314f9e001bb5011795b34f145a1c659e5"
+      },
+      {
+        "name": "_hg70-3f5927d-55465c1d85480b8bfca547225f2af2faf1641c9a4ddf322ae78b7abefa8cdb2e-002.part",
+        "size": 8388608,
+        "sha256": "6b684395abc30f07646ba06ccf7dc15fcca48df6e9f2af13d2e345e26da5dffe"
+      },
+      {
+        "name": "_hg70-3f5927d-55465c1d85480b8bfca547225f2af2faf1641c9a4ddf322ae78b7abefa8cdb2e-003.part",
+        "size": 8388608,
+        "sha256": "339c390cf5ce7ea379cb5c0a81d077fff2fd36f2524a1343d94693e0dc52bafc"
+      },
+      {
+        "name": "_hg70-3f5927d-55465c1d85480b8bfca547225f2af2faf1641c9a4ddf322ae78b7abefa8cdb2e-004.part",
+        "size": 8388608,
+        "sha256": "0db41d1bf4e35ca03629721edf2f5228bde63d5be0ea073e9d3b7c0a8d869238"
+      },
+      {
+        "name": "_hg70-3f5927d-55465c1d85480b8bfca547225f2af2faf1641c9a4ddf322ae78b7abefa8cdb2e-005.part",
+        "size": 8388608,
+        "sha256": "789f6dca0ed686492a4acc6f647b89ba68f91b843858e8d411ed9ce49285d8ac"
+      },
+      {
+        "name": "_hg70-3f5927d-55465c1d85480b8bfca547225f2af2faf1641c9a4ddf322ae78b7abefa8cdb2e-006.part",
+        "size": 8388608,
+        "sha256": "147e8af87f8db65264b431b94ea20c1192d76c77817c068b18c3a7a8f296bc7c"
+      },
+      {
+        "name": "_hg70-3f5927d-55465c1d85480b8bfca547225f2af2faf1641c9a4ddf322ae78b7abefa8cdb2e-007.part",
+        "size": 8388608,
+        "sha256": "9c4aed38b7a9923b285c9d4bd105ec976ac80a0cdc96be045e20e36dda80ae8b"
+      },
+      {
+        "name": "_hg70-3f5927d-55465c1d85480b8bfca547225f2af2faf1641c9a4ddf322ae78b7abefa8cdb2e-008.part",
+        "size": 8388608,
+        "sha256": "29a20e0dfcf81f0137c2290329d712c98c9e76444b35020f6b2a42a19c8081e1"
+      },
+      {
+        "name": "_hg70-3f5927d-55465c1d85480b8bfca547225f2af2faf1641c9a4ddf322ae78b7abefa8cdb2e-009.part",
+        "size": 8388608,
+        "sha256": "9ed1c93b7c0192274aac5a708502d8501c726248b36cb453c7cef7f5c76d2c14"
+      },
+      {
+        "name": "_hg70-3f5927d-55465c1d85480b8bfca547225f2af2faf1641c9a4ddf322ae78b7abefa8cdb2e-010.part",
+        "size": 8388608,
+        "sha256": "2ebf8eff203a57fd4a57434868776a816a1394330648bd9c58d2ff865dd60dda"
+      },
+      {
+        "name": "_hg70-3f5927d-55465c1d85480b8bfca547225f2af2faf1641c9a4ddf322ae78b7abefa8cdb2e-011.part",
+        "size": 8388608,
+        "sha256": "e512401cd73506f69c1471e352e30dc8809c4ea9442ceceea3fe831829cdc1a4"
+      },
+      {
+        "name": "_hg70-3f5927d-55465c1d85480b8bfca547225f2af2faf1641c9a4ddf322ae78b7abefa8cdb2e-012.part",
+        "size": 8388608,
+        "sha256": "7b89b9868f09dc4788c061290b90c23bfc3ab8e9cbf6895f1b97fc4190cf0ca2"
+      },
+      {
+        "name": "_hg70-3f5927d-55465c1d85480b8bfca547225f2af2faf1641c9a4ddf322ae78b7abefa8cdb2e-013.part",
+        "size": 8388608,
+        "sha256": "76f681e8b0636c383c66e752a5d4993937cbb361d2e6a069c955c997551b196b"
+      },
+      {
+        "name": "_hg70-3f5927d-55465c1d85480b8bfca547225f2af2faf1641c9a4ddf322ae78b7abefa8cdb2e-014.part",
+        "size": 8388608,
+        "sha256": "c4fe3ff2167b0e5e373212cc8326a4a654833870048b0e90af8d620b378d4c79"
+      },
+      {
+        "name": "_hg70-3f5927d-55465c1d85480b8bfca547225f2af2faf1641c9a4ddf322ae78b7abefa8cdb2e-015.part",
+        "size": 8388608,
+        "sha256": "7e0a71b84675385dbd5fa9da9d64f00a130fd9740ee80e4314a887aaec7dba93"
+      },
+      {
+        "name": "_hg70-3f5927d-55465c1d85480b8bfca547225f2af2faf1641c9a4ddf322ae78b7abefa8cdb2e-016.part",
+        "size": 8388608,
+        "sha256": "dd30e5a8f275edc332f7d6670a86e9936a00c6185c3c57be4a4173483c8dd73a"
+      },
+      {
+        "name": "_hg70-3f5927d-55465c1d85480b8bfca547225f2af2faf1641c9a4ddf322ae78b7abefa8cdb2e-017.part",
+        "size": 8388608,
+        "sha256": "4dbbde667624654c7b63fae25dfd1d7f6176edfcc9a47e6c4f0ee146d51fe513"
+      },
+      {
+        "name": "_hg70-3f5927d-55465c1d85480b8bfca547225f2af2faf1641c9a4ddf322ae78b7abefa8cdb2e-018.part",
+        "size": 8388608,
+        "sha256": "0040e4b7d3eebab413ba45b4be994dcc505b6a0100350a76273dcb43f3db98a2"
+      },
+      {
+        "name": "_hg70-3f5927d-55465c1d85480b8bfca547225f2af2faf1641c9a4ddf322ae78b7abefa8cdb2e-019.part",
+        "size": 1673728,
+        "sha256": "5a5e78eacc4ea47167708bcbe073f284d30affa10963b2ec7e8275443fd8d05f"
+      }
+    ],
+    "hongguo-downloader-7.0-mac-x64.zip": [
+      {
+        "name": "_hg70-3f5927d-3a2d1ffd1633711f000b9d2b7cce66b15b07f8ec96349f294ac40d1cdcf2f9ac-000.part",
+        "size": 8388608,
+        "sha256": "e08d6b41851973216545131a79e26de293acf03c651df1ec5f8a4a7fa21636e1"
+      },
+      {
+        "name": "_hg70-3f5927d-3a2d1ffd1633711f000b9d2b7cce66b15b07f8ec96349f294ac40d1cdcf2f9ac-001.part",
+        "size": 8388608,
+        "sha256": "f61936d22bcdd8c9adcc6d76b7de9b6b0351f139b070dc70b1059b6574469fcd"
+      },
+      {
+        "name": "_hg70-3f5927d-3a2d1ffd1633711f000b9d2b7cce66b15b07f8ec96349f294ac40d1cdcf2f9ac-002.part",
+        "size": 8388608,
+        "sha256": "f5bfab1c89a8d8ac849cd95473ac7f7d08c9013f7c7e5866770a4fe668abd1c2"
+      },
+      {
+        "name": "_hg70-3f5927d-3a2d1ffd1633711f000b9d2b7cce66b15b07f8ec96349f294ac40d1cdcf2f9ac-003.part",
+        "size": 8388608,
+        "sha256": "3105a850a5582a28264bcaaa32c38454d0f4478a3c57d2658b22af246d6ac6a7"
+      },
+      {
+        "name": "_hg70-3f5927d-3a2d1ffd1633711f000b9d2b7cce66b15b07f8ec96349f294ac40d1cdcf2f9ac-004.part",
+        "size": 8388608,
+        "sha256": "c880b82d9a1d99e96f576cdd147a688e16f3493f495808722dc73d0aaf08d3b6"
+      },
+      {
+        "name": "_hg70-3f5927d-3a2d1ffd1633711f000b9d2b7cce66b15b07f8ec96349f294ac40d1cdcf2f9ac-005.part",
+        "size": 8388608,
+        "sha256": "777f23acd5eea132adfac3b823df96e4c22512c190e392b582453794a92c51bf"
+      },
+      {
+        "name": "_hg70-3f5927d-3a2d1ffd1633711f000b9d2b7cce66b15b07f8ec96349f294ac40d1cdcf2f9ac-006.part",
+        "size": 8388608,
+        "sha256": "29abc92a9b61d855aa82a1b8ca5decb4312bed4a289743f5bc18f447e0490877"
+      },
+      {
+        "name": "_hg70-3f5927d-3a2d1ffd1633711f000b9d2b7cce66b15b07f8ec96349f294ac40d1cdcf2f9ac-007.part",
+        "size": 8388608,
+        "sha256": "75d77ff7ef366cc51c6652cc899bc0de1a613fe170946ae7cbc8487758197a37"
+      },
+      {
+        "name": "_hg70-3f5927d-3a2d1ffd1633711f000b9d2b7cce66b15b07f8ec96349f294ac40d1cdcf2f9ac-008.part",
+        "size": 8388608,
+        "sha256": "7fe3fa1d8265c533fcef1ebac82953af6b1a96e8ebb5016241aa98282e2d476b"
+      },
+      {
+        "name": "_hg70-3f5927d-3a2d1ffd1633711f000b9d2b7cce66b15b07f8ec96349f294ac40d1cdcf2f9ac-009.part",
+        "size": 8388608,
+        "sha256": "4faca551cbc632931954c6a29dd12356d3882245609bff5766740ec01e501636"
+      },
+      {
+        "name": "_hg70-3f5927d-3a2d1ffd1633711f000b9d2b7cce66b15b07f8ec96349f294ac40d1cdcf2f9ac-010.part",
+        "size": 8388608,
+        "sha256": "e8844767acf82d94255c6ed5b2f58875d18ad40c773942d6ab14cbdcf72c28a7"
+      },
+      {
+        "name": "_hg70-3f5927d-3a2d1ffd1633711f000b9d2b7cce66b15b07f8ec96349f294ac40d1cdcf2f9ac-011.part",
+        "size": 8388608,
+        "sha256": "cab60dd2cfa2f6d33acaeab94a58cb7fb6aff45bc19f91d94cf8b1d61ff0a08c"
+      },
+      {
+        "name": "_hg70-3f5927d-3a2d1ffd1633711f000b9d2b7cce66b15b07f8ec96349f294ac40d1cdcf2f9ac-012.part",
+        "size": 8388608,
+        "sha256": "a7deac6021982227496a8e65fc217901dc498a22bfcab4a11f9c01f2b4595917"
+      },
+      {
+        "name": "_hg70-3f5927d-3a2d1ffd1633711f000b9d2b7cce66b15b07f8ec96349f294ac40d1cdcf2f9ac-013.part",
+        "size": 8388608,
+        "sha256": "0b698e98dc822ff32a75692b17ea03612a2ff3a25a2b5a0b0f5f1f714af3f2b5"
+      },
+      {
+        "name": "_hg70-3f5927d-3a2d1ffd1633711f000b9d2b7cce66b15b07f8ec96349f294ac40d1cdcf2f9ac-014.part",
+        "size": 8388608,
+        "sha256": "a2d411439d2e15eba37a19b1273558041d0f5e39605e3b0f302fada7bad45424"
+      },
+      {
+        "name": "_hg70-3f5927d-3a2d1ffd1633711f000b9d2b7cce66b15b07f8ec96349f294ac40d1cdcf2f9ac-015.part",
+        "size": 8388608,
+        "sha256": "085e8a42decf70c66f70096558263642d1e316245ed443f1e3027807941275f6"
+      },
+      {
+        "name": "_hg70-3f5927d-3a2d1ffd1633711f000b9d2b7cce66b15b07f8ec96349f294ac40d1cdcf2f9ac-016.part",
+        "size": 8388608,
+        "sha256": "c6dd7b417d91187bd2c95462d19a9dbdf48aadb0a9d3f9afa29e3c2a15d80ae6"
+      },
+      {
+        "name": "_hg70-3f5927d-3a2d1ffd1633711f000b9d2b7cce66b15b07f8ec96349f294ac40d1cdcf2f9ac-017.part",
+        "size": 8388608,
+        "sha256": "ef4793cc148ad6f616e4326113bae3f79e83d910341784a78bb01b057f6f73fe"
+      },
+      {
+        "name": "_hg70-3f5927d-3a2d1ffd1633711f000b9d2b7cce66b15b07f8ec96349f294ac40d1cdcf2f9ac-018.part",
+        "size": 8388608,
+        "sha256": "c1296ced87f548361e7babcc0658af4c035b01ce227a12d4ed1d21ca6061e24b"
+      },
+      {
+        "name": "_hg70-3f5927d-3a2d1ffd1633711f000b9d2b7cce66b15b07f8ec96349f294ac40d1cdcf2f9ac-019.part",
+        "size": 8388608,
+        "sha256": "7846bafdb897fe0c623666f9c31a2cef1230d908137d1b0c5750bf2009ff6463"
+      },
+      {
+        "name": "_hg70-3f5927d-3a2d1ffd1633711f000b9d2b7cce66b15b07f8ec96349f294ac40d1cdcf2f9ac-020.part",
+        "size": 1528295,
+        "sha256": "0a302713db72eb15904960b15d00cae4a9ca800235a3c665dc899949acc93f71"
+      }
+    ],
+    "hongguo-downloader-7.0-windows-source.zip": [
+      {
+        "name": "_hg70-3f5927d-9e56af240ae2ac38de52975b8712b9c400f2e8155ea945d26a0f5786f4f15a1f-000.part",
+        "size": 5583823,
+        "sha256": "9e56af240ae2ac38de52975b8712b9c400f2e8155ea945d26a0f5786f4f15a1f"
+      }
+    ],
+    "hongguo-drama-7.0-docker-deploy.zip": [
+      {
+        "name": "_hg70-3f5927d-bb923695f82a2102cd3e1da663b29050bcbe6fa7c63f3ffe0d58a193b5799933-000.part",
+        "size": 28233,
+        "sha256": "bb923695f82a2102cd3e1da663b29050bcbe6fa7c63f3ffe0d58a193b5799933"
+      }
+    ],
+    "hongguo-drama-7.0-source.zip": [
+      {
+        "name": "_hg70-3f5927d-9e56af240ae2ac38de52975b8712b9c400f2e8155ea945d26a0f5786f4f15a1f-000.part",
+        "size": 5583823,
+        "sha256": "9e56af240ae2ac38de52975b8712b9c400f2e8155ea945d26a0f5786f4f15a1f"
+      }
+    ],
+    "latest-mac.yml": [
+      {
+        "name": "_hg70-3f5927d-e46ef960b48766ac39eabf8348d409c77195bb9ce9ccff360662c82bb0034efd-000.part",
+        "size": 557,
+        "sha256": "e46ef960b48766ac39eabf8348d409c77195bb9ce9ccff360662c82bb0034efd"
+      }
+    ],
+    "libmedia-1.3.1-152f629-corresponding-source.tar.gz": [
+      {
+        "name": "_hg70-3f5927d-148b3101c2909359a0cece00a0a735a76e3c1410f858bcb5e4f1d88935baa887-000.part",
+        "size": 8388608,
+        "sha256": "d70a105d1c1a319f75c91cc7173f7b43aa982c11081177dd50f4b7cda9eaebb3"
+      },
+      {
+        "name": "_hg70-3f5927d-148b3101c2909359a0cece00a0a735a76e3c1410f858bcb5e4f1d88935baa887-001.part",
+        "size": 8388608,
+        "sha256": "090e8fbc1251367b88c1b74470050b8c329e71a7fbfb16c41f4f76dc5a7ca897"
+      },
+      {
+        "name": "_hg70-3f5927d-148b3101c2909359a0cece00a0a735a76e3c1410f858bcb5e4f1d88935baa887-002.part",
+        "size": 8388608,
+        "sha256": "87442a6e82572c9df6cfc330da0d82b9a1e255609d8359c75d2751a0a1ec9b35"
+      },
+      {
+        "name": "_hg70-3f5927d-148b3101c2909359a0cece00a0a735a76e3c1410f858bcb5e4f1d88935baa887-003.part",
+        "size": 8388608,
+        "sha256": "348ef35b35eca911396e7007698dbb8853b4620ec937d74b5b6e2208e76ac3a7"
+      },
+      {
+        "name": "_hg70-3f5927d-148b3101c2909359a0cece00a0a735a76e3c1410f858bcb5e4f1d88935baa887-004.part",
+        "size": 8388608,
+        "sha256": "1bdbb44573045071fe3e2be88070d13d871a4c79bfe9386eccf27582b3d38820"
+      },
+      {
+        "name": "_hg70-3f5927d-148b3101c2909359a0cece00a0a735a76e3c1410f858bcb5e4f1d88935baa887-005.part",
+        "size": 8388608,
+        "sha256": "3f0524ec83fbff4885cef8c8a2857e343ffdef142974d771954fc303d3616fb7"
+      },
+      {
+        "name": "_hg70-3f5927d-148b3101c2909359a0cece00a0a735a76e3c1410f858bcb5e4f1d88935baa887-006.part",
+        "size": 8388608,
+        "sha256": "ec86f9ba38e43d9b730a9d2a093cfd87f97fb4cfc81d2dd473f7f79a52e8d2b2"
+      },
+      {
+        "name": "_hg70-3f5927d-148b3101c2909359a0cece00a0a735a76e3c1410f858bcb5e4f1d88935baa887-007.part",
+        "size": 8388608,
+        "sha256": "6e40ea2f9541a66aa600d876cb03aa2ebce65e6fb7f551a887730163a7b476e1"
+      },
+      {
+        "name": "_hg70-3f5927d-148b3101c2909359a0cece00a0a735a76e3c1410f858bcb5e4f1d88935baa887-008.part",
+        "size": 8388608,
+        "sha256": "b30ff9911f5b868398feca25384db00bf8ea10d6d39a2130e54560fc64c8a1f3"
+      },
+      {
+        "name": "_hg70-3f5927d-148b3101c2909359a0cece00a0a735a76e3c1410f858bcb5e4f1d88935baa887-009.part",
+        "size": 8388608,
+        "sha256": "389257203820cea84e080795527852f86b8c45e4d48b9571021f28e227c55b51"
+      },
+      {
+        "name": "_hg70-3f5927d-148b3101c2909359a0cece00a0a735a76e3c1410f858bcb5e4f1d88935baa887-010.part",
+        "size": 8388608,
+        "sha256": "d90da82259fd0fe68c76ad6e5f76a664ef50a8d72865cd9f87b194533dfdc72e"
+      },
+      {
+        "name": "_hg70-3f5927d-148b3101c2909359a0cece00a0a735a76e3c1410f858bcb5e4f1d88935baa887-011.part",
+        "size": 8388608,
+        "sha256": "9ff2252498e48acab3852d2d83ac9b61bfb8c1efd2bdb409e1656509007a1cc3"
+      },
+      {
+        "name": "_hg70-3f5927d-148b3101c2909359a0cece00a0a735a76e3c1410f858bcb5e4f1d88935baa887-012.part",
+        "size": 8388608,
+        "sha256": "869ac117b3e8808609c9dec8d05c596fd860ba268c3dd88f351f7e19ed48b10d"
+      },
+      {
+        "name": "_hg70-3f5927d-148b3101c2909359a0cece00a0a735a76e3c1410f858bcb5e4f1d88935baa887-013.part",
+        "size": 8388608,
+        "sha256": "b016d4b182d3f518c1ea595c457c754eada6b41895def790651b04cb1c1c08c4"
+      },
+      {
+        "name": "_hg70-3f5927d-148b3101c2909359a0cece00a0a735a76e3c1410f858bcb5e4f1d88935baa887-014.part",
+        "size": 8388608,
+        "sha256": "fbe11297f820be323fd47a8373320419bd27babd6cf470fb68367189d50d8a7d"
+      },
+      {
+        "name": "_hg70-3f5927d-148b3101c2909359a0cece00a0a735a76e3c1410f858bcb5e4f1d88935baa887-015.part",
+        "size": 8388608,
+        "sha256": "4e21b542fc6df2213199519e2c9d6b4c2e1c88cd7470bb26f280d9e4eba86422"
+      },
+      {
+        "name": "_hg70-3f5927d-148b3101c2909359a0cece00a0a735a76e3c1410f858bcb5e4f1d88935baa887-016.part",
+        "size": 8388608,
+        "sha256": "aa06861781357e77ff49c1d21b797bb574f5dfc9cbb8bff79ac4506c87dbe3bf"
+      },
+      {
+        "name": "_hg70-3f5927d-148b3101c2909359a0cece00a0a735a76e3c1410f858bcb5e4f1d88935baa887-017.part",
+        "size": 8388608,
+        "sha256": "1e5d2d4279ababd8e63a8b2222ab32547fae52e6143a7c4987c658f7dfa90406"
+      },
+      {
+        "name": "_hg70-3f5927d-148b3101c2909359a0cece00a0a735a76e3c1410f858bcb5e4f1d88935baa887-018.part",
+        "size": 8388608,
+        "sha256": "3a9b9333647b7aec68c3fca110fe1c6690df3856876c2347efc93f377564f1e6"
+      },
+      {
+        "name": "_hg70-3f5927d-148b3101c2909359a0cece00a0a735a76e3c1410f858bcb5e4f1d88935baa887-019.part",
+        "size": 8388608,
+        "sha256": "458fd9c2f33a4659f1eb3196d3e10bb8ae47a4aeb502e0e111b733be88353b97"
+      },
+      {
+        "name": "_hg70-3f5927d-148b3101c2909359a0cece00a0a735a76e3c1410f858bcb5e4f1d88935baa887-020.part",
+        "size": 8388608,
+        "sha256": "d03c102f2618ac26898ddb05bfb275df2d7fc5fe1db60ab3e80c79ad73b78874"
+      },
+      {
+        "name": "_hg70-3f5927d-148b3101c2909359a0cece00a0a735a76e3c1410f858bcb5e4f1d88935baa887-021.part",
+        "size": 8388608,
+        "sha256": "946f81b0ff8a6ea372778a403e0dff2d944bc51810a644187171155b31c63b4e"
+      },
+      {
+        "name": "_hg70-3f5927d-148b3101c2909359a0cece00a0a735a76e3c1410f858bcb5e4f1d88935baa887-022.part",
+        "size": 6258726,
+        "sha256": "6d25ecba50ddb07d586246e1ab165b2375b01d70473afb85a4ab3c76552669ea"
+      }
+    ],
+    "librempeg-cb1f8f3-x264-b35605a-arm64-corresponding-source.tar.gz": [
+      {
+        "name": "_hg70-3f5927d-fc32fa63d652a351b0f5242d141801be2f671dcb02b3c60719997dcdd33e002f-000.part",
+        "size": 8388608,
+        "sha256": "451bffc7e707de818df88d5047c0e24b8861472b18fb2b9d293f05cf577da16e"
+      },
+      {
+        "name": "_hg70-3f5927d-fc32fa63d652a351b0f5242d141801be2f671dcb02b3c60719997dcdd33e002f-001.part",
+        "size": 8388608,
+        "sha256": "b948f2e43c39ef32a71d94df5b2c372c71c50bc66bb8c8c1d4f557873a75a334"
+      },
+      {
+        "name": "_hg70-3f5927d-fc32fa63d652a351b0f5242d141801be2f671dcb02b3c60719997dcdd33e002f-002.part",
+        "size": 3100279,
+        "sha256": "9632a592e3b4ba1ac918cda32db6fb3ade5480c4ed630a1e5334411bf3d0d65c"
+      }
+    ],
+    "librempeg-cb1f8f3-x264-b35605a-x64-corresponding-source.tar.gz": [
+      {
+        "name": "_hg70-3f5927d-fc32fa63d652a351b0f5242d141801be2f671dcb02b3c60719997dcdd33e002f-000.part",
+        "size": 8388608,
+        "sha256": "451bffc7e707de818df88d5047c0e24b8861472b18fb2b9d293f05cf577da16e"
+      },
+      {
+        "name": "_hg70-3f5927d-fc32fa63d652a351b0f5242d141801be2f671dcb02b3c60719997dcdd33e002f-001.part",
+        "size": 8388608,
+        "sha256": "b948f2e43c39ef32a71d94df5b2c372c71c50bc66bb8c8c1d4f557873a75a334"
+      },
+      {
+        "name": "_hg70-3f5927d-fc32fa63d652a351b0f5242d141801be2f671dcb02b3c60719997dcdd33e002f-002.part",
+        "size": 3100279,
+        "sha256": "9632a592e3b4ba1ac918cda32db6fb3ade5480c4ed630a1e5334411bf3d0d65c"
+      }
+    ]
+  },
+  "uploadPlanSha256": "9599702a83ba315186f1a7d4a4c525f6e21a8ee9815435f4899d24cfd58feb09",
+  "uniqueChunkCount": 119
+}

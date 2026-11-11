@@ -1,0 +1,93 @@
+{
+  "sourceCommit": "3f5927d0d605ff7742fde8cbd1bb92ffe951b080",
+  "version": "7.0.0",
+  "buildVersion": "7.0.1",
+  "platforms": {
+    "linux-x64": {
+      "runId": 43020192890,
+      "runAttempt": 1,
+      "sourceCommit": "3f5927d0d605ff7742fde8cbd1bb92ffe951b080",
+      "version": "7.0.0",
+      "buildVersion": "7.0.1",
+      "architecture": "x64",
+      "artifacts": [
+        {
+          "id": 13855870062,
+          "name": "linux-appimage-candidate",
+          "archive": "artifact-13855870062.zip",
+          "files": {
+            "linux/LINUX-SHA256SUMS.txt": "LINUX-SHA256SUMS.txt",
+            "linux/SOURCE-SHA.txt": "SOURCE-SHA.txt",
+            "linux/ffmpeg-9.0.2-x264-b35605a-linux-x64-corresponding-source.tar.gz": "ffmpeg-9.0.2-x264-b35605a-linux-x64-corresponding-source.tar.gz",
+            "linux/hongguo-downloader-7.0-linux-source.zip": "hongguo-downloader-7.0-linux-source.zip",
+            "linux/hongguo-downloader-7.0-linux-x64.AppImage": "hongguo-downloader-7.0-linux-x64.AppImage",
+            "linux/librempeg-cb1f8f3-x264-b35605a-linux-x64-corresponding-source.tar.gz": "librempeg-cb1f8f3-x264-b35605a-linux-x64-corresponding-source.tar.gz",
+            "linux/linux-verification/appimage-result.json": "linux-verification/appimage-result.json"
+          }
+        }
+      ]
+    },
+    "windows-x64": {
+      "runId": 43020139254,
+      "runAttempt": 1,
+      "sourceCommit": "3f5927d0d605ff7742fde8cbd1bb92ffe951b080",
+      "version": "7.0.0",
+      "buildVersion": "7.0.1",
+      "architecture": "x64",
+      "artifacts": [
+        {
+          "id": 13855037812,
+          "name": "windows-verification",
+          "archive": "artifact-13855037812.zip",
+          "files": {
+            "windows/verification/installer-result.json": "installer-result.json",
+            "windows/verification/result.json": "result.json"
+          }
+        },
+        {
+          "id": 13854673813,
+          "name": "windows-release-candidate",
+          "archive": "artifact-13854673813.zip",
+          "files": {
+            "windows/SOURCE-SHA.txt": "SOURCE-SHA.txt",
+            "windows/WINDOWS-SHA256SUMS.txt": "WINDOWS-SHA256SUMS.txt",
+            "windows/ffmpeg-9.0.2-x264-b35605a-win-x64-corresponding-source.tar.gz": "ffmpeg-9.0.2-x264-b35605a-win-x64-corresponding-source.tar.gz",
+            "windows/hongguo-downloader-7.0-win-x64-setup.exe": "hongguo-downloader-7.0-win-x64-setup.exe",
+            "windows/hongguo-downloader-7.0-win-x64-setup.exe.blockmap": "hongguo-downloader-7.0-win-x64-setup.exe.blockmap",
+            "windows/hongguo-downloader-7.0-win-x64.exe": "hongguo-downloader-7.0-win-x64.exe",
+            "windows/hongguo-downloader-7.0-win-x64.zip": "hongguo-downloader-7.0-win-x64.zip",
+            "windows/hongguo-downloader-7.0-windows-source.zip": "hongguo-downloader-7.0-windows-source.zip",
+            "windows/latest.yml": "latest.yml",
+            "windows/librempeg-cb1f8f3-x264-b35605a-win-x64-corresponding-source.tar.gz": "librempeg-cb1f8f3-x264-b35605a-win-x64-corresponding-source.tar.gz"
+          }
+        }
+      ]
+    },
+    "docker-amd64": {
+      "runId": 43020156015,
+      "runAttempt": 1,
+      "sourceCommit": "3f5927d0d605ff7742fde8cbd1bb92ffe951b080",
+      "version": "7.0.0",
+      "buildVersion": "7.0.1",
+      "architecture": "amd64",
+      "artifacts": [
+        {
+          "id": 13854134639,
+          "name": "docker-server-candidate",
+          "archive": "artifact-13854134639.zip",
+          "files": {
+            "docker/DOCKER-SHA256SUMS.txt": "DOCKER-SHA256SUMS.txt",
+            "docker/SOURCE-SHA.txt": "SOURCE-SHA.txt",
+            "docker/compose.yaml": "compose.yaml",
+            "docker/docker-verification.json": "docker-verification.json",
+            "docker/docker.md": "docker.md",
+            "docker/ffmpeg-9.0.2-x264-b35605a-linux-x64-corresponding-source.tar.gz": "ffmpeg-9.0.2-x264-b35605a-linux-x64-corresponding-source.tar.gz",
+            "docker/hongguo-drama-7.0-docker-amd64.tar.gz": "hongguo-drama-7.0-docker-amd64.tar.gz",
+            "docker/hongguo-drama-7.0-docker-source.zip": "hongguo-drama-7.0-docker-source.zip",
+            "docker/librempeg-cb1f8f3-x264-b35605a-linux-x64-corresponding-source.tar.gz": "librempeg-cb1f8f3-x264-b35605a-linux-x64-corresponding-source.tar.gz"
+          }
+        }
+      ]
+    }
+  }
+}

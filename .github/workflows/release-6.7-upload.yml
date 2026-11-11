@@ -1,41 +1,33 @@
-name: Upload verified 6.7 artifacts
+name: Transport exact 7.0.1 assets to existing draft
 on:
   workflow_dispatch:
 permissions:
   actions: read
   contents: write
 concurrency:
-  group: release-6.7-transport
+  group: release-441663877-final4-transport
   cancel-in-progress: false
 jobs:
-  upload:
+  transport:
     runs-on: ubuntu-24.04
     timeout-minutes: 60
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      TRANSPORT_PLAN_SHA256: '1d96a8ac890c4edf0a3698a09569a3db7f9ae68a3f7b82f1b95f89ea83764ae2'
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/download-artifact@v4
         with:
-          name: windows-release-candidate
-          run-id: 42837198838
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          path: transport/windows
-      - uses: actions/download-artifact@v4
-        with:
-          name: linux-appimage-candidate
-          run-id: 42837196497
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          path: transport/linux
-      - uses: actions/download-artifact@v4
-        with:
-          name: docker-server-candidate
-          run-id: 42837196496
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          path: transport/docker
-      - name: Reassemble exact signed files and finish the existing draft
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: python3 .github/release-6.7-transport.py
+          persist-credentials: false
+      - name: Verify originals, reassemble current chunks and fill only the specified draft
+        run: >-
+          python3 .github/release-7.0-cloud.py
+          --execute 3f5927d0d605ff7742fde8cbd1bb92ffe951b080
+          --plan .github/release-7.0-transport.json
+          --plan-sha256 "$TRANSPORT_PLAN_SHA256"
+          --assembly-plan .github/release-7.0-upload-plan.json
+          --binding .github/release-7.0-artifact-binding.json
       - uses: actions/upload-artifact@v4
         with:
-          name: release-6.7-transport-verification
+          name: release-7.0-transport-verification
           path: transport-result.json
+          if-no-files-found: error
