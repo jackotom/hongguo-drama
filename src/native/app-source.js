@@ -440,9 +440,8 @@ async function fetchAppPlayUrlFresh(vid, options) {
         let response;
         for (let attempt = 0; attempt < 2; attempt++) {
             throwIfAborted(signal);
-            // Repeating the legacy route on another host cannot recover its persistent
-            // empty 200. Spend the existing single recovery attempt on the current API.
-            const signed = playbackRequest(payload, identity, attempt ? vid : '');
+            // Prefer the current API; only an empty response enables one legacy attempt.
+            const signed = playbackRequest(payload, identity, attempt ? '' : vid);
             if (attempt) signed.headers.Connection = 'close';
             try {
                 response = await requestJson(signed.url, { method: signed.method, headers: signed.headers, data: signed.body }, deadline, signal);
@@ -452,7 +451,7 @@ async function fetchAppPlayUrlFresh(vid, options) {
                 throwIfAborted(signal);
                 if (error.code === 'ERR_CANCELED') throw error;
                 if (attempt || error.code !== 'EMPTY_RESPONSE' || deadline - Date.now() < 1000) throw error;
-                // Keep the video_tab attempt even when a fresh registration fails.
+                // Keep the legacy attempt even when a fresh registration fails.
                 if (deadline - Date.now() >= 8000) {
                     try { identity = await registerPlaybackDevice(requestJson, { signal }); }
                     catch (registrationError) {

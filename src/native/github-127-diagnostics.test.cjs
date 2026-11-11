@@ -213,7 +213,10 @@ test('canceling one lookup leaves another lookup and shared search/account regis
             return playResponse();
         }
         independentSignal = config.signal;
-        const requested = JSON.parse(config.headers['Content-Encoding'] === 'gzip' ? zlib.gunzipSync(config.data) : config.data).mixed_video_id_map['1004'][0];
+        const url = new URL(config.url);
+        const requested = url.pathname === '/reading/bookapi/video_tab/multi_video_model/v1/'
+            ? url.searchParams.get('video_id')
+            : JSON.parse(config.headers['Content-Encoding'] === 'gzip' ? zlib.gunzipSync(config.data) : config.data).mixed_video_id_map['1004'][0];
         return response({ data: { [requested]: { video_model: playModel } } });
     });
     const shared = await api.getPlaybackDevice(api.requestJson);

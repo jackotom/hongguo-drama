@@ -80,12 +80,12 @@ test('cancelling the source cooldown does not send a request or extend the next 
     assert.equal(f.calls[1].at - f.calls[0].at, 1000);
 });
 
-test('empty legacy responses wait one second before the single existing alternate attempt', async () => {
+test('empty current responses wait one second before the single existing legacy attempt', async () => {
     const f = fixture((config, count) => count === 1 ? { status: 200, headers: {}, data: '' } : success(config));
     const result = f.fetch(); await turn();
     await f.advance(999); assert.equal(f.calls.length, 1, '300ms recovery still bursts the API');
     await f.advance(1); await result;
-    assert.equal(f.calls.length, 2); assert.equal(f.calls[1].method, 'GET');
+    assert.equal(f.calls.length, 2); assert.equal(f.calls[1].method, 'POST');
 });
 
 test('explicit rejection remains terminal and releases the queue for an independent later action', async () => {

@@ -31,7 +31,7 @@ function appFixture(rows) {
   const calls = [];
   const app = load('app-source.js', { axios: async config => {
     calls.push(config);
-    return { status: 200, headers: {}, data: JSON.stringify(config.method === 'POST'
+    return { status: 200, headers: {}, data: JSON.stringify(new URL(config.url).pathname.endsWith('/multi_video_model/v1/')
       ? { data: { '11': { video_model: { fallback_api: 'https://vod.snssdk.com/info' } } } }
       : { video_info: { data: { video_list: rows } } }) };
   } });
@@ -144,7 +144,7 @@ const checks = [
     ];
     for (const [response, second, expected] of cases) {
       const app = load('app-source.js', { axios: async config => {
-        const result = { status: 200, headers: {}, ...(config.method === 'POST' ? response : { data: second }) };
+        const result = { status: 200, headers: {}, ...(new URL(config.url).pathname.endsWith('/multi_video_model/v1/') ? response : { data: second }) };
         if (typeof result.data !== 'string') result.data = JSON.stringify(result.data);
         return result;
       } });

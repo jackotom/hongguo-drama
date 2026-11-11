@@ -17,7 +17,7 @@ function appFixture(videoList, model = {}) {
   const calls = [];
   const app = load('app-source.js', { axios: async config => {
     calls.push(config);
-    return { status: 200, headers: {}, data: JSON.stringify(config.method === 'POST'
+    return { status: 200, headers: {}, data: JSON.stringify(new URL(config.url).pathname.endsWith('/multi_video_model/v1/')
       ? { data: { '11': { video_model: { fallback_api: 'https://vod.snssdk.com/info' } } } }
       : { video_info: { data: { ...model, video_list: videoList } } }) };
   } });

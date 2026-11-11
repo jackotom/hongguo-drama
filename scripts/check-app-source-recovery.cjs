@@ -146,8 +146,8 @@ function row(definition, width, height, suffix) {
     return inlineResponse([plain]);
   }, { getPlaybackDevice: async () => identities[0] });
   assert.equal((await alternate.fetchAppPlayUrl(vid)).url, plain.main_url);
-  assert.deepEqual(routes, [['POST', '/novel/player/multi_video_model/v1/'],
-    ['GET', '/reading/bookapi/video_tab/multi_video_model/v1/']]);
+  assert.deepEqual(routes, [['GET', '/reading/bookapi/video_tab/multi_video_model/v1/'],
+    ['POST', '/novel/player/multi_video_model/v1/']]);
   let inlineCalls = 0;
   const direct = load(async config => {
     inlineCalls++;

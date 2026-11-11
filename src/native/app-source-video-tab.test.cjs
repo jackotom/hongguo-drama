@@ -1,4 +1,4 @@
-// Offline regression for #130: a legacy empty 200 must recover through video_tab.
+// Current video_tab first; legacy is a single bounded recovery for an empty response.
 const assert = require('node:assert/strict');
 const { test } = require('node:test');
 const fs = require('node:fs');
@@ -38,8 +38,41 @@ function fixture(tabResponse, { legacyResponse, signal } = {}) {
         fetch: options => module.exports.fetchAppPlayUrl(vid, { quality: '1080p', signal, ...options }) };
 }
 
+test('current video_tab first succeeds with one registration and one model request', async () => {
+    const f = fixture(response(nested(model())));
+    assert.equal((await f.fetch()).url, media);
+    assert.equal(f.calls.length, 1, 'successful current API must not probe legacy');
+    assert.equal(f.registrations(), 1);
+    assert.equal(f.calls[0].method, 'GET');
+    assert.equal(f.calls[0].data, null);
+});
+
+test('the single legacy fallback signs its final host query gzip body and fresh timestamp', async () => {
+    const f = fixture({ status: 200, headers: {}, data: '' }, {
+        legacyResponse: response({ code: 0, data: { [vid]: { video_model: model() } } }),
+    });
+    assert.equal((await f.fetch()).url, media);
+    assert.equal(f.calls.length, 2); assert.equal(f.registrations(), 2);
+    const first = f.calls[0], request = f.calls[1], url = new URL(request.url);
+    assert.equal(first.method, 'GET'); assert.equal(request.method, 'POST');
+    assert.equal(url.hostname, 'api5-normal-sinfonlineb.fqnovel.com');
+    assert.equal(url.pathname, '/novel/player/multi_video_model/v1/');
+    assert.equal(request.headers.Connection, 'close');
+    assert.equal(request.headers['Content-Encoding'], 'gzip');
+    const body = JSON.parse(require('node:zlib').gunzipSync(request.data));
+    assert.deepEqual(body.mixed_video_id_map['1004'], [vid]);
+    const timestamp = Number(request.headers['x-khronos']);
+    assert.equal(url.searchParams.get('ts'), String(timestamp));
+    assert.equal(url.searchParams.get('_rticket'), request.headers['x-ss-req-ticket']);
+    assert.ok(timestamp > Number(first.headers['x-khronos']), 'recovery must sign after its one-second wait');
+    assert.equal(f.context.branchOf(request.url, request.data, timestamp), 0);
+    const bytes = Buffer.from(request.headers['x-gorgon'], 'hex'), random = bytes[2] | bytes[3] << 8;
+    assert.equal(request.headers['x-gorgon'], f.context.xGorgon(url.search.slice(1), request.data, timestamp, random));
+    assert.notEqual(request.headers['x-gorgon'], f.context.xGorgon(url.search.slice(1), null, timestamp, random));
+});
+
 for (const stringify of [false, true]) {
-    test(`empty legacy response recovers the exact nested video_tab model (${stringify ? 'string' : 'object'})`, async () => {
+    test(`current API returns the exact nested video_tab model (${stringify ? 'string' : 'object'})`, async () => {
         const value = model();
         const payload = nested(stringify ? JSON.stringify(value) : value);
         payload.data.video_model_data['999'] = { video_model: { ...value, video_list: [] } };
@@ -50,10 +83,10 @@ for (const stringify of [false, true]) {
         assert.equal(result.width, 1080);
         assert.equal(result.height, 1920);
         assert.equal(result.contentKey, null);
-        assert.equal(f.calls.length, 2, 'one legacy request and one video_tab recovery; no metadata fallback');
-        assert.equal(f.registrations(), 2, 'retain the existing fresh-identity recovery budget');
+        assert.equal(f.calls.length, 1, 'current success must not send legacy or metadata requests');
+        assert.equal(f.registrations(), 1, 'current success needs only its initial registration');
 
-        const request = f.calls[1], url = new URL(request.url), query = url.searchParams;
+        const request = f.calls[0], url = new URL(request.url), query = url.searchParams;
         for (const [key, value] of Object.entries({ video_id: vid, video_id_type: '0', device_level: '1',
             need_all_video_definition: '1', need_mp4_align: '0', use_os_player: '0',
             video_platform: '1024', source: '0', from_video_id: '', device_id: identity.device_id, iid: identity.iid,
@@ -96,26 +129,26 @@ for (const [name, result, code] of [
     test(`video_tab ${name} stops within the existing request budget`, async () => {
         const f = fixture(result);
         await assert.rejects(f.fetch(), error => code ? error.code === code : error.status === 403);
-        assert.equal(f.calls.length, 2);
-        assert.equal(f.registrations(), 2);
+        assert.equal(f.calls.length, code === 'EMPTY_RESPONSE' ? 2 : 1);
+        assert.equal(f.registrations(), code === 'EMPTY_RESPONSE' ? 2 : 1);
     });
 }
 
-test('successful legacy requests retain their original one-request path', async () => {
-    const f = fixture(() => assert.fail('video_tab must not be requested'), {
+test('an empty current response retains the successful legacy recovery', async () => {
+    const f = fixture({ status: 200, headers: {}, data: '' }, {
         legacyResponse: response({ code: 0, data: { [vid]: { video_model: model() } } }),
     });
     assert.equal((await f.fetch()).url, media);
-    assert.equal(f.calls.length, 1);
-    assert.equal(f.registrations(), 1);
+    assert.equal(f.calls.length, 2);
+    assert.equal(f.registrations(), 2);
 });
 
 for (const legacyResponse of [response({ code: 1 }), { status: 429, headers: {}, data: '' }]) {
     test(`explicit legacy rejection remains terminal (${legacyResponse.status})`, async () => {
-        const f = fixture(() => assert.fail('explicit rejection must not start video_tab'), { legacyResponse });
+        const f = fixture({ status: 200, headers: {}, data: '' }, { legacyResponse });
         await assert.rejects(f.fetch());
-        assert.equal(f.calls.length, 1);
-        assert.equal(f.registrations(), 1);
+        assert.equal(f.calls.length, 2);
+        assert.equal(f.registrations(), 2);
     });
 }
 
@@ -126,8 +159,8 @@ test('cancellation during video_tab prevents any further route or registration',
         return response(nested(model()));
     }, { signal: controller.signal });
     await assert.rejects(f.fetch(), { code: 'ERR_CANCELED' });
-    assert.equal(f.calls.length, 2);
-    assert.equal(f.registrations(), 2);
+    assert.equal(f.calls.length, 1);
+    assert.equal(f.registrations(), 1);
 });
 
 for (const [changes, code] of [[{ main_url: 'https://127.0.0.1/private' }, 'SECURITY_BLOCKED'],
@@ -137,6 +170,6 @@ for (const [changes, code] of [[{ main_url: 'https://127.0.0.1/private' }, 'SECU
         Object.assign(value.video_list.hd, changes);
         const f = fixture(response(nested(value)));
         await assert.rejects(f.fetch(), error => error.code === code);
-        assert.equal(f.calls.length, 2);
+        assert.equal(f.calls.length, 1);
     });
 }
