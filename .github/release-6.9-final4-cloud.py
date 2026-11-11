@@ -101,11 +101,18 @@ def api(endpoint, method='GET', destination=None):
     if destination is not None:
         require(method == 'GET', 'Binary API operation must be read only')
         media = 'application/vnd.github+json' if endpoint.startswith(f'repos/{REPO}/actions/artifacts/') else 'application/octet-stream'
-        command += ['-H', 'Accept: ' + media]
+        token = os.environ.get('GH_TOKEN') or os.environ.get('GITHUB_TOKEN') or ''
+        require(token and '\n' not in token and '\r' not in token, 'Valid in-memory download credential required')
+        values = {'url': 'https://api.github.com/' + endpoint,
+            'header': 'Authorization: Bearer ' + token, 'connect-timeout': '15', 'max-time': '120'}
+        config = ('silent\nshow-error\nfail-with-body\nlocation\nhttp1.1\nproto = "=https"\nproto-redir = "=https"\n'
+            + 'header = ' + json.dumps('Accept: ' + media) + '\n'
+            + '\n'.join(key + ' = ' + json.dumps(value) for key, value in values.items())
+            + '\nwrite-out = "%{stderr}HTTP %{http_code}\\n"\n').encode()
         for attempt in range(3):
             with destination.open('xb') as stream:
-                process = subprocess.run(command, stdout=stream, stderr=subprocess.PIPE,
-                    env={**os.environ, 'GODEBUG': 'http2client=0'})
+                process = subprocess.run(['curl', '-q', '--config', '-'], input=config,
+                    stdout=stream, stderr=subprocess.PIPE)
             if process.returncode == 0:
                 return None
             destination.unlink()  # Only this attempt's newly created partial transport file.
