@@ -54,6 +54,7 @@ for (const stringify of [false, true]) {
         assert.equal(f.registrations(), 2, 'retain the existing fresh-identity recovery budget');
 
         const request = f.calls[1], url = new URL(request.url), query = url.searchParams;
+        assert.notEqual(request.headers['x-argus'], f.calls[0].headers['x-argus'], 'recovery must sign the new GET query and absent body');
         for (const [key, value] of Object.entries({ video_id: vid, video_id_type: '0', device_level: '1',
             need_all_video_definition: '1', need_mp4_align: '0', use_os_player: '0',
             video_platform: '1024', source: '0', from_video_id: '', device_id: identity.device_id, iid: identity.iid,
@@ -67,13 +68,9 @@ for (const stringify of [false, true]) {
         assert.equal(query.get('_rticket'), request.headers['x-ss-req-ticket']);
         const timestamp = Number(request.headers['x-khronos']);
         assert.equal(query.get('ts'), String(timestamp));
-        assert.equal(f.context.branchOf(request.url, null, timestamp), 0);
-        const bytes = Buffer.from(request.headers['x-gorgon'], 'hex');
-        const random = bytes[2] | (bytes[3] << 8);
-        assert.equal(request.headers['x-gorgon'], f.context.xGorgon(url.search.slice(1), null, timestamp, random));
-        assert.notEqual(request.headers['x-gorgon'], f.context.xGorgon(url.search.slice(1), Buffer.alloc(0), timestamp, random),
-            'an absent GET body signs zero bytes, not MD5(empty)');
-        assert.ok(request.headers['x-medusa']);
+        assert.ok(Buffer.from(request.headers['x-argus'], 'base64').length > 100);
+        assert.equal(Buffer.from(request.headers['x-ladon'], 'base64').length, 36);
+        for (const name of ['x-gorgon', 'x-medusa', 'x-helios']) assert.equal(request.headers[name], undefined);
         assert.ok(request.timeout > 0 && request.timeout <= 12000);
         assert.ok(request.signal);
     });

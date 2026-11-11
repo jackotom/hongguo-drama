@@ -38,3 +38,11 @@ app-source.js reuses its existing signing routines for a bodyless GET after
 an empty legacy POST, preserves exact episode matching and accepts both array
 and object rendition lists. No account cookies, tokens or persistent identity
 are added. Validation and scope are recorded in docs/issue-130-video-tab.md.
+
+Playback ArgusBean551 / Ladon signatures in player-signature.js are ported from
+tsukiyo-zero/hongguoTV core/Argus.kt, commit
+269c6d8877d19be7f52d3c43eb12444477df95b8 (GPL-3.0-only), derived from ch6vip/fqapp:
+https://github.com/tsukiyo-zero/hongguoTV/pull/104
+https://github.com/ch6vip/fqapp
+Changes: Node.js crypto / existing SM3 implementation; playback-only request
+binding to the final encoded query, actual compressed body and shared timestamp.

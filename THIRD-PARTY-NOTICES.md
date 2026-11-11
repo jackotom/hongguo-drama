@@ -214,3 +214,10 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+
+## 播放请求 ArgusBean551 / Ladon 签名（GPL-3.0-only）
+
+`src/native/player-signature.js` 移植自 [tsukiyo-zero/hongguoTV](https://github.com/tsukiyo-zero/hongguoTV)
+提交 `269c6d8877d19be7f52d3c43eb12444477df95b8` 的 `core/Argus.kt`（PR #104），原始算法来源为
+[ch6vip/fqapp](https://github.com/ch6vip/fqapp)。沿用 GPL-3.0-only，许可全文见本项目 `LICENSE`。
+本项目改为 Node.js 实现，使用现有 SM3 和内置 crypto；仅接入播放请求，保留搜索、注册请求原有签名。

@@ -47,13 +47,11 @@ function fixture({ wrongVid = false, fallback = 'https://vod.snssdk.com/info', m
       assert.equal(query.get('_rticket'), config.headers['x-ss-req-ticket']);
       assert.ok(Buffer.isBuffer(config.data));
       assert.deepEqual(JSON.parse(config.headers['Content-Encoding'] === 'gzip' ? zlib.gunzipSync(config.data) : config.data).mixed_video_id_map['1004'], ['11']);
-      assert.equal(context.branchOf(config.url, config.data, timestamp), 0);
-      const raw = Buffer.from(config.headers['x-gorgon'], 'hex');
-      assert.equal(raw.length, 26);
-      const random = raw[2] | (raw[3] << 8);
-      assert.equal(config.headers['x-gorgon'], context.xGorgon(new URL(config.url).search.slice(1), config.data, timestamp, random));
-      assert.notEqual(config.headers['x-gorgon'], context.xGorgon(new URL(config.url).search.slice(1), Buffer.from('altered body'), timestamp, random));
-      for (const name of ['x-medusa', 'x-helios', 'x-ladon', 'x-argus']) assert.ok(Buffer.from(config.headers[name], 'base64').length > 0);
+      assert.equal(config.headers['x-ss-stub'], crypto.createHash('md5').update(config.data).digest('hex'));
+      assert.notEqual(config.headers['x-ss-stub'], crypto.createHash('md5').update(zlib.gunzipSync(config.data)).digest('hex'));
+      assert.ok(Buffer.from(config.headers['x-argus'], 'base64').length > 100);
+      assert.equal(Buffer.from(config.headers['x-ladon'], 'base64').length, 36);
+      for (const name of ['x-gorgon', 'x-medusa', 'x-helios']) assert.equal(config.headers[name], undefined);
       assert.equal(config.headers.Cookie, undefined);
       assert.equal(config.headers.Authorization, undefined);
       const model = { video_model: JSON.stringify({ fallback_api: fallback }) };
@@ -72,6 +70,7 @@ function fixture({ wrongVid = false, fallback = 'https://vod.snssdk.com/info', m
         assert.equal(typeof requestJson, 'function');
         return playbackDevice;
       } };
+      if (name === './player-signature') return require(path.join(nativeDir, 'player-signature'));
       if (name === './sm3') return require(path.join(nativeDir, 'sm3'));
       if (name === './download-quality') return require(path.join(nativeDir, 'download-quality'));
       if (name === './request-signal') return require(path.join(nativeDir, 'request-signal'));
