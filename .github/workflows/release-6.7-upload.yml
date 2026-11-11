@@ -1,41 +1,33 @@
-name: Upload verified 6.7 artifacts
+name: Transport exact 6.9.4 assets to existing draft
 on:
   workflow_dispatch:
 permissions:
   actions: read
   contents: write
 concurrency:
-  group: release-6.7-transport
+  group: release-441185875-final4-transport
   cancel-in-progress: false
 jobs:
-  upload:
+  transport:
     runs-on: ubuntu-24.04
     timeout-minutes: 60
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      TRANSPORT_PLAN_SHA256: 'de0e6259436ef5577e8128c22b60ea3166f46d8c1e4f7bcdf18ac8c0576cd17c'
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/download-artifact@v4
         with:
-          name: windows-release-candidate
-          run-id: 42837198838
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          path: transport/windows
-      - uses: actions/download-artifact@v4
-        with:
-          name: linux-appimage-candidate
-          run-id: 42837196497
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          path: transport/linux
-      - uses: actions/download-artifact@v4
-        with:
-          name: docker-server-candidate
-          run-id: 42837196496
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          path: transport/docker
-      - name: Reassemble exact signed files and finish the existing draft
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: python3 .github/release-6.7-transport.py
+          persist-credentials: false
+      - name: Verify originals, reassemble current chunks and fill only the specified draft
+        run: >-
+          python3 .github/release-6.9-final4-cloud.py
+          --execute b364419c2b81da3a7e28fd637011aaff9b8acf2c
+          --plan .github/release-6.9-final4-transport.json
+          --plan-sha256 "$TRANSPORT_PLAN_SHA256"
+          --assembly-plan .github/release-6.9-final4-upload-plan.json
+          --binding .github/release-6.9-final4-artifact-binding.json
       - uses: actions/upload-artifact@v4
         with:
-          name: release-6.7-transport-verification
+          name: release-6.9-final4-transport-verification
           path: transport-result.json
+          if-no-files-found: error
