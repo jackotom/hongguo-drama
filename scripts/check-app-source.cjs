@@ -27,7 +27,21 @@ function encodedKey() {
   return raw.toString('base64');
 }
 function fixture({ wrongVid = false, fallback = 'https://vod.snssdk.com/info', media = 'https://v3-reading.qznovelvod.com/video.mp4', redirect = '', malformedKey = false, videoList = null, encrypted = true, emptyCurrent = false } = {}) {
-  const calls = [];
+  const calls = [], signatures = [];
+  const entropy = { randField: 420072733, ladonRandom: Buffer.from('01020304', 'hex') };
+  function assertPlayerSignature(config) {
+    const signed = signatures.at(-1), query = new URL(config.url).searchParams;
+    assert.ok(signed, 'model must use PlayerSigner');
+    assert.equal(signed.input.query, new URL(config.url).search.slice(1));
+    assert.equal(signed.input.body, config.data);
+    assert.equal(query.get('ts'), String(signed.input.ts));
+    assert.equal(config.headers['x-ss-req-ticket'], String(signed.input.ts * 1000));
+    assert.ok(Number(query.get('_rticket')) >= signed.input.ts * 1000 && Number(query.get('_rticket')) < signed.input.ts * 1000 + 1000);
+    for (const name of ['x-ss-req-ticket', 'x-khronos', 'x-argus', 'x-ladon', 'x-ss-stub']) assert.equal(config.headers[name], signed.headers[name], name);
+    for (const name of ['x-gorgon', 'x-medusa', 'x-helios']) assert.equal(config.headers[name], undefined);
+    assert.ok(Buffer.from(config.headers['x-argus'], 'base64').length > 4);
+    assert.ok(Buffer.from(config.headers['x-ladon'], 'base64').length > 4);
+  }
   const seed = Buffer.alloc(16, 7);
   const constants = Buffer.from('4dd4c2e6b83162090e52b3c7a6733ba41cb2462b829ab58a196b39db57177524f49baf7f08e8d68d26a72e37c1a95a2f1f05a51892aef2949732b62a38aadd58', 'hex');
   const material = crypto.createHash('sha512').update(Buffer.concat([crypto.createHash('sha512').update(seed).digest(), constants])).digest();
@@ -49,13 +63,7 @@ function fixture({ wrongVid = false, fallback = 'https://vod.snssdk.com/info', m
       const query = new URL(config.url).searchParams, timestamp = Number(config.headers['x-khronos']);
       assert.equal(query.get('video_id'), '11');
       assert.equal(query.get('ts'), String(timestamp));
-      assert.equal(query.get('_rticket'), config.headers['x-ss-req-ticket']);
-      assert.equal(context.branchOf(config.url, null, timestamp), 0);
-      const raw = Buffer.from(config.headers['x-gorgon'], 'hex'), random = raw[2] | raw[3] << 8;
-      assert.equal(raw.length, 26);
-      assert.equal(config.headers['x-gorgon'], context.xGorgon(new URL(config.url).search.slice(1), null, timestamp, random));
-      assert.notEqual(config.headers['x-gorgon'], context.xGorgon(new URL(config.url).search.slice(1), Buffer.alloc(0), timestamp, random));
-      for (const name of ['x-medusa', 'x-helios', 'x-ladon', 'x-argus']) assert.ok(Buffer.from(config.headers[name], 'base64').length > 0);
+      assertPlayerSignature(config);
       return emptyCurrent ? { status: 200, headers: {}, data: '' } : modelResponse;
     }
     if (config.method === 'POST') {
@@ -63,16 +71,9 @@ function fixture({ wrongVid = false, fallback = 'https://vod.snssdk.com/info', m
       const query = new URL(config.url).searchParams;
       const timestamp = Number(config.headers['x-khronos']);
       assert.equal(query.get('ts'), String(timestamp));
-      assert.equal(query.get('_rticket'), config.headers['x-ss-req-ticket']);
       assert.ok(Buffer.isBuffer(config.data));
       assert.deepEqual(JSON.parse(config.headers['Content-Encoding'] === 'gzip' ? zlib.gunzipSync(config.data) : config.data).mixed_video_id_map['1004'], ['11']);
-      assert.equal(context.branchOf(config.url, config.data, timestamp), 0);
-      const raw = Buffer.from(config.headers['x-gorgon'], 'hex');
-      assert.equal(raw.length, 26);
-      const random = raw[2] | (raw[3] << 8);
-      assert.equal(config.headers['x-gorgon'], context.xGorgon(new URL(config.url).search.slice(1), config.data, timestamp, random));
-      assert.notEqual(config.headers['x-gorgon'], context.xGorgon(new URL(config.url).search.slice(1), Buffer.from('altered body'), timestamp, random));
-      for (const name of ['x-medusa', 'x-helios', 'x-ladon', 'x-argus']) assert.ok(Buffer.from(config.headers[name], 'base64').length > 0);
+      assertPlayerSignature(config);
       assert.equal(config.headers.Cookie, undefined);
       assert.equal(config.headers.Authorization, undefined);
       return modelResponse;
@@ -91,6 +92,10 @@ function fixture({ wrongVid = false, fallback = 'https://vod.snssdk.com/info', m
         return playbackDevice;
       } };
       if (name === './sm3') return require(path.join(nativeDir, 'sm3'));
+      if (name === './playback-signature') return { signPlayer: input => {
+        const headers = require(path.join(nativeDir, 'playback-signature')).signPlayer({ ...input, ...entropy });
+        signatures.push({ input, headers }); return headers;
+      } };
       if (name === './download-quality') return require(path.join(nativeDir, 'download-quality'));
       if (name === './request-signal') return require(path.join(nativeDir, 'request-signal'));
       if (name === 'node:zlib') return zlib;

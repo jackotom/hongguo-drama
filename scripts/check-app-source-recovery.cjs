@@ -19,6 +19,7 @@ function load(axios, { realDevice = false, getPlaybackDevice, registerPlaybackDe
       if (name === './sm3') return require('../src/native/sm3');
       if (name === './download-quality') return require('../src/native/download-quality');
       if (name === './request-signal') return require('../src/native/request-signal');
+      if (name === './playback-signature') return require('../src/native/playback-signature');
       if (name === './playback-device') return getPlaybackDevice || registerPlaybackDevice ? {
         getPlaybackDevice: getPlaybackDevice || (async () => ({ device_id: '1000000000000001', iid: '1000000000000002', cdid: 'fixture' })),
         registerPlaybackDevice: registerPlaybackDevice || (async () => ({ device_id: '1000000000000001', iid: '1000000000000002', cdid: 'fixture' })),
@@ -152,8 +153,9 @@ function row(definition, width, height, suffix) {
   const direct = load(async config => {
     inlineCalls++;
     assert.equal(new URL(config.url).searchParams.get('device_id'), '1000000000000001');
-    assert.ok(config.headers['x-medusa']);
-    assert.ok(config.headers['x-gorgon']);
+    assert.ok(Buffer.from(config.headers['x-argus'], 'base64').length > 4);
+    assert.ok(Buffer.from(config.headers['x-ladon'], 'base64').length > 4);
+    for (const name of ['x-medusa', 'x-gorgon', 'x-helios']) assert.equal(config.headers[name], undefined);
     assert.equal(config.headers.Cookie, undefined);
     return inlineResponse([plain]);
   });

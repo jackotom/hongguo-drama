@@ -4,6 +4,21 @@ const fs = require('node:fs'), os = require('node:os'), path = require('node:pat
 const { spawn, execFileSync } = require('node:child_process');
 const { connect, sleep } = require('./fixtures/cdp.cjs');
 const pkg = require('../package.json');
+const { safeError } = require('../server/storage.cjs');
+
+function safeDownloadFailure(value) {
+  if (!value || typeof value !== 'object') return null;
+  const clean = text => safeError({ message: String(text ?? '')
+    .replace(/\b[a-z][a-z0-9+.-]*:(?:\/\/|\\\/\\\/)[^\s"'<>）]+/gi, '[来源地址]')
+    .replace(/(?:[a-z]:[\\/]|\\\\|\/)[^\s"'<>）]+/gi, '[路径]')
+    .replace(/\b(?:authorization|cookie|set-cookie)\b["']?\s*[:=][^\r\n]*/gi, '[凭据]')
+    .replace(/\b(?:token|access[_-]?token|refresh[_-]?token|api[_-]?key|password|passwd|secret|account(?:[_-]?id)?|user(?:[_-]?(?:id|name))?|uid|email|phone|device[_-]?id|install[_-]?id|iid|did|session[_-]?id|decryption[_-]?key)\b["']?\s*[:=]\s*(?:"[^"]*(?:"|$)|'[^']*(?:'|$)|[^\s;,}\]]+)/gi, '[凭据]')
+    .replace(/\b(?:Basic\s+\S+|eyJ[a-z0-9_-]+\.[a-z0-9_-]+\.[a-z0-9_-]+|gh[pousr]_[a-z0-9]+|github_pat_[a-z0-9_]+|sk-[a-z0-9_-]+|\d{8,}|[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12})\b/gi, '[凭据]') });
+  return { seriesId: /^\d{1,30}$/.test(String(value.seriesId)) ? String(value.seriesId) : null,
+    title: clean(value.title), episode: Number.isInteger(value.episode) && value.episode > 0 ? value.episode : null,
+    status: ['failed', 'stopped'].includes(value.status) ? value.status : 'unknown', error: clean(value.error) };
+}
+
 (async () => {
   assert.equal(process.platform, 'linux'); assert.equal(process.arch, 'x64');
   const dist = path.resolve(__dirname, '../dist');
@@ -64,6 +79,7 @@ const pkg = require('../package.json');
     assert.equal((await cdp.evaluate(`(async()=>{const settings=await window.electronAPI.getSettings();
       return window.electronAPI.saveSettings({...settings,root:${JSON.stringify(path.join(temp,'media'))}});})()`)).success,true);
     result.realPlayback = await cdp.evaluate(`(async()=>{
+      window.__hongguoRealDownloadFailure=null;
       const api=window.electronAPI;
       const catalog=await api.browseList({source:'hongguo',category:'hot-real-drama'});
       if(!catalog.success||!catalog.results?.length)throw Error('Real Hongguo catalog unavailable');
@@ -84,7 +100,11 @@ const pkg = require('../package.json');
           const tasks=await api.getDownloadTasks();
           const task=tasks.find(item=>String(item.hongguoInfo?.vid)===String(episode.vid));
           if(task?.status==='completed'&&task.receivedBytes>0){downloaded=task;break;}
-          if(task&&['failed','stopped'].includes(task.status))throw Error('Real download failed or stopped');
+          if(task&&['failed','stopped'].includes(task.status)){
+            window.__hongguoRealDownloadFailure={seriesId:String(drama.series_id),title:drama.series_title,
+              episode:episode.vid_index,status:task.status,error:String(task.error||'')};
+            throw Error('Real download failed or stopped');
+          }
           await new Promise(resolve=>setTimeout(resolve,200));
         }
         if(!downloaded)throw Error('Real complete download timed out');
@@ -125,7 +145,14 @@ const pkg = require('../package.json');
     result.checks.push('Fresh random Hongguo episodes 1 and 2: real source preparation and ten seconds muted playback each');
     result.passed = true;
     console.log('PASS actual Linux AppImage: media tools, launch, software assets and two real muted episodes');
-  } catch (error) { result.error = error.message; throw error; }
+  } catch (error) {
+    result.error = error.message;
+    if (cdp) try {
+      const failure = safeDownloadFailure(await cdp.evaluate('window.__hongguoRealDownloadFailure || null', 5000));
+      if (failure) result.realDownloadFailure = failure;
+    } catch {}
+    throw error;
+  }
   finally {
     cdp?.close(); child?.kill('SIGTERM'); await sleep(250);
     fs.writeFileSync(path.join(output, 'appimage-result.json'), JSON.stringify(result, null, 2) + '\n');

@@ -133,7 +133,7 @@ jobs:
       - name: Run playback source regression checks
         if: ${{ !inputs.build_only }}
         run: |
-          node --test src/native/app-source-video-tab.test.cjs src/native/app-source-inline-fallback.test.cjs src/native/github-127-diagnostics.test.cjs src/native/github-127-handoff.test.cjs src/native/github-127-transport.test.cjs src/native/hongguo-cancellation.test.cjs src/native/playback-device.test.cjs
+          node --test src/native/app-source-video-tab.test.cjs src/native/app-source-inline-fallback.test.cjs src/native/github-127-diagnostics.test.cjs src/native/github-127-handoff.test.cjs src/native/github-127-transport.test.cjs src/native/hongguo-cancellation.test.cjs src/native/playback-device.test.cjs src/native/playback-signature.test.cjs
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
           node scripts/check-app-source.cjs
           if ($LASTEXITCODE) { exit $LASTEXITCODE }

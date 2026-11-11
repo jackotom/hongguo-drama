@@ -4,6 +4,8 @@ const { test } = require('node:test');
 const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
+const { signPlayer } = require('./playback-signature');
+const signerEntropy = { randField: 420072733, ladonRandom: Buffer.from('01020304', 'hex') };
 
 const vid = '7700946421087751193';
 const identity = { device_id: '9007199254740993', iid: '9007199254741993', cdid: 'synthetic' };
@@ -16,13 +18,17 @@ const response = data => ({ status: 200, headers: {}, data: JSON.stringify(data)
 const nested = value => ({ code: 0, data: { video_model_data: { [vid]: { video_model: value } } } });
 
 function fixture(tabResponse, { legacyResponse, signal } = {}) {
-    const calls = [];
+    const calls = [], signatures = [];
     let registrations = 0;
     const module = { exports: {} };
     const context = { module, Buffer, URL, AbortSignal, setTimeout, clearTimeout, require(name) {
         if (name === './playback-device') return { registerPlaybackDevice: async () => {
             registrations++;
             return identity;
+        } };
+        if (name === './playback-signature') return { signPlayer: input => {
+            signatures.push(input);
+            return signPlayer({ ...input, ...signerEntropy });
         } };
         if (name === 'axios') return async config => {
             calls.push(config);
@@ -34,9 +40,71 @@ function fixture(tabResponse, { legacyResponse, signal } = {}) {
         return require(name.startsWith('.') ? path.join(__dirname, name) : name);
     } };
     vm.runInNewContext(fs.readFileSync(require.resolve('./app-source'), 'utf8'), context);
-    return { context, calls, registrations: () => registrations,
+    return { context, calls, signatures, registrations: () => registrations,
         fetch: options => module.exports.fetchAppPlayUrl(vid, { quality: '1080p', signal, ...options }) };
 }
+
+function assertPlayerBinding(f, request, index) {
+    const input = f.signatures[index], url = new URL(request.url);
+    assert.ok(input, 'model must use the real PlayerSigner family');
+    assert.equal(input.query, url.search.slice(1));
+    assert.equal(input.body, request.data, 'sign the actual sent Buffer, not the JSON before gzip');
+    assert.equal(input.ts, Number(request.headers['x-khronos']));
+    const expected = signPlayer({ ...input, ...signerEntropy });
+    for (const name of ['x-ss-req-ticket', 'x-khronos', 'x-argus', 'x-ladon', 'x-ss-stub']) assert.equal(request.headers[name], expected[name], name);
+    assert.equal(request.headers['x-ss-req-ticket'], String(input.ts * 1000));
+    const ticket = Number(url.searchParams.get('_rticket'));
+    assert.ok(ticket >= input.ts * 1000 && ticket < input.ts * 1000 + 1000);
+    for (const name of ['x-gorgon', 'x-medusa', 'x-helios']) assert.equal(request.headers[name], undefined, name);
+    assert.ok(Buffer.from(request.headers['x-argus'], 'base64').length > 4);
+    assert.ok(Buffer.from(request.headers['x-ladon'], 'base64').length > 4);
+}
+
+test('model first GET uses one real551/Ladon signature over its final query and time', async () => {
+    const f = fixture(response(nested(model())));
+    assert.equal((await f.fetch()).url, media);
+    assert.equal(f.calls.length, 1); assert.equal(f.registrations(), 1); assert.equal(f.signatures.length, 1);
+    assertPlayerBinding(f, f.calls[0], 0);
+    assert.equal(f.calls[0].data, null); assert.equal(f.calls[0].headers['x-ss-stub'], undefined);
+});
+
+test('only empty current recovers once with a new551 signature over the actual legacy gzip bytes', async () => {
+    const f = fixture({ status: 200, headers: {}, data: '' }, {
+        legacyResponse: response({ code: 0, data: { [vid]: { video_model: model() } } }),
+    });
+    assert.equal((await f.fetch()).url, media);
+    assert.equal(f.calls.length, 2); assert.equal(f.registrations(), 2); assert.equal(f.signatures.length, 2);
+    assertPlayerBinding(f, f.calls[0], 0); assertPlayerBinding(f, f.calls[1], 1);
+    const request = f.calls[1], plain = require('node:zlib').gunzipSync(request.data);
+    const payload = JSON.parse(plain);
+    assert.equal(payload.biz_param.device_level, 3);
+    assert.equal(new URL(request.url).searchParams.get('version_code'), '74332');
+    assert.match(request.headers['User-Agent'], /^com\.phoenix\.read\/74332 /);
+    assert.notEqual(request.headers['x-ss-stub'], signPlayer({ ...f.signatures[1], ...signerEntropy, body: plain })['x-ss-stub']);
+    assert.notEqual(request.headers['x-argus'], signPlayer({ ...f.signatures[1], ...signerEntropy, query: f.signatures[1].query + '&different=1' })['x-argus']);
+});
+
+for (const target of ['https://api5-normal-sinfonlineb.fqnovel.com/reading/bookapi/video_tab/multi_video_model/v1/?changed=1',
+    'https://api5-normal-sinfonlinea.fqnovel.com/reading/bookapi/video_tab/multi_video_model/v1/']) {
+    test('signed current GET refuses a redirect before forwarding real signatures: ' + new URL(target).hostname, async () => {
+        const f = fixture({ status: 302, headers: { location: target }, data: '' });
+        await assert.rejects(f.fetch(), { code: 'SECURITY_BLOCKED' });
+        assert.equal(f.calls.length, 1, 'no redirect request and no legacy recovery');
+        assert.equal(f.registrations(), 1); assert.equal(f.signatures.length, 1);
+    });
+}
+
+test('unsigned official JSON requests retain bounded validated redirects', async () => {
+    let returned = false;
+    const f = fixture(() => {
+        if (!returned) { returned = true; return { status: 302, headers: { location: 'https://api5-normal-sinfonlinea.fqnovel.com/reading/bookapi/video_tab/multi_video_model/v1/' }, data: '' }; }
+        return response({ allowed: true });
+    });
+    const value = await f.context.module.exports.requestJson('https://api5-normal-sinfonlineb.fqnovel.com/reading/bookapi/video_tab/multi_video_model/v1/',
+        { method: 'GET', headers: { 'User-Agent': 'unsigned-fixture' } }, Date.now() + 1000);
+    assert.equal(value.allowed, true); assert.equal(f.calls.length, 2); assert.equal(f.registrations(), 0);
+    for (const request of f.calls) for (const name of ['x-argus', 'x-ladon', 'Cookie']) assert.equal(request.headers[name], undefined);
+});
 
 test('current video_tab first succeeds with one registration and one model request', async () => {
     const f = fixture(response(nested(model())));
@@ -63,12 +131,8 @@ test('the single legacy fallback signs its final host query gzip body and fresh 
     assert.deepEqual(body.mixed_video_id_map['1004'], [vid]);
     const timestamp = Number(request.headers['x-khronos']);
     assert.equal(url.searchParams.get('ts'), String(timestamp));
-    assert.equal(url.searchParams.get('_rticket'), request.headers['x-ss-req-ticket']);
+    assertPlayerBinding(f, request, 1);
     assert.ok(timestamp > Number(first.headers['x-khronos']), 'recovery must sign after its one-second wait');
-    assert.equal(f.context.branchOf(request.url, request.data, timestamp), 0);
-    const bytes = Buffer.from(request.headers['x-gorgon'], 'hex'), random = bytes[2] | bytes[3] << 8;
-    assert.equal(request.headers['x-gorgon'], f.context.xGorgon(url.search.slice(1), request.data, timestamp, random));
-    assert.notEqual(request.headers['x-gorgon'], f.context.xGorgon(url.search.slice(1), null, timestamp, random));
 });
 
 for (const stringify of [false, true]) {
@@ -97,16 +161,9 @@ for (const stringify of [false, true]) {
             assert.equal(request.headers[name], undefined, name);
         }
         assert.match(request.headers['User-Agent'], /^com\.phoenix\.read\/73932 /);
-        assert.equal(query.get('_rticket'), request.headers['x-ss-req-ticket']);
+        assertPlayerBinding(f, request, 0);
         const timestamp = Number(request.headers['x-khronos']);
         assert.equal(query.get('ts'), String(timestamp));
-        assert.equal(f.context.branchOf(request.url, null, timestamp), 0);
-        const bytes = Buffer.from(request.headers['x-gorgon'], 'hex');
-        const random = bytes[2] | (bytes[3] << 8);
-        assert.equal(request.headers['x-gorgon'], f.context.xGorgon(url.search.slice(1), null, timestamp, random));
-        assert.notEqual(request.headers['x-gorgon'], f.context.xGorgon(url.search.slice(1), Buffer.alloc(0), timestamp, random),
-            'an absent GET body signs zero bytes, not MD5(empty)');
-        assert.ok(request.headers['x-medusa']);
         assert.ok(request.timeout > 0 && request.timeout <= 12000);
         assert.ok(request.signal);
     });

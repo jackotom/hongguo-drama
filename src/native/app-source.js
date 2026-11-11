@@ -10,6 +10,7 @@ const crypto = require('node:crypto');
 const { gzipSync } = require('node:zlib');
 const { setTimeout: delay } = require('node:timers/promises');
 const { registerPlaybackDevice } = require('./playback-device');
+const { signPlayer } = require('./playback-signature');
 const { abortError, throwIfAborted, boundedSignal, networkFailure } = require('./request-signal');
 const sm3 = require('./sm3');
 const { normalizeDownloadQuality, meetsDownloadQuality } = require('./download-quality');
@@ -146,35 +147,26 @@ function helios(khronos) {
 
 function branchOf(url, body, khronos) { const bodyMd5 = body ? crypto.createHash('md5').update(body).digest() : Buffer.alloc(16); const q = sm3(url.split('?')[1]); const iv = getIv(getIv(getIv(0x20230928, q), bodyMd5), le32(khronos)); const low = iv & 15; return low - (((low * 171) >> 9) * 3); }
 function playbackRequest(payload, identity, videoId = '') {
-    // video_tab parameters follow tsukiyo-zero/hongguoTV's ContentRepository.tabVideoModel
-    // (GPL-3.0-only). A bodyless GET must sign sixteen zero bytes, not MD5(empty).
+    // Sign the final query and actual gzip body; other API families retain their original signer.
     const body = videoId ? null : gzipSync(Buffer.from(payload));
-    const khronos = Math.floor(Date.now() / 1000), ticketBase = Date.now();
+    const requestTicket = Date.now(), khronos = Math.floor(requestTicket / 1000);
     const device = { ...(videoId ? VIDEO_TAB_DEVICE : PLAYBACK_DEVICE), ...identity };
     const values = videoId ? { video_id: videoId, video_id_type: '0', device_level: '1',
         need_all_video_definition: '1', need_mp4_align: '0', use_os_player: '0',
         video_platform: '1024', source: '0', from_video_id: '' } : {};
-    let query, url, requestTicket;
-    for (let n = 0; n < 128; n += 1) {
-        requestTicket = ticketBase + n;
-        query = pythonUrlEncode({ ...device, ...values, ts: String(khronos), _rticket: String(requestTicket) });
-        url = `${videoId ? VIDEO_TAB_API : VIDEO_API}?${query}`;
-        if (branchOf(url, body, khronos) === 0) break;
-        if (n === 127) throw new Error('无法生成播放请求签名');
-    }
+    const query = pythonUrlEncode({ ...device, ...values, ts: String(khronos), _rticket: String(requestTicket) });
+    const url = `${videoId ? VIDEO_TAB_API : VIDEO_API}?${query}`;
+    const signature = signPlayer({ query, body, ts: khronos });
     const headers = {
         'User-Agent': VIDEO_UA.replace(DEVICE.version_code, device.version_code), Accept: 'application/json; charset=utf-8,application/x-protobuf',
-        'x-ss-req-ticket': String(requestTicket), 'sdk-version': '2', 'x-xs-from-web': '0',
+        'x-ss-req-ticket': signature['x-ss-req-ticket'], 'sdk-version': '2', 'x-xs-from-web': '0',
         'passport-sdk-version': videoId ? '50561' : '5051452', 'x-ss-dp': String(device.aid),
-        'x-khronos': String(khronos),
-        'x-gorgon': xGorgon(query, body, khronos, Math.floor(Math.random() * 65536)),
-        // Vendor timestamp placeholders, not cryptographic Ladon/Argus signatures.
-        'x-ladon': be32(khronos).toString('base64'), 'x-argus': le32(khronos).toString('base64'),
-        'x-helios': helios(khronos), 'x-medusa': buildMedusa(url, body, khronos, device), 'x-tt-dt': '',
+        'x-khronos': signature['x-khronos'],
+        'x-ladon': signature['x-ladon'], 'x-argus': signature['x-argus'], 'x-tt-dt': '',
         'x-tt-store-region': 'cn', 'x-tt-store-region-src': 'did',
     };
     if (body) Object.assign(headers, { 'Content-Type': 'application/json; charset=UTF-8',
-        'Content-Encoding': 'gzip', 'x-ss-stub': md5(body) });
+        'Content-Encoding': 'gzip', 'x-ss-stub': signature['x-ss-stub'] });
     else headers['x-tt-request-tag'] = 't=0;n=0';
     return { url, body, headers, method: videoId ? 'GET' : 'POST' };
 }
@@ -366,8 +358,9 @@ async function requestJson(url, options, deadline, signal) {
         }
         throwIfAborted(signal);
         if ([301, 302, 303, 307, 308].includes(response.status)) {
-            // Do not resend a signed body to a redirect destination.
-            if (requestOptions.method === 'POST' || !response.headers.location) throw Object.assign(new Error('App 接口发生不支持的跳转'), { code: 'SECURITY_BLOCKED' });
+            // Signatures/session headers bind the final URL and must not follow a redirect.
+            const bound = Object.keys(requestOptions.headers || {}).some(name => /^(?:x-argus|x-ladon|x-gorgon|x-medusa|cookie|authorization)$/i.test(name));
+            if (requestOptions.method === 'POST' || bound || !response.headers.location) throw Object.assign(new Error('App 接口发生不支持的跳转'), { code: 'SECURITY_BLOCKED' });
             url = checkedUrl(new URL(response.headers.location, url).href, ['fqnovel.com', 'snssdk.com']);
             continue;
         }
