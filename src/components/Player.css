@@ -746,6 +746,8 @@
 .player-online-quality-row { display: flex; flex-wrap: wrap; gap: 12px; justify-content: flex-end; margin-bottom: 8px; }
 .player-online-quality-row[hidden] { display: none; }
 .player-online-quality-row .player-download-quality { flex-wrap: nowrap; }
+.player-online-quality-row .player-decoder-control { min-width: 0; max-width: 100%; }
+.player-decoder-control .input-field { min-width: 0; }
 .layout-landscape .player-online-quality-row { margin-block: 12px 24px; }
 .player-header .player-header-right { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 120px), 1fr)); gap: 8px; }
 .player-header-right .player-series-actions { display: contents; }

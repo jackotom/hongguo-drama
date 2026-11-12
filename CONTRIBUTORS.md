@@ -1,6 +1,6 @@
 # 贡献者与问题反馈致谢
 
-核对日期：2026-11-12。收录本仓库公开默认分支的提交作者，以及全部开放／已关闭 PR、Issue 的提交账号。共核对 264 个提交、10 个 PR、136 个 Issue。仅展示公开账号与提交编号，不收录邮箱等私人资料。
+核对日期：2026-11-12。收录本仓库公开默认分支的提交作者，以及全部开放／已关闭 PR、Issue 的提交账号。共核对 264 个提交、10 个 PR、137 个 Issue。仅展示公开账号与提交编号，不收录邮箱等私人资料。
 
 ## 代码提交作者
 
@@ -55,7 +55,7 @@
 | [@gugugaga-doro](https://github.com/gugugaga-doro) | [#39](https://github.com/jackotom/hongguo-drama/issues/39)、[#120](https://github.com/jackotom/hongguo-drama/issues/120) |
 | [@GuoJiKaiHehe](https://github.com/GuoJiKaiHehe) | [#84](https://github.com/jackotom/hongguo-drama/issues/84)、[#95](https://github.com/jackotom/hongguo-drama/issues/95)、[#139](https://github.com/jackotom/hongguo-drama/issues/139) |
 | [@hongminzheng](https://github.com/hongminzheng) | [#83](https://github.com/jackotom/hongguo-drama/issues/83) |
-| [@huihui278](https://github.com/huihui278) | [#44](https://github.com/jackotom/hongguo-drama/issues/44)、[#148](https://github.com/jackotom/hongguo-drama/issues/148) |
+| [@huihui278](https://github.com/huihui278) | [#44](https://github.com/jackotom/hongguo-drama/issues/44)、[#148](https://github.com/jackotom/hongguo-drama/issues/148)、[#149](https://github.com/jackotom/hongguo-drama/issues/149) |
 | [@Ifover](https://github.com/Ifover) | [#135](https://github.com/jackotom/hongguo-drama/issues/135)、[#136](https://github.com/jackotom/hongguo-drama/issues/136) |
 | [@kanonso](https://github.com/kanonso) | [#79](https://github.com/jackotom/hongguo-drama/issues/79)、[#112](https://github.com/jackotom/hongguo-drama/issues/112) |
 | [@ken6678831-man](https://github.com/ken6678831-man) | [#10](https://github.com/jackotom/hongguo-drama/issues/10) |

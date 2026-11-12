@@ -49,6 +49,7 @@ const { boundedSignal, throwIfAborted } = require('./src/native/request-signal')
 const { normalizeDownloadQuality, meetsDownloadQuality } = require('./src/native/download-quality');
 const { decryptInWorker } = require('./src/native/decrypt-worker.cjs');
 const { convertBytevc2 } = require('./src/native/bytevc2');
+const hardwareEncoding = require('./src/native/hardware-encoder');
 const { createDownloadTemporary, downloadTemporaryOwner, inspectDownloadTemporary, cleanupDownloadTemporary } = require('./src/native/download-temporary');
 const store = require('./src/store');
 const watchHistory = require('./src/native/watch-history');
@@ -244,6 +245,7 @@ function getDefaultSettings() {
     auto_delete_watched: false,
     // 兼容模式：本机无法解码 HEVC 时自动转码为 H.264（解决「黑屏有声」）
     compat_mode: true,
+    fast_conversion: false,
     cache_next_episode: true,
     picture_in_picture_mode: 'custom',
     stealth_wake_region: { ...DEFAULT_STEALTH_WAKE_REGION },
@@ -502,6 +504,7 @@ function getCurrentSettings() {
   const saved = store.getSettings() || {};
   const merged = { ...getDefaultSettings(), ...saved };
   merged.stealth_wake_region = normalizeStealthWakeRegion(merged.stealth_wake_region);
+  merged.fast_conversion = merged.fast_conversion === true;
   // 保证并发数合法
   const mc = parseInt(merged.max_concurrent, 10);
   MAX_CONCURRENT_DOWNLOADS = Number.isInteger(mc) && mc >= 1 && mc <= 10 ? mc : 3;
@@ -1179,15 +1182,19 @@ async function executeHongguoDownload(task) {
         try {
           if (playInfo.codec === 'bytevc2') {
             const notice = task.qualityNotice;
-            const progress = (seconds, phase = 'transcoding') => {
+            let conversionMeta;
+            const progress = (seconds, phase = 'transcoding', meta = conversionMeta) => {
+              conversionMeta = meta;
               task.progress = Math.min(99, Math.floor(seconds / playInfo.duration * 100));
-              task.qualityNotice = phase === 'queued' ? '视频已下载，等待其他视频转换完成' : '视频已下载，正在转换为可播放格式';
+              task.qualityNotice = phase === 'queued' ? '视频已下载，等待其他视频转换完成'
+                : conversionNotice(meta) || '视频已下载，正在转换为可播放格式';
               sendToRenderer('download-progress', { id, progress: task.progress, qualityNotice: task.qualityNotice });
             };
             try {
               await convertBytevc2({ executable: resolveFfmpeg('librempeg'), input: tmpPath, output: decodedPath,
+                fastConversion: getCurrentSettings().fast_conversion,
                 contentKey: playInfo.contentKey, duration: playInfo.duration, cancelToken: source.token, onProgress: progress,
-                onPhase: phase => progress(0, phase), onOutputCreated: temporary.outputCreated });
+                onPhase: (phase, meta) => progress(0, phase, meta), onOutputCreated: temporary.outputCreated });
             } finally { task.qualityNotice = notice || ''; }
           } else {
             await temporary.reserveOutput();
@@ -3261,11 +3268,13 @@ async function fetchDecryptedEpisodeOnce(vid, onProgress, seriesId, playInfo, si
       await pipeline(response.data, fs.createWriteStream(input, { mode: 0o600 }), { signal });
       if (!received || (total && received !== total)) throw mediaTransferError('视频下载不完整，请重试');
       if (playInfo.codec === 'bytevc2') {
+        let conversionMeta;
         await convertBytevc2({ executable: resolveFfmpeg('librempeg'), input, output,
+          fastConversion: getCurrentSettings().fast_conversion,
           contentKey: playInfo.contentKey, duration: playInfo.duration, signal, maxBytes,
-          onPhase: phase => onProgress?.(0, received, phase),
+          onPhase: (phase, meta) => { conversionMeta = meta; onProgress?.(0, received, phase, conversionNotice(meta)); },
           getPriority: () => [...onlineSessions.values()].some(session => session.vid === String(vid) && !session.prefetch) ? 2 : 1,
-          onProgress: seconds => onProgress?.(Math.floor(received * Math.min(1, seconds / playInfo.duration)), received, 'transcoding') });
+          onProgress: seconds => onProgress?.(Math.floor(received * Math.min(1, seconds / playInfo.duration)), received, 'transcoding', conversionNotice(conversionMeta)) });
       } else {
         if (onProgress) onProgress(received, received, 'decrypting');
         await decryptContentKeyFile(input, output, playInfo.contentKey, { signal });
@@ -3329,8 +3338,8 @@ ipcMain.handle('prepare-online-play', async (event, payload) => {
         const controller = new AbortController();
         job = { controller, force };
         job.promise = trackOnlineWork(controller, (async () => {
-          const progress = (received,total,phase) => {
-            job.progress = { received, total, percent: total ? Math.floor(received / total * 100) : 0, phase: phase || 'downloading' };
+          const progress = (received,total,phase,notice) => {
+            job.progress = { received, total, percent: total ? Math.floor(received / total * 100) : 0, phase: phase || 'downloading', ...(notice ? {notice} : {}) };
             for (const active of onlineSessions.values()) if (active.cacheKey === key) {
               sendToRenderer('online-play-progress',{vid:sourceVid,seriesId,vidIndex,requestId:active.requestId, ...job.progress});
             }
@@ -3568,7 +3577,14 @@ function trimCompatCache(currentOutput) {
   }
 }
 
-/** 探测可用的 H.264 编码器：先看列表，再实际试编一帧（列表里有不代表能用，如无 N 卡时的 nvenc） */
+function conversionNotice(meta) {
+  if (!meta?.fastConversion) return '';
+  if (meta.hardwareFallbackReason === 'unavailable') return '显卡加速不可用，已回退CPU转换';
+  if (meta.hardwareFallbackReason) return '显卡加速失败，已回退CPU转换';
+  return meta.encoder && meta.encoder !== 'libx264' ? '正在使用显卡加速转换' : '';
+}
+
+/** 探测自动兼容路径的编码器；新增显卡编码仅由高性能选项启用。 */
 async function pickH264Encoder(ffmpegPath, task) {
   if (compatEncoder) return compatEncoder;
   const { execFile } = require('child_process');
@@ -3584,7 +3600,7 @@ async function pickH264Encoder(ffmpegPath, task) {
 
   const candidates = (process.platform === 'darwin'
     ? ['h264_videotoolbox', 'libx264']
-    : ['h264_nvenc', 'h264_qsv', 'h264_amf', 'h264_mf', 'libx264']).filter((e) =>
+    : ['libx264']).filter((e) =>
     list.includes(e)
   );
   if (!candidates.includes('libx264')) candidates.push('libx264'); // 软件兜底
@@ -3753,14 +3769,25 @@ async function transcodeForPlayback(payload, job = { controller: new AbortContro
     if (quality !== 'auto') await verifyDownloadQuality(inputPath, quality);
     const duration = ffprobePath ? await probeDuration(ffprobePath, inputPath, job) : 0;
     checkCancelled();
-    let encoder = force ? 'libx264' : await pickH264Encoder(ffmpegPath, job);
+    const fastConversion = !force && getCurrentSettings().fast_conversion;
+    let hardwareFallbackReason = null;
+    let encoder;
+    if (fastConversion) {
+      encoder = (await hardwareEncoding.pickHardwareEncoder({ executable: ffmpegPath,
+        inputArgs: ['-i', inputPath], signal }))?.encoder || 'libx264';
+      if (encoder === 'libx264') hardwareFallbackReason = 'unavailable';
+    } else encoder = force ? 'libx264' : await pickH264Encoder(ffmpegPath, job);
     checkCancelled();
 
     const started = Date.now();
     for (let attempt = 0; attempt < 2; attempt++) {
       checkCancelled();
+      const notice = conversionNotice({ fastConversion, encoder, hardwareFallbackReason });
+      if (notice) reportProgress({ seriesId: String(seriesId), vidIndex: Number(vidIndex), percent: 0, notice });
       // 2) 转码（硬件编码器用各自推荐的参数）
-      const encArgs = encoder === 'libx264'
+      const encArgs = fastConversion && encoder !== 'libx264'
+        ? hardwareEncoding.hardwareEncoderArgs(encoder)
+        : encoder === 'libx264'
         ? ['-c:v', 'libx264', '-preset', 'veryfast', '-crf', '23', '-profile:v', 'high', '-level', '4.2']
         : encoder === 'h264_videotoolbox'
         ? ['-c:v', 'h264_videotoolbox', '-b:v', '6M', '-pix_fmt', 'yuv420p']
@@ -3808,7 +3835,7 @@ async function transcodeForPlayback(payload, job = { controller: new AbortContro
             if (m && duration > 0) {
               const sec = parseInt(m[1], 10) / 1e6;
               const pct = Math.max(0, Math.min(99, Math.floor((sec / duration) * 100)));
-              reportProgress({ seriesId: String(seriesId), vidIndex: Number(vidIndex), percent: pct });
+              reportProgress({ seriesId: String(seriesId), vidIndex: Number(vidIndex), percent: pct, ...(notice ? {notice} : {}) });
             }
           }
         });
@@ -3827,6 +3854,10 @@ async function transcodeForPlayback(payload, job = { controller: new AbortContro
         const tail = stderrTail.split('\n').filter(Boolean).slice(-2).join(' ').slice(0, 300);
         console.warn('[Compat] 转码失败 code=', code, tail);
         if (encoder !== 'libx264') {
+          if (fastConversion && /No space left|Permission denied|Input\/output error|Disk quota|Read-only file system|File too large|Cannot allocate memory|Out of memory|Invalid data found|Error while decoding|Error submitting packet|corrupt|decryption/i.test(stderrTail)) {
+            return { success: false, error: '视频输入或存储不可用，转换已停止，原视频已保留' };
+          }
+          hardwareFallbackReason = 'encoder-failed';
           encoder = 'libx264';
           continue;
         }
@@ -3842,7 +3873,8 @@ async function transcodeForPlayback(payload, job = { controller: new AbortContro
     console.log(`[Compat] 完成 ${(size / 1048576).toFixed(1)}MB  用时 ${elapsed}s`);
 
     reportProgress({ seriesId: String(seriesId), vidIndex: Number(vidIndex), percent: 100, done: true });
-    return { success: true, url: localPlayUrl(out), size, elapsed: Number(elapsed), encoder };
+    return { success: true, url: localPlayUrl(out), size, elapsed: Number(elapsed), encoder,
+      fastConversion, hardwareFallbackReason };
   } catch (error) {
     if (signal.aborted) return compatCancelled();
     console.error('[Compat] 转码失败:', error.message);
@@ -4626,7 +4658,7 @@ ipcMain.handle('select-folder', async () => {
   return result.filePaths[0];
 });
 
-const SETTINGS_KEYS = ['root', 'name_format', 'max_concurrent', 'download_quality', 'download_metadata', 'export_text', 'auto_delete_watched', 'compat_mode', 'cache_next_episode', 'picture_in_picture_mode', 'stealth_wake_region', 'show_danmaku_controls', 'app_updates_enabled', 'watch_updates_enabled', 'watch_sequels_enabled', 'watch_notifications_enabled', 'search_app_enabled', 'proxy_enabled', 'proxy_mode', 'proxy_host', 'proxy_port', 'proxy_username', 'proxy_password'];
+const SETTINGS_KEYS = ['root', 'name_format', 'max_concurrent', 'download_quality', 'download_metadata', 'export_text', 'auto_delete_watched', 'compat_mode', 'fast_conversion', 'cache_next_episode', 'picture_in_picture_mode', 'stealth_wake_region', 'show_danmaku_controls', 'app_updates_enabled', 'watch_updates_enabled', 'watch_sequels_enabled', 'watch_notifications_enabled', 'search_app_enabled', 'proxy_enabled', 'proxy_mode', 'proxy_host', 'proxy_port', 'proxy_username', 'proxy_password'];
 
 function normalizeTextExportKinds(value) {
   return { danmaku: value?.danmaku === true, comments: value?.comments === true, reviews: value?.reviews === true };
@@ -4641,6 +4673,7 @@ function settingsForRenderer(settings) {
 
 function applyEditableSettings(current, incoming) {
   const source = normalizeProxySettings(incoming && typeof incoming === 'object' ? incoming : {});
+  if (Object.prototype.hasOwnProperty.call(source, 'fast_conversion') && typeof source.fast_conversion !== 'boolean') throw new Error('显卡加速设置必须为开关值');
   if (Object.prototype.hasOwnProperty.call(source, 'picture_in_picture_mode')
     && !['native', 'custom'].includes(source.picture_in_picture_mode)) throw new Error('不支持的画中画小窗模式');
   const merged = { ...current };

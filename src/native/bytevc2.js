@@ -36,7 +36,7 @@ function acquire(signal, cancelToken, getPriority) {
   });
 }
 
-async function convertBytevc2({ executable, input, output, contentKey, duration, signal, cancelToken, onProgress, onPhase, onOutputCreated, maxBytes = Infinity, getPriority = () => 0 }) {
+async function convertBytevc2({ executable, input, output, contentKey, duration, signal, cancelToken, onProgress, onPhase, onOutputCreated, maxBytes = Infinity, getPriority = () => 0, fastConversion = false }) {
   const cancelled = () => signal?.aborted || cancelToken?.reason;
   if (cancelled()) throw abortError();
   if (!executable) throw new Error('未找到内置 ByteVC2 解码组件，请重新下载完整版本后重试');
@@ -46,7 +46,6 @@ async function convertBytevc2({ executable, input, output, contentKey, duration,
   const release = await acquire(signal, cancelToken, getPriority);
   try {
     if (cancelled()) throw abortError();
-    onPhase?.('transcoding');
     let identity;
     const checkOutput = async () => {
       if (!await isOwnedFile(output, identity)) throw Object.assign(new Error('视频转换临时文件已变化，已有文件已保留，请重试'), { code: 'EEXIST' });
@@ -58,18 +57,27 @@ async function convertBytevc2({ executable, input, output, contentKey, duration,
         onOutputCreated?.(identity);
       } finally { await file.close(); }
       if (cancelled()) throw abortError();
-      const encoders = process.platform === 'darwin' && process.arch === 'arm64'
-        ? ['h264_videotoolbox', 'libx264'] : ['libx264'];
+      const inputArgs = [...(contentKey ? ['-decryption_key', contentKey] : []), '-i', input];
+      const hardware = fastConversion ? await require('./hardware-encoder').pickHardwareEncoder({ executable, inputArgs, signal, cancelToken }) : null;
+      if (cancelled()) throw abortError();
+      const hardwareEncoder = fastConversion ? hardware?.encoder : process.platform === 'darwin' && process.arch === 'arm64' ? 'h264_videotoolbox' : null;
+      const encoders = hardwareEncoder ? [hardwareEncoder, 'libx264'] : ['libx264'];
+      const decoderThreads = fastConversion ? 4 : 2;
+      let hardwareFallbackReason = fastConversion && !hardwareEncoder ? 'unavailable' : null;
       for (const encoder of encoders) {
         try {
           if (cancelled()) throw abortError();
           let seconds = 0, diagnostics = '', terminalFailure = false;
-          const videoArgs = encoder === 'h264_videotoolbox'
+          const metadata = { encoder, fastConversion, decoderThreads, hardwareFallbackReason };
+          onPhase?.('transcoding', metadata);
+          const videoArgs = fastConversion && encoder !== 'libx264'
+            ? require('./hardware-encoder').hardwareEncoderArgs(encoder)
+            : encoder === 'h264_videotoolbox'
             ? ['-c:v', encoder, '-allow_sw', '0', '-realtime', '0', '-q:v', '68', '-profile:v', 'high', '-pix_fmt', 'yuv420p', '-threads:v', '2']
             : ['-c:v', 'libx264', '-preset', 'veryfast', '-crf', '23', '-pix_fmt', 'yuv420p',
               '-threads:v', '2', '-x264-params', 'lookahead_threads=1'];
           const args = ['-y', '-hide_banner', '-loglevel', 'error', '-xerror', '-protocol_whitelist', 'file,pipe',
-            '-filter_threads', '1', '-threads:v', '2', ...(contentKey ? ['-decryption_key', contentKey] : []), '-i', input,
+            '-filter_threads', '1', '-threads:v', String(decoderThreads), ...inputArgs,
             '-map', '0:v:0', '-map', '0:a?', ...videoArgs,
             '-c:a', 'copy', '-movflags', '+faststart', '-progress', 'pipe:1', '-nostats',
             ...(Number.isFinite(maxBytes) ? ['-fs', String(maxBytes)] : []), '-f', 'mp4', output];
@@ -107,8 +115,8 @@ async function convertBytevc2({ executable, input, output, contentKey, duration,
               if (stopping || cancelled()) reject(abortError());
               else if (code !== 0) reject(Object.assign(new Error('ByteVC2 转码失败，请重新获取片源后重试'), {
                 code: 'BYTEVC2_CONVERSION_FAILED',
-                hardwareEncoderFailed: encoder === 'h264_videotoolbox' && !terminalFailure
-                  && /Unknown encoder.*h264_videotoolbox|(?:cannot|failed to) create.*compression session|h264_videotoolbox[^\n]*(?:error|failed)|Error while opening encoder/i.test(diagnostics),
+                hardwareEncoderFailed: encoder !== 'libx264' && !terminalFailure
+                  && /Unknown encoder.*h264_(?:videotoolbox|nvenc)|(?:cannot|failed to) create.*compression session|h264_(?:videotoolbox|nvenc)[^\n]*(?:error|failed)|Error while opening encoder|Cannot load (?:nvcuda|libcuda|nvEncodeAPI|libnvidia-encode)|No capable devices found|Driver does not support|minimum required Nvidia driver/i.test(diagnostics),
               }));
               else resolve();
             });
@@ -121,10 +129,11 @@ async function convertBytevc2({ executable, input, output, contentKey, duration,
           const size = (await fs.stat(output)).size;
           if (size >= maxBytes) throw Object.assign(new Error('本集转码后过大，请下载后播放'), { code: 'MEDIA_TOO_LARGE' });
           if (!size || seconds < duration - 1) throw new Error('ByteVC2 转码结果不完整，请重试本集');
-          return { codec: 'h264', size, encoder };
+          return { codec: 'h264', size, ...metadata };
         } catch (error) {
-          if (encoder !== 'h264_videotoolbox' || cancelled()
+          if (encoder === 'libx264' || cancelled()
             || !(error.hardwareEncoderFailed || error.code === 'MEDIA_TOO_LARGE')) throw error;
+          hardwareFallbackReason = error.code === 'MEDIA_TOO_LARGE' ? 'output-too-large' : 'encoder-failed';
           await checkOutput();
           await fs.truncate(output, 0);
           onProgress?.(0);

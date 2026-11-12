@@ -8,11 +8,11 @@ const { EventEmitter } = require('node:events');
 const { PassThrough } = require('node:stream');
 const vm = require('node:vm');
 
-function fixture(t, { code = 0, seconds = 60, wait = false, hardware = false, codes = [], errors = [], outputBytes = [] } = {}) {
+function fixture(t, { code = 0, seconds = 60, wait = false, hardware = false, codes = [], errors = [], outputBytes = [], probedEncoder = null, probeError = null } = {}) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'hg-bytevc2-'));
   const input = path.join(root, 'input'), output = path.join(root, 'output');
   fs.writeFileSync(input, 'synthetic process fixture, never played');
-  const calls = [], kills = [], children = [];
+  const calls = [], kills = [], children = [], probeCalls = [];
   t.after(() => { mock.restoreAll(); fs.rmSync(root, { recursive: true, force: true }); });
   mock.method(cp, 'spawn', (exe, args, options) => {
     calls.push({ exe, args, options });
@@ -33,10 +33,13 @@ function fixture(t, { code = 0, seconds = 60, wait = false, hardware = false, co
   });
   const module = { exports: {} };
   vm.runInNewContext(fs.readFileSync(path.join(__dirname, 'bytevc2.js'), 'utf8'), {
-    module, require, process: { platform: hardware ? 'darwin' : 'linux', arch: hardware ? 'arm64' : 'x64' },
+    module, require: name => name === './hardware-encoder' ? {
+      ...require('./hardware-encoder'),
+      pickHardwareEncoder: async options => { probeCalls.push(options); if (probeError) throw probeError; return probedEncoder ? { encoder: probedEncoder } : null; },
+    } : require(name), process: { platform: hardware ? 'darwin' : 'linux', arch: hardware ? 'arm64' : 'x64' },
     setTimeout, clearTimeout,
   });
-  return { input, output, calls, kills, children, finish: (index, code = 0) => {
+  return { input, output, calls, kills, children, probeCalls, finish: (index, code = 0) => {
     children[index].stdout.write('out_time_us=60000000\nprogress=end\n');
     children[index].emit('close', code);
   }, run: extra => module.exports.convertBytevc2({ executable: '/fixture/librempeg', input, output, duration: 60, ...extra }) };
@@ -326,4 +329,80 @@ test('download cancellation tokens also stop conversion without exposing their r
   source.cancel('PRIVATE_CANCELLATION_SENTINEL');
   await assert.rejects(promise, error => error.code === 'ERR_CANCELED' && !/SENTINEL/.test(error.message));
   assert.deepEqual(f.kills, ['SIGTERM']); assert.equal(fs.existsSync(f.output), false);
+});
+
+
+test('fast conversion probes the actual encrypted input and uses NVENC with bounded CPU decoding', async t => {
+  const f = fixture(t, { probedEncoder: 'h264_nvenc' }), phases = [];
+  const result = await f.run({ fastConversion: true, contentKey: '01'.repeat(16), onPhase: (phase, meta) => phases.push({ phase, meta }) });
+  assert.equal(f.probeCalls.length, 1);
+  assert.deepEqual(Array.from(f.probeCalls[0].inputArgs), ['-decryption_key', '01'.repeat(16), '-i', f.input]);
+  const args = f.calls[0].args;
+  assert.equal(args[args.indexOf('-c:v') + 1], 'h264_nvenc');
+  assert.equal(args[args.indexOf('-threads:v') + 1], '4');
+  assert.equal(args[args.lastIndexOf('-threads:v') + 1], '2');
+  assert.equal(args[args.indexOf('-cq') + 1], '21');
+  assert.equal(args[args.indexOf('-c:a') + 1], 'copy');
+  assert.equal(args.includes('-hwaccel'), false, 'ByteVC2 still uses bounded CPU decode');
+  assert.equal(result.hardwareFallbackReason, null);
+  assert.equal(result.decoderThreads, 4);
+  assert.equal(phases.at(-1).meta.encoder, 'h264_nvenc');
+  assert.equal(phases.at(-1).meta.fastConversion, true);
+});
+
+test('fast conversion reports unavailable hardware and safely uses software once', async t => {
+  const f = fixture(t), phases = [];
+  const result = await f.run({ fastConversion: true, onPhase: (phase, meta) => phases.push({ phase, meta }) });
+  assert.equal(f.probeCalls.length, 1);
+  assert.equal(f.calls.length, 1);
+  assert.equal(result.encoder, 'libx264');
+  assert.equal(result.hardwareFallbackReason, 'unavailable');
+  assert.equal(phases.at(-1).meta.hardwareFallbackReason, 'unavailable');
+  assert.equal(f.calls[0].args[f.calls[0].args.indexOf('-threads:v') + 1], '4');
+});
+
+test('fast conversion uses VideoToolbox on an actually probed Mac encoder', async t => {
+  const f = fixture(t, { hardware: true, probedEncoder: 'h264_videotoolbox' });
+  const result = await f.run({ fastConversion: true });
+  assert.equal(f.probeCalls.length, 1);
+  assert.equal(result.encoder, 'h264_videotoolbox');
+  assert.equal(result.decoderThreads, 4);
+  assert.equal(f.calls[0].args[f.calls[0].args.indexOf('-allow_sw') + 1], '0');
+});
+
+for (const [message, reason] of [['Cannot load nvcuda.dll', 'encoder-failed'], ['', 'output-too-large']]) {
+  test(`fast conversion makes one software fallback and reports ${reason}`, async t => {
+    const f = fixture(t, { probedEncoder: 'h264_nvenc', codes: message ? [1, 0] : [], errors: [message], outputBytes: message ? [] : [20, 10] }), phases = [];
+    const result = await f.run({ fastConversion: true, ...(message ? {} : { maxBytes: 15 }), onPhase: (phase, meta) => phases.push({ phase, meta }) });
+    assert.equal(f.calls.length, 2);
+    assert.equal(result.encoder, 'libx264');
+    assert.equal(result.hardwareFallbackReason, reason);
+    assert.equal(phases.at(-1).meta.hardwareFallbackReason, reason);
+    assert.equal(phases.at(-1).meta.encoder, 'libx264');
+  });
+}
+
+for (const message of ['No space left on device', 'Invalid data found when processing input']) {
+  test(`fast conversion does not retry NVENC terminal failure: ${message}`, async t => {
+    const f = fixture(t, { probedEncoder: 'h264_nvenc', code: 1, errors: [`[h264_nvenc] ${message}`] });
+    await assert.rejects(f.run({ fastConversion: true }), error => error.code === 'BYTEVC2_CONVERSION_FAILED');
+    assert.equal(f.probeCalls.length, 1);
+    assert.equal(f.calls.length, 1);
+    assert.equal(fs.existsSync(f.output), false);
+  });
+}
+
+test('fast conversion cancellation during hardware probing spawns no conversion and removes its reservation', async t => {
+  const f = fixture(t, { probeError: Object.assign(new Error('cancelled probe'), { code: 'ERR_CANCELED' }) });
+  await assert.rejects(f.run({ fastConversion: true }), error => error.code === 'ERR_CANCELED');
+  assert.equal(f.calls.length, 0);
+  assert.equal(fs.existsSync(f.output), false);
+});
+
+test('default conversion does not probe or increase the original decoder threads', async t => {
+  const f = fixture(t, { probedEncoder: 'h264_nvenc' });
+  const result = await f.run();
+  assert.equal(f.probeCalls.length, 0);
+  assert.equal(result.encoder, 'libx264');
+  assert.equal(f.calls[0].args[f.calls[0].args.indexOf('-threads:v') + 1], '2');
 });

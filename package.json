@@ -86,7 +86,8 @@
             "LIBREMPEG-*",
             "WINDOWS-*.txt",
             "COPYING.*",
-            "LICENSE.md"
+            "LICENSE.md",
+            "NV-*"
           ]
         }
       ],
@@ -240,7 +241,7 @@
     "appImage": {
       "executableArgs": []
     },
-    "buildVersion": "7.1.1"
+    "buildVersion": "7.1.2"
   },
   "engines": {
     "node": ">=22.12"

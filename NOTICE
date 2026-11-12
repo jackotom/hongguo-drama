@@ -174,3 +174,5 @@ https://github.com/dawei233/hongguo-drama
 二十五、7.1 下载恢复、临时文件身份与依赖更新（发行候选）
 恢复／重试仅在同剧原队列槽位内按集号升序，临时文件身份以精确十进制字符串持久化；保留跨剧优先顺序、旧安全收据兼容及无法确认文件的保留边界。
 7.1采纳 anupam-orbis 在 PR #140 提交的 follow-redirects 依赖锁更新（实际1.16.3）；新增本项目重定向安全回归。完整协作记录见 CONTRIBUTORS.md。
+
+7.1新增huihui278在Issue #149提出的高性能转换入口，默认关闭；ByteVC2仍由CPU解码，显卡仅优先编码H.264。双Mac使用VideoToolbox，Windows／Linux使用NVIDIA NVENC并保留明确CPU回退。NVENC头文件来自官方FFmpeg/nv-codec-headers 12.1.14.0，固定1889e62e2d35ff7aa9baca2bceb14f053785e6f1；MIT完整声明和精确源码随相应媒体包提供，不包含NVIDIA驱动或运行库。构建与实际平台验收状态见docs/release-7.1.md。

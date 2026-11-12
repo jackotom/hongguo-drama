@@ -46,12 +46,12 @@ jobs:
         id: media-cache
         with:
           path: ${{ runner.temp }}/media/artifacts
-          key: windows-media-${{ hashFiles('scripts/build-ffmpeg-source-win.sh') }}
+          key: windows-media-${{ hashFiles('scripts/build-ffmpeg-source-win.sh', 'scripts/prepare-nv-codec-headers.sh') }}
       - uses: actions/cache@v4
         id: librempeg-cache
         with:
           path: ${{ runner.temp }}/librempeg/artifacts
-          key: windows-librempeg-${{ hashFiles('scripts/build-librempeg-source.sh', 'scripts/librempeg-videotoolbox-prototype.patch') }}
+          key: windows-librempeg-${{ hashFiles('scripts/build-librempeg-source.sh', 'scripts/librempeg-videotoolbox-prototype.patch', 'scripts/prepare-nv-codec-headers.sh') }}
       - name: Restore pinned historical Windows media without executing binaries
         if: ${{ inputs.build_only && (steps.media-cache.outputs.cache-hit != 'true' || steps.librempeg-cache.outputs.cache-hit != 'true') }}
         env:

@@ -16,6 +16,9 @@ PKG_CONFIG_TOOL=$(command -v pkg-config)
 mkdir -p "$ROOT"
 ROOT=$(cd "$ROOT" && pwd)
 mkdir -p "$ROOT"/{archives,sources,prefix,build-x264,build-librempeg,logs,artifacts/bin,corresponding-source}
+if [[ "$TARGET" == win-x64 || "$TARGET" == linux-x64 ]]; then
+  bash "$(dirname "$SCRIPT")/prepare-nv-codec-headers.sh" "$ROOT"
+fi
 LIBREMPEG_ARCHIVE="$ROOT/archives/librempeg-$LIBREMPEG_COMMIT.tar.gz"
 X264_ARCHIVE="$ROOT/archives/x264-$X264_COMMIT.tar.gz"
 [[ -f "$LIBREMPEG_ARCHIVE" ]] || curl -fsSL --retry 2 "https://codeload.github.com/librempeg/librempeg/tar.gz/$LIBREMPEG_COMMIT" -o "$LIBREMPEG_ARCHIVE"
@@ -33,7 +36,7 @@ PY
 [[ -d "$ROOT/sources/librempeg-$LIBREMPEG_COMMIT" ]] || tar -xzf "$LIBREMPEG_ARCHIVE" -C "$ROOT/sources"
 [[ -d "$ROOT/sources/x264-$X264_COMMIT" ]] || tar -xzf "$X264_ARCHIVE" -C "$ROOT/sources"
 # The pinned upstream VideoToolbox implementation omits its internal declaration.
-if [[ "$TARGET" == arm64 ]]; then
+if [[ "$TARGET" == arm64 || "$TARGET" == x64 ]]; then
   if ! grep -q '^int ff_videotoolbox_buffer_append(' "$ROOT/sources/librempeg-$LIBREMPEG_COMMIT/libavcodec/vt_internal.h"; then
     patch --batch --forward -p1 -d "$ROOT/sources/librempeg-$LIBREMPEG_COMMIT" < "$VT_PATCH" > "$ROOT/logs/videotoolbox-patch.log" 2>&1
   fi
@@ -44,14 +47,18 @@ export PKG_CONFIG_PATH=
 export PKG_CONFIG_LIBDIR="$ROOT/prefix/lib/pkgconfig"
 unset CPATH C_INCLUDE_PATH CPLUS_INCLUDE_PATH LIBRARY_PATH DYLD_LIBRARY_PATH LDFLAGS CFLAGS CPPFLAGS || true
 if [[ "$TARGET" == win-x64 ]]; then
+  ENCODERS+=,h264_nvenc
   THREAD_ARGS=(--enable-w32threads --disable-pthreads)
   X264_ARGS=(--host=x86_64-w64-mingw32 --cross-prefix=x86_64-w64-mingw32- --disable-asm --extra-ldflags=-static)
   MEDIA_ARGS=(--arch=x86_64 --target-os=mingw32 --enable-cross-compile --cross-prefix=x86_64-w64-mingw32- --disable-asm --extra-cflags=-I../prefix/include --extra-ldflags='-static -L../prefix/lib')
+  MEDIA_ARGS+=(--enable-ffnvcodec --enable-nvenc)
   SUFFIX=.exe
 elif [[ "$TARGET" == linux-x64 ]]; then
+  ENCODERS+=,h264_nvenc
   THREAD_ARGS=(--enable-pthreads)
   X264_ARGS=(--host=x86_64-linux-gnu)
   MEDIA_ARGS=(--arch=x86_64 --target-os=linux --extra-cflags=-I../prefix/include --extra-ldflags=-L../prefix/lib)
+  MEDIA_ARGS+=(--enable-ffnvcodec --enable-nvenc)
   SUFFIX=
 else
   THREAD_ARGS=(--enable-pthreads)
@@ -67,10 +74,8 @@ else
   MEDIA_ARGS=(--arch="$HOST" --target-os=darwin --cc=/usr/bin/clang --extra-cflags="-arch $ARCH -mmacosx-version-min=13.0 -I../prefix/include" --extra-ldflags="-arch $ARCH -mmacosx-version-min=13.0 -L../prefix/lib")
   # Librempeg's x86 init objects require standalone assembly; use its complete C fallback without NASM.
   [[ "$TARGET" != x64 ]] || MEDIA_ARGS+=(--disable-asm)
-  if [[ "$TARGET" == arm64 ]]; then
-    ENCODERS+=,h264_videotoolbox
-    MEDIA_ARGS+=(--enable-videotoolbox)
-  fi
+  ENCODERS+=,h264_videotoolbox
+  MEDIA_ARGS+=(--enable-videotoolbox)
   SUFFIX=
 fi
 cd "$ROOT/build-x264"
@@ -100,19 +105,19 @@ allowed = {'kernel32.dll','msvcrt.dll','user32.dll','advapi32.dll','bcrypt.dll',
 assert 'pei-x86-64' in s
 assert all(x.lower() in allowed for x in re.findall(r'DLL Name:\s*(\S+)', s))
 PY
+  grep -q '^#define CONFIG_H264_NVENC_ENCODER 1' config_components.h
 elif [[ "$TARGET" == linux-x64 ]]; then
   ldd "$TOOL" > "$ROOT/logs/imports.txt"
   ! grep -q 'not found' "$ROOT/logs/imports.txt"
   "$TOOL" -hide_banner -decoders 2>/dev/null | awk '$2 == "bvc2" { found=1 } END { exit !found }'
+  "$TOOL" -hide_banner -encoders 2>/dev/null | awk '$2 == "h264_nvenc" { found=1 } END { exit !found }'
 else
   lipo "$TOOL" -verify_arch "$ARCH"
   otool -L "$TOOL" | tail -n +2 | awk '{print $1}' | while IFS= read -r dep; do
     case "$dep" in /usr/lib/*|/System/Library/*) ;; *) echo 'Non-system helper dependency' >&2; exit 1;; esac
   done
   "$TOOL" -hide_banner -decoders 2>/dev/null | awk '$2 == "bvc2" { found=1 } END { exit !found }'
-  if [[ "$TARGET" == arm64 ]]; then
-    "$TOOL" -hide_banner -encoders 2>/dev/null | awk '$2 == "h264_videotoolbox" { found=1 } END { exit !found }'
-  fi
+  "$TOOL" -hide_banner -encoders 2>/dev/null | awk '$2 == "h264_videotoolbox" { found=1 } END { exit !found }'
 fi
 cp "$LIBREMPEG_ARCHIVE" "$X264_ARCHIVE" "$SCRIPT" "$VT_PATCH" "$ROOT/corresponding-source/"
 cp "$ROOT/sources/librempeg-$LIBREMPEG_COMMIT/COPYING.GPLv3" "$ROOT/artifacts/bin/LIBREMPEG-COPYING.GPLv3"

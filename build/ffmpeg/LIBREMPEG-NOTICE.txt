@@ -14,14 +14,35 @@ The static x264 dependency uses commit b35605ace3ddf7c1a5d67a2eb553f034aef41d55;
 see LIBREMPEG-X264-LICENSE.txt. Upstream attribution is retained in the source.
 
 Build: bash scripts/build-librempeg-source.sh BUILD_DIRECTORY TARGET JOBS
-TARGET is arm64, x64 (macOS), or win-x64 (Linux with mingw-w64).
+TARGET is arm64 or x64 (macOS), win-x64 (Linux with mingw-w64),
+or linux-x64 (native Linux x64).
 Distributions containing this executable must include the generated exact
 librempeg-cb1f8f3-x264-b35605a-TARGET-corresponding-source.tar.gz archive,
 which contains both pinned upstream archives, the complete build script,
 and librempeg-videotoolbox-prototype.patch. The patch adds the missing internal
 ff_videotoolbox_buffer_append declaration in the pinned upstream source.
-macOS arm64 explicitly enables VideoToolbox H.264 encoding alongside x264;
-other targets retain software encoding. The build manifest records both the
-script and patch SHA256 on macOS.
+Both macOS targets enable VideoToolbox H.264 encoding alongside x264.
+Windows and Linux x64 targets enable NVIDIA NVENC H.264 encoding alongside
+x264. ByteVC2 decoding remains on the CPU; this is not GPU ByteVC2 decoding.
+The optional fast-conversion preference defaults to off. When enabled, it
+uses four CPU decoder threads in the existing single conversion queue,
+tests the hardware encoder against the actual input, and reports a bounded
+CPU fallback if acceleration is unavailable or fails. Cancellation, input
+and storage errors do not trigger a blind hardware retry. GPU/driver support
+is required; no claim is made that every discrete GPU supports this path.
+The build manifest records both script and patch SHA256 on macOS.
+
+Windows and Linux corresponding-source archives additionally contain:
+  prepare-nv-codec-headers.sh
+  nv-codec-headers-1889e62e2d35ff7aa9baca2bceb14f053785e6f1.tar.gz
+  NV-CODEC-HEADERS-LICENSE.txt
+These official FFmpeg nv-codec-headers 12.1.14.0 headers are MIT licensed.
+Upstream: https://github.com/FFmpeg/nv-codec-headers
+Pinned commit: 1889e62e2d35ff7aa9baca2bceb14f053785e6f1
+Source archive SHA256: e30d4791fd386de8b5c9f88dec781e546ec148b8808440dd421da5f26c2700ae
+The bundled license file retains each header's complete copyright and MIT
+notice. No NVIDIA runtime or driver is bundled; the user's installed driver
+is loaded dynamically. Native NVIDIA GPU execution has not yet been verified
+for this 7.1 source candidate.
 
 This source change is not itself a signed or published release.

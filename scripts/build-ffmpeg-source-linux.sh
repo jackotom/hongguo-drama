@@ -13,6 +13,7 @@ FFMPEG_SHA256=8c3850283eb25fa026482078a04051e0be17347b09ef81a0849bec15a96e002e
 X264_COMMIT=b35605ace3ddf7c1a5d67a2eb553f034aef41d55
 X264_SHA256=df62afece4eecef8ddf196f115dfec6e936a21b04ec2117a0f4e412de29b20e5
 mkdir -p "$ROOT"/{archives,sources,prefix,build-x264,build-ffmpeg,logs,artifacts/bin,corresponding-source}
+bash "$(dirname "$SCRIPT")/prepare-nv-codec-headers.sh" "$ROOT"
 FFMPEG_ARCHIVE="$ROOT/archives/ffmpeg-$FFMPEG_VERSION.tar.xz"
 X264_ARCHIVE="$ROOT/archives/x264-$X264_COMMIT.tar.gz"
 [[ -f "$FFMPEG_ARCHIVE" ]] || curl -fsSL --retry 2 "https://ffmpeg.org/releases/ffmpeg-$FFMPEG_VERSION.tar.xz" -o "$FFMPEG_ARCHIVE"
@@ -40,10 +41,12 @@ cd "$ROOT/build-ffmpeg"
   --disable-autodetect --disable-shared --enable-static --disable-doc --disable-debug \
   --disable-ffplay --disable-network --disable-indevs --disable-outdevs --enable-indev=lavfi \
   --enable-gpl --enable-version3 --enable-libx264 --pkg-config=pkg-config --pkg-config-flags=--static \
+  --enable-ffnvcodec --enable-nvenc --enable-encoder=h264_nvenc \
   --extra-cflags=-I../prefix/include --extra-ldflags=-L../prefix/lib \
   > "$ROOT/logs/ffmpeg-configure.log" 2>&1
 make -j "$JOBS" ffmpeg ffprobe > "$ROOT/logs/ffmpeg-build.log" 2>&1
 install -m 755 ffmpeg ffprobe "$ROOT/artifacts/bin/"
+"$ROOT/artifacts/bin/ffmpeg" -hide_banner -encoders 2>/dev/null | awk '$2 == "h264_nvenc" { found=1 } END { exit !found }'
 for tool in ffmpeg ffprobe; do
   ldd "$ROOT/artifacts/bin/$tool" > "$ROOT/logs/$tool.imports.txt"
   ! grep -q 'not found' "$ROOT/logs/$tool.imports.txt"
