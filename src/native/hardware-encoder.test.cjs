@@ -5,8 +5,9 @@ const path = require('node:path');
 const vm = require('node:vm');
 const { EventEmitter } = require('node:events');
 
-function fixture({ platform = 'win32', listed = true, failure = '', hang = false, frames = 12 } = {}) {
+function fixture({ platform = 'win32', listed = true, listing = ' V....D h264_nvenc NVIDIA\n V....D h264_videotoolbox Apple\n', failure = '', failureOnlyFirst = false, hang = false, frames = 12 } = {}) {
   const calls = [], children = [];
+  let encodeSpawns = 0;
   const spawn = (file, args) => {
     calls.push({ file, args });
     const child = new EventEmitter();
@@ -14,8 +15,14 @@ function fixture({ platform = 'win32', listed = true, failure = '', hang = false
     child.kill = signal => { child.killedWith = signal; setImmediate(() => child.emit('close', 1)); };
     children.push(child);
     setImmediate(() => {
-      if (args.includes('-encoders')) { child.stdout.emit('data', listed ? ' V....D h264_nvenc NVIDIA\n V....D h264_videotoolbox Apple\n' : ' V....D libx264 software\n'); child.emit('close', 0); }
-      else if (!hang) { child.stdout.emit('data', `frame=${frames}\nprogress=end\n`); if (failure) child.stderr.emit('data', failure); child.emit('close', failure ? 1 : 0); }
+      if (args.includes('-encoders')) { child.stdout.emit('data', listed ? listing : ' V....D libx264 software\n'); child.emit('close', 0); }
+      else if (!hang) {
+        encodeSpawns += 1;
+        const callFailure = failure && (!failureOnlyFirst || encodeSpawns === 1);
+        child.stdout.emit('data', `frame=${callFailure ? 0 : frames}\nprogress=end\n`);
+        if (callFailure) child.stderr.emit('data', failure);
+        child.emit('close', callFailure ? 1 : 0);
+      }
     });
     return child;
   };
@@ -44,6 +51,25 @@ test('listed NVENC must encode the current input before selection, with bounded 
 test('missing encoder or unsupported platform does not spawn an encode', async () => {
   const h = fixture({ listed: false }); assert.equal(await h.pickHardwareEncoder(input), null); assert.equal(h.calls.length, 1);
   const other = fixture({ platform: 'freebsd' }); assert.equal(await other.pickHardwareEncoder(input), null); assert.equal(other.calls.length, 0);
+});
+test('listed AMD AMF is selected with bounded CQP quality args after NVENC is unavailable', async () => {
+  const h = fixture({ listing: ' V....D h264_amf AMD\n' });
+  assert.equal((await h.pickHardwareEncoder(input))?.encoder, 'h264_amf');
+  assert.equal(h.calls.length, 2);
+  const args = h.calls[1].args;
+  assert.equal(args[args.indexOf('-c:v') + 1], 'h264_amf');
+  assert.equal(args[args.indexOf('-quality') + 1], 'speed');
+  assert.equal(args[args.indexOf('-rc') + 1], 'cqp');
+  assert.equal(args[args.indexOf('-qp_i') + 1], '26');
+  assert.equal(args[args.indexOf('-qp_p') + 1], '26');
+});
+test('a listed AMF probe failure still selects a later candidate before giving up', async () => {
+  // NVENC is listed first but fails to encode; AMF is listed next and must be probed.
+  const h = fixture({ listing: ' V....D h264_nvenc NVIDIA\n V....D h264_amf AMD\n', failure: 'Cannot load amfrt64.dll', failureOnlyFirst: true });
+  assert.equal((await h.pickHardwareEncoder(input))?.encoder, 'h264_amf');
+  assert.equal(h.calls.length, 3); // -encoders + failed NVENC probe + successful AMF probe
+  assert.equal(h.calls[1].args[h.calls[1].args.indexOf('-c:v') + 1], 'h264_nvenc');
+  assert.equal(h.calls[2].args[h.calls[2].args.indexOf('-c:v') + 1], 'h264_amf');
 });
 test('Apple hardware probe refuses software VideoToolbox fallback', async () => {
   const h = fixture({ platform: 'darwin' }); assert.equal((await h.pickHardwareEncoder(input))?.encoder, 'h264_videotoolbox');

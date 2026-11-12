@@ -116,7 +116,7 @@ async function convertBytevc2({ executable, input, output, contentKey, duration,
               else if (code !== 0) reject(Object.assign(new Error('ByteVC2 转码失败，请重新获取片源后重试'), {
                 code: 'BYTEVC2_CONVERSION_FAILED',
                 hardwareEncoderFailed: encoder !== 'libx264' && !terminalFailure
-                  && /Unknown encoder.*h264_(?:videotoolbox|nvenc)|(?:cannot|failed to) create.*compression session|h264_(?:videotoolbox|nvenc)[^\n]*(?:error|failed)|Error while opening encoder|Cannot load (?:nvcuda|libcuda|nvEncodeAPI|libnvidia-encode)|No capable devices found|Driver does not support|minimum required Nvidia driver/i.test(diagnostics),
+                  && /Unknown encoder.*h264_(?:videotoolbox|nvenc|amf)|(?:cannot|failed to) create.*compression session|h264_(?:videotoolbox|nvenc|amf)[^\n]*(?:error|failed)|Error while opening encoder|Cannot load (?:nvcuda|libcuda|nvEncodeAPI|libnvidia-encode|amfrt64)|No capable devices found|Driver does not support|minimum required Nvidia driver|AMF[^\n]*(?:not available|not supported|failed|error)|CreateComponent[^\n]*(?:failed|null)/i.test(diagnostics),
               }));
               else resolve();
             });
