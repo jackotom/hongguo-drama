@@ -1,0 +1,99 @@
+{
+  "sourceCommit": "bdab9d6158e07524f234f88c1168f20baa2cd507",
+  "version": "7.1.0",
+  "buildVersion": "7.1.2",
+  "platforms": {
+    "windows-x64": {
+      "runId": 43157689481,
+      "runAttempt": 1,
+      "sourceCommit": "bdab9d6158e07524f234f88c1168f20baa2cd507",
+      "version": "7.1.0",
+      "buildVersion": "7.1.2",
+      "architecture": "x64",
+      "artifacts": [
+        {
+          "id": 13916753595,
+          "name": "windows-verification",
+          "archive": "artifact-13916753595.zip",
+          "files": {
+            "windows/windows-verification/installer-result.json": "installer-result.json",
+            "windows/windows-verification/portable-windows-auto-next-hidden.png": "portable-windows-auto-next-hidden.png",
+            "windows/windows-verification/portable-windows-download-quality.png": "portable-windows-download-quality.png",
+            "windows/windows-verification/portable-windows-fullscreen-hidden.png": "portable-windows-fullscreen-hidden.png",
+            "windows/windows-verification/portable-windows-playback.png": "portable-windows-playback.png",
+            "windows/windows-verification/portable-windows-shortcut-hidden.png": "portable-windows-shortcut-hidden.png",
+            "windows/windows-verification/result.json": "result.json"
+          }
+        },
+        {
+          "id": 13916514477,
+          "name": "windows-release-candidate",
+          "archive": "artifact-13916514477.zip",
+          "files": {
+            "windows/ffmpeg-9.0.2-x264-b35605a-win-x64-corresponding-source.tar.gz": "ffmpeg-9.0.2-x264-b35605a-win-x64-corresponding-source.tar.gz",
+            "windows/hongguo-downloader-7.1-win-x64-setup.exe": "hongguo-downloader-7.1-win-x64-setup.exe",
+            "windows/hongguo-downloader-7.1-win-x64-setup.exe.blockmap": "hongguo-downloader-7.1-win-x64-setup.exe.blockmap",
+            "windows/hongguo-downloader-7.1-win-x64.exe": "hongguo-downloader-7.1-win-x64.exe",
+            "windows/hongguo-downloader-7.1-win-x64.zip": "hongguo-downloader-7.1-win-x64.zip",
+            "windows/hongguo-downloader-7.1-windows-source.zip": "hongguo-downloader-7.1-windows-source.zip",
+            "windows/latest.yml": "latest.yml",
+            "windows/librempeg-cb1f8f3-x264-b35605a-win-x64-corresponding-source.tar.gz": "librempeg-cb1f8f3-x264-b35605a-win-x64-corresponding-source.tar.gz",
+            "windows/SOURCE-SHA.txt": "SOURCE-SHA.txt",
+            "windows/WINDOWS-SHA256SUMS.txt": "WINDOWS-SHA256SUMS.txt"
+          }
+        }
+      ]
+    },
+    "linux-x64": {
+      "runId": 43157689435,
+      "runAttempt": 1,
+      "sourceCommit": "bdab9d6158e07524f234f88c1168f20baa2cd507",
+      "version": "7.1.0",
+      "buildVersion": "7.1.2",
+      "architecture": "x64",
+      "artifacts": [
+        {
+          "id": 13916692394,
+          "name": "linux-appimage-candidate",
+          "archive": "artifact-13916692394.zip",
+          "files": {
+            "linux/LINUX-SHA256SUMS.txt": "LINUX-SHA256SUMS.txt",
+            "linux/ffmpeg-9.0.2-x264-b35605a-linux-x64-corresponding-source.tar.gz": "ffmpeg-9.0.2-x264-b35605a-linux-x64-corresponding-source.tar.gz",
+            "linux/SOURCE-SHA.txt": "SOURCE-SHA.txt",
+            "linux/hongguo-downloader-7.1-linux-source.zip": "hongguo-downloader-7.1-linux-source.zip",
+            "linux/hongguo-downloader-7.1-linux-x64.AppImage": "hongguo-downloader-7.1-linux-x64.AppImage",
+            "linux/librempeg-cb1f8f3-x264-b35605a-linux-x64-corresponding-source.tar.gz": "librempeg-cb1f8f3-x264-b35605a-linux-x64-corresponding-source.tar.gz",
+            "linux/linux-verification/appimage-result.json": "linux-verification/appimage-result.json"
+          }
+        }
+      ]
+    },
+    "docker-amd64": {
+      "runId": 43157691047,
+      "runAttempt": 1,
+      "sourceCommit": "bdab9d6158e07524f234f88c1168f20baa2cd507",
+      "version": "7.1.0",
+      "buildVersion": "7.1.2",
+      "architecture": "amd64",
+      "artifacts": [
+        {
+          "id": 13917300924,
+          "name": "docker-server-candidate",
+          "archive": "artifact-13917300924.zip",
+          "files": {
+            "docker/DOCKER-SHA256SUMS.txt": "DOCKER-SHA256SUMS.txt",
+            "docker/compose.yaml": "compose.yaml",
+            "docker/SOURCE-SHA.txt": "SOURCE-SHA.txt",
+            "docker/docker-verification.json": "docker-verification.json",
+            "docker/docker.md": "docker.md",
+            "docker/ffmpeg-9.0.2-x264-b35605a-linux-x64-corresponding-source.tar.gz": "ffmpeg-9.0.2-x264-b35605a-linux-x64-corresponding-source.tar.gz",
+            "docker/hongguo-drama-7.1-docker-amd64.tar.gz": "hongguo-drama-7.1-docker-amd64.tar.gz",
+            "docker/hongguo-drama-7.1-docker-source.zip": "hongguo-drama-7.1-docker-source.zip",
+            "docker/librempeg-cb1f8f3-x264-b35605a-linux-x64-corresponding-source.tar.gz": "librempeg-cb1f8f3-x264-b35605a-linux-x64-corresponding-source.tar.gz",
+            "docker/live-check.log": "live-check.log"
+          }
+        }
+      ]
+    }
+  }
+}

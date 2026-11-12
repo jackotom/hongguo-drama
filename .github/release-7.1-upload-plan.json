@@ -1,0 +1,2051 @@
+{
+  "passed": true,
+  "assembly_status": "complete",
+  "version": "7.1.0",
+  "buildVersion": "7.1.2",
+  "tag": "v7.1",
+  "draft": true,
+  "sourceCommit": "bdab9d6158e07524f234f88c1168f20baa2cd507",
+  "assetCount": 25,
+  "assets": {
+    "Hongguo-7.1-mac-arm64.dmg": {
+      "size": 178710382,
+      "sha256": "254875ece01dededea430d74982d311fbff835b8aae1f5a4a5ba9fed114fd1cc"
+    },
+    "Hongguo-7.1-mac-x64.dmg": {
+      "size": 189068510,
+      "sha256": "dc59110275f7289cfe95a727a825ab7f403eaadc8d8ea8933b39f8b38cd05e49"
+    },
+    "SHA256SUMS.txt": {
+      "size": 2633,
+      "sha256": "b8e3ae1923331db1ad13196dfee6e6e1841f37dd18e98115da746ee4eed35627"
+    },
+    "ffmpeg-9.0.2-x264-b35605a-corresponding-source.tar.gz": {
+      "size": 13122060,
+      "sha256": "bfcac890fe098e27bd1cdc4209837377ecaae3bea4fc5b1ea197ec4ab1c2b2e9"
+    },
+    "ffmpeg-9.0.2-x264-b35605a-linux-x64-corresponding-source.tar.gz": {
+      "size": 13251776,
+      "sha256": "403bbdd5a320b4dde8d730391ec9da39dcbb463ec3c5943017e1a8308b0d94a2"
+    },
+    "ffmpeg-9.0.2-x264-b35605a-win-x64-corresponding-source.tar.gz": {
+      "size": 13284659,
+      "sha256": "f27155fd5507d2763c0c4d702c0e6ad1793c9ad8dea3047c92865f8ecec47a5a"
+    },
+    "ffmpeg-9.0.2-x264-b35605a-x64-corresponding-source.tar.gz": {
+      "size": 13122451,
+      "sha256": "ad68bf181e6bcc8609bcfad68a4a1c071b046af7743fd21b4e645132080eba60"
+    },
+    "hongguo-downloader-7.1-linux-x64.AppImage": {
+      "size": 160063077,
+      "sha256": "336d0c1a12710cd11079628ff82d3120b940861247f9c3a792b9287f1c291d09"
+    },
+    "hongguo-downloader-7.1-mac-arm64.zip": {
+      "size": 161223451,
+      "sha256": "2c7ff459b18e55ec24e580349892bc1785f26a7ad659ef4f57deec2691034a09"
+    },
+    "hongguo-downloader-7.1-mac-x64.zip": {
+      "size": 169536868,
+      "sha256": "4a09ca2b228c74e49908b03668d7066846177486822d525ab7294967b00901c6"
+    },
+    "hongguo-downloader-7.1-win-x64-setup.exe": {
+      "size": 137879841,
+      "sha256": "daf8141a89cbcbbd2071b5d5f3afdf1187c616e891eb98b928f2c239c49a2489"
+    },
+    "hongguo-downloader-7.1-win-x64-setup.exe.blockmap": {
+      "size": 145751,
+      "sha256": "60e2833e6d8bd2a6bb7217892c23dc1aeeeb19493089fc2d4406fbdd68ee1ffd"
+    },
+    "hongguo-downloader-7.1-win-x64.exe": {
+      "size": 114223221,
+      "sha256": "91dd4bb06ca607c30ebbeb7498a40367a99c625159c5ec9d5a7623883d4f8893"
+    },
+    "hongguo-downloader-7.1-win-x64.zip": {
+      "size": 114234244,
+      "sha256": "6c6a2ffcae16a079b4c7315bf234904178f9541c81a180a3d24c86e9a489e4a2"
+    },
+    "hongguo-downloader-7.1-windows-source.zip": {
+      "size": 5631914,
+      "sha256": "d73343584ae716edfca262a1309de494f1767f2b3a493d2c7a70488a19328f10"
+    },
+    "hongguo-drama-7.1-docker-amd64.tar.gz": {
+      "size": 107489235,
+      "sha256": "1a79151154a8e869c100ad5ebafff5d64580bd1589b2ac9d7c08e2ca9936d968"
+    },
+    "hongguo-drama-7.1-docker-deploy.zip": {
+      "size": 29911,
+      "sha256": "50e9bdcb91ec5ac638185674827e09704af41f788aa16c17a2ec111465e6d4eb"
+    },
+    "hongguo-drama-7.1-source.zip": {
+      "size": 5631914,
+      "sha256": "d73343584ae716edfca262a1309de494f1767f2b3a493d2c7a70488a19328f10"
+    },
+    "latest-mac.yml": {
+      "size": 557,
+      "sha256": "b61ddb58e768dd76548c0e0da9379113565afd359b4352366abfdd98a469e4f3"
+    },
+    "latest.yml": {
+      "size": 377,
+      "sha256": "be5503812b574b203af735628d0ddd1b5c7445613ad4ce670bb23e7cd7f430b6"
+    },
+    "libmedia-1.3.1-152f629-corresponding-source.tar.gz": {
+      "size": 190808102,
+      "sha256": "148b3101c2909359a0cece00a0a735a76e3c1410f858bcb5e4f1d88935baa887"
+    },
+    "librempeg-cb1f8f3-x264-b35605a-arm64-corresponding-source.tar.gz": {
+      "size": 19877572,
+      "sha256": "d26f61f26fc320ff53081345cc23b64916e4b5564463dcc3857a49f1acfa4570"
+    },
+    "librempeg-cb1f8f3-x264-b35605a-linux-x64-corresponding-source.tar.gz": {
+      "size": 19959114,
+      "sha256": "dc348745552f73e6413c78c496fbecef0f99d0d992c5cc372a1a801686e04730"
+    },
+    "librempeg-cb1f8f3-x264-b35605a-win-x64-corresponding-source.tar.gz": {
+      "size": 19959114,
+      "sha256": "dc348745552f73e6413c78c496fbecef0f99d0d992c5cc372a1a801686e04730"
+    },
+    "librempeg-cb1f8f3-x264-b35605a-x64-corresponding-source.tar.gz": {
+      "size": 19877572,
+      "sha256": "d26f61f26fc320ff53081345cc23b64916e4b5564463dcc3857a49f1acfa4570"
+    }
+  },
+  "updates": {
+    "latest-mac.yml": {
+      "version": "7.1.0",
+      "files": [
+        {
+          "url": "hongguo-downloader-7.1-mac-arm64.zip",
+          "sha512": "QOCLsljX7byZ7DniijxBo1mp4GyLniKCRdnfM9yB67rdCj2ggtmTGAcWQoW3R0fK2E2l7sscEKtzJWPVMKzTgw==",
+          "size": 161223451
+        },
+        {
+          "url": "hongguo-downloader-7.1-mac-x64.zip",
+          "sha512": "8Vp3/RUSNyswAWxbKrddRRNwy6GfvFw4VctkIaHgf2oKhpfhe4ZOnpOrsN+OISJO4rvRLCOt6oH274d85rbSqQ==",
+          "size": 169536868
+        }
+      ],
+      "path": "hongguo-downloader-7.1-mac-arm64.zip",
+      "passed": true
+    },
+    "latest.yml": {
+      "version": "7.1.0",
+      "files": [
+        {
+          "url": "hongguo-downloader-7.1-win-x64-setup.exe",
+          "sha512": "H1+gZfRo6aM1tgQPwJZDT3TjJ4WfAaopSQ068WScWBD93T6/Lhhqx4OJ2aIwOSzgtm8FvjxPU5WIYRyZ7ai1gQ==",
+          "size": 137879841
+        }
+      ],
+      "path": "hongguo-downloader-7.1-win-x64-setup.exe",
+      "passed": true
+    }
+  },
+  "gateReceiptNames": [
+    "packaged-source-verification.json",
+    "mac-real-result.json",
+    "x64-startup.json",
+    "dmg-verification.json",
+    "mac-update-verification.json",
+    "windows-packaged-source-verification.json",
+    "windows/windows-verification/result.json",
+    "windows/windows-verification/installer-result.json",
+    "linux-packaged-source-verification.json",
+    "linux/linux-verification/appimage-result.json",
+    "docker/docker-verification.json",
+    "linux-docker-media-binary-comparison.json"
+  ],
+  "gateReceiptFiles": {
+    "packaged-source-verification.json": {
+      "size": 5946,
+      "sha256": "ee0463e04d6e4fedd9eb66ef13bc138b6a32fb226e4f9202f56900e52f410a0d"
+    },
+    "mac-real-result.json": {
+      "size": 3814,
+      "sha256": "08a2c86fdb69569c2f4cb54444598ac0c3e97f2614f7ab33e173ddc82b0ed1b0"
+    },
+    "x64-startup.json": {
+      "size": 915,
+      "sha256": "b946820bd1a01afa3e4b527233d4e842c58bc2b075263294f1f187be2bd12cd9"
+    },
+    "dmg-verification.json": {
+      "size": 2111,
+      "sha256": "91955a72f1b84491d9c629951a30814e2a0cd6fc712626092ac37c20cfdb5293"
+    },
+    "mac-update-verification.json": {
+      "size": 804,
+      "sha256": "0e387589c9e8375be3f486af676cbe4094d8dcc9b47b028d9b87ad3c51dd13a1"
+    },
+    "windows-packaged-source-verification.json": {
+      "size": 9763,
+      "sha256": "00b97009d01477350c6cd2d245dae9e9dc52e4216b8e71771f6cf28f99cea9e5"
+    },
+    "windows/windows-verification/result.json": {
+      "size": 10446,
+      "sha256": "2f405975ebb6a7ce62474899e31d0f0238fedc76235f790f64b136d8f9ccbbfe"
+    },
+    "windows/windows-verification/installer-result.json": {
+      "size": 1287,
+      "sha256": "353d10e9f6e27fecb65e407c869710024f173f88c7bfc666ec57d42af2d58556"
+    },
+    "linux-packaged-source-verification.json": {
+      "size": 4573,
+      "sha256": "964869d4ec519378e7f74ad1c05cce9dbeebe3d00868277e662b57bf6e4b0296"
+    },
+    "linux/linux-verification/appimage-result.json": {
+      "size": 1330,
+      "sha256": "d6ef35cfca1c673d527ac25ecc1c526b6fc8b135be15c423c29a25c5b242dfa0"
+    },
+    "docker/docker-verification.json": {
+      "size": 414,
+      "sha256": "43ea7f7760f02da804e4cbf4a74d4c8740cc1f008a1244d28e6dac2dcbfc8277"
+    },
+    "linux-docker-media-binary-comparison.json": {
+      "size": 1108,
+      "sha256": "a50603e60193024a67e119f05d5d6f768c5a606685713ffa573d53bd6b9f7b64"
+    },
+    "artifact-13916753595.zip": {
+      "size": 1406708,
+      "sha256": "0632568b138c60affa7c75bc85e326fbeee2f6f30f6e5f15174594c2dd47dfe4"
+    },
+    "windows/windows-verification/portable-windows-auto-next-hidden.png": {
+      "size": 390391,
+      "sha256": "fd2ab0819b30506630771a932a21fef01ed9b1ac061175f047940d7d04ce9055"
+    },
+    "windows/windows-verification/portable-windows-download-quality.png": {
+      "size": 51330,
+      "sha256": "8063c3acaecd329c4554f7066ce0e6bcb492cf28c6bdcbe71cf85ab5bcd954fc"
+    },
+    "windows/windows-verification/portable-windows-fullscreen-hidden.png": {
+      "size": 421181,
+      "sha256": "bdd93e1c6fd28e8cdc9af7b82723f0471039357760184cd05d525444dc61d203"
+    },
+    "windows/windows-verification/portable-windows-playback.png": {
+      "size": 173470,
+      "sha256": "60119db2f5f81a968f406c3bba7004376040363c58500a4da0f813832304d356"
+    },
+    "windows/windows-verification/portable-windows-shortcut-hidden.png": {
+      "size": 378450,
+      "sha256": "a533a1d958597ba318f120c05acc6208eae7c698cdfcb63700e45b54d3b53b71"
+    },
+    "artifact-13916514477.zip": {
+      "size": 405350495,
+      "sha256": "a6b1da2c0441d9d427af6f8737f23198ddd6a1e76afa3d20fadedc28cd2d9197"
+    },
+    "windows/ffmpeg-9.0.2-x264-b35605a-win-x64-corresponding-source.tar.gz": {
+      "size": 13284659,
+      "sha256": "f27155fd5507d2763c0c4d702c0e6ad1793c9ad8dea3047c92865f8ecec47a5a"
+    },
+    "windows/hongguo-downloader-7.1-win-x64-setup.exe": {
+      "size": 137879841,
+      "sha256": "daf8141a89cbcbbd2071b5d5f3afdf1187c616e891eb98b928f2c239c49a2489"
+    },
+    "windows/hongguo-downloader-7.1-win-x64-setup.exe.blockmap": {
+      "size": 145751,
+      "sha256": "60e2833e6d8bd2a6bb7217892c23dc1aeeeb19493089fc2d4406fbdd68ee1ffd"
+    },
+    "windows/hongguo-downloader-7.1-win-x64.exe": {
+      "size": 114223221,
+      "sha256": "91dd4bb06ca607c30ebbeb7498a40367a99c625159c5ec9d5a7623883d4f8893"
+    },
+    "windows/hongguo-downloader-7.1-win-x64.zip": {
+      "size": 114234244,
+      "sha256": "6c6a2ffcae16a079b4c7315bf234904178f9541c81a180a3d24c86e9a489e4a2"
+    },
+    "windows/hongguo-downloader-7.1-windows-source.zip": {
+      "size": 5640311,
+      "sha256": "2e993bb73e7e46e39d99bb1c200e8436c52b26a23a971db9b678bd5c0b24e609"
+    },
+    "windows/latest.yml": {
+      "size": 377,
+      "sha256": "be5503812b574b203af735628d0ddd1b5c7445613ad4ce670bb23e7cd7f430b6"
+    },
+    "windows/librempeg-cb1f8f3-x264-b35605a-win-x64-corresponding-source.tar.gz": {
+      "size": 19959114,
+      "sha256": "dc348745552f73e6413c78c496fbecef0f99d0d992c5cc372a1a801686e04730"
+    },
+    "windows/SOURCE-SHA.txt": {
+      "size": 42,
+      "sha256": "2a819e82124b3bb82d9fbe79dec9ca8801a99a126dcc461ec96762b206eb5caf"
+    },
+    "windows/WINDOWS-SHA256SUMS.txt": {
+      "size": 961,
+      "sha256": "f29a70610b86bb50c45042c89eef6e48176daa3c827ab28b966bea4d31f86500"
+    },
+    "artifact-13916692394.zip": {
+      "size": 198255345,
+      "sha256": "04e15d4f0d6b6ae925b8c505e76e372ec9c95a4918a439189da40c973930b6d5"
+    },
+    "linux/LINUX-SHA256SUMS.txt": {
+      "size": 585,
+      "sha256": "efd6c024916030d71da9e2144b8ce36b74c96029564c7008e6deb532a41a007a"
+    },
+    "linux/ffmpeg-9.0.2-x264-b35605a-linux-x64-corresponding-source.tar.gz": {
+      "size": 13251776,
+      "sha256": "403bbdd5a320b4dde8d730391ec9da39dcbb463ec3c5943017e1a8308b0d94a2"
+    },
+    "linux/SOURCE-SHA.txt": {
+      "size": 41,
+      "sha256": "7a57275b0a214dcfce8c1805a92fcf83a7edc8a1cbed31d70b3792f2538d2b20"
+    },
+    "linux/hongguo-downloader-7.1-linux-source.zip": {
+      "size": 5631914,
+      "sha256": "79669d10ae6c875c2b4c987925faf92fb09f61d8ded0be49d355ee81441fa1d5"
+    },
+    "linux/hongguo-downloader-7.1-linux-x64.AppImage": {
+      "size": 160063077,
+      "sha256": "336d0c1a12710cd11079628ff82d3120b940861247f9c3a792b9287f1c291d09"
+    },
+    "linux/librempeg-cb1f8f3-x264-b35605a-linux-x64-corresponding-source.tar.gz": {
+      "size": 19959114,
+      "sha256": "dc348745552f73e6413c78c496fbecef0f99d0d992c5cc372a1a801686e04730"
+    },
+    "artifact-13917300924.zip": {
+      "size": 145713951,
+      "sha256": "34c0c2642922ae5b49ef53258d706709e85ed66e9d1a2ee8ca4a3a3ed9558480"
+    },
+    "docker/DOCKER-SHA256SUMS.txt": {
+      "size": 879,
+      "sha256": "5cdea06d13f47ae138ce8b87192b7b3d7a3e8b1311dca6296f810096afbbd0d1"
+    },
+    "docker/compose.yaml": {
+      "size": 622,
+      "sha256": "9ef82958a9e7ee02df4519c4373238b9cc94ef19a2d06b117cb5ca052cdf2fc9"
+    },
+    "docker/SOURCE-SHA.txt": {
+      "size": 41,
+      "sha256": "7a57275b0a214dcfce8c1805a92fcf83a7edc8a1cbed31d70b3792f2538d2b20"
+    },
+    "docker/docker.md": {
+      "size": 7110,
+      "sha256": "7e3780f49f32fec2a8adf195ce04128586b98f2cc33597fff5ff38d422ffc0fe"
+    },
+    "docker/ffmpeg-9.0.2-x264-b35605a-linux-x64-corresponding-source.tar.gz": {
+      "size": 13251774,
+      "sha256": "cb486ddf52f4759d17da35d5e23da2ebfb955febff0512a7f1321f1b9ebb77a9"
+    },
+    "docker/hongguo-drama-7.1-docker-amd64.tar.gz": {
+      "size": 107489235,
+      "sha256": "1a79151154a8e869c100ad5ebafff5d64580bd1589b2ac9d7c08e2ca9936d968"
+    },
+    "docker/hongguo-drama-7.1-docker-source.zip": {
+      "size": 5631914,
+      "sha256": "79669d10ae6c875c2b4c987925faf92fb09f61d8ded0be49d355ee81441fa1d5"
+    },
+    "docker/librempeg-cb1f8f3-x264-b35605a-linux-x64-corresponding-source.tar.gz": {
+      "size": 19959114,
+      "sha256": "dc348745552f73e6413c78c496fbecef0f99d0d992c5cc372a1a801686e04730"
+    },
+    "docker/live-check.log": {
+      "size": 1629,
+      "sha256": "3c33b2ae5b8aaa178e4950bc1ade6d58fe7888cec1aabfd141ea484f55fccac5"
+    },
+    "artifact-binding.json": {
+      "size": 5014,
+      "sha256": "40acb6aa51e762e36bacfa1cd1e8afea4f370434792956a98ca476bbe02ff3f6"
+    }
+  },
+  "ciProvenance": {
+    "passed": true,
+    "sourceCommit": "bdab9d6158e07524f234f88c1168f20baa2cd507",
+    "runs": [
+      {
+        "id": 43157689481,
+        "name": "Windows x64 release candidate",
+        "node_id": "WFR_kwLOU-0FXM8AAAAKDGYUiQ",
+        "head_branch": "codex/fix-7.1-downloads",
+        "head_sha": "bdab9d6158e07524f234f88c1168f20baa2cd507",
+        "path": ".github/workflows/windows.yml",
+        "display_title": "Windows x64 release candidate",
+        "run_number": 129,
+        "event": "workflow_dispatch",
+        "status": "completed",
+        "conclusion": "success",
+        "workflow_id": 381209003,
+        "check_suite_id": 116869411708,
+        "check_suite_node_id": "CS_kwDOU-0FXM8AAAAbNfWzfA",
+        "url": "https://api.github.com/repos/jackotom/hongguo-drama/actions/runs/43157689481",
+        "html_url": "https://github.com/jackotom/hongguo-drama/actions/runs/43157689481",
+        "pull_requests": [],
+        "created_at": "2026-11-12T04:53:16Z",
+        "updated_at": "2026-11-12T05:10:02Z",
+        "actor": {
+          "login": "jackotom",
+          "id": 282187345,
+          "node_id": "U_kgDOENHWUQ",
+          "avatar_url": "https://avatars.githubusercontent.com/u/282187345?v=4",
+          "gravatar_id": "",
+          "url": "https://api.github.com/users/jackotom",
+          "html_url": "https://github.com/jackotom",
+          "followers_url": "https://api.github.com/users/jackotom/followers",
+          "following_url": "https://api.github.com/users/jackotom/following{/other_user}",
+          "gists_url": "https://api.github.com/users/jackotom/gists{/gist_id}",
+          "starred_url": "https://api.github.com/users/jackotom/starred{/owner}{/repo}",
+          "subscriptions_url": "https://api.github.com/users/jackotom/subscriptions",
+          "organizations_url": "https://api.github.com/users/jackotom/orgs",
+          "repos_url": "https://api.github.com/users/jackotom/repos",
+          "events_url": "https://api.github.com/users/jackotom/events{/privacy}",
+          "received_events_url": "https://api.github.com/users/jackotom/received_events",
+          "type": "User",
+          "user_view_type": "public",
+          "site_admin": false
+        },
+        "run_attempt": 1,
+        "referenced_workflows": [],
+        "run_started_at": "2026-11-12T04:53:16Z",
+        "triggering_actor": {
+          "login": "jackotom",
+          "id": 282187345,
+          "node_id": "U_kgDOENHWUQ",
+          "avatar_url": "https://avatars.githubusercontent.com/u/282187345?v=4",
+          "gravatar_id": "",
+          "url": "https://api.github.com/users/jackotom",
+          "html_url": "https://github.com/jackotom",
+          "followers_url": "https://api.github.com/users/jackotom/followers",
+          "following_url": "https://api.github.com/users/jackotom/following{/other_user}",
+          "gists_url": "https://api.github.com/users/jackotom/gists{/gist_id}",
+          "starred_url": "https://api.github.com/users/jackotom/starred{/owner}{/repo}",
+          "subscriptions_url": "https://api.github.com/users/jackotom/subscriptions",
+          "organizations_url": "https://api.github.com/users/jackotom/orgs",
+          "repos_url": "https://api.github.com/users/jackotom/repos",
+          "events_url": "https://api.github.com/users/jackotom/events{/privacy}",
+          "received_events_url": "https://api.github.com/users/jackotom/received_events",
+          "type": "User",
+          "user_view_type": "public",
+          "site_admin": false
+        },
+        "jobs_url": "https://api.github.com/repos/jackotom/hongguo-drama/actions/runs/43157689481/jobs",
+        "logs_url": "https://api.github.com/repos/jackotom/hongguo-drama/actions/runs/43157689481/logs",
+        "check_suite_url": "https://api.github.com/repos/jackotom/hongguo-drama/check-suites/116869411708",
+        "artifacts_url": "https://api.github.com/repos/jackotom/hongguo-drama/actions/runs/43157689481/artifacts",
+        "cancel_url": "https://api.github.com/repos/jackotom/hongguo-drama/actions/runs/43157689481/cancel",
+        "rerun_url": "https://api.github.com/repos/jackotom/hongguo-drama/actions/runs/43157689481/rerun",
+        "previous_attempt_url": null,
+        "workflow_url": "https://api.github.com/repos/jackotom/hongguo-drama/actions/workflows/381209003",
+        "head_commit": {
+          "id": "bdab9d6158e07524f234f88c1168f20baa2cd507",
+          "tree_id": "1373ecb8bcce1ad6ff454f21a48cd145dc6f8e79",
+          "message": "release: 7.1 \u52a0\u5165\u663e\u5361\u5feb\u901f\u8f6c\u6362\u4e0e\u6709\u754c\u56de\u9000\u5e76\u51bb\u7ed3\u4e94\u5e73\u53f0 [skip ci]",
+          "timestamp": "2026-11-12T04:52:32Z",
+          "author": {
+            "name": "jackotom",
+            "email": "idellasalamehwoi28@gmail.com"
+          },
+          "committer": {
+            "name": "jackotom",
+            "email": "idellasalamehwoi28@gmail.com"
+          }
+        },
+        "repository": {
+          "id": 1408042332,
+          "node_id": "R_kgDOU-0FXA",
+          "name": "hongguo-drama",
+          "full_name": "jackotom/hongguo-drama",
+          "private": false,
+          "owner": {
+            "login": "jackotom",
+            "id": 282187345,
+            "node_id": "U_kgDOENHWUQ",
+            "avatar_url": "https://avatars.githubusercontent.com/u/282187345?v=4",
+            "gravatar_id": "",
+            "url": "https://api.github.com/users/jackotom",
+            "html_url": "https://github.com/jackotom",
+            "followers_url": "https://api.github.com/users/jackotom/followers",
+            "following_url": "https://api.github.com/users/jackotom/following{/other_user}",
+            "gists_url": "https://api.github.com/users/jackotom/gists{/gist_id}",
+            "starred_url": "https://api.github.com/users/jackotom/starred{/owner}{/repo}",
+            "subscriptions_url": "https://api.github.com/users/jackotom/subscriptions",
+            "organizations_url": "https://api.github.com/users/jackotom/orgs",
+            "repos_url": "https://api.github.com/users/jackotom/repos",
+            "events_url": "https://api.github.com/users/jackotom/events{/privacy}",
+            "received_events_url": "https://api.github.com/users/jackotom/received_events",
+            "type": "User",
+            "user_view_type": "public",
+            "site_admin": false
+          },
+          "html_url": "https://github.com/jackotom/hongguo-drama",
+          "description": "\u7ea2\u679c\u77ed\u5267\u684c\u9762\u7248 \u00b7 \u652f\u6301 M \u7cfb\u5217 Mac\u3001Intel Mac \u548c Windows \u00b7 \u4e09\u6765\u6e90\u641c\u7d22\u3001\u64ad\u653e\u3001\u4e0b\u8f7d\u4e0e\u8ffd\u5267 \u00b7 GPL-3.0 \u5f00\u6e90",
+          "fork": false,
+          "url": "https://api.github.com/repos/jackotom/hongguo-drama",
+          "forks_url": "https://api.github.com/repos/jackotom/hongguo-drama/forks",
+          "keys_url": "https://api.github.com/repos/jackotom/hongguo-drama/keys{/key_id}",
+          "collaborators_url": "https://api.github.com/repos/jackotom/hongguo-drama/collaborators{/collaborator}",
+          "teams_url": "https://api.github.com/repos/jackotom/hongguo-drama/teams",
+          "hooks_url": "https://api.github.com/repos/jackotom/hongguo-drama/hooks",
+          "issue_events_url": "https://api.github.com/repos/jackotom/hongguo-drama/issues/events{/number}",
+          "events_url": "https://api.github.com/repos/jackotom/hongguo-drama/events",
+          "assignees_url": "https://api.github.com/repos/jackotom/hongguo-drama/assignees{/user}",
+          "branches_url": "https://api.github.com/repos/jackotom/hongguo-drama/branches{/branch}",
+          "tags_url": "https://api.github.com/repos/jackotom/hongguo-drama/tags",
+          "blobs_url": "https://api.github.com/repos/jackotom/hongguo-drama/git/blobs{/sha}",
+          "git_tags_url": "https://api.github.com/repos/jackotom/hongguo-drama/git/tags{/sha}",
+          "git_refs_url": "https://api.github.com/repos/jackotom/hongguo-drama/git/refs{/sha}",
+          "trees_url": "https://api.github.com/repos/jackotom/hongguo-drama/git/trees{/sha}",
+          "statuses_url": "https://api.github.com/repos/jackotom/hongguo-drama/statuses/{sha}",
+          "languages_url": "https://api.github.com/repos/jackotom/hongguo-drama/languages",
+          "stargazers_url": "https://api.github.com/repos/jackotom/hongguo-drama/stargazers",
+          "contributors_url": "https://api.github.com/repos/jackotom/hongguo-drama/contributors",
+          "subscribers_url": "https://api.github.com/repos/jackotom/hongguo-drama/subscribers",
+          "subscription_url": "https://api.github.com/repos/jackotom/hongguo-drama/subscription",
+          "commits_url": "https://api.github.com/repos/jackotom/hongguo-drama/commits{/sha}",
+          "git_commits_url": "https://api.github.com/repos/jackotom/hongguo-drama/git/commits{/sha}",
+          "comments_url": "https://api.github.com/repos/jackotom/hongguo-drama/comments{/number}",
+          "issue_comment_url": "https://api.github.com/repos/jackotom/hongguo-drama/issues/comments{/number}",
+          "contents_url": "https://api.github.com/repos/jackotom/hongguo-drama/contents/{+path}",
+          "compare_url": "https://api.github.com/repos/jackotom/hongguo-drama/compare/{base}...{head}",
+          "merges_url": "https://api.github.com/repos/jackotom/hongguo-drama/merges",
+          "archive_url": "https://api.github.com/repos/jackotom/hongguo-drama/{archive_format}{/ref}",
+          "downloads_url": "https://api.github.com/repos/jackotom/hongguo-drama/downloads",
+          "issues_url": "https://api.github.com/repos/jackotom/hongguo-drama/issues{/number}",
+          "pulls_url": "https://api.github.com/repos/jackotom/hongguo-drama/pulls{/number}",
+          "milestones_url": "https://api.github.com/repos/jackotom/hongguo-drama/milestones{/number}",
+          "notifications_url": "https://api.github.com/repos/jackotom/hongguo-drama/notifications{?since,all,participating}",
+          "labels_url": "https://api.github.com/repos/jackotom/hongguo-drama/labels{/name}",
+          "releases_url": "https://api.github.com/repos/jackotom/hongguo-drama/releases{/id}",
+          "deployments_url": "https://api.github.com/repos/jackotom/hongguo-drama/deployments"
+        },
+        "head_repository": {
+          "id": 1408042332,
+          "node_id": "R_kgDOU-0FXA",
+          "name": "hongguo-drama",
+          "full_name": "jackotom/hongguo-drama",
+          "private": false,
+          "owner": {
+            "login": "jackotom",
+            "id": 282187345,
+            "node_id": "U_kgDOENHWUQ",
+            "avatar_url": "https://avatars.githubusercontent.com/u/282187345?v=4",
+            "gravatar_id": "",
+            "url": "https://api.github.com/users/jackotom",
+            "html_url": "https://github.com/jackotom",
+            "followers_url": "https://api.github.com/users/jackotom/followers",
+            "following_url": "https://api.github.com/users/jackotom/following{/other_user}",
+            "gists_url": "https://api.github.com/users/jackotom/gists{/gist_id}",
+            "starred_url": "https://api.github.com/users/jackotom/starred{/owner}{/repo}",
+            "subscriptions_url": "https://api.github.com/users/jackotom/subscriptions",
+            "organizations_url": "https://api.github.com/users/jackotom/orgs",
+            "repos_url": "https://api.github.com/users/jackotom/repos",
+            "events_url": "https://api.github.com/users/jackotom/events{/privacy}",
+            "received_events_url": "https://api.github.com/users/jackotom/received_events",
+            "type": "User",
+            "user_view_type": "public",
+            "site_admin": false
+          },
+          "html_url": "https://github.com/jackotom/hongguo-drama",
+          "description": "\u7ea2\u679c\u77ed\u5267\u684c\u9762\u7248 \u00b7 \u652f\u6301 M \u7cfb\u5217 Mac\u3001Intel Mac \u548c Windows \u00b7 \u4e09\u6765\u6e90\u641c\u7d22\u3001\u64ad\u653e\u3001\u4e0b\u8f7d\u4e0e\u8ffd\u5267 \u00b7 GPL-3.0 \u5f00\u6e90",
+          "fork": false,
+          "url": "https://api.github.com/repos/jackotom/hongguo-drama",
+          "forks_url": "https://api.github.com/repos/jackotom/hongguo-drama/forks",
+          "keys_url": "https://api.github.com/repos/jackotom/hongguo-drama/keys{/key_id}",
+          "collaborators_url": "https://api.github.com/repos/jackotom/hongguo-drama/collaborators{/collaborator}",
+          "teams_url": "https://api.github.com/repos/jackotom/hongguo-drama/teams",
+          "hooks_url": "https://api.github.com/repos/jackotom/hongguo-drama/hooks",
+          "issue_events_url": "https://api.github.com/repos/jackotom/hongguo-drama/issues/events{/number}",
+          "events_url": "https://api.github.com/repos/jackotom/hongguo-drama/events",
+          "assignees_url": "https://api.github.com/repos/jackotom/hongguo-drama/assignees{/user}",
+          "branches_url": "https://api.github.com/repos/jackotom/hongguo-drama/branches{/branch}",
+          "tags_url": "https://api.github.com/repos/jackotom/hongguo-drama/tags",
+          "blobs_url": "https://api.github.com/repos/jackotom/hongguo-drama/git/blobs{/sha}",
+          "git_tags_url": "https://api.github.com/repos/jackotom/hongguo-drama/git/tags{/sha}",
+          "git_refs_url": "https://api.github.com/repos/jackotom/hongguo-drama/git/refs{/sha}",
+          "trees_url": "https://api.github.com/repos/jackotom/hongguo-drama/git/trees{/sha}",
+          "statuses_url": "https://api.github.com/repos/jackotom/hongguo-drama/statuses/{sha}",
+          "languages_url": "https://api.github.com/repos/jackotom/hongguo-drama/languages",
+          "stargazers_url": "https://api.github.com/repos/jackotom/hongguo-drama/stargazers",
+          "contributors_url": "https://api.github.com/repos/jackotom/hongguo-drama/contributors",
+          "subscribers_url": "https://api.github.com/repos/jackotom/hongguo-drama/subscribers",
+          "subscription_url": "https://api.github.com/repos/jackotom/hongguo-drama/subscription",
+          "commits_url": "https://api.github.com/repos/jackotom/hongguo-drama/commits{/sha}",
+          "git_commits_url": "https://api.github.com/repos/jackotom/hongguo-drama/git/commits{/sha}",
+          "comments_url": "https://api.github.com/repos/jackotom/hongguo-drama/comments{/number}",
+          "issue_comment_url": "https://api.github.com/repos/jackotom/hongguo-drama/issues/comments{/number}",
+          "contents_url": "https://api.github.com/repos/jackotom/hongguo-drama/contents/{+path}",
+          "compare_url": "https://api.github.com/repos/jackotom/hongguo-drama/compare/{base}...{head}",
+          "merges_url": "https://api.github.com/repos/jackotom/hongguo-drama/merges",
+          "archive_url": "https://api.github.com/repos/jackotom/hongguo-drama/{archive_format}{/ref}",
+          "downloads_url": "https://api.github.com/repos/jackotom/hongguo-drama/downloads",
+          "issues_url": "https://api.github.com/repos/jackotom/hongguo-drama/issues{/number}",
+          "pulls_url": "https://api.github.com/repos/jackotom/hongguo-drama/pulls{/number}",
+          "milestones_url": "https://api.github.com/repos/jackotom/hongguo-drama/milestones{/number}",
+          "notifications_url": "https://api.github.com/repos/jackotom/hongguo-drama/notifications{?since,all,participating}",
+          "labels_url": "https://api.github.com/repos/jackotom/hongguo-drama/labels{/name}",
+          "releases_url": "https://api.github.com/repos/jackotom/hongguo-drama/releases{/id}",
+          "deployments_url": "https://api.github.com/repos/jackotom/hongguo-drama/deployments"
+        }
+      },
+      {
+        "id": 43157689435,
+        "name": "Linux x64 AppImage candidate",
+        "node_id": "WFR_kwLOU-0FXM8AAAAKDGYUWw",
+        "head_branch": "codex/fix-7.1-downloads",
+        "head_sha": "bdab9d6158e07524f234f88c1168f20baa2cd507",
+        "path": ".github/workflows/linux.yml",
+        "display_title": "Linux x64 AppImage candidate",
+        "run_number": 33,
+        "event": "workflow_dispatch",
+        "status": "completed",
+        "conclusion": "success",
+        "workflow_id": 408922621,
+        "check_suite_id": 116869411582,
+        "check_suite_node_id": "CS_kwDOU-0FXM8AAAAbNfWy_g",
+        "url": "https://api.github.com/repos/jackotom/hongguo-drama/actions/runs/43157689435",
+        "html_url": "https://github.com/jackotom/hongguo-drama/actions/runs/43157689435",
+        "pull_requests": [],
+        "created_at": "2026-11-12T04:53:16Z",
+        "updated_at": "2026-11-12T05:02:18Z",
+        "actor": {
+          "login": "jackotom",
+          "id": 282187345,
+          "node_id": "U_kgDOENHWUQ",
+          "avatar_url": "https://avatars.githubusercontent.com/u/282187345?v=4",
+          "gravatar_id": "",
+          "url": "https://api.github.com/users/jackotom",
+          "html_url": "https://github.com/jackotom",
+          "followers_url": "https://api.github.com/users/jackotom/followers",
+          "following_url": "https://api.github.com/users/jackotom/following{/other_user}",
+          "gists_url": "https://api.github.com/users/jackotom/gists{/gist_id}",
+          "starred_url": "https://api.github.com/users/jackotom/starred{/owner}{/repo}",
+          "subscriptions_url": "https://api.github.com/users/jackotom/subscriptions",
+          "organizations_url": "https://api.github.com/users/jackotom/orgs",
+          "repos_url": "https://api.github.com/users/jackotom/repos",
+          "events_url": "https://api.github.com/users/jackotom/events{/privacy}",
+          "received_events_url": "https://api.github.com/users/jackotom/received_events",
+          "type": "User",
+          "user_view_type": "public",
+          "site_admin": false
+        },
+        "run_attempt": 1,
+        "referenced_workflows": [],
+        "run_started_at": "2026-11-12T04:53:16Z",
+        "triggering_actor": {
+          "login": "jackotom",
+          "id": 282187345,
+          "node_id": "U_kgDOENHWUQ",
+          "avatar_url": "https://avatars.githubusercontent.com/u/282187345?v=4",
+          "gravatar_id": "",
+          "url": "https://api.github.com/users/jackotom",
+          "html_url": "https://github.com/jackotom",
+          "followers_url": "https://api.github.com/users/jackotom/followers",
+          "following_url": "https://api.github.com/users/jackotom/following{/other_user}",
+          "gists_url": "https://api.github.com/users/jackotom/gists{/gist_id}",
+          "starred_url": "https://api.github.com/users/jackotom/starred{/owner}{/repo}",
+          "subscriptions_url": "https://api.github.com/users/jackotom/subscriptions",
+          "organizations_url": "https://api.github.com/users/jackotom/orgs",
+          "repos_url": "https://api.github.com/users/jackotom/repos",
+          "events_url": "https://api.github.com/users/jackotom/events{/privacy}",
+          "received_events_url": "https://api.github.com/users/jackotom/received_events",
+          "type": "User",
+          "user_view_type": "public",
+          "site_admin": false
+        },
+        "jobs_url": "https://api.github.com/repos/jackotom/hongguo-drama/actions/runs/43157689435/jobs",
+        "logs_url": "https://api.github.com/repos/jackotom/hongguo-drama/actions/runs/43157689435/logs",
+        "check_suite_url": "https://api.github.com/repos/jackotom/hongguo-drama/check-suites/116869411582",
+        "artifacts_url": "https://api.github.com/repos/jackotom/hongguo-drama/actions/runs/43157689435/artifacts",
+        "cancel_url": "https://api.github.com/repos/jackotom/hongguo-drama/actions/runs/43157689435/cancel",
+        "rerun_url": "https://api.github.com/repos/jackotom/hongguo-drama/actions/runs/43157689435/rerun",
+        "previous_attempt_url": null,
+        "workflow_url": "https://api.github.com/repos/jackotom/hongguo-drama/actions/workflows/408922621",
+        "head_commit": {
+          "id": "bdab9d6158e07524f234f88c1168f20baa2cd507",
+          "tree_id": "1373ecb8bcce1ad6ff454f21a48cd145dc6f8e79",
+          "message": "release: 7.1 \u52a0\u5165\u663e\u5361\u5feb\u901f\u8f6c\u6362\u4e0e\u6709\u754c\u56de\u9000\u5e76\u51bb\u7ed3\u4e94\u5e73\u53f0 [skip ci]",
+          "timestamp": "2026-11-12T04:52:32Z",
+          "author": {
+            "name": "jackotom",
+            "email": "idellasalamehwoi28@gmail.com"
+          },
+          "committer": {
+            "name": "jackotom",
+            "email": "idellasalamehwoi28@gmail.com"
+          }
+        },
+        "repository": {
+          "id": 1408042332,
+          "node_id": "R_kgDOU-0FXA",
+          "name": "hongguo-drama",
+          "full_name": "jackotom/hongguo-drama",
+          "private": false,
+          "owner": {
+            "login": "jackotom",
+            "id": 282187345,
+            "node_id": "U_kgDOENHWUQ",
+            "avatar_url": "https://avatars.githubusercontent.com/u/282187345?v=4",
+            "gravatar_id": "",
+            "url": "https://api.github.com/users/jackotom",
+            "html_url": "https://github.com/jackotom",
+            "followers_url": "https://api.github.com/users/jackotom/followers",
+            "following_url": "https://api.github.com/users/jackotom/following{/other_user}",
+            "gists_url": "https://api.github.com/users/jackotom/gists{/gist_id}",
+            "starred_url": "https://api.github.com/users/jackotom/starred{/owner}{/repo}",
+            "subscriptions_url": "https://api.github.com/users/jackotom/subscriptions",
+            "organizations_url": "https://api.github.com/users/jackotom/orgs",
+            "repos_url": "https://api.github.com/users/jackotom/repos",
+            "events_url": "https://api.github.com/users/jackotom/events{/privacy}",
+            "received_events_url": "https://api.github.com/users/jackotom/received_events",
+            "type": "User",
+            "user_view_type": "public",
+            "site_admin": false
+          },
+          "html_url": "https://github.com/jackotom/hongguo-drama",
+          "description": "\u7ea2\u679c\u77ed\u5267\u684c\u9762\u7248 \u00b7 \u652f\u6301 M \u7cfb\u5217 Mac\u3001Intel Mac \u548c Windows \u00b7 \u4e09\u6765\u6e90\u641c\u7d22\u3001\u64ad\u653e\u3001\u4e0b\u8f7d\u4e0e\u8ffd\u5267 \u00b7 GPL-3.0 \u5f00\u6e90",
+          "fork": false,
+          "url": "https://api.github.com/repos/jackotom/hongguo-drama",
+          "forks_url": "https://api.github.com/repos/jackotom/hongguo-drama/forks",
+          "keys_url": "https://api.github.com/repos/jackotom/hongguo-drama/keys{/key_id}",
+          "collaborators_url": "https://api.github.com/repos/jackotom/hongguo-drama/collaborators{/collaborator}",
+          "teams_url": "https://api.github.com/repos/jackotom/hongguo-drama/teams",
+          "hooks_url": "https://api.github.com/repos/jackotom/hongguo-drama/hooks",
+          "issue_events_url": "https://api.github.com/repos/jackotom/hongguo-drama/issues/events{/number}",
+          "events_url": "https://api.github.com/repos/jackotom/hongguo-drama/events",
+          "assignees_url": "https://api.github.com/repos/jackotom/hongguo-drama/assignees{/user}",
+          "branches_url": "https://api.github.com/repos/jackotom/hongguo-drama/branches{/branch}",
+          "tags_url": "https://api.github.com/repos/jackotom/hongguo-drama/tags",
+          "blobs_url": "https://api.github.com/repos/jackotom/hongguo-drama/git/blobs{/sha}",
+          "git_tags_url": "https://api.github.com/repos/jackotom/hongguo-drama/git/tags{/sha}",
+          "git_refs_url": "https://api.github.com/repos/jackotom/hongguo-drama/git/refs{/sha}",
+          "trees_url": "https://api.github.com/repos/jackotom/hongguo-drama/git/trees{/sha}",
+          "statuses_url": "https://api.github.com/repos/jackotom/hongguo-drama/statuses/{sha}",
+          "languages_url": "https://api.github.com/repos/jackotom/hongguo-drama/languages",
+          "stargazers_url": "https://api.github.com/repos/jackotom/hongguo-drama/stargazers",
+          "contributors_url": "https://api.github.com/repos/jackotom/hongguo-drama/contributors",
+          "subscribers_url": "https://api.github.com/repos/jackotom/hongguo-drama/subscribers",
+          "subscription_url": "https://api.github.com/repos/jackotom/hongguo-drama/subscription",
+          "commits_url": "https://api.github.com/repos/jackotom/hongguo-drama/commits{/sha}",
+          "git_commits_url": "https://api.github.com/repos/jackotom/hongguo-drama/git/commits{/sha}",
+          "comments_url": "https://api.github.com/repos/jackotom/hongguo-drama/comments{/number}",
+          "issue_comment_url": "https://api.github.com/repos/jackotom/hongguo-drama/issues/comments{/number}",
+          "contents_url": "https://api.github.com/repos/jackotom/hongguo-drama/contents/{+path}",
+          "compare_url": "https://api.github.com/repos/jackotom/hongguo-drama/compare/{base}...{head}",
+          "merges_url": "https://api.github.com/repos/jackotom/hongguo-drama/merges",
+          "archive_url": "https://api.github.com/repos/jackotom/hongguo-drama/{archive_format}{/ref}",
+          "downloads_url": "https://api.github.com/repos/jackotom/hongguo-drama/downloads",
+          "issues_url": "https://api.github.com/repos/jackotom/hongguo-drama/issues{/number}",
+          "pulls_url": "https://api.github.com/repos/jackotom/hongguo-drama/pulls{/number}",
+          "milestones_url": "https://api.github.com/repos/jackotom/hongguo-drama/milestones{/number}",
+          "notifications_url": "https://api.github.com/repos/jackotom/hongguo-drama/notifications{?since,all,participating}",
+          "labels_url": "https://api.github.com/repos/jackotom/hongguo-drama/labels{/name}",
+          "releases_url": "https://api.github.com/repos/jackotom/hongguo-drama/releases{/id}",
+          "deployments_url": "https://api.github.com/repos/jackotom/hongguo-drama/deployments"
+        },
+        "head_repository": {
+          "id": 1408042332,
+          "node_id": "R_kgDOU-0FXA",
+          "name": "hongguo-drama",
+          "full_name": "jackotom/hongguo-drama",
+          "private": false,
+          "owner": {
+            "login": "jackotom",
+            "id": 282187345,
+            "node_id": "U_kgDOENHWUQ",
+            "avatar_url": "https://avatars.githubusercontent.com/u/282187345?v=4",
+            "gravatar_id": "",
+            "url": "https://api.github.com/users/jackotom",
+            "html_url": "https://github.com/jackotom",
+            "followers_url": "https://api.github.com/users/jackotom/followers",
+            "following_url": "https://api.github.com/users/jackotom/following{/other_user}",
+            "gists_url": "https://api.github.com/users/jackotom/gists{/gist_id}",
+            "starred_url": "https://api.github.com/users/jackotom/starred{/owner}{/repo}",
+            "subscriptions_url": "https://api.github.com/users/jackotom/subscriptions",
+            "organizations_url": "https://api.github.com/users/jackotom/orgs",
+            "repos_url": "https://api.github.com/users/jackotom/repos",
+            "events_url": "https://api.github.com/users/jackotom/events{/privacy}",
+            "received_events_url": "https://api.github.com/users/jackotom/received_events",
+            "type": "User",
+            "user_view_type": "public",
+            "site_admin": false
+          },
+          "html_url": "https://github.com/jackotom/hongguo-drama",
+          "description": "\u7ea2\u679c\u77ed\u5267\u684c\u9762\u7248 \u00b7 \u652f\u6301 M \u7cfb\u5217 Mac\u3001Intel Mac \u548c Windows \u00b7 \u4e09\u6765\u6e90\u641c\u7d22\u3001\u64ad\u653e\u3001\u4e0b\u8f7d\u4e0e\u8ffd\u5267 \u00b7 GPL-3.0 \u5f00\u6e90",
+          "fork": false,
+          "url": "https://api.github.com/repos/jackotom/hongguo-drama",
+          "forks_url": "https://api.github.com/repos/jackotom/hongguo-drama/forks",
+          "keys_url": "https://api.github.com/repos/jackotom/hongguo-drama/keys{/key_id}",
+          "collaborators_url": "https://api.github.com/repos/jackotom/hongguo-drama/collaborators{/collaborator}",
+          "teams_url": "https://api.github.com/repos/jackotom/hongguo-drama/teams",
+          "hooks_url": "https://api.github.com/repos/jackotom/hongguo-drama/hooks",
+          "issue_events_url": "https://api.github.com/repos/jackotom/hongguo-drama/issues/events{/number}",
+          "events_url": "https://api.github.com/repos/jackotom/hongguo-drama/events",
+          "assignees_url": "https://api.github.com/repos/jackotom/hongguo-drama/assignees{/user}",
+          "branches_url": "https://api.github.com/repos/jackotom/hongguo-drama/branches{/branch}",
+          "tags_url": "https://api.github.com/repos/jackotom/hongguo-drama/tags",
+          "blobs_url": "https://api.github.com/repos/jackotom/hongguo-drama/git/blobs{/sha}",
+          "git_tags_url": "https://api.github.com/repos/jackotom/hongguo-drama/git/tags{/sha}",
+          "git_refs_url": "https://api.github.com/repos/jackotom/hongguo-drama/git/refs{/sha}",
+          "trees_url": "https://api.github.com/repos/jackotom/hongguo-drama/git/trees{/sha}",
+          "statuses_url": "https://api.github.com/repos/jackotom/hongguo-drama/statuses/{sha}",
+          "languages_url": "https://api.github.com/repos/jackotom/hongguo-drama/languages",
+          "stargazers_url": "https://api.github.com/repos/jackotom/hongguo-drama/stargazers",
+          "contributors_url": "https://api.github.com/repos/jackotom/hongguo-drama/contributors",
+          "subscribers_url": "https://api.github.com/repos/jackotom/hongguo-drama/subscribers",
+          "subscription_url": "https://api.github.com/repos/jackotom/hongguo-drama/subscription",
+          "commits_url": "https://api.github.com/repos/jackotom/hongguo-drama/commits{/sha}",
+          "git_commits_url": "https://api.github.com/repos/jackotom/hongguo-drama/git/commits{/sha}",
+          "comments_url": "https://api.github.com/repos/jackotom/hongguo-drama/comments{/number}",
+          "issue_comment_url": "https://api.github.com/repos/jackotom/hongguo-drama/issues/comments{/number}",
+          "contents_url": "https://api.github.com/repos/jackotom/hongguo-drama/contents/{+path}",
+          "compare_url": "https://api.github.com/repos/jackotom/hongguo-drama/compare/{base}...{head}",
+          "merges_url": "https://api.github.com/repos/jackotom/hongguo-drama/merges",
+          "archive_url": "https://api.github.com/repos/jackotom/hongguo-drama/{archive_format}{/ref}",
+          "downloads_url": "https://api.github.com/repos/jackotom/hongguo-drama/downloads",
+          "issues_url": "https://api.github.com/repos/jackotom/hongguo-drama/issues{/number}",
+          "pulls_url": "https://api.github.com/repos/jackotom/hongguo-drama/pulls{/number}",
+          "milestones_url": "https://api.github.com/repos/jackotom/hongguo-drama/milestones{/number}",
+          "notifications_url": "https://api.github.com/repos/jackotom/hongguo-drama/notifications{?since,all,participating}",
+          "labels_url": "https://api.github.com/repos/jackotom/hongguo-drama/labels{/name}",
+          "releases_url": "https://api.github.com/repos/jackotom/hongguo-drama/releases{/id}",
+          "deployments_url": "https://api.github.com/repos/jackotom/hongguo-drama/deployments"
+        }
+      },
+      {
+        "id": 43157691047,
+        "name": "Docker server candidate",
+        "node_id": "WFR_kwLOU-0FXM8AAAAKDGYapw",
+        "head_branch": "codex/fix-7.1-downloads",
+        "head_sha": "bdab9d6158e07524f234f88c1168f20baa2cd507",
+        "path": ".github/workflows/docker.yml",
+        "display_title": "Docker server candidate",
+        "run_number": 20,
+        "event": "workflow_dispatch",
+        "status": "completed",
+        "conclusion": "success",
+        "workflow_id": 411886352,
+        "check_suite_id": 116869415937,
+        "check_suite_node_id": "CS_kwDOU-0FXM8AAAAbNfXEAQ",
+        "url": "https://api.github.com/repos/jackotom/hongguo-drama/actions/runs/43157691047",
+        "html_url": "https://github.com/jackotom/hongguo-drama/actions/runs/43157691047",
+        "pull_requests": [],
+        "created_at": "2026-11-12T04:53:17Z",
+        "updated_at": "2026-11-12T05:00:51Z",
+        "actor": {
+          "login": "jackotom",
+          "id": 282187345,
+          "node_id": "U_kgDOENHWUQ",
+          "avatar_url": "https://avatars.githubusercontent.com/u/282187345?v=4",
+          "gravatar_id": "",
+          "url": "https://api.github.com/users/jackotom",
+          "html_url": "https://github.com/jackotom",
+          "followers_url": "https://api.github.com/users/jackotom/followers",
+          "following_url": "https://api.github.com/users/jackotom/following{/other_user}",
+          "gists_url": "https://api.github.com/users/jackotom/gists{/gist_id}",
+          "starred_url": "https://api.github.com/users/jackotom/starred{/owner}{/repo}",
+          "subscriptions_url": "https://api.github.com/users/jackotom/subscriptions",
+          "organizations_url": "https://api.github.com/users/jackotom/orgs",
+          "repos_url": "https://api.github.com/users/jackotom/repos",
+          "events_url": "https://api.github.com/users/jackotom/events{/privacy}",
+          "received_events_url": "https://api.github.com/users/jackotom/received_events",
+          "type": "User",
+          "user_view_type": "public",
+          "site_admin": false
+        },
+        "run_attempt": 1,
+        "referenced_workflows": [],
+        "run_started_at": "2026-11-12T04:53:17Z",
+        "triggering_actor": {
+          "login": "jackotom",
+          "id": 282187345,
+          "node_id": "U_kgDOENHWUQ",
+          "avatar_url": "https://avatars.githubusercontent.com/u/282187345?v=4",
+          "gravatar_id": "",
+          "url": "https://api.github.com/users/jackotom",
+          "html_url": "https://github.com/jackotom",
+          "followers_url": "https://api.github.com/users/jackotom/followers",
+          "following_url": "https://api.github.com/users/jackotom/following{/other_user}",
+          "gists_url": "https://api.github.com/users/jackotom/gists{/gist_id}",
+          "starred_url": "https://api.github.com/users/jackotom/starred{/owner}{/repo}",
+          "subscriptions_url": "https://api.github.com/users/jackotom/subscriptions",
+          "organizations_url": "https://api.github.com/users/jackotom/orgs",
+          "repos_url": "https://api.github.com/users/jackotom/repos",
+          "events_url": "https://api.github.com/users/jackotom/events{/privacy}",
+          "received_events_url": "https://api.github.com/users/jackotom/received_events",
+          "type": "User",
+          "user_view_type": "public",
+          "site_admin": false
+        },
+        "jobs_url": "https://api.github.com/repos/jackotom/hongguo-drama/actions/runs/43157691047/jobs",
+        "logs_url": "https://api.github.com/repos/jackotom/hongguo-drama/actions/runs/43157691047/logs",
+        "check_suite_url": "https://api.github.com/repos/jackotom/hongguo-drama/check-suites/116869415937",
+        "artifacts_url": "https://api.github.com/repos/jackotom/hongguo-drama/actions/runs/43157691047/artifacts",
+        "cancel_url": "https://api.github.com/repos/jackotom/hongguo-drama/actions/runs/43157691047/cancel",
+        "rerun_url": "https://api.github.com/repos/jackotom/hongguo-drama/actions/runs/43157691047/rerun",
+        "previous_attempt_url": null,
+        "workflow_url": "https://api.github.com/repos/jackotom/hongguo-drama/actions/workflows/411886352",
+        "head_commit": {
+          "id": "bdab9d6158e07524f234f88c1168f20baa2cd507",
+          "tree_id": "1373ecb8bcce1ad6ff454f21a48cd145dc6f8e79",
+          "message": "release: 7.1 \u52a0\u5165\u663e\u5361\u5feb\u901f\u8f6c\u6362\u4e0e\u6709\u754c\u56de\u9000\u5e76\u51bb\u7ed3\u4e94\u5e73\u53f0 [skip ci]",
+          "timestamp": "2026-11-12T04:52:32Z",
+          "author": {
+            "name": "jackotom",
+            "email": "idellasalamehwoi28@gmail.com"
+          },
+          "committer": {
+            "name": "jackotom",
+            "email": "idellasalamehwoi28@gmail.com"
+          }
+        },
+        "repository": {
+          "id": 1408042332,
+          "node_id": "R_kgDOU-0FXA",
+          "name": "hongguo-drama",
+          "full_name": "jackotom/hongguo-drama",
+          "private": false,
+          "owner": {
+            "login": "jackotom",
+            "id": 282187345,
+            "node_id": "U_kgDOENHWUQ",
+            "avatar_url": "https://avatars.githubusercontent.com/u/282187345?v=4",
+            "gravatar_id": "",
+            "url": "https://api.github.com/users/jackotom",
+            "html_url": "https://github.com/jackotom",
+            "followers_url": "https://api.github.com/users/jackotom/followers",
+            "following_url": "https://api.github.com/users/jackotom/following{/other_user}",
+            "gists_url": "https://api.github.com/users/jackotom/gists{/gist_id}",
+            "starred_url": "https://api.github.com/users/jackotom/starred{/owner}{/repo}",
+            "subscriptions_url": "https://api.github.com/users/jackotom/subscriptions",
+            "organizations_url": "https://api.github.com/users/jackotom/orgs",
+            "repos_url": "https://api.github.com/users/jackotom/repos",
+            "events_url": "https://api.github.com/users/jackotom/events{/privacy}",
+            "received_events_url": "https://api.github.com/users/jackotom/received_events",
+            "type": "User",
+            "user_view_type": "public",
+            "site_admin": false
+          },
+          "html_url": "https://github.com/jackotom/hongguo-drama",
+          "description": "\u7ea2\u679c\u77ed\u5267\u684c\u9762\u7248 \u00b7 \u652f\u6301 M \u7cfb\u5217 Mac\u3001Intel Mac \u548c Windows \u00b7 \u4e09\u6765\u6e90\u641c\u7d22\u3001\u64ad\u653e\u3001\u4e0b\u8f7d\u4e0e\u8ffd\u5267 \u00b7 GPL-3.0 \u5f00\u6e90",
+          "fork": false,
+          "url": "https://api.github.com/repos/jackotom/hongguo-drama",
+          "forks_url": "https://api.github.com/repos/jackotom/hongguo-drama/forks",
+          "keys_url": "https://api.github.com/repos/jackotom/hongguo-drama/keys{/key_id}",
+          "collaborators_url": "https://api.github.com/repos/jackotom/hongguo-drama/collaborators{/collaborator}",
+          "teams_url": "https://api.github.com/repos/jackotom/hongguo-drama/teams",
+          "hooks_url": "https://api.github.com/repos/jackotom/hongguo-drama/hooks",
+          "issue_events_url": "https://api.github.com/repos/jackotom/hongguo-drama/issues/events{/number}",
+          "events_url": "https://api.github.com/repos/jackotom/hongguo-drama/events",
+          "assignees_url": "https://api.github.com/repos/jackotom/hongguo-drama/assignees{/user}",
+          "branches_url": "https://api.github.com/repos/jackotom/hongguo-drama/branches{/branch}",
+          "tags_url": "https://api.github.com/repos/jackotom/hongguo-drama/tags",
+          "blobs_url": "https://api.github.com/repos/jackotom/hongguo-drama/git/blobs{/sha}",
+          "git_tags_url": "https://api.github.com/repos/jackotom/hongguo-drama/git/tags{/sha}",
+          "git_refs_url": "https://api.github.com/repos/jackotom/hongguo-drama/git/refs{/sha}",
+          "trees_url": "https://api.github.com/repos/jackotom/hongguo-drama/git/trees{/sha}",
+          "statuses_url": "https://api.github.com/repos/jackotom/hongguo-drama/statuses/{sha}",
+          "languages_url": "https://api.github.com/repos/jackotom/hongguo-drama/languages",
+          "stargazers_url": "https://api.github.com/repos/jackotom/hongguo-drama/stargazers",
+          "contributors_url": "https://api.github.com/repos/jackotom/hongguo-drama/contributors",
+          "subscribers_url": "https://api.github.com/repos/jackotom/hongguo-drama/subscribers",
+          "subscription_url": "https://api.github.com/repos/jackotom/hongguo-drama/subscription",
+          "commits_url": "https://api.github.com/repos/jackotom/hongguo-drama/commits{/sha}",
+          "git_commits_url": "https://api.github.com/repos/jackotom/hongguo-drama/git/commits{/sha}",
+          "comments_url": "https://api.github.com/repos/jackotom/hongguo-drama/comments{/number}",
+          "issue_comment_url": "https://api.github.com/repos/jackotom/hongguo-drama/issues/comments{/number}",
+          "contents_url": "https://api.github.com/repos/jackotom/hongguo-drama/contents/{+path}",
+          "compare_url": "https://api.github.com/repos/jackotom/hongguo-drama/compare/{base}...{head}",
+          "merges_url": "https://api.github.com/repos/jackotom/hongguo-drama/merges",
+          "archive_url": "https://api.github.com/repos/jackotom/hongguo-drama/{archive_format}{/ref}",
+          "downloads_url": "https://api.github.com/repos/jackotom/hongguo-drama/downloads",
+          "issues_url": "https://api.github.com/repos/jackotom/hongguo-drama/issues{/number}",
+          "pulls_url": "https://api.github.com/repos/jackotom/hongguo-drama/pulls{/number}",
+          "milestones_url": "https://api.github.com/repos/jackotom/hongguo-drama/milestones{/number}",
+          "notifications_url": "https://api.github.com/repos/jackotom/hongguo-drama/notifications{?since,all,participating}",
+          "labels_url": "https://api.github.com/repos/jackotom/hongguo-drama/labels{/name}",
+          "releases_url": "https://api.github.com/repos/jackotom/hongguo-drama/releases{/id}",
+          "deployments_url": "https://api.github.com/repos/jackotom/hongguo-drama/deployments"
+        },
+        "head_repository": {
+          "id": 1408042332,
+          "node_id": "R_kgDOU-0FXA",
+          "name": "hongguo-drama",
+          "full_name": "jackotom/hongguo-drama",
+          "private": false,
+          "owner": {
+            "login": "jackotom",
+            "id": 282187345,
+            "node_id": "U_kgDOENHWUQ",
+            "avatar_url": "https://avatars.githubusercontent.com/u/282187345?v=4",
+            "gravatar_id": "",
+            "url": "https://api.github.com/users/jackotom",
+            "html_url": "https://github.com/jackotom",
+            "followers_url": "https://api.github.com/users/jackotom/followers",
+            "following_url": "https://api.github.com/users/jackotom/following{/other_user}",
+            "gists_url": "https://api.github.com/users/jackotom/gists{/gist_id}",
+            "starred_url": "https://api.github.com/users/jackotom/starred{/owner}{/repo}",
+            "subscriptions_url": "https://api.github.com/users/jackotom/subscriptions",
+            "organizations_url": "https://api.github.com/users/jackotom/orgs",
+            "repos_url": "https://api.github.com/users/jackotom/repos",
+            "events_url": "https://api.github.com/users/jackotom/events{/privacy}",
+            "received_events_url": "https://api.github.com/users/jackotom/received_events",
+            "type": "User",
+            "user_view_type": "public",
+            "site_admin": false
+          },
+          "html_url": "https://github.com/jackotom/hongguo-drama",
+          "description": "\u7ea2\u679c\u77ed\u5267\u684c\u9762\u7248 \u00b7 \u652f\u6301 M \u7cfb\u5217 Mac\u3001Intel Mac \u548c Windows \u00b7 \u4e09\u6765\u6e90\u641c\u7d22\u3001\u64ad\u653e\u3001\u4e0b\u8f7d\u4e0e\u8ffd\u5267 \u00b7 GPL-3.0 \u5f00\u6e90",
+          "fork": false,
+          "url": "https://api.github.com/repos/jackotom/hongguo-drama",
+          "forks_url": "https://api.github.com/repos/jackotom/hongguo-drama/forks",
+          "keys_url": "https://api.github.com/repos/jackotom/hongguo-drama/keys{/key_id}",
+          "collaborators_url": "https://api.github.com/repos/jackotom/hongguo-drama/collaborators{/collaborator}",
+          "teams_url": "https://api.github.com/repos/jackotom/hongguo-drama/teams",
+          "hooks_url": "https://api.github.com/repos/jackotom/hongguo-drama/hooks",
+          "issue_events_url": "https://api.github.com/repos/jackotom/hongguo-drama/issues/events{/number}",
+          "events_url": "https://api.github.com/repos/jackotom/hongguo-drama/events",
+          "assignees_url": "https://api.github.com/repos/jackotom/hongguo-drama/assignees{/user}",
+          "branches_url": "https://api.github.com/repos/jackotom/hongguo-drama/branches{/branch}",
+          "tags_url": "https://api.github.com/repos/jackotom/hongguo-drama/tags",
+          "blobs_url": "https://api.github.com/repos/jackotom/hongguo-drama/git/blobs{/sha}",
+          "git_tags_url": "https://api.github.com/repos/jackotom/hongguo-drama/git/tags{/sha}",
+          "git_refs_url": "https://api.github.com/repos/jackotom/hongguo-drama/git/refs{/sha}",
+          "trees_url": "https://api.github.com/repos/jackotom/hongguo-drama/git/trees{/sha}",
+          "statuses_url": "https://api.github.com/repos/jackotom/hongguo-drama/statuses/{sha}",
+          "languages_url": "https://api.github.com/repos/jackotom/hongguo-drama/languages",
+          "stargazers_url": "https://api.github.com/repos/jackotom/hongguo-drama/stargazers",
+          "contributors_url": "https://api.github.com/repos/jackotom/hongguo-drama/contributors",
+          "subscribers_url": "https://api.github.com/repos/jackotom/hongguo-drama/subscribers",
+          "subscription_url": "https://api.github.com/repos/jackotom/hongguo-drama/subscription",
+          "commits_url": "https://api.github.com/repos/jackotom/hongguo-drama/commits{/sha}",
+          "git_commits_url": "https://api.github.com/repos/jackotom/hongguo-drama/git/commits{/sha}",
+          "comments_url": "https://api.github.com/repos/jackotom/hongguo-drama/comments{/number}",
+          "issue_comment_url": "https://api.github.com/repos/jackotom/hongguo-drama/issues/comments{/number}",
+          "contents_url": "https://api.github.com/repos/jackotom/hongguo-drama/contents/{+path}",
+          "compare_url": "https://api.github.com/repos/jackotom/hongguo-drama/compare/{base}...{head}",
+          "merges_url": "https://api.github.com/repos/jackotom/hongguo-drama/merges",
+          "archive_url": "https://api.github.com/repos/jackotom/hongguo-drama/{archive_format}{/ref}",
+          "downloads_url": "https://api.github.com/repos/jackotom/hongguo-drama/downloads",
+          "issues_url": "https://api.github.com/repos/jackotom/hongguo-drama/issues{/number}",
+          "pulls_url": "https://api.github.com/repos/jackotom/hongguo-drama/pulls{/number}",
+          "milestones_url": "https://api.github.com/repos/jackotom/hongguo-drama/milestones{/number}",
+          "notifications_url": "https://api.github.com/repos/jackotom/hongguo-drama/notifications{?since,all,participating}",
+          "labels_url": "https://api.github.com/repos/jackotom/hongguo-drama/labels{/name}",
+          "releases_url": "https://api.github.com/repos/jackotom/hongguo-drama/releases{/id}",
+          "deployments_url": "https://api.github.com/repos/jackotom/hongguo-drama/deployments"
+        }
+      }
+    ],
+    "artifacts": [
+      {
+        "name": "windows-verification",
+        "id": 13916753595,
+        "runId": 43157689481,
+        "attempt": 1,
+        "headSha": "bdab9d6158e07524f234f88c1168f20baa2cd507",
+        "zip": {
+          "size": 1406708,
+          "sha256": "0632568b138c60affa7c75bc85e326fbeee2f6f30f6e5f15174594c2dd47dfe4"
+        },
+        "members": {
+          "installer-result.json": {
+            "size": 1287,
+            "sha256": "353d10e9f6e27fecb65e407c869710024f173f88c7bfc666ec57d42af2d58556"
+          },
+          "portable-windows-auto-next-hidden.png": {
+            "size": 390391,
+            "sha256": "fd2ab0819b30506630771a932a21fef01ed9b1ac061175f047940d7d04ce9055"
+          },
+          "portable-windows-download-quality.png": {
+            "size": 51330,
+            "sha256": "8063c3acaecd329c4554f7066ce0e6bcb492cf28c6bdcbe71cf85ab5bcd954fc"
+          },
+          "portable-windows-fullscreen-hidden.png": {
+            "size": 421181,
+            "sha256": "bdd93e1c6fd28e8cdc9af7b82723f0471039357760184cd05d525444dc61d203"
+          },
+          "portable-windows-playback.png": {
+            "size": 173470,
+            "sha256": "60119db2f5f81a968f406c3bba7004376040363c58500a4da0f813832304d356"
+          },
+          "portable-windows-shortcut-hidden.png": {
+            "size": 378450,
+            "sha256": "a533a1d958597ba318f120c05acc6208eae7c698cdfcb63700e45b54d3b53b71"
+          },
+          "result.json": {
+            "size": 10446,
+            "sha256": "2f405975ebb6a7ce62474899e31d0f0238fedc76235f790f64b136d8f9ccbbfe"
+          }
+        }
+      },
+      {
+        "name": "windows-release-candidate",
+        "id": 13916514477,
+        "runId": 43157689481,
+        "attempt": 1,
+        "headSha": "bdab9d6158e07524f234f88c1168f20baa2cd507",
+        "zip": {
+          "size": 405350495,
+          "sha256": "a6b1da2c0441d9d427af6f8737f23198ddd6a1e76afa3d20fadedc28cd2d9197"
+        },
+        "members": {
+          "ffmpeg-9.0.2-x264-b35605a-win-x64-corresponding-source.tar.gz": {
+            "size": 13284659,
+            "sha256": "f27155fd5507d2763c0c4d702c0e6ad1793c9ad8dea3047c92865f8ecec47a5a"
+          },
+          "hongguo-downloader-7.1-win-x64-setup.exe": {
+            "size": 137879841,
+            "sha256": "daf8141a89cbcbbd2071b5d5f3afdf1187c616e891eb98b928f2c239c49a2489"
+          },
+          "hongguo-downloader-7.1-win-x64-setup.exe.blockmap": {
+            "size": 145751,
+            "sha256": "60e2833e6d8bd2a6bb7217892c23dc1aeeeb19493089fc2d4406fbdd68ee1ffd"
+          },
+          "hongguo-downloader-7.1-win-x64.exe": {
+            "size": 114223221,
+            "sha256": "91dd4bb06ca607c30ebbeb7498a40367a99c625159c5ec9d5a7623883d4f8893"
+          },
+          "hongguo-downloader-7.1-win-x64.zip": {
+            "size": 114234244,
+            "sha256": "6c6a2ffcae16a079b4c7315bf234904178f9541c81a180a3d24c86e9a489e4a2"
+          },
+          "hongguo-downloader-7.1-windows-source.zip": {
+            "size": 5640311,
+            "sha256": "2e993bb73e7e46e39d99bb1c200e8436c52b26a23a971db9b678bd5c0b24e609"
+          },
+          "latest.yml": {
+            "size": 377,
+            "sha256": "be5503812b574b203af735628d0ddd1b5c7445613ad4ce670bb23e7cd7f430b6"
+          },
+          "librempeg-cb1f8f3-x264-b35605a-win-x64-corresponding-source.tar.gz": {
+            "size": 19959114,
+            "sha256": "dc348745552f73e6413c78c496fbecef0f99d0d992c5cc372a1a801686e04730"
+          },
+          "SOURCE-SHA.txt": {
+            "size": 42,
+            "sha256": "2a819e82124b3bb82d9fbe79dec9ca8801a99a126dcc461ec96762b206eb5caf"
+          },
+          "WINDOWS-SHA256SUMS.txt": {
+            "size": 961,
+            "sha256": "f29a70610b86bb50c45042c89eef6e48176daa3c827ab28b966bea4d31f86500"
+          }
+        }
+      },
+      {
+        "name": "linux-appimage-candidate",
+        "id": 13916692394,
+        "runId": 43157689435,
+        "attempt": 1,
+        "headSha": "bdab9d6158e07524f234f88c1168f20baa2cd507",
+        "zip": {
+          "size": 198255345,
+          "sha256": "04e15d4f0d6b6ae925b8c505e76e372ec9c95a4918a439189da40c973930b6d5"
+        },
+        "members": {
+          "LINUX-SHA256SUMS.txt": {
+            "size": 585,
+            "sha256": "efd6c024916030d71da9e2144b8ce36b74c96029564c7008e6deb532a41a007a"
+          },
+          "ffmpeg-9.0.2-x264-b35605a-linux-x64-corresponding-source.tar.gz": {
+            "size": 13251776,
+            "sha256": "403bbdd5a320b4dde8d730391ec9da39dcbb463ec3c5943017e1a8308b0d94a2"
+          },
+          "SOURCE-SHA.txt": {
+            "size": 41,
+            "sha256": "7a57275b0a214dcfce8c1805a92fcf83a7edc8a1cbed31d70b3792f2538d2b20"
+          },
+          "hongguo-downloader-7.1-linux-source.zip": {
+            "size": 5631914,
+            "sha256": "79669d10ae6c875c2b4c987925faf92fb09f61d8ded0be49d355ee81441fa1d5"
+          },
+          "hongguo-downloader-7.1-linux-x64.AppImage": {
+            "size": 160063077,
+            "sha256": "336d0c1a12710cd11079628ff82d3120b940861247f9c3a792b9287f1c291d09"
+          },
+          "librempeg-cb1f8f3-x264-b35605a-linux-x64-corresponding-source.tar.gz": {
+            "size": 19959114,
+            "sha256": "dc348745552f73e6413c78c496fbecef0f99d0d992c5cc372a1a801686e04730"
+          },
+          "linux-verification/appimage-result.json": {
+            "size": 1330,
+            "sha256": "d6ef35cfca1c673d527ac25ecc1c526b6fc8b135be15c423c29a25c5b242dfa0"
+          }
+        }
+      },
+      {
+        "name": "docker-server-candidate",
+        "id": 13917300924,
+        "runId": 43157691047,
+        "attempt": 1,
+        "headSha": "bdab9d6158e07524f234f88c1168f20baa2cd507",
+        "zip": {
+          "size": 145713951,
+          "sha256": "34c0c2642922ae5b49ef53258d706709e85ed66e9d1a2ee8ca4a3a3ed9558480"
+        },
+        "members": {
+          "DOCKER-SHA256SUMS.txt": {
+            "size": 879,
+            "sha256": "5cdea06d13f47ae138ce8b87192b7b3d7a3e8b1311dca6296f810096afbbd0d1"
+          },
+          "compose.yaml": {
+            "size": 622,
+            "sha256": "9ef82958a9e7ee02df4519c4373238b9cc94ef19a2d06b117cb5ca052cdf2fc9"
+          },
+          "SOURCE-SHA.txt": {
+            "size": 41,
+            "sha256": "7a57275b0a214dcfce8c1805a92fcf83a7edc8a1cbed31d70b3792f2538d2b20"
+          },
+          "docker-verification.json": {
+            "size": 414,
+            "sha256": "43ea7f7760f02da804e4cbf4a74d4c8740cc1f008a1244d28e6dac2dcbfc8277"
+          },
+          "docker.md": {
+            "size": 7110,
+            "sha256": "7e3780f49f32fec2a8adf195ce04128586b98f2cc33597fff5ff38d422ffc0fe"
+          },
+          "ffmpeg-9.0.2-x264-b35605a-linux-x64-corresponding-source.tar.gz": {
+            "size": 13251774,
+            "sha256": "cb486ddf52f4759d17da35d5e23da2ebfb955febff0512a7f1321f1b9ebb77a9"
+          },
+          "hongguo-drama-7.1-docker-amd64.tar.gz": {
+            "size": 107489235,
+            "sha256": "1a79151154a8e869c100ad5ebafff5d64580bd1589b2ac9d7c08e2ca9936d968"
+          },
+          "hongguo-drama-7.1-docker-source.zip": {
+            "size": 5631914,
+            "sha256": "79669d10ae6c875c2b4c987925faf92fb09f61d8ded0be49d355ee81441fa1d5"
+          },
+          "librempeg-cb1f8f3-x264-b35605a-linux-x64-corresponding-source.tar.gz": {
+            "size": 19959114,
+            "sha256": "dc348745552f73e6413c78c496fbecef0f99d0d992c5cc372a1a801686e04730"
+          },
+          "live-check.log": {
+            "size": 1629,
+            "sha256": "3c33b2ae5b8aaa178e4950bc1ade6d58fe7888cec1aabfd141ea484f55fccac5"
+          }
+        }
+      }
+    ]
+  },
+  "frozenMediaSourceVerification": {
+    "ffmpeg-9.0.2-x264-b35605a-corresponding-source.tar.gz": {
+      "passed": true,
+      "members": 13,
+      "archive": {
+        "size": 13122060,
+        "sha256": "bfcac890fe098e27bd1cdc4209837377ecaae3bea4fc5b1ea197ec4ab1c2b2e9"
+      }
+    },
+    "ffmpeg-9.0.2-x264-b35605a-linux-x64-corresponding-source.tar.gz": {
+      "passed": true,
+      "sourceCommit": "bdab9d6158e07524f234f88c1168f20baa2cd507",
+      "platform": "linux",
+      "nvLicenseSha256": "2db4f10959abe44e0cede85a6fded66f80ea1b1733be2b67d44cb6301924d8e0",
+      "archive": {
+        "size": 13251776,
+        "sha256": "403bbdd5a320b4dde8d730391ec9da39dcbb463ec3c5943017e1a8308b0d94a2"
+      },
+      "frozenBuildScriptSha256": "63bd24ec58eb2940828cf89fa7d2a1561e53dddfabb0532b82bf113135183c1e",
+      "members": {
+        "NV-CODEC-HEADERS-LICENSE.txt": 6223,
+        "TOOLCHAIN.txt": 246,
+        "build-ffmpeg-source-linux.sh": 3982,
+        "ffmpeg-9.0.2.tar.xz": 12040788,
+        "ffmpeg-config.log": 567295,
+        "nv-codec-headers-1889e62e2d35ff7aa9baca2bceb14f053785e6f1.tar.gz": 79617,
+        "prepare-nv-codec-headers.sh": 1932,
+        "x264-b35605ace3ddf7c1a5d67a2eb553f034aef41d55.tar.gz": 1040327,
+        "x264-config.log": 4324
+      },
+      "upstreamArchiveSha256": {
+        "ffmpeg-9.0.2.tar.xz": "8c3850283eb25fa026482078a04051e0be17347b09ef81a0849bec15a96e002e"
+      },
+      "x264TarSha256": "df62afece4eecef8ddf196f115dfec6e936a21b04ec2117a0f4e412de29b20e5"
+    },
+    "ffmpeg-9.0.2-x264-b35605a-win-x64-corresponding-source.tar.gz": {
+      "passed": true,
+      "sourceCommit": "bdab9d6158e07524f234f88c1168f20baa2cd507",
+      "platform": "windows",
+      "nvLicenseSha256": "2db4f10959abe44e0cede85a6fded66f80ea1b1733be2b67d44cb6301924d8e0",
+      "archive": {
+        "size": 13284659,
+        "sha256": "f27155fd5507d2763c0c4d702c0e6ad1793c9ad8dea3047c92865f8ecec47a5a"
+      },
+      "frozenBuildScriptSha256": "92019005a609653e8e2633039800b273e1bb006575b7fef2bccab68d4f2a417a",
+      "members": {
+        "NV-CODEC-HEADERS-LICENSE.txt": 6223,
+        "TOOLCHAIN.txt": 350,
+        "WINDOWS-GCC-LICENSE.txt": 75729,
+        "WINDOWS-MINGW-LICENSE.txt": 37808,
+        "WINDOWS-SHA256SUMS.txt": 155,
+        "WINDOWS-X264-LICENSE.txt": 17992,
+        "build-ffmpeg-source-win.sh": 5402,
+        "ffmpeg-9.0.2.tar.xz": 12040788,
+        "ffmpeg-config.log": 605586,
+        "nv-codec-headers-1889e62e2d35ff7aa9baca2bceb14f053785e6f1.tar.gz": 79617,
+        "prepare-nv-codec-headers.sh": 1932,
+        "x264-b35605ace3ddf7c1a5d67a2eb553f034aef41d55.tar.gz": 1040327,
+        "x264-config.log": 9559
+      },
+      "upstreamArchiveSha256": {
+        "ffmpeg-9.0.2.tar.xz": "8c3850283eb25fa026482078a04051e0be17347b09ef81a0849bec15a96e002e"
+      },
+      "x264TarSha256": "df62afece4eecef8ddf196f115dfec6e936a21b04ec2117a0f4e412de29b20e5"
+    },
+    "ffmpeg-9.0.2-x264-b35605a-x64-corresponding-source.tar.gz": {
+      "passed": true,
+      "members": 14,
+      "archive": {
+        "size": 13122451,
+        "sha256": "ad68bf181e6bcc8609bcfad68a4a1c071b046af7743fd21b4e645132080eba60"
+      }
+    },
+    "libmedia-1.3.1-152f629-corresponding-source.tar.gz": {
+      "passed": true,
+      "members": 2555,
+      "archive": {
+        "size": 190808102,
+        "sha256": "148b3101c2909359a0cece00a0a735a76e3c1410f858bcb5e4f1d88935baa887"
+      }
+    },
+    "librempeg-cb1f8f3-x264-b35605a-arm64-corresponding-source.tar.gz": {
+      "passed": true,
+      "sourceCommit": "bdab9d6158e07524f234f88c1168f20baa2cd507",
+      "platform": "mac",
+      "nvLicenseSha256": null,
+      "archive": {
+        "size": 19877572,
+        "sha256": "d26f61f26fc320ff53081345cc23b64916e4b5564463dcc3857a49f1acfa4570"
+      },
+      "frozenBuildScriptSha256": "e71bf0256cb4dc734661f5bb913ab826d8c1ff63f7a6c9607919bb8da40c54a3",
+      "members": {
+        "build-librempeg-source.sh": 8838,
+        "librempeg-cb1f8f3eef84999e61b27e2d44664858179bc240.tar.gz": 18967273,
+        "librempeg-videotoolbox-prototype.patch": 505,
+        "x264-b35605ace3ddf7c1a5d67a2eb553f034aef41d55.tar.gz": 1039951
+      },
+      "upstreamArchiveSha256": {
+        "librempeg-cb1f8f3eef84999e61b27e2d44664858179bc240.tar.gz": "fd965e6ef9f745af96142cf118d7c2aa0dce906225c9d3cd2ef19e0221723813"
+      },
+      "x264TarSha256": "df62afece4eecef8ddf196f115dfec6e936a21b04ec2117a0f4e412de29b20e5"
+    },
+    "librempeg-cb1f8f3-x264-b35605a-linux-x64-corresponding-source.tar.gz": {
+      "passed": true,
+      "sourceCommit": "bdab9d6158e07524f234f88c1168f20baa2cd507",
+      "platform": "linux",
+      "nvLicenseSha256": "2db4f10959abe44e0cede85a6fded66f80ea1b1733be2b67d44cb6301924d8e0",
+      "archive": {
+        "size": 19959114,
+        "sha256": "dc348745552f73e6413c78c496fbecef0f99d0d992c5cc372a1a801686e04730"
+      },
+      "frozenBuildScriptSha256": "e71bf0256cb4dc734661f5bb913ab826d8c1ff63f7a6c9607919bb8da40c54a3",
+      "members": {
+        "NV-CODEC-HEADERS-LICENSE.txt": 6223,
+        "build-librempeg-source.sh": 8838,
+        "librempeg-cb1f8f3eef84999e61b27e2d44664858179bc240.tar.gz": 18967273,
+        "librempeg-videotoolbox-prototype.patch": 505,
+        "nv-codec-headers-1889e62e2d35ff7aa9baca2bceb14f053785e6f1.tar.gz": 79617,
+        "prepare-nv-codec-headers.sh": 1932,
+        "x264-b35605ace3ddf7c1a5d67a2eb553f034aef41d55.tar.gz": 1040327
+      },
+      "upstreamArchiveSha256": {
+        "librempeg-cb1f8f3eef84999e61b27e2d44664858179bc240.tar.gz": "fd965e6ef9f745af96142cf118d7c2aa0dce906225c9d3cd2ef19e0221723813"
+      },
+      "x264TarSha256": "df62afece4eecef8ddf196f115dfec6e936a21b04ec2117a0f4e412de29b20e5"
+    },
+    "librempeg-cb1f8f3-x264-b35605a-win-x64-corresponding-source.tar.gz": {
+      "passed": true,
+      "sourceCommit": "bdab9d6158e07524f234f88c1168f20baa2cd507",
+      "platform": "windows",
+      "nvLicenseSha256": "2db4f10959abe44e0cede85a6fded66f80ea1b1733be2b67d44cb6301924d8e0",
+      "archive": {
+        "size": 19959114,
+        "sha256": "dc348745552f73e6413c78c496fbecef0f99d0d992c5cc372a1a801686e04730"
+      },
+      "frozenBuildScriptSha256": "e71bf0256cb4dc734661f5bb913ab826d8c1ff63f7a6c9607919bb8da40c54a3",
+      "members": {
+        "NV-CODEC-HEADERS-LICENSE.txt": 6223,
+        "build-librempeg-source.sh": 8838,
+        "librempeg-cb1f8f3eef84999e61b27e2d44664858179bc240.tar.gz": 18967273,
+        "librempeg-videotoolbox-prototype.patch": 505,
+        "nv-codec-headers-1889e62e2d35ff7aa9baca2bceb14f053785e6f1.tar.gz": 79617,
+        "prepare-nv-codec-headers.sh": 1932,
+        "x264-b35605ace3ddf7c1a5d67a2eb553f034aef41d55.tar.gz": 1040327
+      },
+      "upstreamArchiveSha256": {
+        "librempeg-cb1f8f3eef84999e61b27e2d44664858179bc240.tar.gz": "fd965e6ef9f745af96142cf118d7c2aa0dce906225c9d3cd2ef19e0221723813"
+      },
+      "x264TarSha256": "df62afece4eecef8ddf196f115dfec6e936a21b04ec2117a0f4e412de29b20e5"
+    },
+    "librempeg-cb1f8f3-x264-b35605a-x64-corresponding-source.tar.gz": {
+      "passed": true,
+      "sourceCommit": "bdab9d6158e07524f234f88c1168f20baa2cd507",
+      "platform": "mac",
+      "nvLicenseSha256": null,
+      "archive": {
+        "size": 19877572,
+        "sha256": "d26f61f26fc320ff53081345cc23b64916e4b5564463dcc3857a49f1acfa4570"
+      },
+      "frozenBuildScriptSha256": "e71bf0256cb4dc734661f5bb913ab826d8c1ff63f7a6c9607919bb8da40c54a3",
+      "members": {
+        "build-librempeg-source.sh": 8838,
+        "librempeg-cb1f8f3eef84999e61b27e2d44664858179bc240.tar.gz": 18967273,
+        "librempeg-videotoolbox-prototype.patch": 505,
+        "x264-b35605ace3ddf7c1a5d67a2eb553f034aef41d55.tar.gz": 1039951
+      },
+      "upstreamArchiveSha256": {
+        "librempeg-cb1f8f3eef84999e61b27e2d44664858179bc240.tar.gz": "fd965e6ef9f745af96142cf118d7c2aa0dce906225c9d3cd2ef19e0221723813"
+      },
+      "x264TarSha256": "df62afece4eecef8ddf196f115dfec6e936a21b04ec2117a0f4e412de29b20e5"
+    }
+  },
+  "dockerImageVerification": {
+    "passed": true,
+    "imageId": "sha256:443d3283b2e980190aabd37099a92c89406dd819e5ad9f7f478d2c611e3368b2",
+    "sourceCommit": "bdab9d6158e07524f234f88c1168f20baa2cd507",
+    "architecture": "amd64",
+    "layerCount": 13,
+    "archive": {
+      "size": 107489235,
+      "sha256": "1a79151154a8e869c100ad5ebafff5d64580bd1589b2ac9d7c08e2ca9936d968"
+    },
+    "frozenSourceFiles": 99,
+    "productionDependencies": 42,
+    "layerDiffIdsVerified": 13,
+    "nvLicenseSha256": "2db4f10959abe44e0cede85a6fded66f80ea1b1733be2b67d44cb6301924d8e0",
+    "mediaFiles": {
+      "ffmpeg": {
+        "size": 26419440,
+        "sha256": "cf6e254b318bb1c00c2e688bd19c211b383e8274d8dce15ae7cd0b3911a66f9e"
+      },
+      "ffprobe": {
+        "size": 26202288,
+        "sha256": "7ef81875212fe05265025873d5230015336027edd9bfd0d9dbb8105f24e7ce38"
+      },
+      "librempeg": {
+        "size": 7814960,
+        "sha256": "7587f1ef39689b2120a44c53dcee37d91bd8f573b3432e6c7db6d7ea0e638c3b"
+      }
+    }
+  },
+  "linuxDockerMediaEquivalence": {
+    "ffmpeg-9.0.2-x264-b35605a-linux-x64-corresponding-source.tar.gz": {
+      "passed": true,
+      "members": 10,
+      "normalizedDiagnostics": [
+        "corresponding-source/ffmpeg-config.log"
+      ],
+      "firstArchive": {
+        "size": 13251776,
+        "sha256": "403bbdd5a320b4dde8d730391ec9da39dcbb463ec3c5943017e1a8308b0d94a2"
+      },
+      "secondArchive": {
+        "size": 13251774,
+        "sha256": "cb486ddf52f4759d17da35d5e23da2ebfb955febff0512a7f1321f1b9ebb77a9"
+      },
+      "archiveBytesEqual": false,
+      "sourceMembersEqualOutsideWhitelistedDiagnostics": true
+    },
+    "librempeg-cb1f8f3-x264-b35605a-linux-x64-corresponding-source.tar.gz": {
+      "passed": true,
+      "members": 8,
+      "normalizedDiagnostics": [],
+      "firstArchive": {
+        "size": 19959114,
+        "sha256": "dc348745552f73e6413c78c496fbecef0f99d0d992c5cc372a1a801686e04730"
+      },
+      "secondArchive": {
+        "size": 19959114,
+        "sha256": "dc348745552f73e6413c78c496fbecef0f99d0d992c5cc372a1a801686e04730"
+      },
+      "archiveBytesEqual": true,
+      "sourceMembersEqualOutsideWhitelistedDiagnostics": true
+    }
+  },
+  "sourceArchives": {
+    "windows": {
+      "passed": true,
+      "sourceCommit": "bdab9d6158e07524f234f88c1168f20baa2cd507",
+      "crlfOnly": [
+        ".dockerignore",
+        ".github/release-6.7-transport.json",
+        ".github/release-6.7-transport.py",
+        ".github/workflows/docker.yml",
+        ".github/workflows/linux.yml",
+        ".github/workflows/release-6.7-upload.yml",
+        ".github/workflows/test.yml",
+        ".github/workflows/windows.yml",
+        ".gitignore",
+        ".impeccable/README.md",
+        ".impeccable/design.json",
+        ".impeccable/surfaces/src-components-dramafeed-jsx.md",
+        "AGENTS.md",
+        "CONTRIBUTORS.md",
+        "DESIGN.md",
+        "Dockerfile",
+        "LICENSE",
+        "NOTICE",
+        "PRODUCT.md",
+        "README.md",
+        "THIRD-PARTY-NOTICES.md",
+        "android/.gitignore",
+        "android/PORT-PLAN.md",
+        "android/README.md",
+        "android/app/src/main/AndroidManifest.xml",
+        "android/app/src/main/assets/style.css",
+        "android/app/src/main/java/io/github/hongguo/personal/MainActivity.java",
+        "android/app/src/main/res/values/styles.xml",
+        "android/build.py",
+        "android/bundle.cjs",
+        "android/mobile/axios.cjs",
+        "android/mobile/boot.js",
+        "android/mobile/bridge.js",
+        "android/mobile/bundle.cjs",
+        "android/mobile/electron.cjs",
+        "android/mobile/fs.cjs",
+        "android/mobile/index.html",
+        "android/mobile/main.jsx",
+        "android/mobile/media.js",
+        "android/mobile/mine.jsx",
+        "android/mobile/mobile-library.css",
+        "android/mobile/mobile-player.css",
+        "android/mobile/mobile-shell.css",
+        "android/mobile/mobile.css",
+        "android/mobile/path.cjs",
+        "android/mobile/settings.jsx",
+        "android/mobile/web-media-guard.cjs",
+        "android/package-lock.json",
+        "android/package.json",
+        "android/tests/axios-entry.cjs",
+        "android/tests/check_tv_metadata.py",
+        "android/tests/core.test.cjs",
+        "android/tests/fullscreen.test.cjs",
+        "android/tests/media-bundle-fixture.cjs",
+        "android/tests/media-phone-bundle.test.cjs",
+        "android/tests/media-recovery.test.cjs",
+        "android/tests/mobile-library.test.cjs",
+        "android/tests/mobile.test.cjs",
+        "android/tests/player-controls.test.cjs",
+        "android/tests/public-player-fixture.cjs",
+        "android/tests/registration-diagnostics.test.cjs",
+        "android/tests/tv-danmaku.test.cjs",
+        "android/tests/tv-dom-fixture.cjs",
+        "android/tests/tv-media-lifecycle.test.cjs",
+        "android/tests/tv-startup-native.cjs",
+        "android/tests/tv-startup-native.java.txt",
+        "android/tests/tv-startup.test.cjs",
+        "android/tests/tv.test.cjs",
+        "android/tv.css",
+        "android/web/app.js",
+        "android/web/axios.cjs",
+        "android/web/crypto.js",
+        "android/web/globals.js",
+        "android/web/index.html",
+        "android/web/media.js",
+        "android/web/public.js",
+        "android/web/transport.js",
+        "android/web/tv-danmaku.js",
+        "android/web/tv-navigation.js",
+        "android/web/tv-startup.js",
+        "android/web/tv.js",
+        "android/web/zlib.js",
+        "announcements/README.md",
+        "announcements/emergency.json",
+        "announcements/normal.json",
+        "build/app-update.yml",
+        "build/ffmpeg/COPYING.GPLv2",
+        "build/ffmpeg/COPYING.GPLv3",
+        "build/ffmpeg/COPYING.LGPLv2.1",
+        "build/ffmpeg/FFMPEG-NOTICE.txt",
+        "build/ffmpeg/LIBREMPEG-COPYING.AGPLv3",
+        "build/ffmpeg/LIBREMPEG-COPYING.GPLv3",
+        "build/ffmpeg/LIBREMPEG-LICENSE.md",
+        "build/ffmpeg/LIBREMPEG-NOTICE.txt",
+        "build/ffmpeg/LIBREMPEG-X264-LICENSE.txt",
+        "build/ffmpeg/LICENSE.md",
+        "build/ffmpeg/MACOS-LICENSE.txt",
+        "build/ffmpeg/MACOS-NOTICE.txt",
+        "build/ffmpeg/MACOS-VERSIONS.txt",
+        "build/ffmpeg/MACOS-X264-LICENSE.txt",
+        "build/ffmpeg/WINDOWS-NOTICE.txt",
+        "build/licenses/LIBMEDIA-LGPL-3.0.txt",
+        "build/linux-AppRun.sh",
+        "compose.yaml",
+        "docs/3.4-remediation-priorities.md",
+        "docs/EPISODE_COMMENTS.md",
+        "docs/RELEASING.md",
+        "docs/android-mobile-ui-2026-11-09.md",
+        "docs/android-playback-diagnosis-2026-11-09.md",
+        "docs/android-tv.md",
+        "docs/announcements.md",
+        "docs/auto-1080-preview.md",
+        "docs/bytevc2-playback.md",
+        "docs/bytevc2-speed-6.3.md",
+        "docs/docker.md",
+        "docs/download-auto-retry.md",
+        "docs/fix-watch-history-76.md",
+        "docs/github-issues-6.6.md",
+        "docs/inline-playback-metadata-fallback.md",
+        "docs/issue-119-bytevc2-6.3.md",
+        "docs/issue-130-video-tab.md",
+        "docs/issue-147-148-7.1.md",
+        "docs/issue-69-4k.md",
+        "docs/issue-70-device-registration.md",
+        "docs/issue-71-download-retry.md",
+        "docs/issue-72-picture-in-picture.md",
+        "docs/issue-74-dock-4.8.md",
+        "docs/issues-audit-5.9.md",
+        "docs/issues-retest-6.9-2026-11-11.md",
+        "docs/legacy-playback.md",
+        "docs/local-issues-100-102.md",
+        "docs/local-issues-96-98.md",
+        "docs/mac-6.4-fixes-2026-11-08.md",
+        "docs/mac-6.4-qa-2026-11-08.md",
+        "docs/nas-download.md",
+        "docs/overseas-live-2026-11-08.md",
+        "docs/overseas-platforms-6.3.md",
+        "docs/pr-review-7.1-2026-11-12.md",
+        "docs/release-1.2.md",
+        "docs/release-1.7.md",
+        "docs/release-1.71.md",
+        "docs/release-1.72.md",
+        "docs/release-1.73.md",
+        "docs/release-1.74.md",
+        "docs/release-1.75.md",
+        "docs/release-1.80.md",
+        "docs/release-2.0.md",
+        "docs/release-2.1.md",
+        "docs/release-2.2.md",
+        "docs/release-2.3.md",
+        "docs/release-2.4.md",
+        "docs/release-2.5.md",
+        "docs/release-2.6.md",
+        "docs/release-2.7.md",
+        "docs/release-2.8.md",
+        "docs/release-2.9.md",
+        "docs/release-3.0.md",
+        "docs/release-3.1.md",
+        "docs/release-3.2.md",
+        "docs/release-3.3.md",
+        "docs/release-3.4.md",
+        "docs/release-3.5.md",
+        "docs/release-3.6.md",
+        "docs/release-3.7.md",
+        "docs/release-3.8.md",
+        "docs/release-3.9-signature-recovery.md",
+        "docs/release-3.9.md",
+        "docs/release-4.0.md",
+        "docs/release-4.1.md",
+        "docs/release-4.2.md",
+        "docs/release-4.3.md",
+        "docs/release-4.4.md",
+        "docs/release-4.5.md",
+        "docs/release-4.6.md",
+        "docs/release-4.7.md",
+        "docs/release-4.8.md",
+        "docs/release-4.9.md",
+        "docs/release-5.0.md",
+        "docs/release-5.1.md",
+        "docs/release-5.2.md",
+        "docs/release-5.3.md",
+        "docs/release-5.4.md",
+        "docs/release-5.5.md",
+        "docs/release-5.6.md",
+        "docs/release-5.7.md",
+        "docs/release-5.8.md",
+        "docs/release-5.9.md",
+        "docs/release-6.0.md",
+        "docs/release-6.1.md",
+        "docs/release-6.2.md",
+        "docs/release-6.3.md",
+        "docs/release-6.4.md",
+        "docs/release-6.5.md",
+        "docs/release-6.6.md",
+        "docs/release-6.7.md",
+        "docs/release-6.8.md",
+        "docs/release-6.9.md",
+        "docs/release-7.0.md",
+        "docs/release-7.1.md",
+        "docs/release-platforms.md",
+        "docs/superpowers/plans/2026-10-19-in-app-updates.md",
+        "docs/superpowers/plans/2026-10-27-text-export-4.1.md",
+        "docs/superpowers/plans/2026-11-09-tv-6.6.md",
+        "index.html",
+        "main.js",
+        "package-lock.json",
+        "package.json",
+        "preload.js",
+        "scripts/build-ffmpeg-source-linux.sh",
+        "scripts/build-ffmpeg-source-mac-x64.sh",
+        "scripts/build-ffmpeg-source-mac.sh",
+        "scripts/build-ffmpeg-source-win.sh",
+        "scripts/build-librempeg-source.sh",
+        "scripts/check-announcement-ui.cjs",
+        "scripts/check-app-catalog.cjs",
+        "scripts/check-app-media.cjs",
+        "scripts/check-app-search-ipc.cjs",
+        "scripts/check-app-source-recovery.cjs",
+        "scripts/check-app-source.cjs",
+        "scripts/check-app-update-installer.cjs",
+        "scripts/check-app-update-proxy.cjs",
+        "scripts/check-app-update-ui.cjs",
+        "scripts/check-app-update.cjs",
+        "scripts/check-backend-lifecycle.cjs",
+        "scripts/check-boss-key.cjs",
+        "scripts/check-calendar-playback.cjs",
+        "scripts/check-cast-file-pins.cjs",
+        "scripts/check-catalog-routing.cjs",
+        "scripts/check-catalog.cjs",
+        "scripts/check-compat-lifecycle.cjs",
+        "scripts/check-custom-media-integration.cjs",
+        "scripts/check-custom-source.cjs",
+        "scripts/check-danmaku-fullscreen.cjs",
+        "scripts/check-danmaku-live.cjs",
+        "scripts/check-danmaku-official-ui.cjs",
+        "scripts/check-decrypt-worker.cjs",
+        "scripts/check-desktop-source-queue.test.cjs",
+        "scripts/check-desktop-source.test.cjs",
+        "scripts/check-docker-release.cjs",
+        "scripts/check-download-delete-feedback.cjs",
+        "scripts/check-download-following.cjs",
+        "scripts/check-download-manager.cjs",
+        "scripts/check-download-media-validity.cjs",
+        "scripts/check-download-pacing.test.cjs",
+        "scripts/check-download-quality-integration.cjs",
+        "scripts/check-download-quality.cjs",
+        "scripts/check-download-safety.cjs",
+        "scripts/check-download-selection-delete.cjs",
+        "scripts/check-download-source-rejection.cjs",
+        "scripts/check-error-boundary.cjs",
+        "scripts/check-external-player.cjs",
+        "scripts/check-fast-conversion-main.cjs",
+        "scripts/check-ffmpeg-mac.cjs",
+        "scripts/check-ffmpeg-resolution.cjs",
+        "scripts/check-floating-player-host.cjs",
+        "scripts/check-floating-player-window.cjs",
+        "scripts/check-hema-browse.cjs",
+        "scripts/check-hema.cjs",
+        "scripts/check-hls-media.cjs",
+        "scripts/check-hls-space.cjs",
+        "scripts/check-hongguo-identity.cjs",
+        "scripts/check-hongguo-search-ipc.cjs",
+        "scripts/check-issue43-storage.cjs",
+        "scripts/check-linux-appimage.cjs",
+        "scripts/check-linux-media.cjs",
+        "scripts/check-macos.cjs",
+        "scripts/check-main-window-state.cjs",
+        "scripts/check-media-access.cjs",
+        "scripts/check-media-recovery.cjs",
+        "scripts/check-merge-benchmark.cjs",
+        "scripts/check-merge-optimization.cjs",
+        "scripts/check-merge.cjs",
+        "scripts/check-nas-download-ui.cjs",
+        "scripts/check-nas-export.cjs",
+        "scripts/check-native-performance.cjs",
+        "scripts/check-next-cache.cjs",
+        "scripts/check-online-disk-lifecycle.cjs",
+        "scripts/check-picture-in-picture-mode.cjs",
+        "scripts/check-picture-mode.cjs",
+        "scripts/check-playback-resource-limits.cjs",
+        "scripts/check-playback-speed.cjs",
+        "scripts/check-player-controls.cjs",
+        "scripts/check-player-download-state.cjs",
+        "scripts/check-player-episode-frame.cjs",
+        "scripts/check-player-fallback.cjs",
+        "scripts/check-player-fast-conversion.cjs",
+        "scripts/check-player-gestures.cjs",
+        "scripts/check-player-library.cjs",
+        "scripts/check-player-navigation-refresh.cjs",
+        "scripts/check-player-navigation.cjs",
+        "scripts/check-player-online-quality.cjs",
+        "scripts/check-player-preferences.cjs",
+        "scripts/check-player-prefetch-ahead.cjs",
+        "scripts/check-player-prefetch.cjs",
+        "scripts/check-player-resume.cjs",
+        "scripts/check-player-review-2-5.cjs",
+        "scripts/check-player-shortcuts.cjs",
+        "scripts/check-player-storage-refresh.cjs",
+        "scripts/check-portable-data.cjs",
+        "scripts/check-preview-shortcuts.cjs",
+        "scripts/check-proxy-routing.cjs",
+        "scripts/check-public-details.cjs",
+        "scripts/check-rankings.cjs",
+        "scripts/check-record-controls.cjs",
+        "scripts/check-redirect-security.cjs",
+        "scripts/check-release-version.cjs",
+        "scripts/check-renderer-file-urls.cjs",
+        "scripts/check-renderer-security.cjs",
+        "scripts/check-review-native-2-5.cjs",
+        "scripts/check-search-deadline.cjs",
+        "scripts/check-search-permissions.cjs",
+        "scripts/check-search-timeout.cjs",
+        "scripts/check-sequel-finder-ui.cjs",
+        "scripts/check-series-cache.cjs",
+        "scripts/check-series-search.cjs",
+        "scripts/check-settings-picture-in-picture.cjs",
+        "scripts/check-share-security.cjs",
+        "scripts/check-single-instance.cjs",
+        "scripts/check-source-integration.cjs",
+        "scripts/check-source-recovery.cjs",
+        "scripts/check-source-retry-policy.cjs",
+        "scripts/check-source-retry.cjs",
+        "scripts/check-source-routing.cjs",
+        "scripts/check-stealth-window.cjs",
+        "scripts/check-storage-targets.cjs",
+        "scripts/check-store.cjs",
+        "scripts/check-streaming.cjs",
+        "scripts/check-watch-history-3.7.cjs",
+        "scripts/check-watch-history-backend.cjs",
+        "scripts/check-watch-history-display.cjs",
+        "scripts/check-watch-history-integration.cjs",
+        "scripts/check-watch-history.cjs",
+        "scripts/check-web-media-guard.cjs",
+        "scripts/check-window-layout.cjs",
+        "scripts/check-windows-installer.cjs",
+        "scripts/check-windows-release.cjs",
+        "scripts/check-xifan-title-display.cjs",
+        "scripts/check-xifan.cjs",
+        "scripts/create-icon.swift",
+        "scripts/danmaku-live.fixture.jsx",
+        "scripts/dev.js",
+        "scripts/diagnose-playback.cjs",
+        "scripts/fixtures/cdp.cjs",
+        "scripts/fixtures/danmaku-sign-vectors.json",
+        "scripts/fixtures/desktop-source.cjs",
+        "scripts/fixtures/hema-browse/browse.html",
+        "scripts/fixtures/hema-browse/genre.html",
+        "scripts/fixtures/hema-browse/page2.html",
+        "scripts/fixtures/rankings/hot-ai-drama.html",
+        "scripts/fixtures/rankings/hot-comic-drama.html",
+        "scripts/fixtures/rankings/hot-drama-page-2.html",
+        "scripts/fixtures/rankings/hot-drama.html",
+        "scripts/fixtures/trusted-ipc.cjs",
+        "scripts/librempeg-videotoolbox-prototype.patch",
+        "scripts/make-zip.js",
+        "scripts/prepare-electron.cjs",
+        "scripts/prepare-mac-update.cjs",
+        "scripts/prepare-nv-codec-headers.sh",
+        "scripts/prepare-release-assets.js",
+        "scripts/reuse-release-media.py",
+        "scripts/setup-ffmpeg-mac.js",
+        "scripts/setup-ffmpeg.js",
+        "scripts/setup-software-player.cjs",
+        "scripts/setup-winCodeSign.js",
+        "scripts/software-player-assets.json",
+        "scripts/test.cjs",
+        "scripts/verify-best-def.js",
+        "scripts/windows-download-acceptance.cjs",
+        "server/index.cjs",
+        "server/live-check.cjs",
+        "server/media.cjs",
+        "server/public/app.js",
+        "server/public/index.html",
+        "server/public/styles.css",
+        "server/search.cjs",
+        "server/server.test.cjs",
+        "server/source-cancellation.test.cjs",
+        "server/storage.cjs",
+        "src/App.jsx",
+        "src/components/AccountManagement.css",
+        "src/components/AccountManagement.jsx",
+        "src/components/AnnouncementNotice.css",
+        "src/components/AnnouncementNotice.jsx",
+        "src/components/AnnouncementSettings.jsx",
+        "src/components/AppUpdateNotice.css",
+        "src/components/AppUpdateNotice.jsx",
+        "src/components/AppearanceSettings.jsx",
+        "src/components/BossKeySettings.jsx",
+        "src/components/Browse.css",
+        "src/components/Browse.jsx",
+        "src/components/BuiltinSources.jsx",
+        "src/components/CastPanel.jsx",
+        "src/components/CommentDanmaku.css",
+        "src/components/CommentDanmaku.jsx",
+        "src/components/CommunityPanel.css",
+        "src/components/CommunityPanel.jsx",
+        "src/components/CustomSources.css",
+        "src/components/CustomSources.jsx",
+        "src/components/DownloadManager.css",
+        "src/components/DownloadManager.jsx",
+        "src/components/DramaFeed.css",
+        "src/components/DramaFeed.jsx",
+        "src/components/ErrorBoundary.css",
+        "src/components/ErrorBoundary.jsx",
+        "src/components/HongguoDownload.css",
+        "src/components/HongguoDownload.jsx",
+        "src/components/LanguageSettings.jsx",
+        "src/components/NasDownload.css",
+        "src/components/NasDownload.jsx",
+        "src/components/OfficialDanmaku.jsx",
+        "src/components/PageMenu.jsx",
+        "src/components/Player.css",
+        "src/components/Player.jsx",
+        "src/components/PlayerControls.css",
+        "src/components/PlayerControls.jsx",
+        "src/components/RandomDrama.css",
+        "src/components/RandomDrama.jsx",
+        "src/components/ReleaseCalendar.css",
+        "src/components/ReleaseCalendar.jsx",
+        "src/components/SearchPanel.jsx",
+        "src/components/SequelFinder.jsx",
+        "src/components/Settings.css",
+        "src/components/Settings.jsx",
+        "src/components/ShortcutSettings.jsx",
+        "src/components/SoftwareVideo.jsx",
+        "src/components/StealthWakeRegion.css",
+        "src/components/StealthWakeRegion.jsx",
+        "src/components/StealthWindow.css",
+        "src/components/VideoEnhancement.css",
+        "src/components/VideoEnhancement.jsx",
+        "src/components/WatchHistory.css",
+        "src/components/WatchHistory.jsx",
+        "src/components/__tests__/cast-panel.test.mjs",
+        "src/components/__tests__/comment-danmaku.test.mjs",
+        "src/components/__tests__/community-panel.test.mjs",
+        "src/components/__tests__/download-manager.test.mjs",
+        "src/components/__tests__/feed-cache.test.mjs",
+        "src/components/__tests__/history-groups.test.mjs",
+        "src/components/__tests__/language.test.mjs",
+        "src/components/__tests__/local-library.test.mjs",
+        "src/components/__tests__/media-sources.test.mjs",
+        "src/components/__tests__/official-danmaku.test.mjs",
+        "src/components/__tests__/player-display.test.mjs",
+        "src/components/__tests__/random-drama.test.mjs",
+        "src/components/__tests__/search-details.test.mjs",
+        "src/components/__tests__/search-ranking.test.mjs",
+        "src/components/__tests__/software-video.test.mjs",
+        "src/components/__tests__/stealth-wake-region.test.mjs",
+        "src/components/check-ui-state.cjs",
+        "src/components/danmakuModel.mjs",
+        "src/components/danmakuOfficial.mjs",
+        "src/components/danmakuSource.mjs",
+        "src/components/episodeRange.js",
+        "src/components/feedCache.mjs",
+        "src/components/historyGroups.mjs",
+        "src/components/icons.jsx",
+        "src/components/mediaSourcesModel.mjs",
+        "src/components/randomDramaModel.mjs",
+        "src/components/searchRanking.mjs",
+        "src/components/stealthWakeRegion.mjs",
+        "src/components/touchHoldSpeed.mjs",
+        "src/components/touchHoldSpeed.test.mjs",
+        "src/components/useDialogKeyboard.js",
+        "src/components/useFloatingPlayer.js",
+        "src/components/useMediaSources.js",
+        "src/components/useStealthWindow.js",
+        "src/i18n/en.json",
+        "src/i18n/index.js",
+        "src/i18n/language.mjs",
+        "src/i18n/templates.json",
+        "src/i18n/translator.mjs",
+        "src/index.css",
+        "src/localLibrary.js",
+        "src/main.jsx",
+        "src/native/account-session.js",
+        "src/native/account-session.test.cjs",
+        "src/native/account-web-login.js",
+        "src/native/account-web-login.test.cjs",
+        "src/native/app-announcements.js",
+        "src/native/app-announcements.test.cjs",
+        "src/native/app-source-inline-fallback.test.cjs",
+        "src/native/app-source-pacing.test.cjs",
+        "src/native/app-source-video-tab.test.cjs",
+        "src/native/app-source.js",
+        "src/native/app-update-installer.js",
+        "src/native/app-update.js",
+        "src/native/boss-key.js",
+        "src/native/bytevc2.js",
+        "src/native/bytevc2.test.cjs",
+        "src/native/casting.js",
+        "src/native/casting.test.cjs",
+        "src/native/catalog.js",
+        "src/native/community-credits.json",
+        "src/native/custom-source.js",
+        "src/native/danmaku-sign.js",
+        "src/native/danmaku-sign.test.cjs",
+        "src/native/danmaku.js",
+        "src/native/danmaku.test.cjs",
+        "src/native/decrypt-worker.cjs",
+        "src/native/download-quality.js",
+        "src/native/download-temporary.js",
+        "src/native/dramabox.js",
+        "src/native/dramabox.test.cjs",
+        "src/native/episode-comments.js",
+        "src/native/episode-comments.test.cjs",
+        "src/native/episode-panel.js",
+        "src/native/episode-panel.test.cjs",
+        "src/native/floating-player-window.js",
+        "src/native/github-127-diagnostics.test.cjs",
+        "src/native/github-127-handoff.test.cjs",
+        "src/native/github-127-transport.test.cjs",
+        "src/native/hardware-encoder.js",
+        "src/native/hardware-encoder.test.cjs",
+        "src/native/hema.js",
+        "src/native/hls-media.js",
+        "src/native/hongguo-app-catalog.js",
+        "src/native/hongguo-app-new.js",
+        "src/native/hongguo-app-new.test.cjs",
+        "src/native/hongguo-app-search.js",
+        "src/native/hongguo-app-search.test.cjs",
+        "src/native/hongguo-cancellation-fixture.cjs",
+        "src/native/hongguo-cancellation.test.cjs",
+        "src/native/hongguo-search.js",
+        "src/native/hongguo-search.test.cjs",
+        "src/native/hongguo.js",
+        "src/native/licenses/LICENSE.drpys.txt",
+        "src/native/licenses/NOTICE.txt",
+        "src/native/media-access.js",
+        "src/native/media-sources.js",
+        "src/native/media-sources.test.cjs",
+        "src/native/merge-plan.js",
+        "src/native/merge-runner.js",
+        "src/native/nas-export.js",
+        "src/native/nas-export.test.cjs",
+        "src/native/playback-device.js",
+        "src/native/playback-device.test.cjs",
+        "src/native/playback-signature.js",
+        "src/native/playback-signature.test.cjs",
+        "src/native/portable-data.js",
+        "src/native/preview-startup.test.cjs",
+        "src/native/proxy-secret.test.cjs",
+        "src/native/public-details.js",
+        "src/native/public-details.test.cjs",
+        "src/native/reelshort.js",
+        "src/native/reelshort.test.cjs",
+        "src/native/renderer-security.js",
+        "src/native/request-signal.js",
+        "src/native/series-search.js",
+        "src/native/sm3.js",
+        "src/native/stealth-region.js",
+        "src/native/stealth-region.test.cjs",
+        "src/native/stealth-window.js",
+        "src/native/text-export-integration.test.cjs",
+        "src/native/text-export.js",
+        "src/native/text-export.test.cjs",
+        "src/native/ui-language.mjs",
+        "src/native/watch-history.js",
+        "src/native/web-media-guard.js",
+        "src/native/window-layout.js",
+        "src/native/xifan.js",
+        "src/playerDisplay.mjs",
+        "src/searchHistory.js",
+        "src/shortcuts.js",
+        "src/softwareVideo.mjs",
+        "src/store.js",
+        "src/theme.js",
+        "src/videoEnhancement.js",
+        "vite.config.js",
+        "\u542f\u52a8\u7ea2\u679c\u4e0b\u8f7d\u5668.bat",
+        "\u5f00\u53d1\u6a21\u5f0f.bat"
+      ]
+    },
+    "linux": {
+      "passed": true,
+      "sourceCommit": "bdab9d6158e07524f234f88c1168f20baa2cd507",
+      "crlfOnly": []
+    },
+    "docker": {
+      "passed": true,
+      "sourceCommit": "bdab9d6158e07524f234f88c1168f20baa2cd507",
+      "crlfOnly": []
+    }
+  },
+  "sourcePrivacy": {
+    "passed": true,
+    "sourceCommit": "bdab9d6158e07524f234f88c1168f20baa2cd507",
+    "members": 615,
+    "scope": "Frozen application files and package-owned diagnostics; not a blanket nested-upstream privacy guarantee"
+  },
+  "platforms": [
+    "macOS arm64",
+    "macOS x64",
+    "Windows x64",
+    "Linux x64",
+    "Docker linux/amd64"
+  ]
+}
