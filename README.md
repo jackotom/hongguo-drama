@@ -24,24 +24,24 @@
 
 ## 下载与安装
 
-**7.1发行候选**（内部`7.1.0`，桌面构建`7.1.2`），**尚未公开，当前正式版为7.0**。恢复／重试按同剧集号升序，修复临时文件身份误报冲突，升级重定向安全依赖，新增默认关闭的显卡加速格式转换（#149），并完整致谢历史贡献者。见[7.1范围与待验状态](docs/release-7.1.md)。
+**当前正式版：7.1**（内部`7.1.0`，桌面构建`7.1.2`）。新增高性能显卡转换选项，修复下载恢复／重试顺序与临时文件冲突，升级依赖并补齐完整贡献致谢。五类平台已统一公开；验证与性能边界见[7.1回执](docs/release-7.1.md)。
 
-以下为7.1计划下载地址，正式公开后可用；现在请使用下方7.0正式下载。
+以下为7.1正式下载。Mac已签名、公证、装订；Windows EXE未签名。
 
 | 平台 | 下载7.1 | 使用方式 |
 |---|---|---|
-| Apple芯片Mac，macOS 13+ | [DMG](https://github.com/jackotom/hongguo-drama/releases/download/v7.1/Hongguo-7.1-mac-arm64.dmg) | 拖入应用程序；发布前须完成签名、公证、装订 |
-| Intel Mac，macOS 13+ | [DMG](https://github.com/jackotom/hongguo-drama/releases/download/v7.1/Hongguo-7.1-mac-x64.dmg) | 同上；Intel硬件覆盖以本轮回执为准 |
+| Apple芯片Mac，macOS 13+ | [DMG](https://github.com/jackotom/hongguo-drama/releases/download/v7.1/Hongguo-7.1-mac-arm64.dmg) | 拖入应用程序；已签名、公证、装订 |
+| Intel Mac，macOS 13+ | [DMG](https://github.com/jackotom/hongguo-drama/releases/download/v7.1/Hongguo-7.1-mac-x64.dmg) | 同上；验收仅Rosetta |
 | Windows x64 | [安装版](https://github.com/jackotom/hongguo-drama/releases/download/v7.1/hongguo-downloader-7.1-win-x64-setup.exe) · [便携EXE](https://github.com/jackotom/hongguo-drama/releases/download/v7.1/hongguo-downloader-7.1-win-x64.exe) · [便携ZIP](https://github.com/jackotom/hongguo-drama/releases/download/v7.1/hongguo-downloader-7.1-win-x64.zip) | 安装版支持应用内更新；EXE未签名 |
 | Linux x64 | [AppImage](https://github.com/jackotom/hongguo-drama/releases/download/v7.1/hongguo-downloader-7.1-linux-x64.AppImage) | 赋予执行权限；手动更新 |
 | Docker Linux amd64 / NAS | [镜像](https://github.com/jackotom/hongguo-drama/releases/download/v7.1/hongguo-drama-7.1-docker-amd64.tar.gz) · [部署包](https://github.com/jackotom/hongguo-drama/releases/download/v7.1/hongguo-drama-7.1-docker-deploy.zip) | 按[部署文档](docs/docker.md)设置令牌与挂载目录 |
 
-[7.1计划发行页](https://github.com/jackotom/hongguo-drama/releases/tag/v7.1) · [SHA256](https://github.com/jackotom/hongguo-drama/releases/download/v7.1/SHA256SUMS.txt) · [精确源码](https://github.com/jackotom/hongguo-drama/releases/download/v7.1/hongguo-drama-7.1-source.zip)。实际状态见[7.1候选记录](docs/release-7.1.md)。TV和手机保持独立，不包含在本轮五类产物中。上游部分网页片源仍可能404、只提供预览或超时，不保证所有内容永久可播。
+[7.1发行页](https://github.com/jackotom/hongguo-drama/releases/tag/v7.1) · [SHA256](https://github.com/jackotom/hongguo-drama/releases/download/v7.1/SHA256SUMS.txt) · [精确源码](https://github.com/jackotom/hongguo-drama/releases/download/v7.1/hongguo-drama-7.1-source.zip)。实际状态见[7.1正式回执](docs/release-7.1.md)。TV和手机保持独立，不包含在本轮五类产物中。上游部分网页片源仍可能404、只提供预览或超时，不保证所有内容永久可播。
 
 <details>
-<summary>7.0 当前正式下载与发行说明</summary>
+<summary>7.0 历史下载与发行说明</summary>
 
-**当前正式版：7.0**（内部`7.0.0`，桌面构建`7.0.1`）。7.0已于2026-11-11 21:41:46（Asia/Shanghai）正式公开并设Latest，内部7.0.0、桌面构建7.0.1，冻结源码`3f5927d0d605ff7742fde8cbd1bb92ffe951b080`。双Mac、Windows x64、Linux x64 AppImage、Docker amd64五类共25份正式附件；双Mac已签名、公证、装订，Windows EXE未签名且App真实下载队列未测，Intel仅Rosetta。未运行通用全量测试，未替换本机正式安装；TV与手机独立。见[7.0正式回执](docs/release-7.0.md)。
+**历史正式版：7.0**（内部`7.0.0`，桌面构建`7.0.1`）。7.0已于2026-11-11 21:41:46（Asia/Shanghai）正式公开并设Latest，内部7.0.0、桌面构建7.0.1，冻结源码`3f5927d0d605ff7742fde8cbd1bb92ffe951b080`。双Mac、Windows x64、Linux x64 AppImage、Docker amd64五类共25份正式附件；双Mac已签名、公证、装订，Windows EXE未签名且App真实下载队列未测，Intel仅Rosetta。未运行通用全量测试，未替换本机正式安装；TV与手机独立。见[7.0正式回执](docs/release-7.0.md)。
 
 | 平台 | 下载7.0 | 使用方式 |
 |---|---|---|
@@ -211,13 +211,14 @@ Mac和Windows安装版保留应用内更新入口；完整6.4→6.5自动更新�
 3. 打开详情点「立即播放」，也可选择集数与清晰度加入下载队列。
 4. 下次从「我的剧库」或「观看记录」接着看；下载进度、失败重试和整剧合并在「下载管理」。
 
-## 7.1（发行候选，尚未公开）
+## 7.1
 
+- 桌面解码菜单新增默认关闭的高性能显卡转换模式，实际检测VideoToolbox／NVENC并明确显示CPU回退；ByteVC2仍由CPU解码。本轮M5样本未显示提速，性能与覆盖范围见[7.1回执](docs/release-7.1.md)。
 - #148：恢复、手动／自动重试在同剧原队列槽位内按集号升序，跨剧优先顺序不变。
 - #147：精确保存临时文件身份，减少大文件编号引起的误报冲突；旧安全收据兼容，不能确认的旧身份与替换文件继续保留。
 - 采纳[@anupam-orbis](https://github.com/anupam-orbis)的[PR #140](https://github.com/jackotom/hongguo-drama/pull/140)实际依赖锁更新，将follow-redirects 1.16.1升至1.16.3；不宣称本项目已发生凭据泄漏。
 - 完整致谢历史代码作者、PR提交者及Issue作者；[完整名单](CONTRIBUTORS.md)保留每项记录。
-- #92、#143、#129已有等价／独立覆盖，保留当前签名、受检备用取源与显式选择本地文件语义。验收状态及待办见[7.1记录](docs/release-7.1.md)。
+- #92、#143、#129已有等价／独立覆盖，保留当前签名、受检备用取源与显式选择本地文件语义。本轮验证与限制见[7.1记录](docs/release-7.1.md)。
 
 ## 7.0（已正式发布）
 
@@ -714,7 +715,7 @@ Mac和Windows安装版保留应用内更新入口；完整6.4→6.5自动更新�
 - **断点续播**：按剧保存集数和播放位置，从剧库或观看记录接着看；切换到应用内其他页面，仍可继续播放并保存进度。
 - **0.25×–4× 倍速**：共 16 档。右下角倍速数字是独立按钮，每点增加 0.25×，4× 后回到 1×；三点菜单可直接选档，切集与连播保持当前倍速。
 - **兼容播放**：默认开启兼容模式；解码失败、黑屏有声时尝试转为 H.264，也可手动「转码后播放」。显示转码进度，支持取消和清理缓存。
-- **高性能转换（7.1候选）**：桌面「解码方式 → 高性能显卡快速解码（老电脑请勿使用）」默认关闭。开启后优先用显卡编码H.264；ByteVC2仍由CPU解码，4线程、单队列。Mac尝试VideoToolbox，Windows／Linux尝试NVIDIA NVENC；实际输入试编码出帧，不支持或失败时明确提示并回退CPU。不是所有格式的GPU硬解，也不保证所有独显支持；实体NVIDIA尚未实跑。
+- **高性能转换（7.1）**：桌面「解码方式 → 高性能显卡快速解码（老电脑请勿使用）」默认关闭。开启后优先用显卡编码H.264；ByteVC2仍由CPU解码，4线程、单队列。Mac尝试VideoToolbox，Windows／Linux尝试NVIDIA NVENC；实际输入试编码出帧，不支持或失败时明确提示并回退CPU。不是所有格式的GPU硬解，也不保证所有独显支持；实体NVIDIA尚未实跑。本轮M5样本未提速且文件更大，见[性能与验收记录](docs/release-7.1.md)。
 - **失败恢复**：可取消准备、重试本集、重新连接片源或尝试兼容转码。地址过期或传输中断时有限次刷新取址，不无限重试；硬件转码失败时尝试软件转码。
 
 优先选择兼容性较好的 H.264 片源，同编码内再优先清晰度；可能低于 HEVC 片源的最高分辨率。软件转码可能更慢，来源服务异常仍可能导致播放失败。
@@ -877,7 +878,7 @@ https://github.com/user-attachments/assets/b95f4f60-b57c-495f-a30e-62ac2b0bda11
 
 ## 版本与验证范围
 
-当前正式版为7.0。两处错误恢复修复的五平台必要验收完成；双Mac已签名、公证、装订。Windows EXE未签名、真实App下载队列未测，Intel仅Rosetta；未运行通用全量测试，保留两项已知断言差异。完整范围见[7.0回执](docs/release-7.0.md)。以下保留历史版本记录，不作为本版验收证据。
+7.1已于2026-11-12 14:10:02（Asia/Shanghai）正式公开并设Latest，内部7.1.0、桌面构建7.1.2，冻结源码`bdab9d6158e07524f234f88c1168f20baa2cd507`。双Mac、Windows x64、Linux x64 AppImage、Docker amd64五类共25份正式附件，远端大小／SHA256、三份清单及匿名下载入口已核对；119个临时分段已清理。双Mac新签名、公证、装订；Windows EXE未签名，Intel仅Rosetta，NVIDIA实体未验。高性能模式功能通过，M5本轮样本未提速且文件更大。未替换本机正式安装；TV与手机独立。完整范围见[7.1回执](docs/release-7.1.md)。以下保留历史记录，不作为本版验收。
 
 4.1（内部 `4.1.0`，标签 `v4.1`）已正式发布，包含内置来源全局开关与文字导出。文字导出候选阶段的整剧验证结果为 80 个视频 `completed`、合计 `241881712` 字节；弹幕 80 份、386 条，其中 3 份为空；评论 25 份、307 条；剧评 1 份、4 条。另 55 集评论本次来源未开放，未生成空文件或误取其他集，网络与写盘实际失败为 0。该整剧原始资料随旧工作区回收而丢失，数值来自此前已观察的聊天回执，不作为本轮重新下载或播放的证据。加入来源开关后重新构建三端，204 项单元、91 项平台检查、Windows 安装及升级检查通过；Mac 完成签名、公证及装订，16 项附件摘要与大小一致。详见 [4.1 说明](docs/release-4.1.md)。
 

@@ -1,6 +1,6 @@
-# 7.1 五平台发行候选
+# 7.1 五平台正式发行
 
-7.1为本轮发行候选（内部7.1.0、桌面构建7.1.2），尚未公开，当前正式版为7.0。修复#148恢复／重试同剧原队列槽位内按集号升序、#147临时文件身份精确持久化，采纳anupam-orbis的#140依赖锁更新（follow-redirects 1.16.3），并完整致谢历史代码贡献者、PR提交者和Issue作者。新增#149默认关闭的显卡加速格式转换，ByteVC2仍由CPU解码；Mac使用VideoToolbox，Windows／Linux仅尝试NVIDIA NVENC，不支持或失败时提示并回退CPU，实体NVIDIA尚未验收。#92、#143和#129保留已有覆盖及安全边界，不整块覆盖当前实现。五类新包及本轮必要验收齐备后一次公开；双Mac新签名、公证、装订，不替换本机正式安装。状态与待验门槛见[7.1记录](release-7.1.md)。
+7.1已于2026-11-12 14:10:02（Asia/Shanghai）正式公开并设Latest，内部7.1.0、桌面构建7.1.2，冻结源码`bdab9d6158e07524f234f88c1168f20baa2cd507`。双Mac、Windows x64、Linux x64 AppImage、Docker amd64五类共25份正式附件，远端大小／SHA256、三份清单及匿名下载入口已核对；119个临时分段已清理。双Mac新签名、公证、装订；Windows EXE未签名，Intel仅Rosetta，NVIDIA实体未验。高性能模式功能通过，M5本轮样本未提速且文件更大。未替换本机正式安装；TV与手机独立。完整回执见[7.1说明](release-7.1.md)。
 
 7.1高性能模式须用本轮新媒体包验收当前真实输入探测、明确CPU回退及取消／输入／存储保护，不能沿用旧候选的三条已取消CI。双Mac Librempeg按新脚本重建；Windows／Linux的FFmpeg和Librempeg须启用NVENC，并在原9份对应源码归档中包含固定nv-codec-headers源码、准备脚本和完整MIT许可，不增加独立发行附件。实体NVIDIA未实跑时如实标明，不外推普通CI的CPU回退结果。
 
