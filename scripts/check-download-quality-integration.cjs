@@ -42,7 +42,31 @@ function fixture({ width = 1080, height = 1920, quality = 'auto', realMedia = fa
     setQuality: value => { settings.download_quality = value; } };
 }
 const payload = quality => ({ seriesId: '1', seriesTitle: '测试剧', episodes: [{vid:'11',vid_index:1}], ...(quality ? {quality} : {}) });
-async function bytevc2Fixture(check, { conflict = false, cancel = false, replaceCenc = false } = {}) {
+async function withLargeFileIds(root, check) {
+  const promises = require('node:fs/promises');
+  const original = { open:promises.open, lstat:promises.lstat, lstatSync:fs.lstatSync };
+  const identities = new Map();
+  const large = (file, stat) => {
+    if (!String(file).startsWith(root + path.sep)) return stat;
+    const key = `${stat.dev}:${stat.ino}`;
+    if (!identities.has(key)) identities.set(key, (1n << 60n) + BigInt(identities.size + 1));
+    // Adjacent 64-bit IDs round to the same Number; identical timestamps isolate the ID check.
+    stat.ino = typeof stat.ino === 'bigint' ? identities.get(key) : Number(identities.get(key));
+    stat.birthtimeMs = typeof stat.birthtimeMs === 'bigint' ? 123n : 123;
+    if (typeof stat.birthtimeNs === 'bigint') stat.birthtimeNs = 123000000n;
+    return stat;
+  };
+  promises.open = async (file, ...args) => {
+    const handle = await original.open(file, ...args), stat = handle.stat.bind(handle);
+    handle.stat = async (...options) => large(file, await stat(...options));
+    return handle;
+  };
+  promises.lstat = async (file, ...args) => large(file, await original.lstat(file, ...args));
+  fs.lstatSync = (file, ...args) => large(file, original.lstatSync(file, ...args));
+  try { await check(); }
+  finally { promises.open = original.open; promises.lstat = original.lstat; fs.lstatSync = original.lstatSync; }
+}
+async function bytevc2Fixture(check, { conflict = false, cancel = false, replaceCenc = false, cenc = false } = {}) {
   const h = fixture(), cp = require('node:child_process'), promises = require('node:fs/promises');
   const spawn = cp.spawn, open = promises.open;
   let foreignOutput, spawns = 0, closed = false;
@@ -71,7 +95,7 @@ async function bytevc2Fixture(check, { conflict = false, cancel = false, replace
   };
   try {
     h.run("hongguo.fetchPlayUrlSingle = async () => ({url:'https://media.example/video.mp4',codec:'bytevc2',duration:12})");
-    if (replaceCenc) h.run("hongguo.fetchPlayUrlSingle = async () => ({url:'https://media.example/video.mp4',contentKey:Buffer.alloc(16).toString('hex')})");
+    if (replaceCenc || cenc) h.run("hongguo.fetchPlayUrlSingle = async () => ({url:'https://media.example/video.mp4',contentKey:Buffer.alloc(16).toString('hex')})");
     await h.handlers['hongguo-download-batch']({}, payload());
     await check(h, () => ({ foreignOutput, spawns, closed }));
   } finally { promises.open = open; cp.spawn = spawn; }
@@ -89,6 +113,75 @@ async function realFootageCatalog(browseList) {
   return catalog;
 }
 const checks = [
+  ['large file IDs finish downloads and allow removing records', async () => {
+    const h = fixture();
+    await h.handlers['hongguo-download-batch']({}, payload());
+    await withLargeFileIds(h.root, async () => {
+      await h.run('executeHongguoDownload(downloadTasks[0])');
+      const task = h.saved()[0];
+      assert.equal(task.status, 'completed', task.error);
+      assert.equal(fs.statSync(task.savePath).size, 200000);
+      assert.equal(task.temporaryDownloads.length, 0);
+      const removed = await h.handlers['delete-tasks']({}, [task.id], { deleteFiles:false });
+      assert.equal(removed.success, true, removed.error);
+      assert.equal(removed.count, 1);
+      assert.equal(fs.existsSync(task.savePath), true);
+    });
+  }],
+  ...[false, true].map(cenc => [`large file IDs finish ${cenc ? 'CENC' : 'ByteVC2'} output without weakening cleanup`, async () => {
+    await bytevc2Fixture(async h => withLargeFileIds(h.root, async () => {
+      await h.run('executeHongguoDownload(downloadTasks[0])');
+      const task = h.saved()[0];
+      assert.equal(task.status, 'completed', task.error);
+      assert.equal(fs.statSync(task.savePath).size, 200000);
+      assert.equal(task.temporaryDownloads.length, 0);
+    }), { cenc });
+  }]),
+  ['large file ID receipts survive JSON persistence and clean only their owned files', async () => {
+    const h = fixture(), native = require('../src/native/download-temporary');
+    const owner = { taskId:'large', seriesId:'1', vid:'11', vidIndex:1, savePath:path.join(h.root, 'large.mp4') };
+    await withLargeFileIds(h.root, async () => {
+      const temporary = await native.createDownloadTemporary(h.root, { owner });
+      fs.writeFileSync(temporary.input, Buffer.alloc(120000));
+      await temporary.reserveOutput(); fs.writeFileSync(temporary.output, Buffer.alloc(130000));
+      const receipt = JSON.parse(JSON.stringify(temporary.record));
+      assert.equal(typeof receipt.files['input.enc.tmp'].ino, 'string');
+      const state = native.inspectDownloadTemporary(receipt, owner);
+      assert.equal(state.unverifiedItems, 0);
+      assert.equal(state.files.reduce((sum, file) => sum + file.size, 0), 250000);
+      const cleaned = await native.cleanupDownloadTemporary(receipt, owner);
+      assert.equal(cleaned.missing, true);
+      assert.equal(cleaned.freed, 250000);
+    });
+  }],
+  ['large file IDs distinguish replacements even when Number and timestamps collide', async () => {
+    const h = fixture(), native = require('../src/native/download-temporary');
+    const owner = { taskId:'collision', seriesId:'1', vid:'11', vidIndex:1, savePath:path.join(h.root, 'collision.mp4') };
+    await withLargeFileIds(h.root, async () => {
+      const temporary = await native.createDownloadTemporary(h.root, { owner });
+      fs.renameSync(temporary.input, temporary.input + '.original');
+      fs.writeFileSync(temporary.input, 'keep replacement');
+      assert.equal(Number(temporary.record.files['input.enc.tmp'].ino), Number(fs.lstatSync(temporary.input).ino));
+      await assert.rejects(temporary.checkInput(), error => error.code === 'EEXIST');
+      await temporary.cleanup();
+      assert.equal(fs.readFileSync(temporary.input, 'utf8'), 'keep replacement');
+      assert.equal(fs.existsSync(temporary.input + '.original'), true);
+    });
+  }],
+  ...[false, true].map(unsafe => [`legacy ${unsafe ? 'unsafe' : 'safe'} numeric file ID receipts ${unsafe ? 'retain' : 'clean'} files`, async () => {
+    const h = fixture(), native = require('../src/native/download-temporary');
+    const owner = { taskId:'legacy', seriesId:'1', vid:'11', vidIndex:1, savePath:path.join(h.root, 'legacy.mp4') };
+    const temporary = await native.createDownloadTemporary(h.root, { owner });
+    fs.writeFileSync(temporary.input, Buffer.alloc(120000));
+    const identity = file => { const stat = fs.lstatSync(file); return { dev:stat.dev, ino:stat.ino, birthtimeMs:stat.birthtimeMs }; };
+    const receipt = JSON.parse(JSON.stringify(temporary.record));
+    receipt.identity = identity(receipt.directory);
+    receipt.files['input.enc.tmp'] = identity(temporary.input);
+    if (unsafe) receipt.files['input.enc.tmp'].ino = Number.MAX_SAFE_INTEGER + 1;
+    const cleaned = await native.cleanupDownloadTemporary(receipt, owner);
+    assert.equal(cleaned.missing, !unsafe);
+    assert.equal(fs.existsSync(temporary.input), unsafe);
+  }]),
   ['disk cache download preserves ownership and allows deleting its record', async () => {
     const h = fixture();
     const cache = path.join(h.root, 'cached.mp4');

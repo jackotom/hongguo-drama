@@ -1,4 +1,4 @@
-<!-- 7.0 desktop/Docker release; this directory keeps its existing scope. -->
+<!-- 7.1 desktop/Docker release; this directory keeps its existing scope. -->
 <!-- 6.7 unified release. -->
 # 公告数据
 

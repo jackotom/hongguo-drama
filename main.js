@@ -1,4 +1,4 @@
-// Hongguo Drama 7.0: desktop runtime; server entry is server/index.cjs.
+// Hongguo Drama 7.1: desktop runtime; server entry is server/index.cjs.
 /**
  * main.js - 红果短剧 6.2 下载器（独立版）主进程
  *
@@ -707,6 +707,21 @@ function pumpQueue() {
   downloadQueueTimer = null;
   if (quitCleanup) return;
   downloadQueue = downloadQueue.filter(task => task.status === 'pending');
+  // Recovered/retried episodes reuse their series' queue slots without overtaking another series.
+  const episodeSlots = new Map();
+  downloadQueue.forEach((task, index) => {
+    const seriesId = String(task.hongguoInfo?.series_id ?? '');
+    const episode = Number(task.hongguoInfo?.vid_index);
+    if (!seriesId || !Number.isSafeInteger(episode) || episode < 1) return;
+    const slots = episodeSlots.get(seriesId) || [];
+    slots.push(index);
+    episodeSlots.set(seriesId, slots);
+  });
+  for (const slots of episodeSlots.values()) {
+    const episodes = slots.map(index => downloadQueue[index])
+      .sort((a, b) => Number(a.hongguoInfo.vid_index) - Number(b.hongguoInfo.vid_index));
+    slots.forEach((index, order) => { downloadQueue[index] = episodes[order]; });
+  }
   for (const task of downloadQueue) repairTaskDestination(task);
   const cooldown = hongguoDownloadReadyAt - Date.now();
   while (activeDownloads < MAX_CONCURRENT_DOWNLOADS) {

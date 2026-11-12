@@ -1,4 +1,4 @@
-# Hongguo Drama 7.0: build and verify the frozen desktop/Docker source.
+# Hongguo Drama 7.1: build and verify the frozen desktop/Docker source.
 name: Linux x64 AppImage candidate
 on:
   workflow_dispatch:

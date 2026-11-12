@@ -2,9 +2,18 @@ const fs = require('node:fs/promises');
 const disk = require('node:fs');
 const path = require('node:path');
 
-const sameIdentity = (a, b) => b && Number.isSafeInteger(a.ino) && a.ino > 0
-  && a.dev === b.dev && a.ino === b.ino && a.birthtimeMs === b.birthtimeMs;
-const identityOf = stat => ({ dev:stat.dev, ino:stat.ino, birthtimeMs:stat.birthtimeMs });
+// Persist exact IDs as strings: 64-bit file IDs can exceed Number's safe integer range.
+const identityOf = stat => typeof stat.ino === 'bigint'
+  ? { dev:String(stat.dev), ino:String(stat.ino), birthtimeNs:String(stat.birthtimeNs) }
+  : { dev:stat.dev, ino:stat.ino, birthtimeMs:stat.birthtimeMs };
+const statOptions = identity => ({ bigint:typeof identity?.ino !== 'number' });
+const sameIdentity = (stat, identity) => {
+  if (typeof identity?.ino === 'number') return Number.isSafeInteger(stat.ino) && stat.ino > 0
+    && stat.dev === identity.dev && stat.ino === identity.ino && stat.birthtimeMs === identity.birthtimeMs;
+  if (typeof stat.ino !== 'bigint' || stat.ino <= 0n || typeof stat.birthtimeNs !== 'bigint') return false;
+  const a = identityOf(stat), b = typeof identity?.ino === 'bigint' ? identityOf(identity) : identity;
+  return !!b && a.dev === b.dev && a.ino === b.ino && a.birthtimeNs === b.birthtimeNs;
+};
 const downloadTemporaryOwner = task => ({ taskId:String(task.id || ''), seriesId:String(task.hongguoInfo?.series_id || ''),
   vid:String(task.hongguoInfo?.vid || ''), vidIndex:Number(task.hongguoInfo?.vid_index), savePath:task.savePath });
 
@@ -18,17 +27,17 @@ function inspectDownloadTemporary(record, owner) {
     || !/^\.hongguo-download-[A-Za-z0-9]{6}$/.test(path.basename(record.directory)) || !record.files || typeof record.files !== 'object' || Array.isArray(record.files)) return unknown();
   const result = { files:[], unverifiedItems:0, unverifiedBytes:0, missing:false, directoryVerified:true };
   try {
-    const directory = disk.lstatSync(record.directory);
+    const directory = disk.lstatSync(record.directory, statOptions(record.identity));
     if (!directory.isDirectory() || !sameIdentity(directory, record.identity)) return unknown();
     for (const name of disk.readdirSync(record.directory)) {
       const file = path.join(record.directory, name);
       try {
-        const stat = disk.lstatSync(file);
+        const stat = disk.lstatSync(file, statOptions(record.files[name]));
         if (['input.enc.tmp', 'decoded.mp4'].includes(name) && stat.isFile() && sameIdentity(stat, record.files[name])) {
-          result.files.push({ file, identity:record.files[name], size:stat.size });
+          result.files.push({ file, identity:record.files[name], size:Number(stat.size) });
         } else {
           result.unverifiedItems++;
-          result.unverifiedBytes = stat.isFile() && result.unverifiedBytes !== null ? result.unverifiedBytes + stat.size : null;
+          result.unverifiedBytes = stat.isFile() && result.unverifiedBytes !== null ? result.unverifiedBytes + Number(stat.size) : null;
         }
       } catch (_) { result.unverifiedItems++; result.unverifiedBytes = null; }
     }
@@ -41,12 +50,12 @@ async function cleanupDownloadTemporary(record, owner, canRemove = () => true) {
   if (!state.missing && state.directoryVerified) {
     for (const item of state.files) {
       try {
-        if (!canRemove() || !sameIdentity(await fs.lstat(record.directory), record.identity)) break;
+        if (!canRemove() || !sameIdentity(await fs.lstat(record.directory, statOptions(record.identity)), record.identity)) break;
         if (await removeOwnedFile(item.file, item.identity, canRemove)) { count++; freed += item.size; }
       } catch (_) { failed++; }
     }
     try {
-      const current = await fs.lstat(record.directory);
+      const current = await fs.lstat(record.directory, statOptions(record.identity));
       if (canRemove() && sameIdentity(current, record.identity)) await fs.rmdir(record.directory);
     } catch (error) { if (!['ENOENT', 'ENOTEMPTY', 'EEXIST'].includes(error.code)) failed++; }
     state = inspectDownloadTemporary(record, owner);
@@ -56,14 +65,14 @@ async function cleanupDownloadTemporary(record, owner, canRemove = () => true) {
 
 async function isOwnedFile(file, identity) {
   try {
-    const current = await fs.lstat(file);
+    const current = await fs.lstat(file, statOptions(identity));
     return current.isFile() && sameIdentity(current, identity);
   } catch (error) { if (error.code === 'ENOENT') return false; throw error; }
 }
 
 async function removeOwnedFile(file, identity, canRemove = () => true) {
   try {
-    const current = await fs.lstat(file);
+    const current = await fs.lstat(file, statOptions(identity));
     if (!current.isFile() || !sameIdentity(current, identity) || !canRemove()) return false;
     await fs.unlink(file);
     return true;
@@ -76,11 +85,11 @@ async function removeOwnedFile(file, identity, canRemove = () => true) {
 async function createDownloadTemporary(directory, { owner, onChange = () => {} } = {}) {
   // A fresh private directory avoids legacy leftovers without guessing who owns them.
   const root = await fs.mkdtemp(path.join(directory, '.hongguo-download-'));
-  const record = { version:1, owner, directory:root, identity:identityOf(await fs.lstat(root)), files:{} };
+  const record = { version:1, owner, directory:root, identity:identityOf(await fs.lstat(root, { bigint:true })), files:{} };
   const input = path.join(root, 'input.enc.tmp'), output = path.join(root, 'decoded.mp4');
   const reserve = async file => {
     const handle = await fs.open(file, 'wx', 0o600);
-    try { record.files[path.basename(file)] = identityOf(await handle.stat()); onChange(record); } finally { await handle.close(); }
+    try { record.files[path.basename(file)] = identityOf(await handle.stat({ bigint:true })); onChange(record); } finally { await handle.close(); }
   };
   const removeOutput = async () => {
     if (record.files['decoded.mp4']) {

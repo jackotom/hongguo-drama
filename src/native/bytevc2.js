@@ -54,7 +54,7 @@ async function convertBytevc2({ executable, input, output, contentKey, duration,
     try {
       const file = await fs.open(output, 'wx', 0o600);
       try {
-        identity = await file.stat();
+        identity = await file.stat({ bigint:true });
         onOutputCreated?.(identity);
       } finally { await file.close(); }
       if (cancelled()) throw abortError();

@@ -1,4 +1,4 @@
-# Hongguo Drama 7.0: desktop and Docker candidate; publication is coordinated separately.
+# Hongguo Drama 7.1: desktop and Docker candidate; publication is coordinated separately.
 name: Windows x64 release candidate
 on:
   workflow_dispatch:
@@ -8,7 +8,7 @@ on:
         type: string
         default: ''
       skip_playback:
-        description: Skip player playback when the required acceptance footage is unavailable
+        description: Skip real App download queue and player playback when acceptance footage is unavailable
         type: boolean
         default: false
       build_only:
@@ -170,7 +170,7 @@ jobs:
             dist/*.yml
             dist/*.blockmap
           key: ${{ steps.app-cache.outputs.cache-primary-key }}
-      - name: Verify portable, fresh NSIS install, reinstall and real 1.80 upgrade
+      - name: Verify real portable App queue and playback, fresh NSIS install, reinstall and real 1.80 upgrade
         if: ${{ !inputs.build_only }}
         env:
           HONGGUO_SKIP_PLAYBACK: ${{ inputs.skip_playback || false }}

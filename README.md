@@ -18,22 +18,42 @@
   <a href="#完整功能">完整功能</a> ·
   <a href="#界面与演示">界面与演示</a> ·
   <a href="#常见问题">常见问题</a> ·
+  <a href="#贡献者">贡献与致谢</a> ·
   <a href="https://github.com/jackotom/hongguo-drama/issues">反馈问题</a>
 </p>
 
 ## 下载与安装
 
-**7.0发行目标**（内部`7.0.0`，桌面构建`7.0.1`）。修复更新注册明确拒绝被掩盖，以及App空响应后重复尝试三个画质的问题。五类新包齐备并完成本轮验收后统一公开；当前正式版仍为6.9。见[7.0范围与状态](docs/release-7.0.md)。
+**7.1发行候选**（内部`7.1.0`，桌面构建`7.1.1`），**尚未公开，当前正式版为7.0**。恢复／重试按同剧集号升序，修复临时文件身份误报冲突，升级重定向安全依赖，并完整致谢历史贡献者。见[7.1范围与待验状态](docs/release-7.1.md)。
+
+以下为7.1计划下载地址，正式公开后可用；现在请使用下方7.0正式下载。
+
+| 平台 | 下载7.1 | 使用方式 |
+|---|---|---|
+| Apple芯片Mac，macOS 13+ | [DMG](https://github.com/jackotom/hongguo-drama/releases/download/v7.1/Hongguo-7.1-mac-arm64.dmg) | 拖入应用程序；发布前须完成签名、公证、装订 |
+| Intel Mac，macOS 13+ | [DMG](https://github.com/jackotom/hongguo-drama/releases/download/v7.1/Hongguo-7.1-mac-x64.dmg) | 同上；Intel硬件覆盖以本轮回执为准 |
+| Windows x64 | [安装版](https://github.com/jackotom/hongguo-drama/releases/download/v7.1/hongguo-downloader-7.1-win-x64-setup.exe) · [便携EXE](https://github.com/jackotom/hongguo-drama/releases/download/v7.1/hongguo-downloader-7.1-win-x64.exe) · [便携ZIP](https://github.com/jackotom/hongguo-drama/releases/download/v7.1/hongguo-downloader-7.1-win-x64.zip) | 安装版支持应用内更新；EXE未签名 |
+| Linux x64 | [AppImage](https://github.com/jackotom/hongguo-drama/releases/download/v7.1/hongguo-downloader-7.1-linux-x64.AppImage) | 赋予执行权限；手动更新 |
+| Docker Linux amd64 / NAS | [镜像](https://github.com/jackotom/hongguo-drama/releases/download/v7.1/hongguo-drama-7.1-docker-amd64.tar.gz) · [部署包](https://github.com/jackotom/hongguo-drama/releases/download/v7.1/hongguo-drama-7.1-docker-deploy.zip) | 按[部署文档](docs/docker.md)设置令牌与挂载目录 |
+
+[7.1计划发行页](https://github.com/jackotom/hongguo-drama/releases/tag/v7.1) · [SHA256](https://github.com/jackotom/hongguo-drama/releases/download/v7.1/SHA256SUMS.txt) · [精确源码](https://github.com/jackotom/hongguo-drama/releases/download/v7.1/hongguo-drama-7.1-source.zip)。实际状态见[7.1候选记录](docs/release-7.1.md)。TV和手机保持独立，不包含在本轮五类产物中。上游部分网页片源仍可能404、只提供预览或超时，不保证所有内容永久可播。
+
+<details>
+<summary>7.0 当前正式下载与发行说明</summary>
+
+**当前正式版：7.0**（内部`7.0.0`，桌面构建`7.0.1`）。7.0已于2026-11-11 21:41:46（Asia/Shanghai）正式公开并设Latest，内部7.0.0、桌面构建7.0.1，冻结源码`3f5927d0d605ff7742fde8cbd1bb92ffe951b080`。双Mac、Windows x64、Linux x64 AppImage、Docker amd64五类共25份正式附件；双Mac已签名、公证、装订，Windows EXE未签名且App真实下载队列未测，Intel仅Rosetta。未运行通用全量测试，未替换本机正式安装；TV与手机独立。见[7.0正式回执](docs/release-7.0.md)。
 
 | 平台 | 下载7.0 | 使用方式 |
 |---|---|---|
-| Apple芯片Mac，macOS 13+ | [DMG](https://github.com/jackotom/hongguo-drama/releases/download/v7.0/Hongguo-7.0-mac-arm64.dmg) | 拖入应用程序；发布前完成签名、公证、装订 |
-| Intel Mac，macOS 13+ | [DMG](https://github.com/jackotom/hongguo-drama/releases/download/v7.0/Hongguo-7.0-mac-x64.dmg) | 同上；Intel硬件覆盖以本轮回执为准 |
+| Apple芯片Mac，macOS 13+ | [DMG](https://github.com/jackotom/hongguo-drama/releases/download/v7.0/Hongguo-7.0-mac-arm64.dmg) | 拖入应用程序；已签名、公证、装订 |
+| Intel Mac，macOS 13+ | [DMG](https://github.com/jackotom/hongguo-drama/releases/download/v7.0/Hongguo-7.0-mac-x64.dmg) | 同上；验收仅Rosetta |
 | Windows x64 | [安装版](https://github.com/jackotom/hongguo-drama/releases/download/v7.0/hongguo-downloader-7.0-win-x64-setup.exe) · [便携EXE](https://github.com/jackotom/hongguo-drama/releases/download/v7.0/hongguo-downloader-7.0-win-x64.exe) · [便携ZIP](https://github.com/jackotom/hongguo-drama/releases/download/v7.0/hongguo-downloader-7.0-win-x64.zip) | 安装版支持应用内更新；EXE未签名 |
 | Linux x64 | [AppImage](https://github.com/jackotom/hongguo-drama/releases/download/v7.0/hongguo-downloader-7.0-linux-x64.AppImage) | 赋予执行权限；手动更新 |
 | Docker Linux amd64 / NAS | [镜像](https://github.com/jackotom/hongguo-drama/releases/download/v7.0/hongguo-drama-7.0-docker-amd64.tar.gz) · [部署包](https://github.com/jackotom/hongguo-drama/releases/download/v7.0/hongguo-drama-7.0-docker-deploy.zip) | 按[部署文档](docs/docker.md)设置令牌与挂载目录 |
 
 [7.0发行页](https://github.com/jackotom/hongguo-drama/releases/tag/v7.0) · [SHA256](https://github.com/jackotom/hongguo-drama/releases/download/v7.0/SHA256SUMS.txt) · [精确源码](https://github.com/jackotom/hongguo-drama/releases/download/v7.0/hongguo-drama-7.0-source.zip)。TV和手机保持独立，不包含在本轮五类产物中。上游部分网页片源仍可能404、只提供预览或超时，不保证所有内容永久可播。
+
+</details>
 
 <details>
 <summary>6.9 历史下载与升级说明</summary>
@@ -191,11 +211,19 @@ Mac和Windows安装版保留应用内更新入口；完整6.4→6.5自动更新�
 3. 打开详情点「立即播放」，也可选择集数与清晰度加入下载队列。
 4. 下次从「我的剧库」或「观看记录」接着看；下载进度、失败重试和整剧合并在「下载管理」。
 
-## 7.0（发行目标）
+## 7.1（发行候选，尚未公开）
+
+- #148：恢复、手动／自动重试在同剧原队列槽位内按集号升序，跨剧优先顺序不变。
+- #147：精确保存临时文件身份，减少大文件编号引起的误报冲突；旧安全收据兼容，不能确认的旧身份与替换文件继续保留。
+- 采纳[@anupam-orbis](https://github.com/anupam-orbis)的[PR #140](https://github.com/jackotom/hongguo-drama/pull/140)实际依赖锁更新，将follow-redirects 1.16.1升至1.16.3；不宣称本项目已发生凭据泄漏。
+- 完整致谢历史代码作者、PR提交者及Issue作者；[完整名单](CONTRIBUTORS.md)保留每项记录。
+- #92、#143、#129已有等价／独立覆盖，保留当前签名、受检备用取源与显式选择本地文件语义。验收状态及待办见[7.1记录](docs/release-7.1.md)。
+
+## 7.0（已正式发布）
 
 - 注册更新明确拒绝不再被备用流程掩盖，保留临时网络故障的有界回退。
 - App空响应结束本轮画质阶梯，保留正常降档、手动重试与预取冷却。
-- 五类平台同源发行，本轮新Mac包签名、公证和装订；验收状态见[7.0记录](docs/release-7.0.md)。
+- 2026-11-11 21:41:46（Asia/Shanghai）正式公开，五类平台同源发行，双Mac已签名、公证和装订；Windows App真实下载队列未测。完整回执见[7.0记录](docs/release-7.0.md)。
 
 ## 6.9
 
@@ -938,6 +966,28 @@ FFmpeg 二进制不提交到 Git。重新分发编译包时，请按 GPL 要求�
 在 Windows x64 上构建安装版或便携 EXE，需准备匹配的 FFmpeg / FFprobe；完整依赖、媒体工具源码与构建命令见 [三平台发行与 Windows 构建说明](docs/RELEASING.md)。云端工作流同时生成 NSIS 安装版、更新清单与便携版。自行构建不会自动获得代码签名。
 
 ## 贡献者
+
+感谢所有代码贡献者与问题反馈者。[完整贡献记录与问题编号](CONTRIBUTORS.md)已核对至 2026-11-12，包含历史开放／已关闭的全部 10 个 PR 和 136 个 Issue。
+
+**代码提交作者：** [@jackotom](https://github.com/jackotom)、[@ZainCheung](https://github.com/ZainCheung)。
+
+**PR 提交者（8 位）：** [@anupam-orbis](https://github.com/anupam-orbis)、[@ceco3000](https://github.com/ceco3000)、[@jackotom](https://github.com/jackotom)、[@jayeeliu](https://github.com/jayeeliu)、[@jjay5520](https://github.com/jjay5520)、[@roytjus](https://github.com/roytjus)、[@xinbaojian](https://github.com/xinbaojian)、[@ZainCheung](https://github.com/ZainCheung)。未合并的方案也保留提交致谢，不代表已经采用。
+
+<details>
+<summary>展开全部 82 位问题反馈者</summary>
+
+[@96827123](https://github.com/96827123) · [@adfnaa](https://github.com/adfnaa) · [@AguoofAlishan](https://github.com/AguoofAlishan) · [@airwenlee](https://github.com/airwenlee) · [@allenyip-blip](https://github.com/allenyip-blip) · [@bigbaibai-luis](https://github.com/bigbaibai-luis) · [@breadxuqiqi](https://github.com/breadxuqiqi) · [@buer052594](https://github.com/buer052594) · [@caolixiang](https://github.com/caolixiang) · [@ccicc-ccicc](https://github.com/ccicc-ccicc) · [@ceco3000](https://github.com/ceco3000) · [@ceylog](https://github.com/ceylog) · [@changyidong](https://github.com/changyidong) · [@chenchihcu](https://github.com/chenchihcu) · [@CloudPeakBAI](https://github.com/CloudPeakBAI) · [@coffeefreehans](https://github.com/coffeefreehans) · [@darkj2k](https://github.com/darkj2k) · [@dcxa521gi](https://github.com/dcxa521gi) · [@diaobugou](https://github.com/diaobugou) · [@dickyluo](https://github.com/dickyluo) · [@eq1024](https://github.com/eq1024) · [@Freeze7749](https://github.com/Freeze7749) · [@fzyifeng](https://github.com/fzyifeng) · [@GGreyCat](https://github.com/GGreyCat) · [@gugugaga-doro](https://github.com/gugugaga-doro) · [@GuoJiKaiHehe](https://github.com/GuoJiKaiHehe) · [@hongminzheng](https://github.com/hongminzheng) · [@huihui278](https://github.com/huihui278) · [@Ifover](https://github.com/Ifover) · [@kanonso](https://github.com/kanonso) · [@ken6678831-man](https://github.com/ken6678831-man) · [@kingport](https://github.com/kingport) · [@leo1300177](https://github.com/leo1300177) · [@licongy](https://github.com/licongy) · [@lqg5522](https://github.com/lqg5522) · [@LTRltr](https://github.com/LTRltr) · [@lzy139822](https://github.com/lzy139822) · [@macvip](https://github.com/macvip) · [@MaxeWang123](https://github.com/MaxeWang123) · [@midpoint](https://github.com/midpoint) · [@Mono-dev07](https://github.com/Mono-dev07) · [@Mrjoker818](https://github.com/Mrjoker818) · [@mydance-wj](https://github.com/mydance-wj) · [@n2ryx](https://github.com/n2ryx) · [@Noisercontrollers](https://github.com/Noisercontrollers) · [@perlist](https://github.com/perlist) · [@ppsbbs](https://github.com/ppsbbs) · [@r5kc](https://github.com/r5kc) · [@RuningLittleSnail](https://github.com/RuningLittleSnail) · [@Ryan-zyg](https://github.com/Ryan-zyg) · [@ryancq1982](https://github.com/ryancq1982) · [@s7c6vr9hsh-pixel](https://github.com/s7c6vr9hsh-pixel) · [@shara2006](https://github.com/shara2006) · [@superterry-svg](https://github.com/superterry-svg) · [@SysuJayce](https://github.com/SysuJayce) · [@sza253](https://github.com/sza253) · [@Tangkage](https://github.com/Tangkage) · [@tt555-1](https://github.com/tt555-1) · [@TTroia](https://github.com/TTroia) · [@VictorLee2077](https://github.com/VictorLee2077) · [@Wan-ZL](https://github.com/Wan-ZL) · [@wangfujie](https://github.com/wangfujie) · [@wgsjjj](https://github.com/wgsjjj) · [@winddriver](https://github.com/winddriver) · [@wms888](https://github.com/wms888) · [@wuhai007007](https://github.com/wuhai007007) · [@wwxiaoo](https://github.com/wwxiaoo) · [@xiaobai-chun](https://github.com/xiaobai-chun) · [@xiaobutx](https://github.com/xiaobutx) · [@xinbaojian](https://github.com/xinbaojian) · [@Xinran123757](https://github.com/Xinran123757) · [@xutengyang](https://github.com/xutengyang) · [@yetonggo](https://github.com/yetonggo) · [@yeuemfantasy](https://github.com/yeuemfantasy) · [@yidasanqian](https://github.com/yidasanqian) · [@yujian0222](https://github.com/yujian0222) · [@yyyyyy1111wq](https://github.com/yyyyyy1111wq) · [@ZainCheung](https://github.com/ZainCheung) · [@zhangyibin8111](https://github.com/zhangyibin8111) · [@Zhengs2009](https://github.com/Zhengs2009) · [@zouyelin](https://github.com/zouyelin) · [@ZZQ2417536071](https://github.com/ZZQ2417536071)
+
+</details>
+
+**页面列示的历史协作账号：** [@cursoragent](https://github.com/cursoragent)。来源与统计边界见完整名单。
+
+GitHub 右侧 Contributors 按真实提交历史自动生成；本节单独向 PR 提交者和问题反馈者致谢。
+
+
+### 7.1
+
+- **[anupam-orbis](https://github.com/anupam-orbis)**：通过[PR #140](https://github.com/jackotom/hongguo-drama/pull/140)提供follow-redirects依赖锁更新，7.1采纳实际版本1.16.3；本项目另补重定向安全回归。
 
 ### 4.1
 

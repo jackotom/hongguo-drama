@@ -1,4 +1,4 @@
-// Run the 4.4 portable EXE on disposable Windows CI with isolated, real Hongguo footage and muted audio.
+// Run the final portable EXE on disposable Windows CI with isolated, real Hongguo downloads and muted audio.
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');
@@ -105,7 +105,7 @@ async function keyHandoff(key, code, expectedSource) {
   return state;
 }
 
-async function realFootage(mediaDir, ffmpeg) {
+async function realFootage(mediaDir, ffmpeg, ffprobe, dataFile) {
   const native = require('../src/native/hongguo');
   const catalog = await require('../src/native/hongguo-app-catalog').browseList({ category: 'hot-real-drama' });
   assert(catalog.success && catalog.results.length, 'Real Hongguo catalog unavailable; do not substitute footage');
@@ -114,41 +114,19 @@ async function realFootage(mediaDir, ffmpeg) {
   assert(series.episodes.length >= 2, 'Real acceptance drama needs two episodes');
   const start = Math.floor(Math.random() * Math.min(10, series.episodes.length - 1));
   const episodes = series.episodes.slice(start, start + 2), samples = [];
-  for (const [index, episode] of episodes.entries()) {
-    const info = await native.fetchPlayUrlSingle(episode.vid, series.series_id, { force: true, quality: '1080p' });
-    assert(info.url, 'Real Hongguo episode source unavailable: ' + JSON.stringify(info.sources?.map(({source,code}) => ({source,code}))));
-    const encrypted = path.join(mediaDir, `original-${index}.mp4`);
-    try {
-      const config = {
-        ...(info.source === 'web' ? require('../src/native/web-media-guard').webMediaRequestOptions(info.url) : {}),
-        headers: { 'User-Agent': info.userAgent || native.UA, 'Accept-Encoding': 'identity',
-          ...((info.referer || info.source === 'web') ? { Referer: info.referer || native.WEB_REFERER } : {}) },
-        responseType: 'arraybuffer', timeout: 60000, maxContentLength: 128 * 1024 * 1024,
-      };
-      let response;
-      try { response = await require('axios').get(info.url, config); }
-      catch (error) {
-        if (info.source !== 'app' || error.response?.status !== 403) throw error;
-        // Match the application's bounded CDN Referer fallback.
-        config.headers.Referer = native.VIDEO_REFERER;
-        response = await require('axios').get(info.url, config);
-      }
-      assert(response.data.byteLength > 0);
-      fs.writeFileSync(encrypted, response.data);
-    } catch (error) { throw new Error('Real Hongguo acceptance download failed (' + (Number(error.response?.status) || error.code || 'unknown') + '); no media URL logged'); }
+  const downloaded = await require('./windows-download-acceptance.cjs')({ evaluate, result, dataFile, mediaDir, series, episodes, ffprobe, ffmpeg, delay });
+  for (const [index, original] of downloaded.entries()) {
     const sample = path.join(mediaDir, `windows-sample-${index + 1}.mp4`);
-    const key = info.contentKey || (info.spadeA ? native.deriveKey(info.spadeA)?.toString('hex') : '');
-    const decoded = spawnSync(ffmpeg, ['-y', '-v', 'error', ...(key ? ['-decryption_key', key] : []),
-      '-i', encrypted, '-t', '15', '-map', '0:v:0', '-map', '0:a:0', '-vf', 'scale=640:-2,setsar=1',
+    const decoded = spawnSync(ffmpeg, ['-y', '-v', 'error',
+      '-i', original, '-t', '15', '-map', '0:v:0', '-map', '0:a:0', '-vf', 'scale=640:-2,setsar=1',
       '-c:v', 'libx264', '-preset', 'ultrafast', '-crf', '20', '-pix_fmt', 'yuv420p', '-c:a', 'aac', sample],
       { timeout: 60000, windowsHide: true, stdio: 'pipe' });
     assert.equal(decoded.status, 0, 'Real Hongguo acceptance video could not be decoded');
-    fs.unlinkSync(encrypted);
     samples.push(sample);
   }
   result.realMedia = { seriesId: series.series_id, title: series.series_title,
     episodes: episodes.map(episode => ({ vid: episode.vid, index: episode.vid_index })),
-    downloadedFromOfficialSource: true, muted: true, durationPerSampleSeconds: 15 };
+    downloadedFromOfficialSource: true, downloadedThroughAppQueue: true, muted: true, durationPerSampleSeconds: 15 };
   return samples;
 }
 (async () => {
@@ -160,6 +138,9 @@ async function realFootage(mediaDir, ffmpeg) {
   const exe = path.join(packaged, pkg.build.productName + '.exe');
   const ffmpeg = path.join(packaged, 'resources/bin/ffmpeg.exe');
   const ffprobe = path.join(packaged, 'resources/bin/ffprobe.exe');
+  const mediaDir = path.join(temp, 'media');
+  fs.mkdirSync(mediaDir);
+  let samples = [];
   for (const file of [exe, ffmpeg, ffprobe]) pe64(file);
   result.checks.push('Portable payload: Electron/FFmpeg/FFprobe are PE x64');
   // Real portable startup: copy the single-file EXE elsewhere, launch it without
@@ -207,6 +188,16 @@ async function realFootage(mediaDir, ffmpeg) {
     assert(fs.existsSync(expectedFile), 'Portable save must create data/data.json next to the program');
     assert.equal(JSON.parse(fs.readFileSync(expectedFile, 'utf8')).settings.max_concurrent, saved.expected, 'Portable save must persist the requested setting');
     result.checks.push('Portable EXE without --user-data-dir reports program-relative config and persists settings there');
+    if (!skipPlayback) {
+      const configured = await evaluate(`(async () => {
+        const settings = await window.electronAPI.getSettings();
+        return window.electronAPI.saveSettings({ ...settings, root: ${JSON.stringify(mediaDir)}, max_concurrent: 1,
+          download_metadata: false, cache_next_episode: false, watch_updates_enabled: false, watch_sequels_enabled: false });
+      })()`);
+      assert.equal(configured.success, true);
+      assert.equal((await evaluate('window.electronAPI.getQueueStatus()')).maxConcurrent, 1);
+      samples = await realFootage(mediaDir, ffmpeg, ffprobe, expectedFile);
+    }
   } finally {
     try { socket?.close(); } catch {}
     socket = null;
@@ -217,12 +208,9 @@ async function realFootage(mediaDir, ffmpeg) {
   for (const file of ['LICENSE.txt', 'NOTICE.txt', 'THIRD-PARTY-NOTICES.md', 'LICENSE.electron.txt', 'LICENSES.chromium.html', 'resources/bin/WINDOWS-NOTICE.txt', 'resources/bin/WINDOWS-X264-LICENSE.txt', 'resources/bin/WINDOWS-MINGW-LICENSE.txt', 'resources/bin/WINDOWS-GCC-LICENSE.txt', 'resources/bin/COPYING.GPLv3']) assert(fs.statSync(path.join(packaged, file)).size > 20, file);
   result.checks.push('Application, Electron, Chromium, FFmpeg and x264 notices present');
   result.ffmpeg = execFileSync(ffmpeg, ['-version'], { encoding: 'utf8', windowsHide: true }).split('\n')[0];
-  const mediaDir = path.join(temp, 'media');
-  fs.mkdirSync(mediaDir);
   const sid = 'windows-smoke';
   let fixtureEpisodes = [];
   if (!skipPlayback) {
-    const samples = await realFootage(mediaDir, ffmpeg);
     result.realMedia.samples = [];
     for (const sample of samples) {
       const probe = JSON.parse(execFileSync(ffprobe, ['-v', 'error', '-show_streams', '-of', 'json', sample], { encoding: 'utf8', windowsHide: true }));
@@ -287,7 +275,8 @@ async function realFootage(mediaDir, ffmpeg) {
   result.checks.push('Single-file portable EXE opens; matching version; isolated profile; extracted media matches payload');
   if (skipPlayback) {
     assert(await evaluate('Array.from(document.querySelectorAll("video")).every(video => video.paused && !video.currentSrc)'), 'Playback skip must leave all video elements unloaded and paused');
-    result.skipReason = 'Playback verification explicitly skipped because the required user fixture is unavailable; no substitute footage was used.';
+    result.skipReason = 'Real App queue and playback verification explicitly skipped; no substitute footage was used.';
+    result.appDownloadQueue = { tested: false, reason: 'Real-media acceptance was explicitly skipped together with playback.' };
     result.passed = true;
     console.log('Windows release startup smoke: PASS (' + result.checks.length + ' checks; playback NOT TESTED)');
     return;

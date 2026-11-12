@@ -1,4 +1,4 @@
-<!-- 7.0 desktop/Docker release; mobile and TV versions remain independent. -->
+<!-- 7.1 desktop/Docker release; mobile and TV versions remain independent. -->
 <!-- 6.8 desktop/Docker release; this directory keeps its existing scope. -->
 # 红果·自用 安卓个人版 1.1（共享React移植进行中） — 项目发行 6.6（手机个人版保持 1.1）
 

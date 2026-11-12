@@ -1,0 +1,785 @@
+{
+  "repository": "jackotom/hongguo-drama",
+  "asOf": "2026-11-12",
+  "codeAuthors": [
+    {
+      "login": "jackotom",
+      "url": "https://github.com/jackotom",
+      "commits": 263
+    },
+    {
+      "login": "ZainCheung",
+      "url": "https://github.com/ZainCheung",
+      "commits": 1
+    }
+  ],
+  "pullRequests": [
+    {
+      "number": 18,
+      "author": "ceco3000",
+      "state": "closed",
+      "merged": false,
+      "url": "https://github.com/jackotom/hongguo-drama/pull/18"
+    },
+    {
+      "number": 29,
+      "author": "jackotom",
+      "state": "closed",
+      "merged": true,
+      "url": "https://github.com/jackotom/hongguo-drama/pull/29"
+    },
+    {
+      "number": 61,
+      "author": "jayeeliu",
+      "state": "closed",
+      "merged": false,
+      "url": "https://github.com/jackotom/hongguo-drama/pull/61"
+    },
+    {
+      "number": 87,
+      "author": "jjay5520",
+      "state": "closed",
+      "merged": false,
+      "url": "https://github.com/jackotom/hongguo-drama/pull/87"
+    },
+    {
+      "number": 88,
+      "author": "jackotom",
+      "state": "closed",
+      "merged": true,
+      "url": "https://github.com/jackotom/hongguo-drama/pull/88"
+    },
+    {
+      "number": 92,
+      "author": "roytjus",
+      "state": "open",
+      "merged": false,
+      "url": "https://github.com/jackotom/hongguo-drama/pull/92"
+    },
+    {
+      "number": 129,
+      "author": "xinbaojian",
+      "state": "open",
+      "merged": false,
+      "url": "https://github.com/jackotom/hongguo-drama/pull/129"
+    },
+    {
+      "number": 133,
+      "author": "ZainCheung",
+      "state": "closed",
+      "merged": true,
+      "url": "https://github.com/jackotom/hongguo-drama/pull/133"
+    },
+    {
+      "number": 140,
+      "author": "anupam-orbis",
+      "state": "open",
+      "merged": false,
+      "url": "https://github.com/jackotom/hongguo-drama/pull/140"
+    },
+    {
+      "number": 143,
+      "author": "roytjus",
+      "state": "open",
+      "merged": false,
+      "url": "https://github.com/jackotom/hongguo-drama/pull/143"
+    }
+  ],
+  "pullRequestAuthors": [
+    {
+      "login": "anupam-orbis",
+      "url": "https://github.com/anupam-orbis",
+      "submissions": [
+        140
+      ]
+    },
+    {
+      "login": "ceco3000",
+      "url": "https://github.com/ceco3000",
+      "submissions": [
+        18
+      ]
+    },
+    {
+      "login": "jackotom",
+      "url": "https://github.com/jackotom",
+      "submissions": [
+        29,
+        88
+      ]
+    },
+    {
+      "login": "jayeeliu",
+      "url": "https://github.com/jayeeliu",
+      "submissions": [
+        61
+      ]
+    },
+    {
+      "login": "jjay5520",
+      "url": "https://github.com/jjay5520",
+      "submissions": [
+        87
+      ]
+    },
+    {
+      "login": "roytjus",
+      "url": "https://github.com/roytjus",
+      "submissions": [
+        92,
+        143
+      ]
+    },
+    {
+      "login": "xinbaojian",
+      "url": "https://github.com/xinbaojian",
+      "submissions": [
+        129
+      ]
+    },
+    {
+      "login": "ZainCheung",
+      "url": "https://github.com/ZainCheung",
+      "submissions": [
+        133
+      ]
+    }
+  ],
+  "issueAuthors": [
+    {
+      "login": "96827123",
+      "url": "https://github.com/96827123",
+      "submissions": [
+        89
+      ]
+    },
+    {
+      "login": "adfnaa",
+      "url": "https://github.com/adfnaa",
+      "submissions": [
+        123
+      ]
+    },
+    {
+      "login": "AguoofAlishan",
+      "url": "https://github.com/AguoofAlishan",
+      "submissions": [
+        35
+      ]
+    },
+    {
+      "login": "airwenlee",
+      "url": "https://github.com/airwenlee",
+      "submissions": [
+        55
+      ]
+    },
+    {
+      "login": "allenyip-blip",
+      "url": "https://github.com/allenyip-blip",
+      "submissions": [
+        58
+      ]
+    },
+    {
+      "login": "bigbaibai-luis",
+      "url": "https://github.com/bigbaibai-luis",
+      "submissions": [
+        40
+      ]
+    },
+    {
+      "login": "breadxuqiqi",
+      "url": "https://github.com/breadxuqiqi",
+      "submissions": [
+        114
+      ]
+    },
+    {
+      "login": "buer052594",
+      "url": "https://github.com/buer052594",
+      "submissions": [
+        23,
+        116
+      ]
+    },
+    {
+      "login": "caolixiang",
+      "url": "https://github.com/caolixiang",
+      "submissions": [
+        102
+      ]
+    },
+    {
+      "login": "ccicc-ccicc",
+      "url": "https://github.com/ccicc-ccicc",
+      "submissions": [
+        65
+      ]
+    },
+    {
+      "login": "ceco3000",
+      "url": "https://github.com/ceco3000",
+      "submissions": [
+        17
+      ]
+    },
+    {
+      "login": "ceylog",
+      "url": "https://github.com/ceylog",
+      "submissions": [
+        5
+      ]
+    },
+    {
+      "login": "changyidong",
+      "url": "https://github.com/changyidong",
+      "submissions": [
+        127
+      ]
+    },
+    {
+      "login": "chenchihcu",
+      "url": "https://github.com/chenchihcu",
+      "submissions": [
+        52
+      ]
+    },
+    {
+      "login": "CloudPeakBAI",
+      "url": "https://github.com/CloudPeakBAI",
+      "submissions": [
+        60
+      ]
+    },
+    {
+      "login": "coffeefreehans",
+      "url": "https://github.com/coffeefreehans",
+      "submissions": [
+        101
+      ]
+    },
+    {
+      "login": "darkj2k",
+      "url": "https://github.com/darkj2k",
+      "submissions": [
+        69
+      ]
+    },
+    {
+      "login": "dcxa521gi",
+      "url": "https://github.com/dcxa521gi",
+      "submissions": [
+        28
+      ]
+    },
+    {
+      "login": "diaobugou",
+      "url": "https://github.com/diaobugou",
+      "submissions": [
+        147
+      ]
+    },
+    {
+      "login": "dickyluo",
+      "url": "https://github.com/dickyluo",
+      "submissions": [
+        63,
+        67,
+        138
+      ]
+    },
+    {
+      "login": "eq1024",
+      "url": "https://github.com/eq1024",
+      "submissions": [
+        124
+      ]
+    },
+    {
+      "login": "Freeze7749",
+      "url": "https://github.com/Freeze7749",
+      "submissions": [
+        53
+      ]
+    },
+    {
+      "login": "fzyifeng",
+      "url": "https://github.com/fzyifeng",
+      "submissions": [
+        9
+      ]
+    },
+    {
+      "login": "GGreyCat",
+      "url": "https://github.com/GGreyCat",
+      "submissions": [
+        90
+      ]
+    },
+    {
+      "login": "gugugaga-doro",
+      "url": "https://github.com/gugugaga-doro",
+      "submissions": [
+        39,
+        120
+      ]
+    },
+    {
+      "login": "GuoJiKaiHehe",
+      "url": "https://github.com/GuoJiKaiHehe",
+      "submissions": [
+        84,
+        95,
+        139
+      ]
+    },
+    {
+      "login": "hongminzheng",
+      "url": "https://github.com/hongminzheng",
+      "submissions": [
+        83
+      ]
+    },
+    {
+      "login": "huihui278",
+      "url": "https://github.com/huihui278",
+      "submissions": [
+        44,
+        148
+      ]
+    },
+    {
+      "login": "Ifover",
+      "url": "https://github.com/Ifover",
+      "submissions": [
+        135,
+        136
+      ]
+    },
+    {
+      "login": "kanonso",
+      "url": "https://github.com/kanonso",
+      "submissions": [
+        79,
+        112
+      ]
+    },
+    {
+      "login": "ken6678831-man",
+      "url": "https://github.com/ken6678831-man",
+      "submissions": [
+        10
+      ]
+    },
+    {
+      "login": "kingport",
+      "url": "https://github.com/kingport",
+      "submissions": [
+        4
+      ]
+    },
+    {
+      "login": "leo1300177",
+      "url": "https://github.com/leo1300177",
+      "submissions": [
+        70
+      ]
+    },
+    {
+      "login": "licongy",
+      "url": "https://github.com/licongy",
+      "submissions": [
+        117
+      ]
+    },
+    {
+      "login": "lqg5522",
+      "url": "https://github.com/lqg5522",
+      "submissions": [
+        98,
+        104,
+        110,
+        111
+      ]
+    },
+    {
+      "login": "LTRltr",
+      "url": "https://github.com/LTRltr",
+      "submissions": [
+        106
+      ]
+    },
+    {
+      "login": "lzy139822",
+      "url": "https://github.com/lzy139822",
+      "submissions": [
+        73
+      ]
+    },
+    {
+      "login": "macvip",
+      "url": "https://github.com/macvip",
+      "submissions": [
+        22,
+        77
+      ]
+    },
+    {
+      "login": "MaxeWang123",
+      "url": "https://github.com/MaxeWang123",
+      "submissions": [
+        25,
+        54
+      ]
+    },
+    {
+      "login": "midpoint",
+      "url": "https://github.com/midpoint",
+      "submissions": [
+        103
+      ]
+    },
+    {
+      "login": "Mono-dev07",
+      "url": "https://github.com/Mono-dev07",
+      "submissions": [
+        119
+      ]
+    },
+    {
+      "login": "Mrjoker818",
+      "url": "https://github.com/Mrjoker818",
+      "submissions": [
+        105,
+        145
+      ]
+    },
+    {
+      "login": "mydance-wj",
+      "url": "https://github.com/mydance-wj",
+      "submissions": [
+        93
+      ]
+    },
+    {
+      "login": "n2ryx",
+      "url": "https://github.com/n2ryx",
+      "submissions": [
+        121
+      ]
+    },
+    {
+      "login": "Noisercontrollers",
+      "url": "https://github.com/Noisercontrollers",
+      "submissions": [
+        13
+      ]
+    },
+    {
+      "login": "perlist",
+      "url": "https://github.com/perlist",
+      "submissions": [
+        107
+      ]
+    },
+    {
+      "login": "ppsbbs",
+      "url": "https://github.com/ppsbbs",
+      "submissions": [
+        21
+      ]
+    },
+    {
+      "login": "r5kc",
+      "url": "https://github.com/r5kc",
+      "submissions": [
+        134
+      ]
+    },
+    {
+      "login": "RuningLittleSnail",
+      "url": "https://github.com/RuningLittleSnail",
+      "submissions": [
+        115
+      ]
+    },
+    {
+      "login": "Ryan-zyg",
+      "url": "https://github.com/Ryan-zyg",
+      "submissions": [
+        46,
+        96
+      ]
+    },
+    {
+      "login": "ryancq1982",
+      "url": "https://github.com/ryancq1982",
+      "submissions": [
+        78
+      ]
+    },
+    {
+      "login": "s7c6vr9hsh-pixel",
+      "url": "https://github.com/s7c6vr9hsh-pixel",
+      "submissions": [
+        42,
+        50,
+        57
+      ]
+    },
+    {
+      "login": "shara2006",
+      "url": "https://github.com/shara2006",
+      "submissions": [
+        14
+      ]
+    },
+    {
+      "login": "superterry-svg",
+      "url": "https://github.com/superterry-svg",
+      "submissions": [
+        66
+      ]
+    },
+    {
+      "login": "SysuJayce",
+      "url": "https://github.com/SysuJayce",
+      "submissions": [
+        31,
+        32,
+        41,
+        100,
+        108
+      ]
+    },
+    {
+      "login": "sza253",
+      "url": "https://github.com/sza253",
+      "submissions": [
+        142
+      ]
+    },
+    {
+      "login": "Tangkage",
+      "url": "https://github.com/Tangkage",
+      "submissions": [
+        49
+      ]
+    },
+    {
+      "login": "tt555-1",
+      "url": "https://github.com/tt555-1",
+      "submissions": [
+        109
+      ]
+    },
+    {
+      "login": "TTroia",
+      "url": "https://github.com/TTroia",
+      "submissions": [
+        59
+      ]
+    },
+    {
+      "login": "VictorLee2077",
+      "url": "https://github.com/VictorLee2077",
+      "submissions": [
+        8,
+        19,
+        26
+      ]
+    },
+    {
+      "login": "Wan-ZL",
+      "url": "https://github.com/Wan-ZL",
+      "submissions": [
+        1,
+        2,
+        3
+      ]
+    },
+    {
+      "login": "wangfujie",
+      "url": "https://github.com/wangfujie",
+      "submissions": [
+        94
+      ]
+    },
+    {
+      "login": "wgsjjj",
+      "url": "https://github.com/wgsjjj",
+      "submissions": [
+        62
+      ]
+    },
+    {
+      "login": "winddriver",
+      "url": "https://github.com/winddriver",
+      "submissions": [
+        20
+      ]
+    },
+    {
+      "login": "wms888",
+      "url": "https://github.com/wms888",
+      "submissions": [
+        6
+      ]
+    },
+    {
+      "login": "wuhai007007",
+      "url": "https://github.com/wuhai007007",
+      "submissions": [
+        33
+      ]
+    },
+    {
+      "login": "wwxiaoo",
+      "url": "https://github.com/wwxiaoo",
+      "submissions": [
+        118
+      ]
+    },
+    {
+      "login": "xiaobai-chun",
+      "url": "https://github.com/xiaobai-chun",
+      "submissions": [
+        91
+      ]
+    },
+    {
+      "login": "xiaobutx",
+      "url": "https://github.com/xiaobutx",
+      "submissions": [
+        132
+      ]
+    },
+    {
+      "login": "xinbaojian",
+      "url": "https://github.com/xinbaojian",
+      "submissions": [
+        126
+      ]
+    },
+    {
+      "login": "Xinran123757",
+      "url": "https://github.com/Xinran123757",
+      "submissions": [
+        75,
+        85,
+        86,
+        128,
+        146
+      ]
+    },
+    {
+      "login": "xutengyang",
+      "url": "https://github.com/xutengyang",
+      "submissions": [
+        11,
+        12,
+        15
+      ]
+    },
+    {
+      "login": "yetonggo",
+      "url": "https://github.com/yetonggo",
+      "submissions": [
+        99,
+        131,
+        137,
+        141
+      ]
+    },
+    {
+      "login": "yeuemfantasy",
+      "url": "https://github.com/yeuemfantasy",
+      "submissions": [
+        122,
+        144
+      ]
+    },
+    {
+      "login": "yidasanqian",
+      "url": "https://github.com/yidasanqian",
+      "submissions": [
+        7,
+        27,
+        30,
+        51,
+        71,
+        72,
+        74
+      ]
+    },
+    {
+      "login": "yujian0222",
+      "url": "https://github.com/yujian0222",
+      "submissions": [
+        113
+      ]
+    },
+    {
+      "login": "yyyyyy1111wq",
+      "url": "https://github.com/yyyyyy1111wq",
+      "submissions": [
+        24
+      ]
+    },
+    {
+      "login": "ZainCheung",
+      "url": "https://github.com/ZainCheung",
+      "submissions": [
+        130
+      ]
+    },
+    {
+      "login": "zhangyibin8111",
+      "url": "https://github.com/zhangyibin8111",
+      "submissions": [
+        43,
+        47,
+        64,
+        76,
+        80,
+        81,
+        97
+      ]
+    },
+    {
+      "login": "Zhengs2009",
+      "url": "https://github.com/Zhengs2009",
+      "submissions": [
+        82
+      ]
+    },
+    {
+      "login": "zouyelin",
+      "url": "https://github.com/zouyelin",
+      "submissions": [
+        16
+      ]
+    },
+    {
+      "login": "ZZQ2417536071",
+      "url": "https://github.com/ZZQ2417536071",
+      "submissions": [
+        36,
+        37,
+        38,
+        45,
+        48,
+        56,
+        68
+      ]
+    }
+  ],
+  "historicalAcknowledgements": [
+    {
+      "login": "cursoragent",
+      "url": "https://github.com/cursoragent",
+      "basis": "用户提供的仓库 Contributors 页面截图；当前默认分支提交作者查询未列出该账号，不计入本次代码作者统计"
+    }
+  ]
+}

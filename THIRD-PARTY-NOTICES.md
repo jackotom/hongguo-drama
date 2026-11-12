@@ -1,7 +1,9 @@
-<!-- 7.0 release target. -->
+<!-- 7.1 release target. -->
 # 第三方组件许可说明
 
-适用源码版本：红果短剧 6.9（发行目标）；以下第三方组件保留各自的版本、作者与许可，本轮未升级依赖。实际发行状态见 `docs/release-6.9.md`。
+适用源码版本：红果短剧 7.1（发行候选，尚未公开）；本轮 follow-redirects 升至1.16.3，其余第三方组件保留各自的版本、作者与许可。实际发行状态见 `docs/release-7.1.md`。
+
+7.1采纳anupam-orbis在PR #140提供的实际依赖锁更新：follow-redirects从1.16.1升至1.16.3；本项目另补重定向安全回归。当前正式版为7.0，完整协作记录见 `CONTRIBUTORS.md`。
 
 本软件（红果短剧下载器）使用了以下第三方组件。各组件的版权归其各自作者所有，
 本软件对这些组件的使用均遵循其原始许可证。
@@ -20,6 +22,7 @@
 | React | 18.3.1 | MIT | https://github.com/facebook/react |
 | React DOM | 18.3.1 | MIT | https://github.com/facebook/react |
 | axios | 1.20.0 | MIT | https://github.com/axios/axios |
+| follow-redirects（axios依赖） | 1.16.3 | MIT | https://github.com/follow-redirects/follow-redirects |
 | electron-updater | 6.8.9 | MIT | https://github.com/electron-userland/electron-builder |
 
 Electron 打包产物中已包含 Chromium 与 Node.js 的许可声明：
