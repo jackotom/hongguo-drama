@@ -19,6 +19,7 @@ test('both production bundle entries resolve one explicit decoder; phone keeps t
     assert(inputs.some(p=>p.endsWith(expected)),'expected decoder must be in the actual dependency graph');
     assert(!inputs.some(p=>p.endsWith(forbidden)),'other decoder must not leak into this bundle');
     assert(inputs.some(p=>p.endsWith('web/media.js')),'both apps consume the shared preparation module');
+    assert(inputs.some(p=>p.endsWith('web/timers.cjs')),'browser bundles must preserve cancellable source pacing');
   }
   for(const [base,name] of [[b.tv,'decrypt.js'],[b.phone,'mobile-decrypt.js']]){
     const compiled=await esbuild.build(b.options(base,{entryPoints:[path.join(b.root,'build',name)],format:'cjs'}));

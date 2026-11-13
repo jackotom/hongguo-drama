@@ -174,7 +174,7 @@ test('shared preparation owns exactly one token/Blob and releases failures or ca
 test('shared Android consumer cancels the delivered G2 registration/model/fallback transport', async t => {
   const root = path.resolve(__dirname,'..');
   const built = await esbuild.build({entryPoints:[path.join(root,'web/media.js')],bundle:true,format:'cjs',platform:'browser',write:false,logLevel:'silent',
-    inject:[path.join(root,'web/globals.js')],alias:{'node:crypto':path.join(root,'web/crypto.js'),'node:zlib':path.join(root,'web/zlib.js'),axios:path.join(root,'web/axios.cjs')},
+    inject:[path.join(root,'web/globals.js')],alias:{'node:crypto':path.join(root,'web/crypto.js'),'node:zlib':path.join(root,'web/zlib.js'),'node:timers/promises':path.join(root,'web/timers.cjs'),axios:path.join(root,'web/axios.cjs')},
     plugins:[{name:'unused-decoder',setup(build){
       build.onResolve({filter:/^android-decrypt$/},()=>({path:'decoder',namespace:'unused'}));
       build.onLoad({filter:/.*/,namespace:'unused'},()=>({contents:'export function decryptMp4Buffer(){throw Error("decoder must not run");}'}));

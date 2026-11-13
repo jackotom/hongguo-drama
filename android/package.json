@@ -2,7 +2,7 @@
   "name": "hongguo-personal-android",
   "private": true,
   "version": "1.1.0",
-  "tvVersion": "6.6.0",
+  "tvVersion": "7.2.0",
   "license": "GPL-3.0-only",
   "scripts": {
     "test": "node bundle.cjs && node --test tests/*.test.cjs",

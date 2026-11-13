@@ -39,7 +39,7 @@ const buildOptions = {
   bundle: true, format: 'iife', platform: 'browser', target: 'chrome100', minify: true,
   inject: [path.join(root, 'web/globals.js')],
   define: { 'process.env.NODE_ENV': '"production"', 'import.meta.env.DEV': 'false' },
-  alias: { 'android-decrypt': path.join(root,'build/mobile-decrypt.js'), 'node:crypto': path.join(root,'web/crypto.js'), 'node:zlib': path.join(root,'web/zlib.js'),
+  alias: { 'android-decrypt': path.join(root,'build/mobile-decrypt.js'), 'node:crypto': path.join(root,'web/crypto.js'), 'node:zlib': path.join(root,'web/zlib.js'), 'node:timers/promises': path.join(root,'web/timers.cjs'),
     'node:fs': path.join(root,'mobile/fs.cjs'), 'node:path': path.join(root,'mobile/path.cjs'),
     axios: path.join(root,'mobile/axios.cjs'), electron: path.join(root,'mobile/electron.cjs') },
   plugins: [{ name: 'android-media-boundary', setup(build) {

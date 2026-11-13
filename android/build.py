@@ -55,6 +55,7 @@ def main():
         directory.mkdir()
     assets = BUILD/'assets' if tv else BUILD/'mobile-assets'
     resources = BUILD/'res' if tv else ROOT/'app/src/main/res'
+    (resources/'drawable').mkdir(parents=True, exist_ok=True)
     manifest = BUILD/'AndroidManifest.xml' if tv else ROOT/'app/src/main/AndroidManifest.xml'
     if tv:
         shutil.copytree(ROOT/'app/src/main/assets',assets,dirs_exist_ok=True)

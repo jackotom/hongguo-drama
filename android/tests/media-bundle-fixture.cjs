@@ -31,6 +31,6 @@ module.exports = function bundles() {
     const decoder={name:'selected-generated-decoder',setup(build){
       build.onResolve({filter:/^android-decrypt$/},()=>({path:base.alias['android-decrypt'],namespace:'generated'}));
     }};
-    return {...base,write:false,logLevel:'silent',metafile:true,...extra,plugins:[...plugins,decoder,virtual,...(extra.plugins||[])]};
+    return {...base,...(extra.entryPoints?{stdin:undefined}:{}),write:false,logLevel:'silent',metafile:true,...extra,plugins:[...plugins,decoder,virtual,...(extra.plugins||[])]};
   }};
 };

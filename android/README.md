@@ -1,4 +1,6 @@
 <!-- 7.2 desktop/Docker release; mobile and TV versions remain independent. -->
+
+TV本轮按明确要求追加7.2，版本与手机独立；构建及实机未测边界见[7.2 TV发行记录](../docs/release-7.2-tv.md)。手机个人版保持1.1/code2，本轮不构建或安装手机。
 <!-- 6.8 desktop/Docker release; this directory keeps its existing scope. -->
 # 红果·自用 安卓个人版 1.1（共享React移植进行中） — 项目发行 6.6（手机个人版保持 1.1）
 
