@@ -1,6 +1,6 @@
-<!-- 7.2 release candidate; not yet published. -->
+<!-- 7.2 published; frozen application source remains unchanged. -->
 
-7.2候选包含#150下载与仅移除记录修复、#153外置盘身份修复；#151中文字幕尚未接入。五平台构建、公证及验收完成后统一公开，当前正式版仍为7.1。进度见[7.2记录](docs/release-7.2.md)。
+7.2已于2026-11-13 15:32:56（Asia/Shanghai）正式公开并设Latest，内部7.2.0、桌面构建7.2.1，冻结源码`26a926f03f5038257e14b932b4762aab2f537ee9`。双Mac、Windows x64、Linux x64 AppImage、Docker amd64五类共25份正式附件，远端大小／SHA256、三份清单与10个匿名下载入口已核对；113个实际上传分段已清理。双Mac本轮新签名、公证、装订；Windows EXE未签名，Intel仅Rosetta。#150与#153修复保留文件安全校验；#151中文字幕未实现。定向检查与必要平台验收通过，通用全量源码CI未全绿，具体失败及平台实测边界见发行回执。未替换本机正式安装；TV与手机独立。完整回执见[7.2说明](docs/release-7.2.md)。
 
 <!-- 7.1 published release; frozen application source remains unchanged. -->
 <!-- Earlier published release records are retained below. -->
@@ -37,7 +37,7 @@
 
 5.4 已正式发布：恢复播放请求签名，增加官网登录、按剧缓存清理、观看记录分组与 DLNA 单集投屏。发行与验证状态见 [5.4说明](docs/release-5.4.md)。
 
-当前正式版：**7.1**；上一正式版：**7.0**（以下保留历史发行记录）。
+当前正式版：**7.2**；上一正式版：**7.1**（以下保留历史发行记录）。
 
 5.4（内部 `5.4.0`）已于 2026-11-02 18:25（Asia/Shanghai）正式发布，标签 `v5.4`，冻结源码 `e7595c040d328655212a2fb0b315286a6ee914b2`。恢复播放请求签名，增加官网登录、按剧清缓存、观看记录分组与 DLNA 单集投屏。三端16附件远端大小及SHA256匹配；双Mac App与DMG四份Apple公证Accepted、签名/装订、只读挂载与更新ZIP恢复通过。源码CI41425248571、Windows CI41425313110通过232单元及102平台检查；Windows便携11项、安装/重装/真实1.80升级资料保留9项通过，EXE未签名。最终arm64包随机真实两集1080P HEVC/AAC下载和静音约10秒播放通过；x64 Rosetta启动退出通过。
 

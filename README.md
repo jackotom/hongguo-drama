@@ -24,9 +24,24 @@
 
 ## 下载与安装
 
-**7.2 发行候选，尚未公开。** 修复外置盘下载归属误判、仅移除记录受阻，以及本地解码组件故障造成的重复下载；保留文件安全校验。海外中文字幕 #151 尚未实现。候选进度见[7.2记录](docs/release-7.2.md)，以下7.1正式下载保持可用。
+**当前正式版：7.2**（内部`7.2.0`，桌面构建`7.2.1`）。修复外置exFAT下载身份误判、仅移除记录受阻，以及本地组件故障造成的无效重复下载；保留文件安全校验。五平台统一公开；#151中文字幕未实现，通用全量源码CI未全绿。验证与限制见[7.2回执](docs/release-7.2.md)。
 
-**当前正式版：7.1**（内部`7.1.0`，桌面构建`7.1.2`）。新增高性能显卡转换选项，修复下载恢复／重试顺序与临时文件冲突，升级依赖并补齐完整贡献致谢。五类平台已统一公开；验证与性能边界见[7.1回执](docs/release-7.1.md)。
+以下为7.2正式下载。Mac已签名、公证、装订；Windows EXE未签名。
+
+| 平台 | 下载7.2 | 使用方式 |
+|---|---|---|
+| Apple芯片Mac，macOS 13+ | [DMG](https://github.com/jackotom/hongguo-drama/releases/download/v7.2/Hongguo-7.2-mac-arm64.dmg) | 拖入应用程序；已签名、公证、装订 |
+| Intel Mac，macOS 13+ | [DMG](https://github.com/jackotom/hongguo-drama/releases/download/v7.2/Hongguo-7.2-mac-x64.dmg) | 同上；验收仅Rosetta |
+| Windows x64 | [安装版](https://github.com/jackotom/hongguo-drama/releases/download/v7.2/hongguo-downloader-7.2-win-x64-setup.exe) · [便携EXE](https://github.com/jackotom/hongguo-drama/releases/download/v7.2/hongguo-downloader-7.2-win-x64.exe) · [便携ZIP](https://github.com/jackotom/hongguo-drama/releases/download/v7.2/hongguo-downloader-7.2-win-x64.zip) | 安装版支持应用内更新；EXE未签名 |
+| Linux x64 | [AppImage](https://github.com/jackotom/hongguo-drama/releases/download/v7.2/hongguo-downloader-7.2-linux-x64.AppImage) | 赋予执行权限；手动更新 |
+| Docker Linux amd64 / NAS | [镜像](https://github.com/jackotom/hongguo-drama/releases/download/v7.2/hongguo-drama-7.2-docker-amd64.tar.gz) · [部署包](https://github.com/jackotom/hongguo-drama/releases/download/v7.2/hongguo-drama-7.2-docker-deploy.zip) | 按[部署文档](docs/docker.md)设置令牌与挂载目录 |
+
+[7.2发行页](https://github.com/jackotom/hongguo-drama/releases/tag/v7.2) · [SHA256](https://github.com/jackotom/hongguo-drama/releases/download/v7.2/SHA256SUMS.txt) · [精确源码](https://github.com/jackotom/hongguo-drama/releases/download/v7.2/hongguo-drama-7.2-source.zip)。实际状态见[7.2正式回执](docs/release-7.2.md)。TV和手机保持独立，不包含在本轮五类产物中。上游部分网页片源仍可能404、只提供预览或超时，不保证所有内容永久可播。
+
+<details>
+<summary>7.1 历史下载与发行说明</summary>
+
+**历史正式版：7.1**（内部`7.1.0`，桌面构建`7.1.2`）。新增高性能显卡转换选项，修复下载恢复／重试顺序与临时文件冲突，升级依赖并补齐完整贡献致谢。五类平台已统一公开；验证与性能边界见[7.1回执](docs/release-7.1.md)。
 
 以下为7.1正式下载。Mac已签名、公证、装订；Windows EXE未签名。
 
@@ -39,6 +54,8 @@
 | Docker Linux amd64 / NAS | [镜像](https://github.com/jackotom/hongguo-drama/releases/download/v7.1/hongguo-drama-7.1-docker-amd64.tar.gz) · [部署包](https://github.com/jackotom/hongguo-drama/releases/download/v7.1/hongguo-drama-7.1-docker-deploy.zip) | 按[部署文档](docs/docker.md)设置令牌与挂载目录 |
 
 [7.1发行页](https://github.com/jackotom/hongguo-drama/releases/tag/v7.1) · [SHA256](https://github.com/jackotom/hongguo-drama/releases/download/v7.1/SHA256SUMS.txt) · [精确源码](https://github.com/jackotom/hongguo-drama/releases/download/v7.1/hongguo-drama-7.1-source.zip)。实际状态见[7.1正式回执](docs/release-7.1.md)。TV和手机保持独立，不包含在本轮五类产物中。上游部分网页片源仍可能404、只提供预览或超时，不保证所有内容永久可播。
+
+</details>
 
 <details>
 <summary>7.0 历史下载与发行说明</summary>
@@ -212,6 +229,12 @@ Mac和Windows安装版保留应用内更新入口；完整6.4→6.5自动更新�
 2. 在「发现短剧」浏览，或在「搜索与下载」输入剧名、红果分享链接或剧集 ID。
 3. 打开详情点「立即播放」，也可选择集数与清晰度加入下载队列。
 4. 下次从「我的剧库」或「观看记录」接着看；下载进度、失败重试和整剧合并在「下载管理」。
+
+## 7.2
+
+- #153：修复exFAT空文件及截断后的编号变化；保留原始句柄、身份、防覆盖和防误删校验。
+- #150：仅移除记录不再被未知临时文件阻拦；缺失或无法启动解码组件时停止无效重复下载，手动重试重新检测。
+- #151中文字幕尚未实现。五平台必要验收通过，通用全量源码CI仍有失败项，详见[7.2正式回执](docs/release-7.2.md)。
 
 ## 7.1
 
@@ -879,6 +902,8 @@ https://github.com/user-attachments/assets/b95f4f60-b57c-495f-a30e-62ac2b0bda11
 到 [Issues](https://github.com/jackotom/hongguo-drama/issues) 提供应用版本、操作系统与芯片类型、来源、复现步骤和错误提示。截图与日志请移除账号信息、Cookie、代理凭据及个人文件路径。
 
 ## 版本与验证范围
+
+7.2已于2026-11-13 15:32:56（Asia/Shanghai）正式公开并设Latest，内部7.2.0、桌面构建7.2.1，冻结源码`26a926f03f5038257e14b932b4762aab2f537ee9`。双Mac、Windows x64、Linux x64 AppImage、Docker amd64五类共25份正式附件，远端大小／SHA256、三份清单与10个匿名下载入口已核对；113个实际上传分段已清理。双Mac本轮新签名、公证、装订；Windows EXE未签名，Intel仅Rosetta。#150与#153修复保留文件安全校验；#151中文字幕未实现。定向检查与必要平台验收通过，通用全量源码CI未全绿，具体失败及平台实测边界见发行回执。未替换本机正式安装；TV与手机独立。完整范围见[7.2回执](docs/release-7.2.md)。以下保留历史记录，不作为本版验收。
 
 7.1已于2026-11-12 14:10:02（Asia/Shanghai）正式公开并设Latest，内部7.1.0、桌面构建7.1.2，冻结源码`bdab9d6158e07524f234f88c1168f20baa2cd507`。双Mac、Windows x64、Linux x64 AppImage、Docker amd64五类共25份正式附件，远端大小／SHA256、三份清单及匿名下载入口已核对；119个临时分段已清理。双Mac新签名、公证、装订；Windows EXE未签名，Intel仅Rosetta，NVIDIA实体未验。高性能模式功能通过，M5本轮样本未提速且文件更大。未替换本机正式安装；TV与手机独立。完整范围见[7.1回执](docs/release-7.1.md)。以下保留历史记录，不作为本版验收。
 
