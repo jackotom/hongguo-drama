@@ -1,0 +1,33 @@
+name: Transport exact 7.2.1 assets to existing draft
+on:
+  workflow_dispatch:
+permissions:
+  actions: read
+  contents: write
+concurrency:
+  group: release-443870946-7.2-transport
+  cancel-in-progress: false
+jobs:
+  transport:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      TRANSPORT_PLAN_SHA256: 'a5a18b326f844800a1ca8beffebe37e6d11256d2e305bd3a62ae6ea55427a879'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Verify originals, reassemble current chunks and fill only the specified draft
+        run: >-
+          python3 .github/release-7.2-cloud.py
+          --execute 26a926f03f5038257e14b932b4762aab2f537ee9
+          --plan .github/release-7.2-transport.json
+          --plan-sha256 "$TRANSPORT_PLAN_SHA256"
+          --assembly-plan .github/release-7.2-upload-plan.json
+          --binding .github/release-7.2-artifact-binding.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-7.2-transport-verification
+          path: transport-result.json
+          if-no-files-found: error

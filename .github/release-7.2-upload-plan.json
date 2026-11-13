@@ -1,0 +1,331 @@
+{
+  "sourceCommit": "26a926f03f5038257e14b932b4762aab2f537ee9",
+  "version": "7.2.0",
+  "buildVersion": "7.2.1",
+  "tag": "v7.2",
+  "draft": true,
+  "assembly_status": "complete",
+  "assetCount": 25,
+  "assets": {
+    "ffmpeg-9.0.2-x264-b35605a-linux-x64-corresponding-source.tar.gz": {
+      "size": 13251771,
+      "sha256": "3425c2993d3e000b1b7431d430f7c59e149156e1ac595bd71091e50cb83fad92"
+    },
+    "librempeg-cb1f8f3-x264-b35605a-win-x64-corresponding-source.tar.gz": {
+      "size": 19959114,
+      "sha256": "dc348745552f73e6413c78c496fbecef0f99d0d992c5cc372a1a801686e04730"
+    },
+    "hongguo-downloader-7.2-linux-x64.AppImage": {
+      "size": 160067086,
+      "sha256": "f3f6f28cc3c56fdff398dac7ed446abcec9b2516d29408feb571c14739c8652e"
+    },
+    "Hongguo-7.2-mac-x64.dmg": {
+      "size": 188809809,
+      "sha256": "807c7b6daea01e80659031bd0747c832096ff12dcd7a62eb00e5300a27d3f779"
+    },
+    "latest-mac.yml": {
+      "size": 557,
+      "sha256": "265d0d4caa1edd8993cffccfc9d5bee9de99cd6d0605fcfc9eb783cb90286e51"
+    },
+    "hongguo-downloader-7.2-win-x64.zip": {
+      "size": 114225536,
+      "sha256": "6fe146ec23348209e273b915bbeb5ea60d703a16f0345bf259aea65e8524ebc5"
+    },
+    "librempeg-cb1f8f3-x264-b35605a-arm64-corresponding-source.tar.gz": {
+      "size": 19877572,
+      "sha256": "d26f61f26fc320ff53081345cc23b64916e4b5564463dcc3857a49f1acfa4570"
+    },
+    "latest.yml": {
+      "size": 377,
+      "sha256": "84c3a4f4efef7587d7175c56279b8d54aac06360536631a2c5aa5c60f242e563"
+    },
+    "libmedia-1.3.1-152f629-corresponding-source.tar.gz": {
+      "size": 190808102,
+      "sha256": "148b3101c2909359a0cece00a0a735a76e3c1410f858bcb5e4f1d88935baa887"
+    },
+    "hongguo-downloader-7.2-win-x64.exe": {
+      "size": 114214476,
+      "sha256": "3261f301688a7550184ba4faaec7b29222b1f5ae115aa491c69418ddca2995dc"
+    },
+    "hongguo-downloader-7.2-mac-arm64.zip": {
+      "size": 160996365,
+      "sha256": "19252e59471181e04c240dd17a6da21d5cd443f8ca2c2ba2b6ef98c0ced7b5ec"
+    },
+    "hongguo-downloader-7.2-win-x64-setup.exe": {
+      "size": 137880579,
+      "sha256": "ba4d9ac94b4e0ddc1b65c629f90f54f3a359366e651e6a63a08ec96d4530b2ed"
+    },
+    "hongguo-drama-7.2-source.zip": {
+      "size": 5675379,
+      "sha256": "d50f335a5b512ddcf8f641ed713776da55d2b41ce6ffc1d61f89171d44e634f9"
+    },
+    "Hongguo-7.2-mac-arm64.dmg": {
+      "size": 179469565,
+      "sha256": "26d83a9bc25267ba45138e235889213693659d1446176e141c35ce3c74a7c32d"
+    },
+    "librempeg-cb1f8f3-x264-b35605a-x64-corresponding-source.tar.gz": {
+      "size": 19877572,
+      "sha256": "d26f61f26fc320ff53081345cc23b64916e4b5564463dcc3857a49f1acfa4570"
+    },
+    "ffmpeg-9.0.2-x264-b35605a-corresponding-source.tar.gz": {
+      "size": 13122060,
+      "sha256": "bfcac890fe098e27bd1cdc4209837377ecaae3bea4fc5b1ea197ec4ab1c2b2e9"
+    },
+    "librempeg-cb1f8f3-x264-b35605a-linux-x64-corresponding-source.tar.gz": {
+      "size": 19959114,
+      "sha256": "dc348745552f73e6413c78c496fbecef0f99d0d992c5cc372a1a801686e04730"
+    },
+    "hongguo-downloader-7.2-win-x64-setup.exe.blockmap": {
+      "size": 145618,
+      "sha256": "314a2daaf58448a91eaa588c5024bbb2701685e8ee45e2d160b92711f9080d25"
+    },
+    "hongguo-downloader-7.2-windows-source.zip": {
+      "size": 5675379,
+      "sha256": "d50f335a5b512ddcf8f641ed713776da55d2b41ce6ffc1d61f89171d44e634f9"
+    },
+    "hongguo-drama-7.2-docker-amd64.tar.gz": {
+      "size": 107490521,
+      "sha256": "1d3e43294e05a13bf7240f0b7af092f009cf67e66e1f54932299e1dc2cbc04b6"
+    },
+    "hongguo-downloader-7.2-mac-x64.zip": {
+      "size": 169287757,
+      "sha256": "0896d973d0f71f9ae3cded603667f5aca77047df8221c7bdb51c5122c420d500"
+    },
+    "hongguo-drama-7.2-docker-deploy.zip": {
+      "size": 29845,
+      "sha256": "b7f83a379dde68c002b5b81bce319ebafab503385fea80742a2d34593d9aa114"
+    },
+    "ffmpeg-9.0.2-x264-b35605a-x64-corresponding-source.tar.gz": {
+      "size": 13122451,
+      "sha256": "ad68bf181e6bcc8609bcfad68a4a1c071b046af7743fd21b4e645132080eba60"
+    },
+    "ffmpeg-9.0.2-x264-b35605a-win-x64-corresponding-source.tar.gz": {
+      "size": 13284656,
+      "sha256": "42846fab878e5b28ae79139f10ff6001a4255704c925dd7dfadef6f3d75e4e0c"
+    },
+    "SHA256SUMS.txt": {
+      "size": 2633,
+      "sha256": "dac37ae52a0d01c6f8b60fe9371799606ac262d9ac702da83f507752e41ca1f2"
+    }
+  },
+  "gateReceiptFiles": {
+    "artifact-14014222085.zip": {
+      "sha256": "4bfe4905a9a9e642d0363084b838f26d44f4f2603b23e0bb562f3dbff2b73398",
+      "size": 198298886
+    },
+    "artifact-14014513954.zip": {
+      "sha256": "bae1435902479002c6f2a1ca3c80c9c0f37fd8431791ab9d5fb503dbb2be207b",
+      "size": 405376311
+    },
+    "artifact-14014553933.zip": {
+      "sha256": "453ec1810d40e5aa583c00bc1fe9a181bc3ae187d7f450a80ef9ddadd8618264",
+      "size": 1453899
+    },
+    "artifact-14014935980.zip": {
+      "sha256": "841df7ee7de8d86243b7a092b8b280cd99e3e5819d773c0e5b1872cb25e8172b",
+      "size": 145751008
+    },
+    "docker/DOCKER-SHA256SUMS.txt": {
+      "sha256": "fc3e93ac4a916be5c524f10d5f22540f53355be40c63506262459b25abc331c4",
+      "size": 879
+    },
+    "docker/SOURCE-SHA.txt": {
+      "sha256": "fee86f9409edf23c69ccef7301c7955bd23b097d23dc1e11fe90c3ada9a5cd68",
+      "size": 41
+    },
+    "docker/compose.yaml": {
+      "sha256": "b243e7ad4843ed38362050205f3ee48f6c4e592d82f919fdebdbe417ac816d1f",
+      "size": 622
+    },
+    "docker/docker-verification.json": {
+      "sha256": "756a1a5e8334432963faeafa4e6c51edcfaf78caa6d2e96ee7778338be3a9d90",
+      "size": 414
+    },
+    "docker/docker.md": {
+      "sha256": "d9f0efce11994622469e633f508bf10d5406659e6ba5e62d320fea79519f5cbc",
+      "size": 7049
+    },
+    "docker/ffmpeg-9.0.2-x264-b35605a-linux-x64-corresponding-source.tar.gz": {
+      "sha256": "81e12adc2a90267aed709ac4f92d2781340556f301a98bf0214550f8da04f21f",
+      "size": 13251767
+    },
+    "docker/hongguo-drama-7.2-docker-amd64.tar.gz": {
+      "sha256": "1d3e43294e05a13bf7240f0b7af092f009cf67e66e1f54932299e1dc2cbc04b6",
+      "size": 107490521
+    },
+    "docker/hongguo-drama-7.2-docker-source.zip": {
+      "sha256": "38fac2c81623af3c89623ab79a5ca92798082ed50e92fd67381b5a7713856c9b",
+      "size": 5675379
+    },
+    "docker/librempeg-cb1f8f3-x264-b35605a-linux-x64-corresponding-source.tar.gz": {
+      "sha256": "dc348745552f73e6413c78c496fbecef0f99d0d992c5cc372a1a801686e04730",
+      "size": 19959114
+    },
+    "docker/live-check.log": {
+      "sha256": "1b802363067e869607df92d8b236fac8de95b93c0d0cb85f036fdad8c0e750d2",
+      "size": 1537
+    },
+    "linux/LINUX-SHA256SUMS.txt": {
+      "sha256": "b039511229cc5c98f77430d8dcc853f1dcf8a7f28b49a5a7ef067357fbaac1c3",
+      "size": 585
+    },
+    "linux/SOURCE-SHA.txt": {
+      "sha256": "fee86f9409edf23c69ccef7301c7955bd23b097d23dc1e11fe90c3ada9a5cd68",
+      "size": 41
+    },
+    "linux/ffmpeg-9.0.2-x264-b35605a-linux-x64-corresponding-source.tar.gz": {
+      "sha256": "3425c2993d3e000b1b7431d430f7c59e149156e1ac595bd71091e50cb83fad92",
+      "size": 13251771
+    },
+    "linux/hongguo-downloader-7.2-linux-source.zip": {
+      "sha256": "38fac2c81623af3c89623ab79a5ca92798082ed50e92fd67381b5a7713856c9b",
+      "size": 5675379
+    },
+    "linux/hongguo-downloader-7.2-linux-x64.AppImage": {
+      "sha256": "f3f6f28cc3c56fdff398dac7ed446abcec9b2516d29408feb571c14739c8652e",
+      "size": 160067086
+    },
+    "linux/librempeg-cb1f8f3-x264-b35605a-linux-x64-corresponding-source.tar.gz": {
+      "sha256": "dc348745552f73e6413c78c496fbecef0f99d0d992c5cc372a1a801686e04730",
+      "size": 19959114
+    },
+    "linux/linux-verification/appimage-result.json": {
+      "sha256": "cca58245dedf731ce20ddbd9e4ff92b4bb4ccd4f72f3c095bb6df6c55ed13916",
+      "size": 1347
+    },
+    "windows/SOURCE-SHA.txt": {
+      "sha256": "c73e618e812dab7ee8bd2bfcc11730a96a3128d671eef5106e0092c381844114",
+      "size": 42
+    },
+    "windows/WINDOWS-SHA256SUMS.txt": {
+      "sha256": "5031d0c266ad848f8f5023a308d0f50994f4f3da1c52e157638b80e60f3d9a1b",
+      "size": 961
+    },
+    "windows/ffmpeg-9.0.2-x264-b35605a-win-x64-corresponding-source.tar.gz": {
+      "sha256": "42846fab878e5b28ae79139f10ff6001a4255704c925dd7dfadef6f3d75e4e0c",
+      "size": 13284656
+    },
+    "windows/hongguo-downloader-7.2-win-x64-setup.exe": {
+      "sha256": "ba4d9ac94b4e0ddc1b65c629f90f54f3a359366e651e6a63a08ec96d4530b2ed",
+      "size": 137880579
+    },
+    "windows/hongguo-downloader-7.2-win-x64-setup.exe.blockmap": {
+      "sha256": "314a2daaf58448a91eaa588c5024bbb2701685e8ee45e2d160b92711f9080d25",
+      "size": 145618
+    },
+    "windows/hongguo-downloader-7.2-win-x64.exe": {
+      "sha256": "3261f301688a7550184ba4faaec7b29222b1f5ae115aa491c69418ddca2995dc",
+      "size": 114214476
+    },
+    "windows/hongguo-downloader-7.2-win-x64.zip": {
+      "sha256": "6fe146ec23348209e273b915bbeb5ea60d703a16f0345bf259aea65e8524ebc5",
+      "size": 114225536
+    },
+    "windows/hongguo-downloader-7.2-windows-source.zip": {
+      "sha256": "282d9e4978674174afb04368ac4f0148423fda1d70fd0d972314aa39c5e287b5",
+      "size": 5683972
+    },
+    "windows/latest.yml": {
+      "sha256": "84c3a4f4efef7587d7175c56279b8d54aac06360536631a2c5aa5c60f242e563",
+      "size": 377
+    },
+    "windows/librempeg-cb1f8f3-x264-b35605a-win-x64-corresponding-source.tar.gz": {
+      "sha256": "dc348745552f73e6413c78c496fbecef0f99d0d992c5cc372a1a801686e04730",
+      "size": 19959114
+    },
+    "windows/windows-verification/installer-result.json": {
+      "sha256": "c8a8c178fcf13d423807456f523ae0df217256e857000431cefc97bee1a6c195",
+      "size": 1287
+    },
+    "windows/windows-verification/portable-windows-auto-next-hidden.png": {
+      "sha256": "96f21ed1b436da815de43373806017f397593b65f87fc5edc1f5b58374eb78c8",
+      "size": 349139
+    },
+    "windows/windows-verification/portable-windows-download-quality.png": {
+      "sha256": "bab916b500a70f281abd87fbdeb7c44255fb6ad1f600590941dd0f7620c795c2",
+      "size": 51389
+    },
+    "windows/windows-verification/portable-windows-fullscreen-hidden.png": {
+      "sha256": "7c0b9167be18a750361c4f5be3ff08631401eedf11a629201cd41b78389951b8",
+      "size": 511570
+    },
+    "windows/windows-verification/portable-windows-playback.png": {
+      "sha256": "bf51e1990f0ce7f17c528b135742646f30434ac764261d4dd79b29f01fe4301b",
+      "size": 179985
+    },
+    "windows/windows-verification/portable-windows-shortcut-hidden.png": {
+      "sha256": "99fc3a5c71b5381c66c2087a065b49fb3c9827956657ffaec26ee38df00d5771",
+      "size": 371214
+    },
+    "windows/windows-verification/result.json": {
+      "sha256": "134dcaf701d5569ad80b9e59c30cce9b29cf40811830b73d407e260adc5b6cc2",
+      "size": 10427
+    },
+    "artifact-binding.json": {
+      "size": 5014,
+      "sha256": "aa69259efb32de88763250f2dcc4fa5e8eb74257042604cfdd0fe051b5689660"
+    },
+    "linux-packaged-source.json": {
+      "size": 291,
+      "sha256": "b00fe6e0ecaf12d11f8540fc96201515206f220bba66f9d302dc7d3a658b497a"
+    },
+    "windows-packaged-source.json": {
+      "size": 3752,
+      "sha256": "56fba4726dda3b8f6f84196f0c4090741f1d444b77f7c4d7c1198158b4de51c3"
+    },
+    "docker-packaged-source.json": {
+      "size": 431,
+      "sha256": "7fa4a6ddcc6308f435f2e1fc2f9b70ca3d318b15c1d65e3de955f6cce5afe53f"
+    },
+    "source-privacy-and-archives.json": {
+      "size": 25560,
+      "sha256": "65c6352d930f5ea5f6c4d97492fddd5512978b3e2e429264b7465c3e597b2808"
+    },
+    "update-metadata-verification.json": {
+      "size": 561,
+      "sha256": "3de7f6ec1082576fc270ef2ca704ae265742af1b678c9bd420411c7b5a13e120"
+    },
+    "mac/mac-final-assets.json": {
+      "size": 2222,
+      "sha256": "2c181faf55353818521a1441e64b6288b5ae647e95cd1915776d5311fbf63939"
+    },
+    "mac-qa/result.json": {
+      "size": 2635,
+      "sha256": "fabb6c592fb3784fdc06b63ca667826ece7f32ceed24f8722755f4b1d4838c9f"
+    },
+    "ci/CI-SUMMARY.json": {
+      "size": 1827,
+      "sha256": "5308a8833f107c36a3ffc1b36ce56ab37eb9051d39b7e4ff49ef727378579418"
+    },
+    "ci/equivalence/linux-docker-equivalence.json": {
+      "size": 11862,
+      "sha256": "0092e05510d419db2ebb907176298b70baad2f54f58e5e2851a2583f77793418"
+    }
+  },
+  "sourceCheckAssessment": {
+    "overallFullSuitePassed": false,
+    "runId": 43375313207,
+    "failedCommandCount": 11,
+    "sameBaselineErrorCategoriesReproducedOn71And72": 10,
+    "lookupTimingFailures": {
+      "count": 2,
+      "localBothVersionsPass": true,
+      "bothVersionsSensitiveTo25msFilesystemDelay": true,
+      "exactCiCauseConfirmed": false
+    },
+    "targetedFixChecksPassed": true,
+    "allPlatformRuntimeAcceptancePassed": true
+  },
+  "subtitleSupport": {
+    "issue": 151,
+    "implemented": false,
+    "reason": "No verified official public caption track; explicit delegated scope to release verified fixes first"
+  },
+  "platforms": [
+    "macOS arm64",
+    "macOS x64",
+    "Windows x64",
+    "Linux x64 AppImage",
+    "Docker amd64"
+  ]
+}
