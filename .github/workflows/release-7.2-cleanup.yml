@@ -1,0 +1,28 @@
+name: Clean exact 7.2 transport chunks after final verification
+on:
+  workflow_dispatch:
+permissions:
+  actions: read
+  contents: write
+concurrency:
+  group: release-443870946-7.2-transport
+  cancel-in-progress: false
+jobs:
+  cleanup:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Verify exact originals and remove only receipt-bound temporary chunks
+        run: python3 .github/release-7.2-cleanup.py --execute 26a926f03f5038257e14b932b4762aab2f537ee9
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-7.2-cleanup-verification
+          path: |
+            cleanup-result.json
+            cleanup-readback/*
+          if-no-files-found: error
