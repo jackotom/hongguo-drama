@@ -47,11 +47,11 @@ export PKG_CONFIG_PATH=
 export PKG_CONFIG_LIBDIR="$ROOT/prefix/lib/pkgconfig"
 unset CPATH C_INCLUDE_PATH CPLUS_INCLUDE_PATH LIBRARY_PATH DYLD_LIBRARY_PATH LDFLAGS CFLAGS CPPFLAGS || true
 if [[ "$TARGET" == win-x64 ]]; then
-  ENCODERS+=,h264_nvenc
+  ENCODERS+=,h264_nvenc,h264_amf
   THREAD_ARGS=(--enable-w32threads --disable-pthreads)
   X264_ARGS=(--host=x86_64-w64-mingw32 --cross-prefix=x86_64-w64-mingw32- --disable-asm --extra-ldflags=-static)
   MEDIA_ARGS=(--arch=x86_64 --target-os=mingw32 --enable-cross-compile --cross-prefix=x86_64-w64-mingw32- --disable-asm --extra-cflags=-I../prefix/include --extra-ldflags='-static -L../prefix/lib')
-  MEDIA_ARGS+=(--enable-ffnvcodec --enable-nvenc)
+  MEDIA_ARGS+=(--enable-ffnvcodec --enable-nvenc --enable-amf)
   SUFFIX=.exe
 elif [[ "$TARGET" == linux-x64 ]]; then
   ENCODERS+=,h264_nvenc
@@ -106,6 +106,7 @@ assert 'pei-x86-64' in s
 assert all(x.lower() in allowed for x in re.findall(r'DLL Name:\s*(\S+)', s))
 PY
   grep -q '^#define CONFIG_H264_NVENC_ENCODER 1' config_components.h
+  grep -q '^#define CONFIG_H264_AMF_ENCODER 1' config_components.h
 elif [[ "$TARGET" == linux-x64 ]]; then
   ldd "$TOOL" > "$ROOT/logs/imports.txt"
   ! grep -q 'not found' "$ROOT/logs/imports.txt"

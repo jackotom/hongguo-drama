@@ -383,7 +383,7 @@ test('fast conversion uses VideoToolbox on an actually probed Mac encoder', asyn
   assert.equal(f.calls[0].args[f.calls[0].args.indexOf('-allow_sw') + 1], '0');
 });
 
-for (const [message, reason] of [['Cannot load nvcuda.dll', 'encoder-failed'], ['', 'output-too-large']]) {
+for (const [message, reason] of [['Cannot load nvcuda.dll', 'encoder-failed'], ['Cannot load amfrt64.dll', 'encoder-failed'], ['AMF CreateComponent(XMemory) failed', 'encoder-failed'], ['', 'output-too-large']]) {
   test(`fast conversion makes one software fallback and reports ${reason}`, async t => {
     const f = fixture(t, { probedEncoder: 'h264_nvenc', codes: message ? [1, 0] : [], errors: [message], outputBytes: message ? [] : [20, 10] }), phases = [];
     const result = await f.run({ fastConversion: true, ...(message ? {} : { maxBytes: 15 }), onPhase: (phase, meta) => phases.push({ phase, meta }) });
