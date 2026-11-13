@@ -1,4 +1,4 @@
-// Hongguo Drama 7.1: desktop runtime; server entry is server/index.cjs.
+// Hongguo Drama 7.2: desktop runtime; server entry is server/index.cjs.
 /**
  * main.js - 红果短剧 6.2 下载器（独立版）主进程
  *
@@ -1148,6 +1148,7 @@ async function executeHongguoDownload(task) {
     }
     if (!reusedCache) await withMediaRecovery(vid, hongguoInfo?.series_id, { playInfo: checkedPlayInfo, quality, allowLowerQuality, force: true, cancelToken: source.token }, async playInfo => {
       source.token.throwIfRequested();
+      const bytevc2Executable = playInfo.codec === 'bytevc2' ? requireBytevc2Executable() : null;
       notifyQuality(Math.min(Number(playInfo.width), Number(playInfo.height)));
       task.progress = 0; task.receivedBytes = 0; task.totalBytes = 0;
       sendToRenderer('download-progress', { id, progress: 0, receivedBytes: 0, totalBytes: 0 });
@@ -1191,7 +1192,7 @@ async function executeHongguoDownload(task) {
               sendToRenderer('download-progress', { id, progress: task.progress, qualityNotice: task.qualityNotice });
             };
             try {
-              await convertBytevc2({ executable: resolveFfmpeg('librempeg'), input: tmpPath, output: decodedPath,
+              await convertBytevc2({ executable: bytevc2Executable, input: tmpPath, output: decodedPath,
                 fastConversion: getCurrentSettings().fast_conversion,
                 contentKey: playInfo.contentKey, duration: playInfo.duration, cancelToken: source.token, onProgress: progress,
                 onPhase: (phase, meta) => progress(0, phase, meta), onOutputCreated: temporary.outputCreated });
@@ -2159,6 +2160,12 @@ function resolveFfmpeg(name) {
     }
   } catch (_) {}
   return null;
+}
+
+function requireBytevc2Executable() {
+  const executable = resolveFfmpeg('librempeg');
+  if (!executable) throw Object.assign(new Error('未找到内置 ByteVC2 解码组件，请重新下载完整版本后重试'), { code:'LOCAL_MEDIA_TOOL_ERROR' });
+  return executable;
 }
 
 function findFileRecursive(dir, fileName, depth) {
@@ -3248,6 +3255,7 @@ async function fetchDecryptedEpisodeOnce(vid, onProgress, seriesId, playInfo, si
   if (!playInfo?.url) throw new Error(playInfo?.error || '未获取到有效播放地址');
   if (signal?.aborted) throw new Error('已取消播放');
   if (playInfo.contentKey && !/^[a-f\d]{32}$/i.test(playInfo.contentKey)) throw new Error('片源解密密钥格式无效');
+  const bytevc2Executable = playInfo.codec === 'bytevc2' ? requireBytevc2Executable() : null;
   const response = await requestMedia(playInfo, { signal });
   const total = Number(response.headers['content-length']) || 0;
   if (total > maxBytes) { response.data.destroy(); throw tooLarge(); }
@@ -3269,7 +3277,7 @@ async function fetchDecryptedEpisodeOnce(vid, onProgress, seriesId, playInfo, si
       if (!received || (total && received !== total)) throw mediaTransferError('视频下载不完整，请重试');
       if (playInfo.codec === 'bytevc2') {
         let conversionMeta;
-        await convertBytevc2({ executable: resolveFfmpeg('librempeg'), input, output,
+        await convertBytevc2({ executable: bytevc2Executable, input, output,
           fastConversion: getCurrentSettings().fast_conversion,
           contentKey: playInfo.contentKey, duration: playInfo.duration, signal, maxBytes,
           onPhase: (phase, meta) => { conversionMeta = meta; onProgress?.(0, received, phase, conversionNotice(meta)); },
@@ -4907,8 +4915,8 @@ function removeFinishedRecords(seriesId, saveChanges = false) {
 }
 
 /** 删掉一组任务记录（从内存与队列中移除） */
-function dropTaskRecords(ids) {
-  const set = new Set(ids.filter(id => !downloadTasks.some(task => task.id === id && (isTaskInFlight(task) || hasPendingTemporaries(task)))));
+function dropTaskRecords(ids, keepFiles = false) {
+  const set = new Set(ids.filter(id => !downloadTasks.some(task => task.id === id && (isTaskInFlight(task) || !keepFiles && hasPendingTemporaries(task)))));
   const previousTasks = downloadTasks, previousQueue = downloadQueue;
   downloadTasks = downloadTasks.filter((t) => !set.has(t.id));
   downloadQueue = downloadQueue.filter((t) => !set.has(t.id));
@@ -4943,13 +4951,11 @@ async function deleteTaskRecords(taskIds, options) {
         if (result.warning) { warnings.push(result.warning); errors.push(result.warning); }
         if (result.failed) { errors.push('部分文件删除失败，对应任务记录已保留'); continue; }
         if (result.warning) continue;
-      } else if (hasPendingTemporaries(task)) {
-        errors.push(temporaryWarning(1)); continue;
       }
       removed.push(id);
     } catch (error) { errors.push(error.message); }
   }
-  try { if (removed.length || cancelledRetries) count = dropTaskRecords(removed); }
+  try { if (removed.length || cancelledRetries) count = dropTaskRecords(removed, !deleteFiles); }
   catch (error) { errors.push(`任务记录保存失败，原记录已保留：${error.message}${cancelledRetries ? '；自动重试取消状态未保存' : ''}`); }
   return { success: errors.length === 0, count, fileCount, freed, failed, warning: warnings.length ? [...new Set(warnings)].join('；') : undefined, error: errors.length ? [...new Set(errors)].join('；') : undefined };
 }

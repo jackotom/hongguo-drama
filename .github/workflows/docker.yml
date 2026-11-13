@@ -1,4 +1,4 @@
-# Hongguo Drama 7.1: build and verify the frozen desktop/Docker source.
+# Hongguo Drama: build and verify the frozen desktop/Docker source.
 name: Docker server candidate
 on:
   workflow_dispatch:
@@ -67,17 +67,20 @@ jobs:
         run: node --test server/*.test.cjs
       - name: Build the exact server image
         run: |
-          docker build --platform linux/amd64 --label org.opencontainers.image.version=7.1.0 --label org.opencontainers.image.revision="$GITHUB_SHA" -t hongguo-drama:7.1 .
+          version=$(node -p "require('./package.json').version")
+          public_version=$(node -p "require('./package.json').version.replace(/\.0$/, '')")
+          docker build --platform linux/amd64 --label org.opencontainers.image.version="$version" --label org.opencontainers.image.revision="$GITHUB_SHA" -t "hongguo-drama:$public_version" .
       - name: Run Docker functional acceptance
         if: ${{ !inputs.build_only }}
         run: node scripts/check-docker-release.cjs
       - name: Save the image and corresponding media sources
         run: |
           mkdir -p dist/docker
-          docker save hongguo-drama:7.1 | gzip > dist/docker/hongguo-drama-7.1-docker-amd64.tar.gz
+          version=$(node -p "require('./package.json').version.replace(/\.0$/, '')")
+          docker save "hongguo-drama:$version" | gzip > "dist/docker/hongguo-drama-$version-docker-amd64.tar.gz"
           cp "$RUNNER_TEMP/linux-media/ffmpeg/artifacts/"*source.tar.gz "$RUNNER_TEMP/linux-media/librempeg/artifacts/"*source.tar.gz dist/docker/
           cp compose.yaml docs/docker.md dist/docker/
-          git archive --format=zip --output=dist/docker/hongguo-drama-7.1-docker-source.zip HEAD
+          git archive --format=zip --output="dist/docker/hongguo-drama-$version-docker-source.zip" HEAD
           printf '%s\n' "$GITHUB_SHA" > dist/docker/SOURCE-SHA.txt
           (cd dist/docker && sha256sum * > DOCKER-SHA256SUMS.txt)
       - uses: actions/upload-artifact@v4

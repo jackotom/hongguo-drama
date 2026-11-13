@@ -82,38 +82,91 @@ async function removeOwnedFile(file, identity, canRemove = () => true) {
   }
 }
 
+async function reserveOwnedFile(file, onChange = () => {}) {
+  const handle = await fs.open(file, 'wx', 0o600);
+  let identity, held = false;
+  const inspect = async () => {
+    let stat = identity;
+    if (held) {
+      stat = await handle.stat({ bigint:true });
+      // exFAT assigns the durable ID on allocation, and changes it again after truncation.
+      if (stat.ino < 0n && stat.size === 0n) {
+        await handle.write(Buffer.alloc(1), 0, 1, 0);
+        stat = await handle.stat({ bigint:true });
+      }
+    }
+    const current = await fs.lstat(file, statOptions(stat));
+    if (!current.isFile() || !sameIdentity(current, stat)) return null;
+    if (held) { identity = stat; onChange(stat); }
+    return stat;
+  };
+  const check = async () => {
+    try { const stat = await inspect(); if (stat) return stat; }
+    catch (error) { if (error.code !== 'ENOENT') throw error; }
+    throw Object.assign(new Error('下载临时文件已变化，已有文件已保留，请重试'), { code:'EEXIST' });
+  };
+  try {
+    identity = await handle.stat({ bigint:true });
+    held = typeof identity.ino === 'bigint' && identity.ino < 0n;
+    if (held) await check();
+    else { onChange(identity); await handle.close(); }
+  } catch (error) { await handle.close().catch(() => {}); throw error; }
+  return { check,
+    remove: async () => {
+      try {
+        if (!await inspect()) return false;
+        await fs.unlink(file);
+        return true;
+      } catch (error) { if (error.code === 'ENOENT') return true; throw error; }
+    },
+    close: async () => { if (held) { held = false; await handle.close(); } } };
+}
+
 async function createDownloadTemporary(directory, { owner, onChange = () => {} } = {}) {
   // A fresh private directory avoids legacy leftovers without guessing who owns them.
   const root = await fs.mkdtemp(path.join(directory, '.hongguo-download-'));
   const record = { version:1, owner, directory:root, identity:identityOf(await fs.lstat(root, { bigint:true })), files:{} };
   const input = path.join(root, 'input.enc.tmp'), output = path.join(root, 'decoded.mp4');
+  const reservations = new Map();
   const reserve = async file => {
-    const handle = await fs.open(file, 'wx', 0o600);
-    try { record.files[path.basename(file)] = identityOf(await handle.stat({ bigint:true })); onChange(record); } finally { await handle.close(); }
+    reservations.set(path.basename(file), await reserveOwnedFile(file, stat => {
+      record.files[path.basename(file)] = identityOf(stat); onChange(record);
+    }));
   };
   const removeOutput = async () => {
     if (record.files['decoded.mp4']) {
-      if (!await removeOwnedFile(output, record.files['decoded.mp4'])) {
+      const reserved = reservations.get('decoded.mp4');
+      if (!await (reserved ? reserved.remove() : removeOwnedFile(output, record.files['decoded.mp4']))) {
         throw Object.assign(new Error('下载临时文件已变化，已有文件已保留，请重试'), { code: 'EEXIST' });
       }
+      await reserved?.close(); reservations.delete('decoded.mp4');
       delete record.files['decoded.mp4']; onChange(record);
     }
   };
-  const cleanup = () => cleanupDownloadTemporary(record, owner);
+  const cleanup = async () => {
+    try {
+      if (inspectDownloadTemporary(record, owner).directoryVerified) {
+        for (const reserved of reservations.values()) await reserved.check().catch(() => {});
+      }
+      return await cleanupDownloadTemporary(record, owner);
+    } finally { await Promise.all([...reservations.values()].map(reserved => reserved.close())); }
+  };
   try { onChange(record); await reserve(input); }
   catch (error) { await cleanup().catch(() => {}); throw error; }
   return { input, output, record, reserveOutput: () => reserve(output),
     outputCreated: stat => { record.files['decoded.mp4'] = identityOf(stat); onChange(record); }, removeOutput, cleanup,
     checkInput: async () => {
+      if (reservations.has('input.enc.tmp')) return reservations.get('input.enc.tmp').check();
       if (!record.files['input.enc.tmp'] || !await isOwnedFile(input, record.files['input.enc.tmp'])) {
         throw Object.assign(new Error('下载临时文件已变化，已有文件已保留，请重试'), { code: 'EEXIST' });
       }
     },
     checkOutput: async () => {
+      if (reservations.has('decoded.mp4')) return reservations.get('decoded.mp4').check();
       if (!record.files['decoded.mp4'] || !await isOwnedFile(output, record.files['decoded.mp4'])) {
         throw Object.assign(new Error('下载临时文件已变化，已有文件已保留，请重试'), { code: 'EEXIST' });
       }
     } };
 }
 
-module.exports = { createDownloadTemporary, removeOwnedFile, isOwnedFile, downloadTemporaryOwner, inspectDownloadTemporary, cleanupDownloadTemporary };
+module.exports = { createDownloadTemporary, reserveOwnedFile, removeOwnedFile, isOwnedFile, downloadTemporaryOwner, inspectDownloadTemporary, cleanupDownloadTemporary };

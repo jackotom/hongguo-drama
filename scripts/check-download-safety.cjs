@@ -53,6 +53,37 @@ async function crashedTemporary(overrides = {}) {
   return { h:restored, temporary, original:h };
 }
 (async () => {
+  await check('issue150 removes missing or conflicting records without touching unknown neighboring files', async () => {
+    for (const channel of ['delete-task','delete-tasks']) {
+      const h = load(); const one = task('one',h.dir), two = task('two',h.dir);
+      one.pathConflict = true; file(two.savePath);
+      const unknown = path.join(h.dir,'.hongguo-download-ABCDEF'); fs.mkdirSync(unknown);
+      fs.writeFileSync(path.join(unknown,'keep'),'unknown owner');
+      h.set('downloadTasks',[one,two]);
+      const args = channel === 'delete-task' ? ['one',{deleteFiles:false}] : [['one'],{deleteFiles:false}];
+      const result = await h.handlers[channel]({},...args);
+      assert.equal(result.success,true,result.error); assert.equal(result.count,1);
+      assert.equal(result.freed,0); assert.equal(result.fileCount,0);
+      assert.equal(fs.readFileSync(path.join(unknown,'keep'),'utf8'),'unknown owner');
+      assert.equal(fs.existsSync(two.savePath),true); assert.equal(h.saved().length,1);
+      assert.equal(h.saved()[0].id,'two');
+    }
+  });
+  await check('issue150 explicit record removal preserves unverified temporary contents', async () => {
+    const {h,temporary} = await crashedTemporary();
+    h.run('downloadTasks[0].temporaryDownloads[0].identity.ino = 0');
+    const result = await h.handlers['delete-task']({},'one',{deleteFiles:false});
+    assert.equal(result.success,true,result.error); assert.equal(result.count,1);
+    assert.equal(h.saved().length,0); assert.equal(result.freed,0);
+    assert.equal(fs.existsSync(temporary.input),true); assert.equal(fs.existsSync(temporary.output),true);
+  });
+  await check('issue150 record removal rolls back on persistence failure without deleting any file', async () => {
+    const h = load({}, {}, process.env, {failSaveTasks:true});
+    const one = task('one',h.dir); file(one.savePath); h.set('downloadTasks',[one]);
+    const result = await h.handlers['delete-task']({},'one',{deleteFiles:false});
+    assert.equal(result.success,false); assert.equal(h.run('downloadTasks.length'),1);
+    assert.equal(fs.existsSync(one.savePath),true); assert.match(result.error,/disk full/);
+  });
   for (const [channel, gateAt] of [['delete-task',1], ['delete-episode-file',1], ['delete-series-files',1], ['delete-series-files',2]]) {
     await check(`astra location snapshot ${channel} retains A after NAS relocation to B (gate ${gateAt})`, async () => {
       const { h, temporary } = await crashedTemporary();
@@ -169,7 +200,7 @@ async function crashedTemporary(overrides = {}) {
     const h = load();
     assert.equal(english(h.context.temporaryWarning(2)), 'Ownership of 2 temporary files or directories could not be verified. They and their task records have been kept, and these items are excluded from releasable space.');
   });
-  await check('astra persisted temporary keeps legacy recovery association when its directory cannot be listed', async () => {
+  await check('issue150 explicit record removal succeeds when its directory cannot be listed', async () => {
     let blocked;
     const fakeFs = Object.create(fs);
     fakeFs.readdirSync = (directory, ...args) => {
@@ -181,7 +212,7 @@ async function crashedTemporary(overrides = {}) {
     const usage = await h.handlers['get-storage-usage']({});
     assert.equal(usage.unverifiedItems, 1); assert.equal(usage.unverifiedBytes, null);
     const result = await h.handlers['delete-task']({}, 'one');
-    assert.equal(result.success, false); assert.equal(h.run('downloadTasks.length'), 1);
+    assert.equal(result.success, true); assert.equal(h.run('downloadTasks.length'), 0);
   });
   await check('astra persisted temporary remains reachable after a successful retry', async () => {
     const { h, temporary } = await crashedTemporary({ './src/native/hongguo':{fetchPlayUrlSingle:async()=>({url:'https://media.example/video'})} });

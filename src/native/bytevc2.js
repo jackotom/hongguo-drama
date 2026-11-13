@@ -1,5 +1,5 @@
 const fs = require('node:fs/promises');
-const { removeOwnedFile, isOwnedFile } = require('./download-temporary');
+const { removeOwnedFile, reserveOwnedFile } = require('./download-temporary');
 
 // Downloads and both prefetched episodes share one CPU budget; never restart an active conversion.
 const waiting = [];
@@ -39,23 +39,22 @@ function acquire(signal, cancelToken, getPriority) {
 async function convertBytevc2({ executable, input, output, contentKey, duration, signal, cancelToken, onProgress, onPhase, onOutputCreated, maxBytes = Infinity, getPriority = () => 0, fastConversion = false }) {
   const cancelled = () => signal?.aborted || cancelToken?.reason;
   if (cancelled()) throw abortError();
-  if (!executable) throw new Error('未找到内置 ByteVC2 解码组件，请重新下载完整版本后重试');
+  if (!executable) throw Object.assign(new Error('未找到内置 ByteVC2 解码组件，请重新下载完整版本后重试'), { code:'LOCAL_MEDIA_TOOL_ERROR' });
   if (contentKey != null && !/^[a-f\d]{32}$/i.test(contentKey)) throw new Error('片源解密密钥格式无效');
   if (!Number.isFinite(duration) || duration <= 0 || !(maxBytes > 0) || input === output) throw new Error('ByteVC2 视频参数无效');
   if (converting || waiting.length) onPhase?.('queued');
   const release = await acquire(signal, cancelToken, getPriority);
   try {
     if (cancelled()) throw abortError();
-    let identity;
+    let identity, reservation;
     const checkOutput = async () => {
-      if (!await isOwnedFile(output, identity)) throw Object.assign(new Error('视频转换临时文件已变化，已有文件已保留，请重试'), { code: 'EEXIST' });
+      await reservation.check();
     };
     try {
-      const file = await fs.open(output, 'wx', 0o600);
-      try {
-        identity = await file.stat({ bigint:true });
+      reservation = await reserveOwnedFile(output, stat => {
+        identity = stat;
         onOutputCreated?.(identity);
-      } finally { await file.close(); }
+      });
       if (cancelled()) throw abortError();
       const inputArgs = [...(contentKey ? ['-decryption_key', contentKey] : []), '-i', input];
       const hardware = fastConversion ? await require('./hardware-encoder').pickHardwareEncoder({ executable, inputArgs, signal, cancelToken }) : null;
@@ -109,7 +108,7 @@ async function convertBytevc2({ executable, input, output, contentKey, duration,
               diagnostics = (diagnostics + data.toString()).slice(-65536);
               terminalFailure ||= /No space left|Permission denied|Input\/output error|Disk quota|Read-only file system|File too large|Cannot allocate memory|Out of memory|Invalid data found|Error while decoding|Error submitting packet|corrupt|decryption/i.test(diagnostics);
             });
-            child.once('error', () => { cleanup(); reject(new Error('无法启动内置 ByteVC2 解码组件')); });
+            child.once('error', cause => { cleanup(); reject(Object.assign(new Error('无法启动内置 ByteVC2 解码组件'), { code:'LOCAL_MEDIA_TOOL_ERROR', cause })); });
             child.once('close', code => {
               cleanup();
               if (stopping || cancelled()) reject(abortError());
@@ -140,10 +139,11 @@ async function convertBytevc2({ executable, input, output, contentKey, duration,
         }
       }
     } catch (error) {
-      if (identity) await removeOwnedFile(output, identity).catch(() => {});
+      if (reservation) await reservation.remove().catch(() => {});
+      else if (identity) await removeOwnedFile(output, identity).catch(() => {});
       if (error.code === 'EEXIST') throw Object.assign(new Error('视频转换临时文件发生冲突，已有文件已保留，请重试'), { code: 'EEXIST' });
       throw error;
-    }
+    } finally { await reservation?.close(); }
   } finally { release(); }
 }
 

@@ -22,7 +22,7 @@ function fixture(t, { code = 0, seconds = 60, wait = false, hardware = false, co
     child.stdout = new PassThrough(); child.stderr = new PassThrough();
     child.kill = signal => { kills.push(signal); queueMicrotask(() => child.emit('close', null)); return true; };
     queueMicrotask(() => {
-      fs.writeFileSync(args.at(-1), outputBytes[index] ? Buffer.alloc(outputBytes[index]) : 'process output');
+      fs.writeFileSync(args.at(-1), outputBytes[index] == null ? 'process output' : Buffer.alloc(outputBytes[index]));
       child.stderr.write(errors[index] || 'PRIVATE_KEY_AND_PATH_SENTINEL');
       if (!wait) {
         child.stdout.write(`out_time_us=${seconds * 1000000}\nprogress=end\n`);
@@ -71,6 +71,19 @@ test('hardware encoder initialization failure retries original software encoding
   assert.equal(args[args.indexOf('-preset') + 1], 'veryfast');
   assert.equal(args[args.indexOf('-crf') + 1], '23');
   assert.equal(result.encoder, 'libx264');
+});
+
+test('removable output survives an empty hardware failure and software fallback', async t => {
+  const f = fixture(t, { hardware:true, codes:[1, 0], errors:['[h264_videotoolbox] cannot create compression session', ''], outputBytes:[0, 200000] });
+  await require('../../scripts/fixtures/transient-file-ids.cjs')(path.dirname(f.output), async () => {
+    const identities = [];
+    const result = await f.run({ onOutputCreated:stat => identities.push(stat.ino) });
+    assert.equal(f.calls.length, 2);
+    assert.equal(result.encoder, 'libx264');
+    assert.equal(result.size, 200000);
+    assert(identities.every(id => id > 0n));
+    assert.notEqual(identities.at(-1), identities[0]);
+  });
 });
 
 for (const message of ['No space left on device', 'Permission denied', 'Input/output error', 'Invalid data found when processing input']) {

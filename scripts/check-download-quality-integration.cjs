@@ -14,7 +14,7 @@ const source = path.resolve(__dirname, '../main.js');
 const req = createRequire(source);
 const dirs = [];
 function fixture({ width = 1080, height = 1920, quality = 'auto', realMedia = false } = {}) {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'hongguo-quality-'));
+  const root = fs.mkdtempSync(path.join(process.env.HONGGUO_TEST_VOLUME || os.tmpdir(), 'hongguo-quality-'));
   dirs.push(root);
   const handlers = {}, calls = [], events = [], app = new EventEmitter();
   let settings = { root, download_quality: quality }, saved;
@@ -113,6 +113,68 @@ async function realFootageCatalog(browseList) {
   return catalog;
 }
 const checks = [
+  ['issue150 missing ByteVC2 component stops before transfer and is classified locally', async () => {
+    const h = fixture();
+    h.run(`globalThis.attempts=0; resolveFfmpeg=name=>name==='librempeg'?null:'/fixture/ffprobe';
+      hongguo.fetchPlayUrlSingle=async()=>({url:'https://media.example/high',codec:'bytevc2',duration:12,
+        variants:[{url:'https://media.example/low',codec:'bytevc2',duration:12}]});
+      requestMedia=async()=>{attempts++;return {headers:{'content-length':'200000'},data:testReadStream()};};`);
+    await h.handlers['hongguo-download-batch']({},payload('1080p'));
+    await h.run('executeHongguoDownload(downloadTasks[0])');
+    assert.equal(h.saved()[0].status,'failed'); assert.equal(h.run('attempts'),0);
+    assert.match(h.saved()[0].error,/ByteVC2/); assert.equal(h.saved()[0].retryAt,undefined);
+    await assert.rejects(require('../src/native/bytevc2').convertBytevc2({}),error=>error.code==='LOCAL_MEDIA_TOOL_ERROR');
+    await assert.rejects(h.run(`fetchDecryptedEpisode('11',null,'1',{url:'https://media.example/high',codec:'bytevc2',duration:12})`),error=>error.code==='LOCAL_MEDIA_TOOL_ERROR');
+    assert.equal(h.run('attempts'),0,'online playback must also preflight before transfer');
+  }],
+  ['issue150 ByteVC2 launch failure never redownloads lower candidates and allows a fresh manual retry', async () => {
+    const h = fixture(); h.context.missingTool=path.join(h.root,'missing-librempeg');
+    h.run(`globalThis.attempts=0; resolveFfmpeg=name=>name==='librempeg'?missingTool:'/fixture/ffprobe';
+      hongguo.fetchPlayUrlSingle=async()=>({url:'https://media.example/high',codec:'bytevc2',duration:12,
+        variants:[{url:'https://media.example/low',codec:'bytevc2',duration:12}]});
+      requestMedia=async()=>{attempts++;return {headers:{'content-length':'200000'},data:testReadStream()};};`);
+    await h.handlers['hongguo-download-batch']({},payload('1080p'));
+    await h.run('executeHongguoDownload(downloadTasks[0])');
+    assert.equal(h.saved()[0].status,'failed'); assert.equal(h.run('attempts'),1);
+    assert.match(h.saved()[0].error,/无法启动内置 ByteVC2/); assert.equal(h.saved()[0].retryAt,undefined);
+    h.run(`hongguo.fetchPlayUrlSingle=async()=>({url:'https://media.example/restored',codec:'h264',duration:12})`);
+    assert.equal((await h.handlers['retry-task']({},h.saved()[0].id)).success,true);
+    await h.run('executeHongguoDownload(downloadTasks[0])');
+    assert.equal(h.saved()[0].status,'completed',h.saved()[0].error); assert.equal(h.run('attempts'),2);
+  }],
+  ['issue150 packaged Windows component discovery rescans resources and ignores developer PATH', async () => {
+    const h = fixture({realMedia:true}), bin = path.join(h.root,'bin'); fs.mkdirSync(bin);
+    h.context.process={...process,platform:'win32',arch:'x64',resourcesPath:h.root,env:{...process.env,PATH:h.root}};
+    h.run('app.isPackaged=true');
+    assert.equal(h.run("resolveFfmpeg('librempeg')"),null);
+    const executable=path.join(bin,'librempeg.exe'); fs.writeFileSync(executable,'component discovery fixture, never executed');
+    assert.equal(h.run("resolveFfmpeg('librempeg')"),executable);
+    fs.unlinkSync(executable); fs.writeFileSync(path.join(h.root,'librempeg.exe'),'untrusted PATH fixture');
+    assert.equal(h.run("resolveFfmpeg('librempeg')"),null);
+  }],
+  ['removable disk finishes a plain download and removes its task record', async () => {
+    const h = fixture();
+    await h.handlers['hongguo-download-batch']({}, payload());
+    await require('./fixtures/transient-file-ids.cjs')(h.root, async () => {
+      await h.run('executeHongguoDownload(downloadTasks[0])');
+      const task = h.saved()[0];
+      assert.equal(task.status, 'completed', task.error);
+      assert.equal(fs.statSync(task.savePath).size, 200000);
+      assert.equal(task.temporaryDownloads.length, 0);
+      const removed = await h.handlers['delete-tasks']({}, [task.id], { deleteFiles:false });
+      assert.equal(removed.success, true, removed.error);
+      assert.equal(fs.existsSync(task.savePath), true);
+    });
+  }],
+  ...[false, true].map(cenc => [`removable disk finishes ${cenc ? 'CENC' : 'ByteVC2'} output and cleans temporary files`, async () => {
+    await bytevc2Fixture(async h => require('./fixtures/transient-file-ids.cjs')(h.root, async () => {
+      await h.run('executeHongguoDownload(downloadTasks[0])');
+      const task = h.saved()[0];
+      assert.equal(task.status, 'completed', task.error);
+      assert.equal(fs.statSync(task.savePath).size, 200000);
+      assert.equal(task.temporaryDownloads.length, 0);
+    }), { cenc });
+  }]),
   ['large file IDs finish downloads and allow removing records', async () => {
     const h = fixture();
     await h.handlers['hongguo-download-batch']({}, payload());

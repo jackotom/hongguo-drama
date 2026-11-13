@@ -1,3 +1,7 @@
+<!-- 7.2 release candidate; not yet published. -->
+
+7.2候选包含#150下载与仅移除记录修复、#153外置盘身份修复；#151中文字幕尚未接入。五平台构建、公证及验收完成后统一公开，当前正式版仍为7.1。进度见[7.2记录](docs/release-7.2.md)。
+
 <!-- 7.1 published release; frozen application source remains unchanged. -->
 <!-- Earlier published release records are retained below. -->
 # 红果短剧
