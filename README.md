@@ -24,9 +24,9 @@
 
 ## 下载与安装
 
-**当前正式版：7.2**（内部`7.2.0`，桌面构建`7.2.1`）。修复外置exFAT下载身份误判、仅移除记录受阻，以及本地组件故障造成的无效重复下载；保留文件安全校验。五平台统一公开；#151中文字幕未实现，通用全量源码CI未全绿。验证与限制见[7.2回执](docs/release-7.2.md)。
+**当前正式版：7.2**（内部`7.2.0`，桌面构建`7.2.1`）。修复外置exFAT下载身份误判、仅移除记录受阻，以及本地组件故障造成的无效重复下载；保留文件安全校验。原五平台正式包与TV开发补充包已公开；#151中文字幕未实现，通用全量源码CI未全绿。验证与限制见[7.2回执](docs/release-7.2.md)。
 
-以下为7.2正式下载。Mac已签名、公证、装订；Windows EXE未签名。
+以下为7.2下载。Mac已签名、公证、装订；Windows EXE未签名；TV为开发补充包，未做电视实机测试。
 
 | 平台 | 下载7.2 | 使用方式 |
 |---|---|---|
@@ -35,8 +35,9 @@
 | Windows x64 | [安装版](https://github.com/jackotom/hongguo-drama/releases/download/v7.2/hongguo-downloader-7.2-win-x64-setup.exe) · [便携EXE](https://github.com/jackotom/hongguo-drama/releases/download/v7.2/hongguo-downloader-7.2-win-x64.exe) · [便携ZIP](https://github.com/jackotom/hongguo-drama/releases/download/v7.2/hongguo-downloader-7.2-win-x64.zip) | 安装版支持应用内更新；EXE未签名 |
 | Linux x64 | [AppImage](https://github.com/jackotom/hongguo-drama/releases/download/v7.2/hongguo-downloader-7.2-linux-x64.AppImage) | 赋予执行权限；手动更新 |
 | Docker Linux amd64 / NAS | [镜像](https://github.com/jackotom/hongguo-drama/releases/download/v7.2/hongguo-drama-7.2-docker-amd64.tar.gz) · [部署包](https://github.com/jackotom/hongguo-drama/releases/download/v7.2/hongguo-drama-7.2-docker-deploy.zip) | 按[部署文档](docs/docker.md)设置令牌与挂载目录 |
+| Android TV／Google TV，Android10+ | [TV APK](https://github.com/jackotom/hongguo-drama/releases/download/v7.2/hongguo-downloader-7.2-android-tv-dev.apk) | 开发补充包；**实机未测试**，见[TV回执](docs/release-7.2-tv.md) |
 
-[7.2发行页](https://github.com/jackotom/hongguo-drama/releases/tag/v7.2) · [SHA256](https://github.com/jackotom/hongguo-drama/releases/download/v7.2/SHA256SUMS.txt) · [精确源码](https://github.com/jackotom/hongguo-drama/releases/download/v7.2/hongguo-drama-7.2-source.zip)。实际状态见[7.2正式回执](docs/release-7.2.md)。TV和手机保持独立，不包含在本轮五类产物中。上游部分网页片源仍可能404、只提供预览或超时，不保证所有内容永久可播。
+[7.2发行页](https://github.com/jackotom/hongguo-drama/releases/tag/v7.2) · [SHA256](https://github.com/jackotom/hongguo-drama/releases/download/v7.2/SHA256SUMS.txt) · [精确源码](https://github.com/jackotom/hongguo-drama/releases/download/v7.2/hongguo-drama-7.2-source.zip)。实际状态见[7.2正式回执](docs/release-7.2.md)。TV已另附开发补充包，精确源码和独立摘要见[TV回执](docs/release-7.2-tv.md)；手机保持独立。上游部分网页片源仍可能404、只提供预览或超时，不保证所有内容永久可播。
 
 <details>
 <summary>7.1 历史下载与发行说明</summary>
@@ -232,6 +233,7 @@ Mac和Windows安装版保留应用内更新入口；完整6.4→6.5自动更新�
 
 ## 7.2
 
+- 追加TV 7.2／code70200开发包，沿用6.6签名；已完成构建与定向检查，**电视实机未测试**，见[TV发行回执](docs/release-7.2-tv.md)。
 - #153：修复exFAT空文件及截断后的编号变化；保留原始句柄、身份、防覆盖和防误删校验。
 - #150：仅移除记录不再被未知临时文件阻拦；缺失或无法启动解码组件时停止无效重复下载，手动重试重新检测。
 - #151中文字幕尚未实现。五平台必要验收通过，通用全量源码CI仍有失败项，详见[7.2正式回执](docs/release-7.2.md)。
@@ -902,6 +904,8 @@ https://github.com/user-attachments/assets/b95f4f60-b57c-495f-a30e-62ac2b0bda11
 到 [Issues](https://github.com/jackotom/hongguo-drama/issues) 提供应用版本、操作系统与芯片类型、来源、复现步骤和错误提示。截图与日志请移除账号信息、Cookie、代理凭据及个人文件路径。
 
 ## 版本与验证范围
+
+7.2 TV开发补充包已于2026-11-13 16:08:18（Asia/Shanghai）追加公开，版本7.2／code70200，沿用公开6.6 TV签名证书；TV源码冻结`2aa068f496f78114389d94c41b83dde877b174ce`。新增APK、精确TV源码和独立SHA256清单三份附件，现共28份正式附件；原25份桌面／Docker附件与原v7.2标签不变。构建、签名连续性、Manifest／包内容、定向源码检查及三附件匿名完整下载摘要核对通过。**TV实机未测试，请用户自行测试；安装、启动、实际遥控、播放和覆盖升级均未验证。** 手机保持独立，本机正式应用未替换。详见[TV补充回执](docs/release-7.2-tv.md)。以下首发五平台记录保持。
 
 7.2已于2026-11-13 15:32:56（Asia/Shanghai）正式公开并设Latest，内部7.2.0、桌面构建7.2.1，冻结源码`26a926f03f5038257e14b932b4762aab2f537ee9`。双Mac、Windows x64、Linux x64 AppImage、Docker amd64五类共25份正式附件，远端大小／SHA256、三份清单与10个匿名下载入口已核对；113个实际上传分段已清理。双Mac本轮新签名、公证、装订；Windows EXE未签名，Intel仅Rosetta。#150与#153修复保留文件安全校验；#151中文字幕未实现。定向检查与必要平台验收通过，通用全量源码CI未全绿，具体失败及平台实测边界见发行回执。未替换本机正式安装；TV与手机独立。完整范围见[7.2回执](docs/release-7.2.md)。以下保留历史记录，不作为本版验收。
 
