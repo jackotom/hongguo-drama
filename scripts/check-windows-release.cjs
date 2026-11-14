@@ -240,7 +240,18 @@ async function realFootage(mediaDir, ffmpeg, ffprobe, dataFile) {
       result.realMedia.samples.push({ width: video.width, height: video.height });
     }
     result.checks.push('Bundled FFmpeg decodes two real downloaded Hongguo episodes to H.264/AAC; FFprobe reads output');
-    fixtureEpisodes = samples.map((savePath, index) => ({ id: `fixture-${index + 1}`, status: 'completed', savePath, hongguoInfo: { series_id: sid, series_title: 'Windows verification', vid: `fixture-${index + 1}`, vid_index: index + 1 } }));
+    fixtureEpisodes = samples.map((savePath, index) => {
+      const stat = fs.lstatSync(savePath, { bigint: true });
+      return {
+        id: `fixture-${index + 1}`, status: 'completed', savePath, endTime: Date.now(),
+        fileIdentity: {
+          dev: String(stat.dev), ino: String(stat.ino), size: String(stat.size),
+          mtimeNs: String(stat.mtimeNs), ctimeNs: String(stat.ctimeNs),
+          birthtimeNs: stat.birthtimeNs == null ? '' : String(stat.birthtimeNs),
+        },
+        hongguoInfo: { series_id: sid, series_title: 'Windows verification', vid: `fixture-${index + 1}`, vid_index: index + 1 },
+      };
+    });
   }
   // Keep remote notices from covering trusted pointer playback checks in this disposable profile.
   fs.writeFileSync(path.join(profile, 'data.json'), JSON.stringify({ announcement: { preferences: { normalEnabled: false, emergencyEnabled: false } }, settings: { root: mediaDir, watch_updates_enabled: false, watch_sequels_enabled: false, cache_next_episode: false }, tasks: fixtureEpisodes, series: skipPlayback ? [] : [{ series_id: sid, series_title: 'Windows verification', episodes: fixtureEpisodes.map(task => ({ ...task.hongguoInfo, title: 'Real Hongguo acceptance footage' })) }] }));

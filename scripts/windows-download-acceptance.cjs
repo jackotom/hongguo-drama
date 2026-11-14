@@ -114,6 +114,16 @@ module.exports = async function checkDownloads({ evaluate, result, dataFile, med
   receipt.phases.push({ action: 'retry-reversed', requested: [...expected].reverse(), started: assertOrder(events, tasks, expected, 'started'), completed: assertOrder(events, tasks, expected, 'completed'), events });
   assert.equal(receipt.temporaryIdentities.length, 2, 'Both real tasks must expose exact persisted temporary-file identities');
   assert.deepEqual(tasks.map(task => task.id), ids, 'Pause/resume/retry must reuse the original persistent task IDs');
+  const seriesEpisodes = await api(`window.electronAPI.getSeriesEpisodes(${JSON.stringify(series.series_id)})`);
+  assert.equal(seriesEpisodes.success, true);
+  for (const index of expected) {
+    const episode = seriesEpisodes.data.episodes.find(item => item.vid_index === index);
+    assert.equal(episode?.status, 'completed', 'Completed App queue task must return a playable episode');
+    assert.match(episode.fileUrl, /^hongguo-local:\/\/f\/[0-9a-f-]{36}$/i, 'Completed App queue task must return an opaque media capability');
+  }
+  receipt.seriesEpisodes = seriesEpisodes.data.episodes
+    .filter(episode => expected.includes(episode.vid_index))
+    .map(episode => ({ index: episode.vid_index, status: episode.status, fileUrl: episode.fileUrl }));
   const files = [];
   for (const episode of episodes) {
     const task = tasks.find(task => task.hongguoInfo.vid === episode.vid);
@@ -187,7 +197,7 @@ module.exports = async function checkDownloads({ evaluate, result, dataFile, med
     trial.settingRestored = true;
   }
   receipt.tested = true;
-  result.checks.push('Final portable EXE native IPC: real two-episode queue, persistent pause/resume and reversed batch retry start/complete in episode order; exact temporary identities match disk, full media probes/decodes and cleans up');
+  result.checks.push('Final portable EXE native IPC: real two-episode queue, persistent pause/resume and reversed batch retry start/complete in episode order; completed tasks rebind to playable episode capabilities; exact temporary identities match disk, full media probes/decodes and cleans up');
   delete result.stage;
   return files;
 };
