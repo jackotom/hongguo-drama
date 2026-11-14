@@ -83,74 +83,84 @@ function safeDownloadFailure(value) {
       const api=window.electronAPI;
       const catalog=await api.browseList({source:'hongguo',category:'hot-real-drama'});
       if(!catalog.success||!catalog.results?.length)throw Error('Real Hongguo catalog unavailable');
-      const drama=catalog.results[Math.floor(Math.random()*catalog.results.length)];
-      const resolved=await api.searchResolve(drama.series_id);
-      if(!resolved.success||String(resolved.data?.series_id)!==String(drama.series_id))throw Error('Real drama registration failed');
-      const unlocked=resolved.data.episodes.filter(ep=>!ep.locked);
-      if(unlocked.length<2)throw Error('Two unlocked real episodes required');
-      const episodes=[];
-      for(const episode of unlocked.slice(0,12)){
-        const requestId=crypto.randomUUID();
-        const prepared=await api.prepareOnlinePlay({vid:episode.vid,seriesId:drama.series_id,vidIndex:episode.vid_index,
-          quality:'compat',requestId,prefetch:false});
-        if(!prepared?.success)continue;
-        await api.releaseOnlinePlay({requestId,streamId:prepared.streamId});
-        episodes.push(episode);
-        if(episodes.length===2)break;
-      }
-      if(episodes.length!==2)throw Error('Two playable real episodes required');
-      const states=[];
       localStorage.setItem('hongguo:online-quality','compat');
       localStorage.setItem('hongguo:software-decode','true');
-      for(const episode of episodes){
-        const queued=await api.downloadSingleEpisode(drama.series_id,episode.vid_index,'auto');
-        if(!queued.success)throw Error('Real Hongguo download submission failed');
-        const deadline=performance.now()+120000;
-        let downloaded;
-        while(performance.now()<deadline){
-          const tasks=await api.getDownloadTasks();
-          const task=tasks.find(item=>String(item.hongguoInfo?.vid)===String(episode.vid));
-          if(task?.status==='completed'&&task.receivedBytes>0){downloaded=task;break;}
-          if(task&&['failed','stopped'].includes(task.status)){
-            window.__hongguoRealDownloadFailure={seriesId:String(drama.series_id),title:drama.series_title,
-              episode:episode.vid_index,status:task.status,error:String(task.error||'')};
-            throw Error('Real download failed or stopped');
+      let lastFailure='no playable pair';
+      const dramas=[...catalog.results].sort(()=>Math.random()-0.5).slice(0,6);
+      for(const drama of dramas){
+        try{
+          const resolved=await api.searchResolve(drama.series_id);
+          if(!resolved.success||String(resolved.data?.series_id)!==String(drama.series_id))throw Error('Real drama registration failed');
+          const unlocked=resolved.data.episodes.filter(ep=>!ep.locked);
+          if(unlocked.length<2)continue;
+          const start=Math.floor(Math.random()*unlocked.length);
+          const ordered=[...unlocked.slice(start),...unlocked.slice(0,start)];
+          const episodes=[];
+          for(const episode of ordered.slice(0,12)){
+            const requestId=crypto.randomUUID();
+            const prepared=await api.prepareOnlinePlay({vid:episode.vid,seriesId:drama.series_id,vidIndex:episode.vid_index,
+              quality:'compat',requestId,prefetch:false});
+            if(!prepared?.success)continue;
+            await api.releaseOnlinePlay({requestId,streamId:prepared.streamId});
+            episodes.push(episode);
+            if(episodes.length===2)break;
           }
-          await new Promise(resolve=>setTimeout(resolve,200));
-        }
-        if(!downloaded)throw Error('Real complete download timed out');
-        const previous=document.querySelector('.player-video')?.currentSrc;
-        const opened=await api.playSeries({seriesId:drama.series_id,vidIndex:episode.vid_index});
-        if(!opened.success)throw Error('Real episode could not open');
-        const playDeadline=performance.now()+60000;
-        let requested=false,played=false;
-        while(performance.now()<playDeadline){
-          const video=document.querySelector('.player-video');
-          if(video){
-            video.muted=true;video.volume=0;
-            if(video.currentSrc&&video.currentSrc!==previous&&video.readyState>=2){
-              if(!requested){requested=true;await video.play();}
-              if(video.currentTime>=10){
-                video.pause();
-                const state={episode:episode.vid_index,vid:episode.vid,bytes:downloaded.receivedBytes,
-                  actualQuality:downloaded.actualQuality,time:video.currentTime,width:video.videoWidth,height:video.videoHeight,
-                  muted:video.muted,volume:video.volume,paused:video.paused,error:video.error?.code||null,
-                  frames:video.getVideoPlaybackQuality().totalVideoFrames,decoder:document.querySelector('select[aria-label="解码方式"]')?.value};
-                if(!state.width||!state.height||!state.frames||state.error||!state.muted||state.volume!==0)throw Error('Real playback validation failed');
-                states.push(state);played=true;break;
+          if(episodes.length!==2){lastFailure='series has fewer than two playable episodes';continue}
+          const states=[];
+          for(const episode of episodes){
+            const queued=await api.downloadSingleEpisode(drama.series_id,episode.vid_index,'auto');
+            if(!queued.success)throw Error('Real Hongguo download submission failed');
+            const deadline=performance.now()+120000;
+            let downloaded;
+            while(performance.now()<deadline){
+              const tasks=await api.getDownloadTasks();
+              const task=tasks.find(item=>String(item.hongguoInfo?.vid)===String(episode.vid));
+              if(task?.status==='completed'&&task.receivedBytes>0){downloaded=task;break;}
+              if(task&&['failed','stopped'].includes(task.status)){
+                window.__hongguoRealDownloadFailure={seriesId:String(drama.series_id),title:drama.series_title,
+                  episode:episode.vid_index,status:task.status,error:String(task.error||'')};
+                throw Error('Real download failed or stopped');
               }
+              await new Promise(resolve=>setTimeout(resolve,200));
+            }
+            if(!downloaded)throw Error('Real complete download timed out');
+            const previous=document.querySelector('.player-video')?.currentSrc;
+            const opened=await api.playSeries({seriesId:drama.series_id,vidIndex:episode.vid_index});
+            if(!opened.success)throw Error('Real episode could not open');
+            const playDeadline=performance.now()+60000;
+            let requested=false,played=false;
+            while(performance.now()<playDeadline){
+              const video=document.querySelector('.player-video');
+              if(video){
+                video.muted=true;video.volume=0;
+                if(video.currentSrc&&video.currentSrc!==previous&&video.readyState>=2){
+                  if(!requested){requested=true;await video.play();}
+                  if(video.currentTime>=10){
+                    video.pause();
+                    const state={episode:episode.vid_index,vid:episode.vid,bytes:downloaded.receivedBytes,
+                      actualQuality:downloaded.actualQuality,time:video.currentTime,width:video.videoWidth,height:video.videoHeight,
+                      muted:video.muted,volume:video.volume,paused:video.paused,error:video.error?.code||null,
+                      frames:video.getVideoPlaybackQuality().totalVideoFrames,decoder:document.querySelector('select[aria-label="解码方式"]')?.value};
+                    if(!state.width||!state.height||!state.frames||state.error||!state.muted||state.volume!==0)throw Error('Real playback validation failed');
+                    states.push(state);played=true;break;
+                  }
+                }
+              }
+              await new Promise(resolve=>setTimeout(resolve,100));
+            }
+            if(!played){
+              const video=document.querySelector('.player-video');video?.pause();
+              throw Error('Real local playback did not advance to ten seconds: '+JSON.stringify({episode:episode.vid_index,
+                time:video?.currentTime,width:video?.videoWidth,readyState:video?.readyState,paused:video?.paused,error:video?.error?.code,
+                decoder:document.querySelector('select[aria-label="解码方式"]')?.value,visibility:document.visibilityState}));
             }
           }
-          await new Promise(resolve=>setTimeout(resolve,100));
-        }
-        if(!played){
-          const video=document.querySelector('.player-video');video?.pause();
-          throw Error('Real local playback did not advance to ten seconds: '+JSON.stringify({episode:episode.vid_index,
-            time:video?.currentTime,width:video?.videoWidth,readyState:video?.readyState,paused:video?.paused,error:video?.error?.code,
-            decoder:document.querySelector('select[aria-label="解码方式"]')?.value,visibility:document.visibilityState}));
+          return {seriesId:drama.series_id,title:drama.series_title,completeDownloads:true,downloadedFromOfficialSource:true,states};
+        }catch(error){
+          lastFailure=error.message;
         }
       }
-      return {seriesId:drama.series_id,title:drama.series_title,completeDownloads:true,downloadedFromOfficialSource:true,states};
+      throw Error('No two playable real episodes in six dramas: '+lastFailure);
     })()`, 420000);
     assert.equal(result.realPlayback.states.length, 2);
     result.checks.push('Fresh random Hongguo episodes 1 and 2: real source preparation and ten seconds muted playback each');
