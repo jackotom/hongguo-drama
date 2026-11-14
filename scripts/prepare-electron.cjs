@@ -31,11 +31,10 @@ const { execFileSync } = require('node:child_process');
   }
   assert(valid(), 'Official Electron asset size or SHA256 mismatch');
   const dist = path.join(root, 'node_modules/electron/dist');
+  fs.rmSync(dist, { recursive: true, force: true });
   fs.mkdirSync(dist, { recursive: true });
   if (process.platform === 'win32') {
-    execFileSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command',
-      'Expand-Archive -LiteralPath $env:HONGGUO_ELECTRON_ZIP -DestinationPath $env:HONGGUO_ELECTRON_DIST -Force'],
-    { env: { ...process.env, HONGGUO_ELECTRON_ZIP: archive, HONGGUO_ELECTRON_DIST: dist }, stdio: 'pipe' });
+    execFileSync('tar.exe', ['-xf', archive, '-C', dist], { stdio: 'pipe' });
   } else if (process.platform === 'darwin') execFileSync('ditto', ['-x', '-k', archive, dist], { stdio: 'pipe' });
   else execFileSync('unzip', ['-q', '-o', archive, '-d', dist], { stdio: 'pipe' });
   const executable = process.platform === 'darwin' ? 'Electron.app/Contents/MacOS/Electron' : process.platform === 'win32' ? 'electron.exe' : 'electron';
