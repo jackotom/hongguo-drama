@@ -50,6 +50,14 @@ module.exports = async function checkDownloads({ evaluate, result, dataFile, med
   const api = expression => evaluate(expression);
   const expected = episodes.map(episode => episode.vid_index);
   const receipt = result.appDownloadQueue = { tested: false, seriesId: series.series_id, episodes: expected, maxConcurrent: 1, phases: [], temporaryIdentities: [], media: [] };
+  const appInfo = await api('window.electronAPI.getAppInfo()');
+  assert.equal(appInfo.configMode, 'portable');
+  assert.equal(path.resolve(appInfo.dataDir).toLowerCase(), path.resolve(path.dirname(dataFile)).toLowerCase());
+  const staleTasks = await api('window.electronAPI.getDownloadTasks()');
+  await api('window.electronAPI.pauseAll()');
+  if (staleTasks.length) await api(`window.electronAPI.deleteTasks(${JSON.stringify(staleTasks.map(task => task.id))})`);
+  assert.equal((await api('window.electronAPI.getDownloadTasks()')).length, 0, 'Each real queue attempt must start from the disposable profile only');
+  receipt.staleTasksRemoved = staleTasks.length;
   const snapshot = () => JSON.parse(fs.readFileSync(dataFile, 'utf8')).tasks.filter(task => String(task.hongguoInfo?.series_id) === String(series.series_id));
   const settle = async predicate => {
     const deadline = Date.now() + 180000;
