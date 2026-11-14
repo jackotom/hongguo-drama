@@ -8,6 +8,7 @@ const slice=(from,to)=>{const start=source.indexOf(from),end=source.indexOf(to,s
 const naming=[
  slice('function sanitizeFolderName(', '// 按命名模板渲染文件名'),
  slice('function playbackQuality(', 'function onlineCacheKey('),
+ slice('function compatSeriesStem(', 'function compatFileName('),
  slice('function compatFileName(', 'function compatCacheStatus('),
 ].join('\n');
 const clearBody=slice('async function clearSeriesPlaybackCache(', "ipcMain.handle('clear-series-playback-cache'");
@@ -19,7 +20,7 @@ const forgetBody=slice("ipcMain.handle('forget-series'", "ipcMain.handle('purge-
  let handler;
  const sessions=new Map([['own',{seriesId:'1'}],['other',{seriesId:'2'}]]),cache=new Map([['own',{seriesId:'1'}],['other',{seriesId:'2'}]]);
  const jobs=new Map();
- const ctx={require,fs,fsp:fs.promises,path,console,onlineSessions:sessions,onlineCache:cache,seriesRegistry:[{series_id:'1',episodes:[{vid_index:5}]},{series_id:'2',episodes:[{vid_index:1}]}],compatPreparing:jobs,getCompatDir:()=>cacheDir,releaseOnlineSession:id=>sessions.delete(id),deleteOnlineCacheEntry:key=>cache.delete(key),isFileInUse:file=>path.basename(file).startsWith('1_003'),store:{saveSeries(value){ctx.seriesRegistry=value;}},ipcMain:{handle:(_channel,fn)=>handler=fn}};
+ const ctx={require,fs,fsp:fs.promises,path,console,createHash:require('node:crypto').createHash,onlineSessions:sessions,onlineCache:cache,seriesRegistry:[{series_id:'1',episodes:[{vid_index:5}]},{series_id:'2',episodes:[{vid_index:1}]}],compatPreparing:jobs,getCompatDir:()=>cacheDir,releaseOnlineSession:id=>sessions.delete(id),deleteOnlineCacheEntry:key=>cache.delete(key),isFileInUse:file=>path.basename(file).startsWith('1_003'),store:{saveSeries(value){ctx.seriesRegistry=value;}},ipcMain:{handle:(_channel,fn)=>handler=fn}};
  vm.createContext(ctx);vm.runInContext(`${naming}\n${clearBody}\n${forgetBody}`,ctx);
  for(const index of [2,3])fs.writeFileSync(ctx.compatPathFor('1',index,index===3?'1080p':'auto'),'old');
  fs.writeFileSync(ctx.compatPathFor('1',2,'auto')+'.part','partial');
@@ -47,8 +48,9 @@ const forgetBody=slice("ipcMain.handle('forget-series'", "ipcMain.handle('purge-
  assert.ok(sessions.has('other')&&cache.has('other'));
  const colliding=ctx.compatPathFor('a:b',1,'auto');fs.writeFileSync(colliding,'ambiguous');
  ctx.seriesRegistry.push({series_id:'a:b',episodes:[]},{series_id:'ab',episodes:[]});
- await assert.rejects(ctx.clearSeriesPlaybackCache('a:b'),/文件名与其他剧冲突/);
- assert.equal(fs.existsSync(colliding),true,'ambiguous cache names must not be deleted');
+ assert.notEqual(ctx.compatPathFor('a:b',1,'auto'),ctx.compatPathFor('ab',1,'auto'),'sanitized series IDs must not collide');
+ await ctx.clearSeriesPlaybackCache('a:b');
+ assert.equal(fs.existsSync(colliding),false,'hashed cache name must be deleted only for its own series');
 
  let releaseClear;const entered=new Promise(r=>{ctx.clearSeriesPlaybackCache=async()=>{r();await new Promise(done=>{releaseClear=done;});};});
  const first=handler({},'1',{clearCache:true});await entered;

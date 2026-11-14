@@ -169,7 +169,9 @@ function SettingsPage({ active = true, preview = false, appInfo = null, wakeRegi
       const res = await window.electronAPI.saveSettings(submitted);
       if (!res?.success) throw new Error(res?.error || '设置未保存，请重试');
       if (isProxy) closeProxy();
-      setSettings(await window.electronAPI.getSettings());
+      const saved = await window.electronAPI.getSettings();
+      setSettings(saved);
+      window.dispatchEvent(new CustomEvent('hongguo-playback-settings', { detail: saved }));
       editedKeys.current.clear();
       setDirty(false);
       setSaved(true);

@@ -8,11 +8,18 @@ function deferred() {
     return { promise, resolve, reject };
 }
 
-function loadNative({ axios = {}, appFetch } = {}) {
+function loadNative({ axios = {}, appFetch, timers } = {}) {
     const modules = new Map();
+    let requestSignal;
+    if (timers) {
+        requestSignal = { exports: {} };
+        new Function('module', 'exports', 'setTimeout', 'clearTimeout', fs.readFileSync(path.join(__dirname, 'request-signal.js'), 'utf8'))(
+            requestSignal, requestSignal.exports, timers.setTimeout, timers.clearTimeout);
+    }
     function local(name) {
         if (name === 'axios') return axios;
         if (name === './app-source' && appFetch) return { fetchAppPlayUrl: appFetch };
+        if (name === './request-signal' && requestSignal) return requestSignal.exports;
         if (!name.startsWith('.')) return require(name);
         const file = require.resolve(path.join(__dirname, name));
         if (!['hongguo.js', 'app-source.js', 'playback-device.js'].includes(path.basename(file))) return require(file);

@@ -1,4 +1,5 @@
 const axios = require('axios');
+const { isPublicMediaUrl } = require('./web-media-guard');
 
 const ORIGIN = 'https://www.kuaikaw.cn';
 const ID = /^\d{1,30}$/;
@@ -11,7 +12,7 @@ function plainText(value) {
 function httpsUrl(value) {
   try {
     const url = new URL(value);
-    return url.protocol === 'https:' && !url.username && !url.password ? url.href : '';
+    return url.protocol === 'https:' && !url.username && !url.password && isPublicMediaUrl(url.href) ? url.href : '';
   } catch (_) { return ''; }
 }
 

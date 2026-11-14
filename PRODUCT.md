@@ -1,3 +1,7 @@
+<!-- 7.3 source and release target; TV and phone remain independent. -->
+
+7.3 为当前源码／发行目标，内部7.3.0、桌面构建7.3.1。新增可配置的 S / D 倍速调节，并加强下载文件身份、外部媒体地址、NAS 目录和 Docker 队列保护。标准发行范围是双Mac、Windows x64、Linux x64 AppImage与Docker amd64；实际状态见[7.3记录](docs/release-7.3.md)。
+
 <!-- 7.2 published; frozen application source remains unchanged. -->
 
 7.2 TV开发补充包已于2026-11-13 16:08:18（Asia/Shanghai）追加公开，版本7.2／code70200，沿用公开6.6 TV签名证书；TV源码冻结`2aa068f496f78114389d94c41b83dde877b174ce`。新增APK、精确TV源码和独立SHA256清单三份附件，现共28份正式附件；原25份桌面／Docker附件与原v7.2标签不变。构建、签名连续性、Manifest／包内容、定向源码检查及三附件匿名完整下载摘要核对通过。**TV实机未测试，请用户自行测试；安装、启动、实际遥控、播放和覆盖升级均未验证。** 手机保持独立，本机正式应用未替换。见[TV补充回执](docs/release-7.2-tv.md)。以下保留原五平台首发记录。

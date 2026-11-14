@@ -76,7 +76,7 @@ const checks = [
   }],
   ['Registration failures retain safe details and remain retryable only for transient causes', async () => {
     for (const [failure, expected, detail] of [
-      [{ code: 'ECONNRESET' }, 'NETWORK_ERROR', '网络连接失败'],
+      [{ code: 'ECONNRESET' }, 'NETWORK_ERROR', '连接失败'],
       [{ code: 'ETIMEDOUT' }, 'TIMEOUT', '请求超时'],
       [{ status: 503 }, 'HTTP_503', 'HTTP 503'],
       [{ status: 403 }, 'HTTP_403', 'HTTP 403'],

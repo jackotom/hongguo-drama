@@ -119,6 +119,15 @@ test('explicit source rejection pauses pending episodes without another request'
   await new Promise(resolve => setImmediate(resolve)); await new Promise(resolve => setImmediate(resolve));
   assert.equal(calls, 1); assert.equal(app.store.tasks[0].status, 'failed'); assert.equal(app.store.tasks[1].status, 'interrupted');
 });
+for (const status of [403, 429]) {
+  test(`CDN HTTP ${status} pauses pending downloads without another request`, async t => {
+    let calls = 0;
+    const { app, api } = await setup(t, { media: { series: async () => detail, download: async () => { calls++; throw Object.assign(new Error(`Request failed with status code ${status}`), { response: { status } }); } } });
+    await api('/api/downloads', { seriesId: '123', episodeIds: ['456', '789'] }); app.drain();
+    await new Promise(resolve => setImmediate(resolve)); await new Promise(resolve => setImmediate(resolve));
+    assert.equal(calls, 1); assert.equal(app.store.tasks[0].status, 'failed'); assert.equal(app.store.tasks[1].status, 'interrupted');
+  });
+}
 test('replaced task mount stops persistence without creating a new state file', async t => {
   const { app } = await setup(t);
   const dir = app.store.dataRoot; fs.renameSync(dir, dir + '-old'); fs.mkdirSync(dir);
@@ -131,4 +140,65 @@ test('retry cannot duplicate another active task for the same episode and qualit
   const second = await api('/api/downloads', { seriesId: '123', episodeIds: ['456'] });
   assert.notEqual(first.body.tasks[0].id, second.body.tasks[0].id);
   assert.equal((await api(`/api/tasks/${first.body.tasks[0].id}/retry`, {})).status, 409);
+});
+test('completed task with a deleted artifact is requeued instead of reused', async t => {
+  const { app, api } = await setup(t);
+  const added = await api('/api/downloads', { seriesId: '123', episodeIds: ['456'] });
+  const id = added.body.tasks[0].id, task = app.store.get(id), file = app.store.output(task);
+  fs.writeFileSync(file, 'stub completed artifact'); app.store.update(task, { status: 'completed', progress: 100 });
+  const reuse = await api('/api/downloads', { seriesId: '123', episodeIds: ['456'] });
+  assert.equal(reuse.status, 202); assert.equal(reuse.body.tasks[0].id, id); assert.equal(app.store.get(id).status, 'completed');
+  fs.rmSync(file);
+  const redownload = await api('/api/downloads', { seriesId: '123', episodeIds: ['456'] });
+  assert.equal(redownload.status, 202); assert.equal(redownload.body.tasks[0].id, id);
+  assert.equal(app.store.tasks.filter(item => item.type === 'download' && item.vid === '456').length, 1);
+  assert.equal(app.store.get(id).status, 'queued');
+});
+test('missing download mount returns safe 409 and interrupts queued downloads', async t => {
+  const { app, api, root } = await setup(t);
+  await api('/api/downloads', { seriesId: '123', episodeIds: ['456', '789'] });
+  fs.rmSync(path.join(root, 'downloads'), { recursive: true, force: true });
+  const result = await api('/api/downloads', { seriesId: '123', episodeIds: ['456'] });
+  assert.equal(result.status, 409); assert.equal(result.body.code, 'MOUNT_CHANGED');
+  assert.equal(result.body.error.includes(root), false);
+  assert.deepEqual(app.store.tasks.map(task => task.status), ['interrupted', 'interrupted']);
+});
+test('changed completed artifact is requeued by repeated submission', async t => {
+  const { app, api } = await setup(t);
+  const added = await api('/api/downloads', { seriesId: '123', episodeIds: ['456'] });
+  const id = added.body.tasks[0].id, task = app.store.get(id), file = app.store.output(task);
+  fs.writeFileSync(file, 'verified fixture'); app.store.complete(task);
+  fs.appendFileSync(file, ' changed');
+  const repeated = await api('/api/downloads', { seriesId: '123', episodeIds: ['456'] });
+  assert.equal(repeated.status, 202); assert.equal(repeated.body.tasks[0].id, id);
+  assert.equal(app.store.get(id).status, 'queued');
+  assert.equal(fs.existsSync(file), false);
+  assert.equal(fs.readdirSync(path.dirname(file)).some(name => name.startsWith(`.invalid-${id}-`)), true);
+});
+test('missing, zero-size and non-regular completed artifacts become interrupted', async t => {
+  const { app, api } = await setup(t);
+  const tasks = [1, 2, 3].map(index => makeTask({ type: 'download', seriesId: '123', seriesTitle: '测试', vid: String(100 + index), episodeIndex: index, quality: 'auto' }));
+  app.store.add(tasks);
+  for (const task of tasks) { fs.writeFileSync(app.store.output(task), 'verified fixture'); app.store.complete(task); }
+  fs.rmSync(app.store.output(tasks[0]));
+  fs.truncateSync(app.store.output(tasks[1]), 0);
+  fs.rmSync(app.store.output(tasks[2])); fs.mkdirSync(app.store.output(tasks[2]));
+  const listed = await api('/api/tasks');
+  assert.equal(listed.status, 200);
+  for (const task of tasks) {
+    assert.equal(app.store.get(task.id).status, 'interrupted');
+    assert.equal(listed.body.tasks.find(item => item.id === task.id).file, undefined);
+  }
+});
+test('startup removes stale download staging directories only', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'hongguo-server-cleanup-'));
+  const data = path.join(root, 'data'), downloads = path.join(root, 'downloads'), series = path.join(downloads, '测试_123');
+  fs.mkdirSync(data); fs.mkdirSync(series, { recursive: true });
+  const stale = path.join(series, '.download-A1B2C3'); fs.mkdirSync(stale); fs.writeFileSync(path.join(stale, 'input.mp4'), 'partial');
+  const userDir = path.join(series, '.download-notes'); fs.mkdirSync(userDir);
+  const keep = path.join(series, '.download-note'); fs.writeFileSync(keep, 'keep');
+  new Storage(data, downloads);
+  assert.equal(fs.existsSync(stale), false); assert.equal(fs.readFileSync(keep, 'utf8'), 'keep');
+  assert.equal(fs.existsSync(userDir), true);
+  fs.rmSync(root, { recursive: true, force: true });
 });

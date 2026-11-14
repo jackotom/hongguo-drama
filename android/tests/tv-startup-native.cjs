@@ -1,5 +1,6 @@
 // Run unchanged production Java methods on a small host fixture, without an APK.
 const fs = require('node:fs');
+const os = require('node:os');
 const path = require('node:path');
 const {spawnSync} = require('node:child_process');
 
@@ -32,7 +33,7 @@ module.exports = function nativeStartupRegression(root, scenario = 'all') {
     .replace('/* PRODUCTION_METHODS */', native + '\n' + helpers + '\n' + reads)
     .replace('/* PRODUCTION_BRIDGE */', source.slice(source.indexOf('public class Bridge {'), source.lastIndexOf('\n}')))
     .replace('/* PRODUCTION_RESUME */', source.split('\n').find(line => line.includes('@Override protected void onResume()')));
-  const dir = fs.mkdtempSync(path.join(root, '../.superpowers/sdd/t1-native-'));
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'hongguo-tv-startup-'));
   const java = process.env.JAVA_HOME || '/opt/homebrew/opt/openjdk@21/libexec/openjdk.jdk/Contents/Home';
   function run(binary, args) {
     const result = spawnSync(path.join(java, 'bin', binary), args, {encoding: 'utf8', timeout: 20000});

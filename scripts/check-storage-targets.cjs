@@ -44,6 +44,7 @@ test('usage counts dismissed and task-only series that delete-all removes', asyn
     tasks: [task('dismissed-a', a), task('visible-b', b), task('task-only-c', c)],
   };
   h.run('seriesRegistry = fixture.registry; downloadTasks = fixture.tasks; mergeTasks = []');
+  h.run('for (const task of downloadTasks) { task.endTime = Date.now(); task.fileIdentity = readFileIdentity(task.savePath); }');
 
   const usage = await h.handlers['get-storage-usage']({});
   assert.equal(usage.success, true);

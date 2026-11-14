@@ -11,8 +11,6 @@ on:
         description: Build and archive only; skip all functional, media, unit and platform acceptance checks
         type: boolean
         default: false
-  push:
-    branches: ['codex/release-6.5']
 permissions:
   contents: read
 jobs:
@@ -79,7 +77,9 @@ jobs:
           version=$(node -p "require('./package.json').version.replace(/\.0$/, '')")
           docker save "hongguo-drama:$version" | gzip > "dist/docker/hongguo-drama-$version-docker-amd64.tar.gz"
           cp "$RUNNER_TEMP/linux-media/ffmpeg/artifacts/"*source.tar.gz "$RUNNER_TEMP/linux-media/librempeg/artifacts/"*source.tar.gz dist/docker/
-          cp compose.yaml docs/docker.md dist/docker/
+          sed "s|^    image: hongguo-drama:.*|    image: hongguo-drama:$version|" compose.yaml > dist/docker/compose.yaml
+          grep -Fqx "    image: hongguo-drama:$version" dist/docker/compose.yaml
+          cp docs/docker.md dist/docker/
           git archive --format=zip --output="dist/docker/hongguo-drama-$version-docker-source.zip" HEAD
           printf '%s\n' "$GITHUB_SHA" > dist/docker/SOURCE-SHA.txt
           (cd dist/docker && sha256sum * > DOCKER-SHA256SUMS.txt)

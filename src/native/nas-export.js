@@ -7,11 +7,30 @@ const axios = require('axios');
 const { seasonTitle } = require('./watch-history');
 const { fetchPublicDetails } = require('./public-details');
 const { publishMergedOutput } = require('./merge-runner');
+const { webMediaRequestOptions } = require('./web-media-guard');
 
 const NAS_INDEX = '.hongguo-nas.json';
 const NAS_IDENTITY_LIMIT = 256 * 1024;
 const nasIndexWrites = new Map();
 const prepareQueues = new Map();
+
+function directoryIdentity(directory) {
+  const stat = fs.lstatSync(directory, { bigint: true });
+  if (!stat.isDirectory() || stat.isSymbolicLink()) throw new Error('NAS 目录不能是符号链接或普通文件');
+  return {
+    dev: String(stat.dev),
+    ino: String(stat.ino),
+    birthtimeNs: stat.birthtimeNs == null ? '' : String(stat.birthtimeNs),
+  };
+}
+
+function directoryIdentityCurrent(directory, identity) {
+  if (!identity) return true;
+  try {
+    const current = directoryIdentity(directory);
+    return current.dev === identity.dev && current.ino === identity.ino && current.birthtimeNs === identity.birthtimeNs;
+  } catch (_) { return false; }
+}
 
 const xml = value => String(value ?? '').replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/g, '')
   .replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&apos;' }[char]));
@@ -34,7 +53,8 @@ function episodeIdentity(episode, seriesId) {
 async function checkRoot(destination) {
   try {
     if (!path.isAbsolute(destination.root) || await fsp.realpath(destination.root) !== destination.root ||
-        !(await fsp.stat(destination.root)).isDirectory() || (await fsp.stat(destination.root)).dev !== destination.device)
+        !(await fsp.stat(destination.root)).isDirectory() || (await fsp.stat(destination.root)).dev !== destination.device ||
+        !directoryIdentityCurrent(destination.root, destination.rootIdentity))
       throw new Error();
   } catch (_) { throw new Error('NAS 目录不可用，请重新挂载共享文件夹后重试'); }
 }
@@ -52,6 +72,9 @@ async function directoryAt(destination, name) {
     const stat = await fsp.lstat(directory);
     if (stat.isSymbolicLink() || !stat.isDirectory()) throw new Error('NAS 目录不能是符号链接或普通文件');
   }
+  if (path.resolve(directory) === path.resolve(destination.directory)
+    && !directoryIdentityCurrent(destination.directory, destination.directoryIdentity))
+    throw new Error('NAS 目标目录已变化，请重新挂载后重试');
   return directory;
 }
 
@@ -208,8 +231,8 @@ function imageExtension(buffer) {
 async function fetchPoster(value) {
   const url = new URL(value);
   if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password) throw new Error('封面地址无效');
-  const response = await axios.get(url.href, { responseType: 'arraybuffer', timeout: 10000,
-    signal: AbortSignal.timeout(10000), maxContentLength: 12 * 1024 * 1024, maxRedirects: 3,
+  const response = await axios.get(url.href, { ...webMediaRequestOptions(url.href), responseType: 'arraybuffer', timeout: 10000,
+    signal: AbortSignal.timeout(10000), maxContentLength: 12 * 1024 * 1024,
     headers: { 'User-Agent': 'Mozilla/5.0' } });
   return Buffer.from(response.data);
 }
@@ -257,9 +280,11 @@ async function prepareNasExport({ root, folderName, series, createFolder = false
   const rootStat = await fsp.stat(root);
   if (!rootStat.isDirectory()) throw new Error('NAS 目录不可用，请重新挂载共享文件夹后重试');
   const seriesId = nasIdentity(series.series_id, '剧号');
-  const destination = { root, device: rootStat.dev, directory: createFolder ? path.join(root, folderName) : root, flat: true,
+  const destination = { root, device: rootStat.dev, rootIdentity: directoryIdentity(root),
+    directory: createFolder ? path.join(root, folderName) : root, flat: true,
     seriesId, title: folderName.replace(/-[a-f0-9]{12}$/, ''), season: parsed.invalid ? 1 : parsed.season };
   destination.directory = await fsp.realpath(await directoryAt(destination));
+  destination.directoryIdentity = directoryIdentity(destination.directory);
   const warnings = await serializePrepare(destination.directory, () =>
     prepareOnce(destination, series, { metadataFetcher, posterFetcher }));
   return { destination, warnings };
@@ -339,4 +364,6 @@ async function copyNasEpisode(task, destination) {
   return { copied, path: files.video };
 }
 
-module.exports = { prepareNasExport, inspectNasEpisode, copyNasEpisode, nasEpisodeFilename, checkNasDirectory: directoryAt };
+module.exports = { prepareNasExport, inspectNasEpisode, copyNasEpisode, nasEpisodeFilename, checkNasDirectory: directoryAt,
+  nasDirectoryIdentityCurrent: destination => directoryIdentityCurrent(destination.root, destination.rootIdentity)
+    && directoryIdentityCurrent(destination.directory, destination.directoryIdentity) };

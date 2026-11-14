@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Hongguo Drama 6.2 release candidate.
+# Hongguo Drama 7.3 release candidate.
 set -euo pipefail
 # Keep Chromium sandboxing enabled; never silently add --no-sandbox on restricted systems.
 APPDIR=${APPDIR:-$(dirname "$(readlink -f "$0")")}

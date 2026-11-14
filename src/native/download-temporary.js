@@ -1,6 +1,10 @@
 const fs = require('node:fs/promises');
 const disk = require('node:fs');
 const path = require('node:path');
+const { randomUUID } = require('node:crypto');
+
+const OWNER_FILE = '.hongguo-owner';
+const ownerMarker = token => `hongguo-download-v2:${token}\n`;
 
 // Persist exact IDs as strings: 64-bit file IDs can exceed Number's safe integer range.
 const identityOf = stat => typeof stat.ino === 'bigint'
@@ -14,12 +18,39 @@ const sameIdentity = (stat, identity) => {
   const a = identityOf(stat), b = typeof identity?.ino === 'bigint' ? identityOf(identity) : identity;
   return !!b && a.dev === b.dev && a.ino === b.ino && a.birthtimeNs === b.birthtimeNs;
 };
+// Negative exFAT directory IDs can change; only those receipts fall back to the task-bound marker.
+function directoryIsOwned(record, current) {
+  try {
+    current ||= disk.lstatSync(record.directory, statOptions(record.identity));
+    if (!current.isDirectory() || current.isSymbolicLink()) return false;
+    if (record.version === 1) return sameIdentity(current, record.identity);
+    if (typeof record.markerToken !== 'string' || !/^[A-Za-z0-9_-]{32,128}$/.test(record.markerToken)
+      || String(current.dev) !== String(record.identity?.dev)) return false;
+    // shortcut: negative IDs cannot distinguish copied markers; exact file receipts remain mandatory until stable directory IDs exist.
+    if (!/^-[1-9]\d*$/.test(String(record.identity?.ino)) && !sameIdentity(current, record.identity)) return false;
+    return hasOwnerMarker(record.directory, record.markerToken);
+  } catch (error) { if (error.code === 'ENOENT') throw error; return false; }
+}
+function hasOwnerMarker(directory, token) {
+  const marker = path.join(directory, OWNER_FILE);
+  try {
+    if (!disk.lstatSync(marker).isFile()) return false;
+    const flags = disk.constants.O_RDONLY | (disk.constants.O_NOFOLLOW || 0);
+    const fd = disk.openSync(marker, flags);
+    try {
+      const stat = disk.fstatSync(fd);
+      const expected = ownerMarker(token);
+      return stat.isFile() && stat.size === Buffer.byteLength(expected)
+        && disk.readFileSync(fd, 'utf8') === expected;
+    } finally { disk.closeSync(fd); }
+  } catch (_) { return false; }
+}
 const downloadTemporaryOwner = task => ({ taskId:String(task.id || ''), seriesId:String(task.hongguoInfo?.series_id || ''),
   vid:String(task.hongguoInfo?.vid || ''), vidIndex:Number(task.hongguoInfo?.vid_index), savePath:task.savePath });
 
 function inspectDownloadTemporary(record, owner) {
   const unknown = () => ({ files:[], unverifiedItems:1, unverifiedBytes:null, missing:false, directoryVerified:false });
-  if (!record || record.version !== 1 || !owner || !owner.taskId || !owner.seriesId || !owner.vid
+  if (!record || ![1, 2].includes(record.version) || !owner || !owner.taskId || !owner.seriesId || !owner.vid
     || !Number.isSafeInteger(owner.vidIndex) || !Object.entries(owner).every(([key, value]) => record.owner?.[key] === value)
     || typeof owner.savePath !== 'string' || !path.isAbsolute(owner.savePath)
     || typeof record.directory !== 'string' || !path.isAbsolute(record.directory)
@@ -27,11 +58,12 @@ function inspectDownloadTemporary(record, owner) {
     || !/^\.hongguo-download-[A-Za-z0-9]{6}$/.test(path.basename(record.directory)) || !record.files || typeof record.files !== 'object' || Array.isArray(record.files)) return unknown();
   const result = { files:[], unverifiedItems:0, unverifiedBytes:0, missing:false, directoryVerified:true };
   try {
-    const directory = disk.lstatSync(record.directory, statOptions(record.identity));
-    if (!directory.isDirectory() || !sameIdentity(directory, record.identity)) return unknown();
+    if (!directoryIsOwned(record)) return unknown();
+    const markerOwned = record.version === 2 && hasOwnerMarker(record.directory, record.markerToken);
     for (const name of disk.readdirSync(record.directory)) {
       const file = path.join(record.directory, name);
       try {
+        if (name === OWNER_FILE && markerOwned) continue;
         const stat = disk.lstatSync(file, statOptions(record.files[name]));
         if (['input.enc.tmp', 'decoded.mp4'].includes(name) && stat.isFile() && sameIdentity(stat, record.files[name])) {
           result.files.push({ file, identity:record.files[name], size:Number(stat.size) });
@@ -50,13 +82,37 @@ async function cleanupDownloadTemporary(record, owner, canRemove = () => true) {
   if (!state.missing && state.directoryVerified) {
     for (const item of state.files) {
       try {
-        if (!canRemove() || !sameIdentity(await fs.lstat(record.directory, statOptions(record.identity)), record.identity)) break;
-        if (await removeOwnedFile(item.file, item.identity, canRemove)) { count++; freed += item.size; }
+        const current = await fs.lstat(record.directory, statOptions(record.identity));
+        if (!canRemove() || !directoryIsOwned(record, current)) break;
+        if (await removeOwnedFile(item.file, item.identity, () => canRemove() && directoryIsOwned(record))) { count++; freed += item.size; }
       } catch (_) { failed++; }
     }
     try {
       const current = await fs.lstat(record.directory, statOptions(record.identity));
-      if (canRemove() && sameIdentity(current, record.identity)) await fs.rmdir(record.directory);
+      if (canRemove() && directoryIsOwned(record, current)) {
+        if (record.version === 1) await fs.rmdir(record.directory);
+        else {
+          const names = disk.readdirSync(record.directory);
+          // Keep the recovery credential until every data file is gone.
+          if (names.length === 1 && names[0] === OWNER_FILE && canRemove() && directoryIsOwned(record)) {
+            const before = identityOf(disk.lstatSync(record.directory, statOptions(record.identity)));
+            await fs.unlink(path.join(record.directory, OWNER_FILE));
+            let removed = false;
+            try {
+              if (canRemove()) { await fs.rmdir(record.directory); removed = true; }
+            } finally {
+              if (!removed) {
+                try {
+                  const stat = disk.lstatSync(record.directory, statOptions(record.identity)), after = identityOf(stat);
+                  if (stat.isDirectory() && Object.keys(before).every(key => before[key] === after[key])) {
+                    await fs.writeFile(path.join(record.directory, OWNER_FILE), ownerMarker(record.markerToken), { flag:'wx', mode:0o600 });
+                  }
+                } catch (error) { if (error.code !== 'ENOENT') throw error; }
+              }
+            }
+          }
+        }
+      }
     } catch (error) { if (!['ENOENT', 'ENOTEMPTY', 'EEXIST'].includes(error.code)) failed++; }
     state = inspectDownloadTemporary(record, owner);
   }
@@ -125,7 +181,10 @@ async function reserveOwnedFile(file, onChange = () => {}) {
 async function createDownloadTemporary(directory, { owner, onChange = () => {} } = {}) {
   // A fresh private directory avoids legacy leftovers without guessing who owns them.
   const root = await fs.mkdtemp(path.join(directory, '.hongguo-download-'));
-  const record = { version:1, owner, directory:root, identity:identityOf(await fs.lstat(root, { bigint:true })), files:{} };
+  const markerToken = randomUUID();
+  const marker = await fs.open(path.join(root, OWNER_FILE), 'wx', 0o600);
+  try { await marker.writeFile(ownerMarker(markerToken)); } finally { await marker.close(); }
+  const record = { version:2, owner, directory:root, markerToken, identity:identityOf(await fs.lstat(root, { bigint:true })), files:{} };
   const input = path.join(root, 'input.enc.tmp'), output = path.join(root, 'decoded.mp4');
   const reservations = new Map();
   const reserve = async file => {
@@ -169,4 +228,5 @@ async function createDownloadTemporary(directory, { owner, onChange = () => {} }
     } };
 }
 
-module.exports = { createDownloadTemporary, reserveOwnedFile, removeOwnedFile, isOwnedFile, downloadTemporaryOwner, inspectDownloadTemporary, cleanupDownloadTemporary };
+module.exports = { createDownloadTemporary, reserveOwnedFile, removeOwnedFile, isOwnedFile, downloadTemporaryOwner,
+  inspectDownloadTemporary, cleanupDownloadTemporary };

@@ -12,8 +12,17 @@ function desktop(t) {
     const module = { exports: {} };
     new Function('require', 'module', '__dirname', source.slice(0, end) + '\nmodule.exports = { fixture, roots };')(
         createRequire(file), module, path.dirname(file));
-    const h = module.exports.fixture(), calls = [], lookups = [], parents = [], entered = deferred();
-    const native = loadNative({ appFetch(vid, config) {
+    const calls = [], lookups = [], parents = [], entered = deferred(), lookupTimers = [];
+    const timerApi = {
+        setTimeout(fn, ms) { const timer = { fn, ms, cleared: false, unref() {} }; lookupTimers.push(timer); return timer; },
+        clearTimeout(timer) { if (timer) timer.cleared = true; },
+    };
+    const requestSignal = { exports: {} };
+    new Function('module', 'exports', 'setTimeout', 'clearTimeout',
+        fs.readFileSync(path.join(__dirname, '../../src/native/request-signal.js'), 'utf8'))(
+        requestSignal, requestSignal.exports, timerApi.setTimeout, timerApi.clearTimeout);
+    const h = module.exports.fixture(1, { requestSignal: requestSignal.exports });
+    const native = loadNative({ timers: timerApi, appFetch(vid, config) {
         const pending = deferred(); calls.push({ ...pending, vid, signal: config.signal }); entered.resolve(); return pending.promise;
     } });
     h.state.load = (vid, options) => {
@@ -31,10 +40,8 @@ function desktop(t) {
     });
     return Object.assign(h, { calls, lookups, native, entered: entered.promise, recover: h.run('withMediaRecovery'),
         controller() { const controller = new AbortController(); parents.push(controller); return controller; },
-        async expireLookup(t) {
-            t.mock.timers.tick(30000);
-            // The pre-fix code owns its wait timer in G1's VM fixture, rather than boundedSignal.
-            for (const timer of h.liveTimers()) if (timer.ms === 30000) timer.fn();
+        async expireLookup() {
+            for (const timer of lookupTimers) if (timer.ms === 30000 && !timer.cleared) timer.fn();
             await turn();
         },
     });

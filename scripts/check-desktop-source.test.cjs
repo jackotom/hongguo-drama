@@ -48,7 +48,6 @@ test('last online session cancels source and a late result cannot restore sessio
 });
 
 for (const shared of [false, true]) test(`lookup timeout releases only its consumer, allows recovery, shared=${shared}`, async t => {
-    t.mock.timers.enable({ apis: ['setTimeout'] });
     const h = desktop(t), parent = h.controller(); let consumed = 0;
     const independent = shared ? h.native.fetchPlayUrlSingle('11', '100', { quality: '1080p' }) : null;
     const result = outcome(h.recover('11', '100', opts(parent.signal), async candidate => { consumed++; return candidate.url; }));
@@ -57,7 +56,7 @@ for (const shared of [false, true]) test(`lookup timeout releases only its consu
     assert.equal(h.lookups[0].signal?.aborted, true, '30s wait must release its provider consumer');
     assert.equal(h.calls[0].signal.aborted, !shared);
     assert.equal(parent.signal.aborted, false, 'lookup timeout must not abort the job');
-    t.mock.timers.tick(0); await turn();
+    await new Promise(resolve => setTimeout(resolve, 5)); await turn();
     assert.equal(h.calls.length, 2); assert.equal(h.lookups[1].force, true);
     assert.equal(h.calls[1].signal.aborted, false);
     h.calls[0].resolve(info('11', 'late'));
@@ -69,7 +68,6 @@ for (const shared of [false, true]) test(`lookup timeout releases only its consu
 });
 
 test('all lookup timeouts abort each exclusive source and remain bounded to three recovery rounds', async t => {
-    t.mock.timers.enable({ apis: ['setTimeout'] });
     const h = desktop(t), parent = h.controller(); let consumed = 0;
     const result = outcome(h.recover('11', '100', opts(parent.signal), async () => { consumed++; }));
     for (let round = 0; round < 3; round++) {
@@ -77,13 +75,13 @@ test('all lookup timeouts abort each exclusive source and remain bounded to thre
         await h.expireLookup(t);
         assert.equal(h.calls[round].signal.aborted, true);
         assert.equal(parent.signal.aborted, false);
-        t.mock.timers.tick(0);
+        await new Promise(resolve => setTimeout(resolve, 5)); await turn();
     }
     const error = (await result).error;
     assert.equal(error.code, 'MEDIA_TRANSFER_ERROR'); assert.equal(error.mediaRetryable, true);
     assert.equal(consumed, 0); assert.equal(h.lookups.length, 3);
     for (const call of h.calls) call.resolve(info('11', 'late'));
-    t.mock.timers.tick(120000); await turn(); assert.equal(h.calls.length, 3);
+    await new Promise(resolve => setTimeout(resolve, 5)); await turn(); assert.equal(h.calls.length, 3);
 });
 
 test('pre-canceled job never invokes provider or consumes existing playInfo', async t => {

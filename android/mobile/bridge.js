@@ -62,7 +62,7 @@ state.files ||= state.tasks.filter(task => task.status === 'completed' && task.t
   seriesId: task.hongguoInfo.series_id, index: task.hongguoInfo.vid_index, token: task.token, quality: task.actualQuality,
 }));
 const fileFor = (id, index) => state.files.find(row => row.seriesId === String(id) && row.index === Number(index) && Native.mediaSize(row.token) > 0);
-const controllers = new Map(), online = new Map(), localPlaybackUrls = new Set();
+const controllers = new Map(), pausedControllers = new Set(), online = new Map(), localPlaybackUrls = new Set();
 const queue = { running: false, paused: true };
 for (const task of state.tasks) {
   task.title ||= task.name || `${task.hongguoInfo?.series_title || seriesFor(task.hongguoInfo?.series_id)?.series_title || '短剧'} 第${task.hongguoInfo?.vid_index || '?'}集`;
@@ -113,28 +113,41 @@ async function pump() {
     let task;
     while (!queue.paused && (task = state.tasks.find(row => row.status === 'pending'))) {
       const controller = new AbortController(); controllers.set(task.id, controller);
-      task.status = 'downloading'; task.progress = 0; task.error = ''; save(); emit('onDownloadQueueChanged');
+      task.status = 'downloading'; task.progress = 0; task.error = '';
+      try {
+        save(); emit('onDownloadQueueChanged');
+      } catch {
+        task.status = 'stopped';
+        controllers.delete(task.id); emit('onDownloadQueueChanged');
+        queue.paused = true;
+        return;
+      }
       try {
         const media = await prepareMedia(task.hongguoInfo.vid, task.quality, controller.signal, (phase,stats={}) => {
           task.progress = phase === 'decrypting' ? 100 : stats.total > 0 ? Math.min(100,Math.round(stats.received/stats.total*100)) : 0;
           Object.assign(task, { receivedBytes: stats.received || 0, totalBytes: stats.total || 0, speed: stats.bytesPerSecond || 0 });
           emit('onDownloadProgress', { id: task.id, progress: task.progress, phase, ...stats, receivedBytes: task.receivedBytes, totalBytes: task.totalBytes, speed: task.speed });
         });
-        if (controller.signal.aborted) { Native.deleteMedia(media.token); continue; }
+        if (controller.signal.aborted) {
+          Native.deleteMedia(media.token);
+          if (pausedControllers.has(task.id) && !queue.paused) task.status = 'pending';
+          continue;
+        }
         Native.persistMedia(media.token);
         state.files.push({ seriesId: task.hongguoInfo.series_id, index: task.hongguoInfo.vid_index, token: media.token, quality: media.quality });
         Object.assign(task, { token: media.token, status: 'completed', progress: 100, size: media.bytes,
           fileSize: media.bytes, actualQuality: media.quality, savePath: media.token, endTime: Date.now() });
         save(); emit('onDownloadCompleted', clone(task));
       } catch (error) {
-        if (controller.signal.aborted) task.status = 'stopped';
+        const resumed = controller.signal.aborted && pausedControllers.has(task.id) && !queue.paused;
+        if (controller.signal.aborted) task.status = resumed ? 'pending' : 'stopped';
         else { task.status = 'failed'; task.error = error.message; }
         if (/^(BUSINESS_REJECTED|DEVICE_REGISTRATION_FAILED|SECURITY_BLOCKED)$/.test(error.code || '')) {
           queue.paused = true;
           for (const pending of state.tasks) if (pending.status === 'pending') pending.status = 'stopped';
         }
-        save(); emit(task.status === 'stopped' ? 'onDownloadStopped' : 'onDownloadFailed', clone(task));
-      } finally { controllers.delete(task.id); emit('onDownloadQueueChanged'); }
+        save(); if (!resumed) emit(controller.signal.aborted ? 'onDownloadStopped' : 'onDownloadFailed', clone(task));
+      } finally { controllers.delete(task.id); pausedControllers.delete(task.id); emit('onDownloadQueueChanged'); }
     }
   } finally { queue.running = false; }
 }
@@ -174,7 +187,10 @@ Object.assign(api, {
     for (const [key,value] of Object.entries(patch)) {
       if (key === 'download_quality' ? !['auto','720p','1080p'].includes(value) : typeof value !== 'boolean') throw new Error('设置值无效，未保存');
     }
-    state.settings = { ...state.settings, ...patch }; save(); return success();
+    const previous = state.settings;
+    state.settings = { ...previous, ...patch };
+    try { save(); } catch (error) { state.settings = previous; throw error; }
+    return success();
   }),
   getMediaSources: async () => ({ success: true, sources: [{ id: 'hongguo', label: '红果短剧' }] }),
   browseCategories: async () => [ ['real-drama','真人剧'], ['comic-drama','漫剧'], ['ai-drama','AI剧'],
@@ -312,10 +328,14 @@ Object.assign(api, {
   pauseAll: guarded(async () => {
     queue.paused = true;
     for (const task of state.tasks) if (['pending','downloading'].includes(task.status)) task.status = 'stopped';
-    save(); for (const controller of controllers.values()) controller.abort(); emit('onDownloadQueueChanged'); return success();
+    save(); for (const [id,controller] of controllers) { pausedControllers.add(id); controller.abort(); }
+    emit('onDownloadQueueChanged'); return success();
   }),
   resumeAll: guarded(async () => {
-    for (const task of state.tasks) if (task.status === 'stopped') task.status = 'pending';
+    for (const task of state.tasks) {
+      if (controllers.has(task.id)) continue;
+      if (['stopped','failed'].includes(task.status)) { task.status = 'pending'; task.error = ''; }
+    }
     save(); queue.paused = false; void pump(); emit('onDownloadQueueChanged'); return success();
   }),
   retryTask: guarded(async id => {

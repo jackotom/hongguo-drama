@@ -54,12 +54,13 @@ def main():
         if directory.exists(): shutil.rmtree(directory)
         directory.mkdir()
     assets = BUILD/'assets' if tv else BUILD/'mobile-assets'
-    resources = BUILD/'res' if tv else ROOT/'app/src/main/res'
+    resources = BUILD/'res'
+    if resources.exists(): shutil.rmtree(resources)
+    shutil.copytree(ROOT/'app/src/main/res',resources)
     (resources/'drawable').mkdir(parents=True, exist_ok=True)
     manifest = BUILD/'AndroidManifest.xml' if tv else ROOT/'app/src/main/AndroidManifest.xml'
     if tv:
         shutil.copytree(ROOT/'app/src/main/assets',assets,dirs_exist_ok=True)
-        shutil.copytree(ROOT/'app/src/main/res',resources,dirs_exist_ok=True)
         html = (ROOT/'web/index.html').read_text().replace('红果·自用','红果短剧 TV').replace('个人版 1.1',f'TV候选版 {version}').replace('手机实播兼容性待真机验收','电视实播兼容性待真机验收')
         html = html.replace('红果<span class="brand-dot">·</span>自用','红果<span class="brand-dot">·</span>TV')
         html = html.replace('src="app.js"', 'src="tv-startup.js"')

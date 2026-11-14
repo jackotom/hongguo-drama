@@ -1,4 +1,5 @@
 const axios = require('axios');
+const { isPublicMediaUrl } = require('./web-media-guard');
 
 const API = 'https://xifan-api-cn.youlishipin.com';
 const ID = /^[a-zA-Z0-9_-]{1,200}$/;
@@ -19,7 +20,7 @@ function parseId(value, episode = false) {
 function httpsUrl(value) {
   try {
     const url = new URL(value);
-    return url.protocol === 'https:' && !url.username && !url.password ? url.href : '';
+    return url.protocol === 'https:' && !url.username && !url.password && isPublicMediaUrl(url.href) ? url.href : '';
   } catch (_) { return ''; }
 }
 

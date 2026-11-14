@@ -157,6 +157,72 @@ test('写入或rename失败保留旧文件、清理临时文件，释放目标�
   assert.deepEqual((await exportSeriesText(options)).danmaku, tally(1));
 });
 
+test('fetch等待后写入前核验目录身份，核验失败不覆盖外来同名JSON', async t => {
+  const { target, options, fetchers } = setup(t);
+  options.kinds = { danmaku: true };
+  fs.mkdirSync(path.dirname(target), { recursive: true });
+  const original = JSON.stringify({ partial: true, items: [{ text: '保留' }] });
+  fs.writeFileSync(target, original);
+  let checked = 0;
+  const result = await exportSeriesText({ ...options,
+    check: () => { checked++; throw new Error('目录已被替换'); } });
+  assert.deepEqual(result.danmaku, tally(0, 1));
+  assert.equal(checked, 1);
+  assert.equal(fs.readFileSync(target, 'utf8'), original);
+  assert.deepEqual(fs.readdirSync(path.dirname(target)), [path.basename(target)]);
+});
+
+test('等待期间出现外来同名target不覆盖，保留未知文件且不留随机临时文件', async t => {
+  const { target, options, fetchers } = setup(t);
+  options.kinds = { danmaku: true };
+  fs.mkdirSync(path.dirname(target), { recursive: true });
+  let entered = false, release;
+  const gate = new Promise(resolve => { release = resolve; });
+  fetchers.fetchDanmaku = async () => { entered = true; await gate; return danmaku(); };
+  const pending = exportSeriesText(options);
+  for (let i = 0; i < 100 && !entered; i++) await new Promise(resolve => setImmediate(resolve));
+  assert.equal(entered, true);
+  fs.writeFileSync(target, 'FOREIGN-TARGET');
+  release();
+  const result = await pending;
+  assert.deepEqual(result.danmaku, tally(0, 1));
+  assert.equal(fs.readFileSync(target, 'utf8'), 'FOREIGN-TARGET');
+  assert.deepEqual(fs.readdirSync(path.dirname(target)), [path.basename(target)]);
+});
+
+test('写入成功时使用随机临时文件，不跟随固定.tmp符号链接', async t => {
+  const { target, options, fetchers } = setup(t);
+  options.kinds = { danmaku: true };
+  fs.mkdirSync(path.dirname(target), { recursive: true });
+  const foreign = path.join(path.dirname(target), 'foreign.json');
+  fs.writeFileSync(foreign, 'FOREIGN');
+  fs.symlinkSync(foreign, `${target}.tmp`);
+  const result = await exportSeriesText(options);
+  assert.deepEqual(result.danmaku, tally(1));
+  assert.equal(read(target).kind, 'danmaku');
+  assert.equal(fs.readFileSync(foreign, 'utf8'), 'FOREIGN');
+  assert.deepEqual(fs.readdirSync(path.dirname(target)).sort(),
+    [path.basename(target), 'foreign.json', `${path.basename(target)}.tmp`].sort());
+});
+
+test('partial旧文件在等待期间被替换，保留替换文件不覆盖', async t => {
+  const { target, options, fetchers } = setup(t);
+  options.kinds = { danmaku: true };
+  fs.mkdirSync(path.dirname(target), { recursive: true });
+  fs.writeFileSync(target, JSON.stringify({ partial: true, items: [{ text: '旧' }] }));
+  let entered = false, release;
+  const gate = new Promise(resolve => { release = resolve; });
+  fetchers.fetchDanmaku = async () => { entered = true; await gate; return danmaku(); };
+  const pending = exportSeriesText(options);
+  for (let i = 0; i < 100 && !entered; i++) await new Promise(resolve => setImmediate(resolve));
+  assert.equal(entered, true);
+  fs.writeFileSync(target, 'FOREIGN-PARTIAL');
+  release();
+  const result = await pending;
+  assert.deepEqual(result.danmaku, tally(0, 1));
+  assert.equal(fs.readFileSync(target, 'utf8'), 'FOREIGN-PARTIAL');
+});
+
 test('同目标跨批并发只取写一次，不能被迟到请求覆盖', async t => {
   const { target, options, fetchers } = setup(t);
   options.kinds = { danmaku: true };

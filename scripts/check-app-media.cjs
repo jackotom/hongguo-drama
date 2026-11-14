@@ -18,6 +18,8 @@ function load(url, mode = 'ok', key = contentKey) {
   Object.assign(app, { getVersion: () => 'test', getPath: () => dir, commandLine: { appendSwitch() {} }, requestSingleInstanceLock: () => true, whenReady: () => ({ then() {} }) });
   const electron = { app, ipcMain: { handle: (n, f) => handlers[n] = f }, protocol: { registerSchemesAsPrivileged() {}, handle: (n, f) => protocols[n] = f } };
   const native = { fetchPlayUrlSingle: async () => ({ url, contentKey: key, source: 'app', codec: 'h264' }), UA: 'test', VIDEO_REFERER: 'https://example.com/', deriveKey: () => { throw new Error('contentKey must never go through spade'); } };
+  const mediaGuard = req('./src/native/web-media-guard');
+  const loopbackGuard = { webMediaRequestOptions: value => new URL(value).hostname === '127.0.0.1' ? {} : mediaGuard.webMediaRequestOptions(value) };
   const childProcess = { spawn: (file, args) => {
     assert.equal(file, '/bundled/ffmpeg');
     assert.equal(args[args.indexOf('-decryption_key') + 1], contentKey);
@@ -34,7 +36,11 @@ function load(url, mode = 'ok', key = contentKey) {
     });
     return child;
   } };
-  const context = vm.createContext({ require: n => n === 'electron' ? electron : n === './src/native/hongguo' ? native : n === 'child_process' || n === 'node:child_process' ? childProcess : n === './src/store' ? { saveTasks() {}, getSettings: () => ({ root: dir }) } : req(n), __dirname: path.dirname(source), console: { log() {}, warn() {}, error() {} }, process, Buffer, URL, Response, Request, Headers, AbortController, setTimeout, clearTimeout });
+  const context = vm.createContext({ require: n => n === 'electron' ? electron : n === './src/native/hongguo' ? native
+    : n === './src/native/web-media-guard' ? loopbackGuard
+    : n === 'child_process' || n === 'node:child_process' ? childProcess
+    : n === './src/store' ? { saveTasks() {}, getSettings: () => ({ root: dir }) } : req(n),
+    __dirname: path.dirname(source), console: { log() {}, warn() {}, error() {} }, process, Buffer, URL, Response, Request, Headers, AbortController, setTimeout, clearTimeout });
   vm.runInContext(fs.readFileSync(source, 'utf8'), context, { filename: source });
   require('./fixtures/trusted-ipc.cjs')(context, handlers);
   // These transport/decryption fixtures are synthetic; real media validity is checked separately.
@@ -42,7 +48,7 @@ function load(url, mode = 'ok', key = contentKey) {
   context.verifyDownloadDecode = async () => {};
   context.resolveFfmpeg = () => '/fixture/ffprobe';
   context.resolveFfmpeg = () => '/bundled/ffmpeg'; context.registerStreamProtocol();
-  return { dir, handlers, protocols, children, context };
+  return { dir, handlers, protocols, children, context, run: source => vm.runInContext(source, context) };
 }
 (async () => {
   const server = http.createServer((r, s) => s.end('encrypted-fixture'));
@@ -59,10 +65,16 @@ function load(url, mode = 'ok', key = contentKey) {
     h.context.clearOnlineCache();
   });
   await check('app download publishes decrypted bytes and removes intermediate files', async () => {
-    const h = load(url), task = { id: 'download', type: 'hongguo', filename: 'final.mp4', customDir: h.dir, hongguoInfo: { vid: 'app' } };
+    const h = load(url), task = { id: 'download', type: 'hongguo', filename: 'final.mp4', customDir: h.dir,
+      hongguoInfo: { vid: 'app', series_id: '1', vid_index: 1 } };
+    h.context.fixtureTask = task; h.run('downloadTasks=[fixtureTask]');
     await h.context.executeHongguoDownload(task);
     assert.equal(task.status, 'completed'); assert.deepEqual(fs.readFileSync(task.savePath), clearBytes);
-    assert.deepEqual(fs.readdirSync(h.dir), ['final.mp4']);
+    assert.deepEqual(fs.readdirSync(h.dir), ['final.mp4'], h.run(`JSON.stringify({
+      entries: ${JSON.stringify(fs.readdirSync(h.dir))},
+      receipts: downloadTasks[0]?.temporaryDownloads || [],
+      state: downloadTasks[0]?.temporaryDownloads?.[0] ? inspectDownloadTemporary(downloadTasks[0].temporaryDownloads[0], downloadTemporaryOwner(downloadTasks[0])) : null
+    })`));
   });
   await check('cancel during native decryption kills child and removes partial output', async () => {
     const h = load(url, 'wait'); const pending = h.handlers['prepare-online-play']({}, { vid: 'cancel', requestId: 'cancel' });

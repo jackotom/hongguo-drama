@@ -17,7 +17,11 @@ test('原生全屏横屏、重复进入、退出恢复方向，保留TV方向且
   try {
     // Execute the real native callback bodies with only Android platform objects stubbed.
     fs.writeFileSync(path.join(directory, 'FullscreenCheck.java'), `
-class FullscreenCheck {
+import java.util.*;
+class Parent {
+  boolean dispatchKeyEvent(Object event) { return false; }
+}
+class FullscreenCheck extends Parent {
   static class ActivityInfo { static final int SCREEN_ORIENTATION_SENSOR_LANDSCAPE = 6; }
   static class View { static final int GONE = 8, VISIBLE = 0; String result = "false"; int backCalls; void setVisibility(int value) {} void evaluateJavascript(String script, java.util.function.Consumer<String> callback) { backCalls++; callback.accept(result); } }
   static class FrameLayout { static class LayoutParams { LayoutParams(int w, int h) {} }
@@ -27,15 +31,22 @@ class FullscreenCheck {
   static class android {
     static class os { static class Build { static class VERSION { static int SDK_INT = 36; } } }
     static class view { static class WindowInsets { boolean keyboard; boolean isVisible(int type) { return keyboard; } static class Type { static int ime() { return 1; } } } }
+    static class util { static class Log { static int i(String tag, String message) { return 0; } } }
   }
-  static class KeyEvent { static final int KEYCODE_BACK = 4, ACTION_UP = 1; int action; boolean cancelled; KeyEvent(int a, boolean c) { action = a; cancelled = c; } int getKeyCode() { return KEYCODE_BACK; } int getAction() { return action; } boolean isCanceled() { return cancelled; } }
+  static class KeyEvent { static final int KEYCODE_BACK = 4, KEYCODE_MEDIA_PLAY_PAUSE = 85, KEYCODE_MEDIA_PLAY = 126,
+    KEYCODE_MEDIA_PAUSE = 127, KEYCODE_MEDIA_FAST_FORWARD = 90, KEYCODE_MEDIA_REWIND = 89, ACTION_DOWN = 0, ACTION_UP = 1;
+    int action; boolean cancelled; KeyEvent(int a, boolean c) { action = a; cancelled = c; } int getKeyCode() { return KEYCODE_BACK; }
+    int getAction() { return action; } boolean isCanceled() { return cancelled; } int getRepeatCount() { return 0; } }
   static class Decor { static android.view.WindowInsets insets = new android.view.WindowInsets(); void setSystemUiVisibility(int value) {} android.view.WindowInsets getRootWindowInsets() { return insets; } }
   static class Window { Decor getDecorView() { return new Decor(); } }
   static class Chrome { public void onShowCustomView(View view, CustomViewCallback callback) {} }
   View fullscreen, web = new View(); FrameLayout root = new FrameLayout();
   WebChromeClient.CustomViewCallback fullscreenCallback;
   ${source.match(/private int orientationBeforeFullscreen[^;]*;/)?.[0] || ''}
+  boolean closed, tvStartupFailed; Set<Integer> tvObservedKeys = new HashSet<>();
   int orientation = -1, hidden; String packageName = "io.github.hongguo.personal";
+  boolean isTv() { return packageName.equals("io.github.hongguo.tv"); }
+  String tvKeyName(int code) { return null; }
   int getRequestedOrientation() { return orientation; }
   void setRequestedOrientation(int value) { orientation = value; }
   String getPackageName() { return packageName; }

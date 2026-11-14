@@ -14,7 +14,7 @@ const rejected = code => ({ url: null, code: 'SOURCE_UNAVAILABLE', error: 'å–æº
   sources: [{ source: 'web', code: 'TIMEOUT' }, { source: 'app', code }] });
 const deferred = () => { let resolve; const promise = new Promise(done => { resolve = done; }); return { promise, resolve }; };
 
-function fixture(concurrency = 1) {
+function fixture(concurrency = 1, { requestSignal = req('./src/native/request-signal') } = {}) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'hongguo-source-rejection-'));
   roots.push(root);
   const handlers = {}, timers = [], events = [], app = new EventEmitter();
@@ -26,6 +26,7 @@ function fixture(concurrency = 1) {
   const context = vm.createContext({ require: name => name === 'electron'
     ? { app, ipcMain: { handle: (channel, fn) => handlers[channel] = fn }, protocol: { registerSchemesAsPrivileged() {} } }
     : name === 'axios' ? axios
+    : name === './src/native/request-signal' ? requestSignal
     : name === './src/native/hongguo' ? { fetchPlayUrlSingle: async (vid, sid, options) => {
       state.calls.push([vid, options.quality]); return state.load(vid, options);
     }, markWebMediaFailure() {} }
@@ -69,16 +70,24 @@ function fixture(concurrency = 1) {
     },
     pump() { run('enqueuePendingTasks(); pumpQueue()'); },
     async drain() {
-      for (let n = 0; n < 30; n++) {
-        if (!run('downloadRuns.size')) return;
-        await run('Promise.all([...downloadRuns.values()])');
+      for (let n = 0; n < 100; n++) {
+        if (run('downloadRuns.size')) await run('Promise.all([...downloadRuns.values()])');
+        await new Promise(resolve => setTimeout(resolve, 5));
+        if (!run('downloadRuns.size') && run('downloadQueue.length') && !run('activeDownloads')) {
+          run('hongguoDownloadReadyAt=0;pumpQueue()');
+        }
+        if (!run('downloadRuns.size') && !run('downloadQueue.length') && !run('activeDownloads')) return;
       }
-      throw new Error('Queue did not settle');
+      throw new Error('Queue did not settle: ' + JSON.stringify({
+        runs: run('downloadRuns.size'), queue: run('downloadQueue.length'), active: run('activeDownloads'),
+        tasks: tasks.map(task => ({ id: task.id, status: task.status, error: task.error, retryAt: task.retryAt })),
+        calls: state.calls, transfers: state.transfers,
+      }));
     },
     liveTimers: () => timers.filter(timer => !timer.cleared),
   };
 }
-async function tick() { for (let n = 0; n < 10; n++) await new Promise(setImmediate); }
+async function tick() { await new Promise(resolve => setTimeout(resolve, 25)); }
 
 const checks = [
   ['registration and App HTTP rejection preserve unstarted tasks instead of failing the queue', async () => {
@@ -128,7 +137,10 @@ const checks = [
     h.state.load = async vid => vid === '1' ? lookup.promise : info(vid);
     h.state.holdTransfer = async playInfo => { if (playInfo.vid === '2') await transfer.promise; };
     h.pump(); await tick();
-    assert.ok(h.state.transfers.includes('2'));
+    assert.ok(h.state.transfers.includes('2'), JSON.stringify({
+      calls: h.state.calls, transfers: h.state.transfers,
+      tasks: h.tasks.map(task => ({ id: task.id, status: task.status, error: task.error })),
+    }));
     lookup.resolve(rejected('HTTP_403')); await tick();
     assert.equal(pending.status, 'stopped'); assert.equal(active.status, 'downloading');
     assert.equal(active.cancelSource.token.reason, undefined);

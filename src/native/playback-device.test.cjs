@@ -70,36 +70,6 @@ test('lazy registration shares one promise and one exact identity across concurr
     assert.equal(calls, 1);
 });
 
-test('empty playback can renew a rejected identity once and concurrent failures share the replacement', async () => {
-    let now = Date.now(), calls = 0;
-    const get = load({ now: () => now });
-    const request = async () => ({ device_id: String(++calls), install_id: String(calls + 100) });
-    const rejected = await get(request);
-    const renewed = await Promise.all(Array.from({ length: 20 }, () => get(request, rejected)));
-    assert.equal(calls, 2, 'one initial registration plus one shared renewal');
-    assert.ok(renewed.every(identity => identity === renewed[0]));
-    assert.notEqual(renewed[0], rejected);
-    assert.equal(await get(request, rejected), renewed[0], 'late rejection cannot replace a newer identity');
-    assert.equal(await get(request, renewed[0]), renewed[0], 'persistent empty responses cannot churn devices');
-    now += 60001;
-    assert.notEqual(await get(request, renewed[0]), renewed[0], 'later transient failures can recover after cooldown');
-    assert.equal(calls, 3);
-});
-
-test('failed renewal stays shared and retains the previous device for other callers', async () => {
-    const get = load();
-    const rejected = await get(async () => ({ device_id: '123', install_id: '456' }));
-    let calls = 0;
-    const fail = async () => { calls++; throw new Error('PRIVATE_RESPONSE_SENTINEL'); };
-    const results = await Promise.allSettled(Array.from({ length: 20 }, () => get(fail, rejected)));
-    assert.equal(calls, 1);
-    assert.ok(results.every(result => result.status === 'rejected' && result.reason.code === 'DEVICE_REGISTRATION_FAILED'));
-    assert.doesNotMatch(JSON.stringify(results), /PRIVATE_RESPONSE_SENTINEL/);
-    assert.equal(await get(fail), rejected, 'a failed refresh must not poison search or account identity reads');
-    assert.equal(await get(fail, rejected), rejected, 'cooldown also bounds failed registration attempts');
-    assert.equal(calls, 1);
-});
-
 test('binary request decrypts to authenticated gzip JSON with the fixed anonymous phone profile', async () => {
     const get = load();
     const started = Date.now();

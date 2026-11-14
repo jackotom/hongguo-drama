@@ -22,6 +22,7 @@ const call = (...args) => handlers['download-following-episodes']({}, ...args);
       downloadTasks=[{hongguoInfo:{series_id:'A',vid:'v3'},status:'pending'},
         {hongguoInfo:{series_id:'A',vid:'v4'},status:'completed',savePath:completePath},
         {hongguoInfo:{series_id:'A',vid:'v5'},status:'completed',savePath:completePath+'.missing'}];`, context);
+    vm.runInContext('downloadTasks[1].endTime=Date.now();downloadTasks[1].fileIdentity=readFileIdentity(completePath)', context);
     let submitted, resolve;
     context.enqueueEpisodes = payload => { submitted = payload; return new Promise(r => { resolve = r; }); };
     const pending = call('A', 2, '720p');

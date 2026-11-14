@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
-const { prepareNasExport, inspectNasEpisode, copyNasEpisode } = require('./nas-export');
+const { prepareNasExport, inspectNasEpisode, copyNasEpisode, checkNasDirectory } = require('./nas-export');
 
 const seriesId = '7691228619774999999';
 const episodes = [1, 2, 3].map(index => ({
@@ -36,6 +36,16 @@ test('new exports keep basic TV identity, omit episode NFO and create an optiona
   await copyNasEpisode(task, destination);
   assert.equal(fs.existsSync(path.join(destination.directory, '测试剧 S01E001.nfo')), false);
   assert.equal((await inspectNasEpisode(destination, episodes[0])).status, 'existing');
+});
+
+test('a same-path replacement of the NAS target directory is rejected by its saved identity', async t => {
+  const root = rootFor(t);
+  const { destination } = await prepareNasExport({ root, folderName: '测试剧', series, createFolder: true }, options);
+  const original = destination.directory;
+  fs.renameSync(original, original + '.old');
+  fs.mkdirSync(original);
+  await assert.rejects(() => checkNasDirectory(destination), /已变化|不可用/);
+  assert.equal(fs.readdirSync(original).length, 0);
 });
 
 test('concurrent prepares for different series sharing a directory reject the loser without mixing metadata', async t => {

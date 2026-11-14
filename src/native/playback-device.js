@@ -11,7 +11,6 @@ const { abortError, throwIfAborted, boundedSignal, networkFailure } = require('.
 const REGISTER_URL = 'https://log5-applog-lf.fqnovel.com/service/2/device_register/?tt_data=a&cronet_version=8d40f833_2026-03-03&ttnet_version=4.2.243.31-douyin&use_store_region_cookie=1';
 const KDF_SALT = Buffer.from('4dd4c2e6b83162090e52b3c7a6733ba41cb2462b829ab58a196b39db57177524f49baf7f08e8d68d26a72e37c1a95a2f1f05a51892aef2949732b62a38aadd58', 'hex');
 let registration;
-let refreshAfter = 0;
 let retryAfter = 0;
 let registrationRetryAfter = 0;
 let lastRegistrationFailure;
@@ -100,24 +99,10 @@ async function registerPlaybackDevice(requestJson, { signal } = {}) {
     }
 }
 
-function getPlaybackDevice(requestJson, rejectedDevice) {
+function getPlaybackDevice(requestJson) {
     if (retryAfter && Date.now() >= retryAfter) {
         registration = undefined;
         retryAfter = 0;
-    }
-    if (rejectedDevice && registration) {
-        const previous = registration;
-        return previous.then(current => {
-            // Concurrent and late failures must share the newest device, with at most one renewal per minute.
-            if (registration !== previous || current !== rejectedDevice || Date.now() < refreshAfter) return registration;
-            refreshAfter = Date.now() + 60000;
-            const renewal = Promise.resolve().then(() => registerPlaybackDevice(requestJson)).catch(error => {
-                if (registration === renewal) registration = previous;
-                throw error;
-            });
-            registration = renewal;
-            return registration;
-        });
     }
     // Share failures briefly to avoid concurrent retries, then allow recovery without restarting.
     registration ||= Promise.resolve().then(() => registerPlaybackDevice(requestJson)).catch(error => {

@@ -81,6 +81,7 @@ test('ordinary disk download can exceed the buffer budget and task changes notif
   h.context.sendToRenderer = (channel, payload) => events.push({ channel, payload });
   h.media(['123456789'], { 'content-length': '9' });
   const task = { id: 'one', type: 'hongguo', filename: 'one.mp4', customDir: h.root, hongguoInfo: { vid: '11', series_id: '1' } };
+  h.context.fixtureTask = task; h.run('downloadTasks = [fixtureTask]');
   await h.context.executeHongguoDownload(task);
   assert.equal(task.status, 'completed', task.error);
   assert.equal(fs.readFileSync(task.savePath, 'utf8'), '123456789');

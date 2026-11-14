@@ -13,6 +13,7 @@ const tick = () => new Promise(resolve => setImmediate(resolve));
 function mount(file, props, api) {
   let cursor = 0, tree;
   const slots = [], effects = [];
+  const callbackSlots = [], memoSlots = [];
   const sources = { sources: [{ id: 'hongguo', label: '红果' }], revision: 0 };
   const react = {
     createElement: (type, props, ...children) => ({ type, props: props || {}, children: children.flat(Infinity) }),
@@ -22,6 +23,16 @@ function mount(file, props, api) {
       return [slots[at], value => { slots[at] = typeof value === 'function' ? value(slots[at]) : value; }];
     },
     useRef(initial) { const at = cursor++; return slots[at] ||= { current: initial }; },
+    useCallback(fn, deps) {
+      const at = cursor++, previous = callbackSlots[at];
+      if (!previous || (deps || []).some((value, index) => value !== previous.deps[index])) callbackSlots[at] = { fn, deps: deps || [] };
+      return callbackSlots[at].fn;
+    },
+    useMemo(fn, deps) {
+      const at = cursor++, previous = memoSlots[at];
+      if (!previous || (deps || []).some((value, index) => value !== previous.deps[index])) memoSlots[at] = { value: fn(), deps: deps || [] };
+      return memoSlots[at].value;
+    },
     useEffect(effect, deps) {
       const at = cursor++, previous = slots[at];
       if (!previous || deps.some((value, index) => value !== previous.deps[index])) {
@@ -31,10 +42,12 @@ function mount(file, props, api) {
       }
     },
   };
+  react.useLayoutEffect = react.useEffect;
   const modules = {
     '../i18n': i18n,
     react, './HongguoDownload.css': {}, './SearchPanel': 'SearchPanel',
-    './icons': Object.fromEntries(['Film', 'Download', 'CheckSquare', 'Square', 'RefreshCw', 'Folder', 'Link2', 'Search', 'Play', 'ExternalLink'].map(name => [name, name])),
+    './Browse.css': {}, './useDialogKeyboard': () => {},
+    './icons': Object.fromEntries(['Film', 'Download', 'CheckSquare', 'Square', 'RefreshCw', 'Folder', 'Link2', 'Search', 'Play', 'ExternalLink', 'Check', 'X'].map(name => [name, name])),
     './useMediaSources': () => sources,
     './mediaSourcesModel.mjs': { mediaSourceLabel: () => '红果' },
     './searchRanking.mjs': { rankSearchResults },
@@ -144,4 +157,76 @@ test('search details preserve real metadata, fold long intros, and ignore stale 
   await tick(); detail.render();
   assert.equal(requests.length, 3, 'other sources never use the Hongguo public API');
   assert.ok(detail.find(node => node.type === 'p' && node.children.includes('当前来源暂无剧情简介')));
+});
+
+test('leaving the resolve page clears a pending resolve so the button re-enables', async () => {
+  const pending = [];
+  let resolveCalls = 0;
+  const api = {
+    hongguoResolve: () => new Promise(resolve => { resolveCalls++; pending.push(resolve); }),
+    getSettings: async () => ({}),
+    getPublicDetails: async () => ({ success: false }),
+  };
+  const props = { active: true };
+  const page = mount('HongguoDownload.jsx', props, api);
+  const tab = () => page.find(node => node.type === 'button'
+    && node.children?.some(child => child?.type === 'span' && child.children?.includes('粘贴链接 / ID')));
+  tab().props.onClick();
+  page.render();
+  page.find(node => node.type === 'input').props.onChange({ target: { value: '12345678' } });
+  page.render();
+  const resolveButton = () => page.find(node => node.type === 'button' && String(node.props?.className || '').includes('btn-primary'));
+  const submitted = resolveButton().props.onClick();
+  page.render();
+  assert.equal(resolveButton().props.disabled, true, 'pending resolve disables the submit button');
+  props.active = false;
+  page.render();
+  page.render();
+  assert.equal(resolveButton().props.disabled, false, 'leaving the page clears the busy state');
+  props.active = true;
+  page.render();
+  page.render();
+  const second = resolveButton().props.onClick();
+  page.render();
+  assert.equal(resolveCalls, 2, 'the same value can be resubmitted after returning');
+  assert.equal(resolveButton().props.disabled, true, 'the second resolve re-enables the busy state');
+  pending[0]({ success: true, data: null });
+  pending[1]({ success: true, data: null });
+  await submitted;
+  await second;
+});
+
+test('a stale batch download success does not close a newer drawer or navigate', async () => {
+  const pendingDownloads = [];
+  let navigated = null;
+  const series = id => ({ series_id: id, series_title: id === 's1' ? '剧1' : '剧2', cover: '', episode_label: '1集' });
+  const api = {
+    browseCategories: async () => [{ slug: 'real-drama', label: '真人剧' }],
+    browseList: async () => ({ success: true, results: [series('s1'), series('s2')], meta: { page: 1, total: 2, totalPages: 1, genres: [] }, sourceUrl: '' }),
+    searchResolve: async id => ({ success: true, data: { series_id: id, series_title: id === 's1' ? '剧1' : '剧2', total: 1, episodes: [{ vid: `v${id}`, vid_index: 1, locked: false }] } }),
+    getSeriesEpisodes: async () => ({ success: true, data: { series_id: 'x', total: 1, completedCount: 0, episodes: [] } }),
+    getSeriesList: async () => [],
+    hongguoDownloadBatch: () => new Promise(resolve => { pendingDownloads.push(resolve); }),
+    playSeries: async () => ({ success: true }),
+  };
+  const page = mount('Browse.jsx', { onNavigate: value => { navigated = value; }, active: true }, api);
+  await tick(); await tick();
+  page.render();
+  const card = title => page.find(node => node.type === 'button' && node.props?.title === title);
+  assert.ok(card('剧1'), 'first card rendered');
+  await card('剧1').props.onClick();
+  await tick(); await tick();
+  page.render();
+  const download = () => page.find(node => node.type === 'button' && node.children?.some(c => c === '下载选中 (1)'));
+  assert.ok(download(), 'download button rendered');
+  const submitted = download().props.onClick();
+  await card('剧2').props.onClick();
+  await tick(); await tick();
+  page.render();
+  assert.ok(page.find(node => node.type === 'span' && node.children?.includes('《剧2》')), 'a newer drawer is open');
+  pendingDownloads[0]({ success: true, count: 1 });
+  await submitted;
+  page.render();
+  assert.equal(navigated, null, 'stale success must not force navigation');
+  assert.ok(page.find(node => node.type === 'span' && node.children?.includes('《剧2》')), 'stale success must not close the newer drawer');
 });

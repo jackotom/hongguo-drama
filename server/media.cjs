@@ -66,8 +66,15 @@ async function download(task, store, signal, update) {
   const work = fs.mkdtempSync(path.join(store.directory(task), '.download-'));
   const input = path.join(work, 'input.mp4'), output = path.join(work, 'output.mp4');
   try {
-    const response = await axios.get(info.url, { ...mediaGuard(info.url), responseType: 'stream', timeout: 60000, signal,
-      headers: { 'User-Agent': info.userAgent || hongguo.UA, 'Accept-Encoding': 'identity', ...(info.referer ? { Referer: info.referer } : {}) } });
+    let response;
+    try {
+      response = await axios.get(info.url, { ...mediaGuard(info.url), responseType: 'stream', timeout: 60000, signal,
+        headers: { 'User-Agent': info.userAgent || hongguo.UA, 'Accept-Encoding': 'identity', ...(info.referer ? { Referer: info.referer } : {}) } });
+    } catch (error) {
+      // Non-2xx stream responses are rejected with the unconsumed stream still open; destroy it before rethrowing.
+      if (error?.response?.data && typeof error.response.data.destroy === 'function') error.response.data.destroy();
+      throw error;
+    }
     const size = Number(response.headers['content-length']);
     if (response.status !== 200 || /text\/|json/i.test(response.headers['content-type'] || '') || size > MAX_BYTES) { response.data.destroy(); throw fail('片源响应不是完整视频或超过 1 GiB 上限'); }
     let received = 0;

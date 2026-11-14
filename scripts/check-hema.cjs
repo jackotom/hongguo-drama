@@ -35,7 +35,8 @@ async function check() {
   }
   const context = { module: { exports: {} }, require: name => name === 'axios' ? {
     get: (url, options) => request('GET', url, null, options), post: (url, body, options) => request('POST', url, body, options),
-  } : require(name), Buffer, URL, AbortController, setTimeout: (fn, ms) => setTimeout(fn, expireTimer ? 0 : ms), clearTimeout };
+  } : ['./src/native/web-media-guard', './web-media-guard'].includes(name) ? require('../src/native/web-media-guard') : require(name),
+    Buffer, URL, AbortController, setTimeout: (fn, ms) => setTimeout(fn, expireTimer ? 0 : ms), clearTimeout };
   vm.runInNewContext(fs.readFileSync(sourcePath, 'utf8'), context, { filename: sourcePath });
   const hema = context.module.exports;
   const search = await hema.search('总裁', 2);

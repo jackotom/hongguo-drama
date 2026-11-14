@@ -68,6 +68,23 @@ test('encrypted session store never writes the raw cookie', () => {
   } finally { fs.rmSync(root, { recursive: true, force: true }); }
 });
 
+test('session store refuses basic_text backend, stays compatible without the API', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'hongguo-account-backend-'));
+  const file = path.join(root, 'account-session.bin');
+  const session = { cookie: 'sessionid=private-fixture' };
+  try {
+    // Android 等平台没有 getSelectedStorageBackend：仍按 isEncryptionAvailable 工作。
+    const legacy = secureSessionStore({ filePath: file, safeStorage: fakeEncryption() });
+    legacy.save(session);
+    assert.equal(legacy.load().cookie, session.cookie);
+
+    const basicText = { ...fakeEncryption(), getSelectedStorageBackend: () => 'basic_text' };
+    const store = secureSessionStore({ filePath: file, safeStorage: basicText });
+    assert.throws(() => store.save(session), /安全存储不可用/);
+    assert.throws(() => store.load(), /安全存储不可用/);
+  } finally { fs.rmSync(root, { recursive: true, force: true }); }
+});
+
 test('restore returns a cached profile before background session verification finishes', async () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'hongguo-account-cache-'));
   const file = path.join(root, 'account-session.bin');

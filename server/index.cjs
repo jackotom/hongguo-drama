@@ -1,4 +1,4 @@
-// Hongguo Drama 7.2: server entry.
+// Hongguo Drama 7.3: server entry.
 const http = require('node:http');
 const fs = require('node:fs');
 const path = require('node:path');
@@ -11,6 +11,11 @@ const PUBLIC = path.join(__dirname, 'public');
 function makeTask(fields) {
   const now = new Date().toISOString();
   return { id: crypto.randomUUID(), ...fields, status: 'queued', progress: 0, createdAt: now, updatedAt: now };
+}
+function pausesDownloads(error) {
+  if ([403, 429].includes(Number(error?.response?.status))) return true;
+  return ['BUSINESS_REJECTED', 'DEVICE_REGISTRATION_FAILED'].includes(error?.code)
+    || error?.code === 'SOURCE_UNAVAILABLE' && error.sources?.some(item => item.source === 'app' && /^(?:BUSINESS_REJECTED|DEVICE_REGISTRATION_FAILED|HTTP_(?:403|429))$/.test(item.code));
 }
 async function body(request) {
   if (!/^application\/json(?:;|$)/i.test(request.headers['content-type'] || '')) throw fail('请求必须使用 application/json', 415);
@@ -27,6 +32,11 @@ function createApp({ token, dataRoot, downloadRoot, media = defaultMedia, search
   const authorized = request => crypto.timingSafeEqual(digest, crypto.createHash('sha256').update(String(request.headers.authorization || '')).digest());
   function drain() {
     if (active || stopped) return;
+    try { store.checkRoot(); } catch (error) {
+      if (error.code !== 'MOUNT_CHANGED') return;
+      try { store.interruptQueued('下载挂载已变化，已暂停剩余任务；请恢复原挂载后手动重试'); } catch { stopped = true; }
+      return;
+    }
     const task = store.tasks.find(item => item.status === 'queued');
     if (!task) return;
     if (task.type === 'download' && nextDownloadAt > Date.now()) {
@@ -46,14 +56,11 @@ function createApp({ token, dataRoot, downloadRoot, media = defaultMedia, search
     active = (async () => {
       try {
         await media[task.type](task, store, controller.signal, update);
-        if (task.status === 'running' && !storageFailed) store.update(task, { status: 'completed', progress: 100 });
+        if (task.status === 'running' && !storageFailed) store.complete(task);
       } catch (error) {
         if (task.status === 'running' && !storageFailed) store.update(task, { status: 'failed', error: safeError(error) });
-        // Explicit upstream denial pauses the pending queue; never hammer the next episode.
-        if (!storageFailed && (['BUSINESS_REJECTED', 'DEVICE_REGISTRATION_FAILED'].includes(error.code) || error.code === 'SOURCE_UNAVAILABLE' && error.sources?.some(item => item.source === 'app' && /^(?:BUSINESS_REJECTED|DEVICE_REGISTRATION_FAILED|HTTP_(?:403|429))$/.test(item.code)))) {
-          for (const pending of store.tasks.filter(item => item.type === 'download' && item.status === 'queued')) Object.assign(pending, { status: 'interrupted', error: '来源拒绝请求，已暂停队列；请稍后手动重试' });
-          store.save();
-        }
+        if (!storageFailed && error.code === 'MOUNT_CHANGED') store.interruptQueued('下载挂载已变化，已暂停剩余任务；请恢复原挂载后手动重试');
+        else if (!storageFailed && pausesDownloads(error)) store.interruptQueued('来源拒绝请求，已暂停队列；请稍后手动重试');
       } finally {
         if (task.type === 'download') nextDownloadAt = Date.now() + 1000;
         controllerById.delete(task.id); active = null; if (!stopped) setImmediate(drain);
@@ -83,7 +90,10 @@ function createApp({ token, dataRoot, downloadRoot, media = defaultMedia, search
       }
       const route = url.pathname;
       if (request.method === 'GET' && route === '/api/status') return send(200, { success: true, version: require('../package.json').version, downloadRoot: '/downloads', concurrency: 1 });
-      if (request.method === 'GET' && route === '/api/tasks') return send(200, { success: true, tasks: store.tasks.map(task => store.publicTask(task)).reverse() });
+      if (request.method === 'GET' && route === '/api/tasks') {
+        store.checkRoot(); store.reconcileCompleted();
+        return send(200, { success: true, tasks: store.tasks.map(task => store.publicTask(task)).reverse() });
+      }
       if (request.method === 'GET' && (route === '/api/search' || /^\/api\/series\/[^/]+$/.test(route))) {
         if (reading >= 2) throw fail('上游查询繁忙，请稍后重试', 429);
         reading++;
@@ -101,8 +111,8 @@ function createApp({ token, dataRoot, downloadRoot, media = defaultMedia, search
       const fileRoute = /^\/api\/files\/([a-f0-9-]{36})$/.exec(route);
       if (fileRoute && request.method === 'GET') {
         const task = store.get(fileRoute[1]); if (task.status !== 'completed') throw fail('文件尚未完成', 409);
-        const file = store.output(task), fd = fs.openSync(file, fs.constants.O_RDONLY | fs.constants.O_NOFOLLOW), stat = fs.fstatSync(fd);
-        if (!stat.isFile()) { fs.closeSync(fd); throw fail('文件不可用', 409); }
+        const file = store.artifact(task).file, fd = fs.openSync(file, fs.constants.O_RDONLY | fs.constants.O_NOFOLLOW), stat = fs.fstatSync(fd);
+        if (!stat.isFile() || stat.size < 1) { fs.closeSync(fd); throw fail('文件不可用', 409, 'ARTIFACT_INVALID'); }
         response.setHeader('Content-Type', 'video/mp4'); response.setHeader('Content-Length', stat.size);
         response.setHeader('Content-Disposition', `attachment; filename="${task.id}.mp4"`);
         const stream = fs.createReadStream(file, { fd, autoClose: true });
@@ -112,6 +122,7 @@ function createApp({ token, dataRoot, downloadRoot, media = defaultMedia, search
       const payload = await body(request);
       if (route === '/api/downloads') {
         assertFields(payload, ['seriesId', 'episodeIds', 'quality']); numericId(payload.seriesId);
+        store.checkRoot();
         if (!Array.isArray(payload.episodeIds) || !payload.episodeIds.length || payload.episodeIds.length > 1000 || payload.episodeIds.some(id => typeof id !== 'string' || !/^\d{1,30}$/.test(id)) || new Set(payload.episodeIds).size !== payload.episodeIds.length) throw fail('请选择有效且不重复的分集');
         const quality = payload.quality || 'auto'; if (!['auto', '720p', '1080p'].includes(quality)) throw fail('画质无效');
         if (reading >= 2) throw fail('上游查询繁忙，请稍后重试', 429);
@@ -121,7 +132,14 @@ function createApp({ token, dataRoot, downloadRoot, media = defaultMedia, search
         // Resolve duplicates after the awaited catalogue so concurrent submissions remain idempotent.
         const tasks = [], added = [];
         for (const episode of selected) {
-          const existing = store.tasks.find(item => item.type === 'download' && item.seriesId === payload.seriesId && item.vid === episode.vid && item.quality === quality && ['queued', 'running', 'completed'].includes(item.status));
+          let existing = store.tasks.find(item => item.type === 'download' && item.seriesId === payload.seriesId && item.vid === episode.vid && item.quality === quality && ['queued', 'running', 'completed'].includes(item.status));
+          if (existing?.status === 'completed') {
+            try { store.artifact(existing); } catch (error) {
+              if (error.code !== 'ARTIFACT_INVALID') throw error;
+              store.quarantineArtifact(existing);
+              store.update(existing, { status: 'queued', progress: 0, error: '', artifact: null });
+            }
+          }
           const task = existing || makeTask({ type: 'download', seriesId: detail.series_id, seriesTitle: detail.series_title, vid: episode.vid, episodeIndex: episode.vid_index, episodeTitle: episode.title, quality });
           tasks.push(task); if (!existing) added.push(task);
         }
@@ -133,7 +151,13 @@ function createApp({ token, dataRoot, downloadRoot, media = defaultMedia, search
         if (!Array.isArray(payload.taskIds) || payload.taskIds.length < 2 || payload.taskIds.length > 1000 || new Set(payload.taskIds).size !== payload.taskIds.length) throw fail('请至少选择两个不同的已完成分集');
         const inputs = payload.taskIds.map(id => store.get(id)).sort((a, b) => a.episodeIndex - b.episodeIndex), first = inputs[0];
         if (inputs.some(input => input.type !== 'download' || input.status !== 'completed' || input.seriesId !== first.seriesId) || new Set(inputs.map(input => input.episodeIndex)).size !== inputs.length) throw fail('只允许同剧且集号不重复的已完成分集合并');
-        for (const input of inputs) if (!fs.existsSync(store.output(input))) throw fail('分集文件不存在，请重新下载');
+        for (const input of inputs) {
+          try { store.artifact(input); } catch (error) {
+            if (error.code === 'MOUNT_CHANGED') throw error;
+            if (error.code === 'ARTIFACT_INVALID') throw fail('分集文件不可用，请重新下载', 409, 'ARTIFACT_INVALID');
+            throw error;
+          }
+        }
         const task = makeTask({ type: 'merge', seriesId: first.seriesId, seriesTitle: first.seriesTitle, taskIds: inputs.map(input => input.id) });
         store.add([task]); send(202, { success: true, task: store.publicTask(task) }); if (autoStart) drain(); return;
       }
@@ -151,7 +175,13 @@ function createApp({ token, dataRoot, downloadRoot, media = defaultMedia, search
         send(200, { success: true, task: store.publicTask(task) }); if (autoStart) drain(); return;
       }
       throw fail('接口不存在', 404);
-    } catch (error) { send(error.status || 500, { success: false, error: safeError(error) }); }
+    } catch (error) {
+      if (error.code === 'MOUNT_CHANGED') {
+        try { store.interruptQueued('下载挂载已变化，已暂停剩余任务；请恢复原挂载后手动重试'); } catch { stopped = true; }
+        return send(409, { success: false, code: 'MOUNT_CHANGED', error: safeError(error) });
+      }
+      send(error.status || 500, { success: false, error: safeError(error) });
+    }
   });
   server.requestTimeout = 30000; server.headersTimeout = 15000; server.maxConnections = 64;
   if (autoStart) setImmediate(drain);

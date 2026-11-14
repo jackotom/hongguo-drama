@@ -24,20 +24,26 @@
 
 ## 下载与安装
 
-**当前正式版：7.2**（内部`7.2.0`，桌面构建`7.2.1`）。修复外置exFAT下载身份误判、仅移除记录受阻，以及本地组件故障造成的无效重复下载；保留文件安全校验。原五平台正式包与TV开发补充包已公开；#151中文字幕未实现，通用全量源码CI未全绿。验证与限制见[7.2回执](docs/release-7.2.md)。
+**当前源码／发行目标：7.3**（内部`7.3.0`，桌面构建`7.3.1`）。新增可配置的 S / D 倍速调节，并加强下载文件身份、媒体地址、NAS 目录和 Docker 队列保护。标准发行只含双 Mac、Windows、Linux 与 Docker；TV 和手机独立。
 
-以下为7.2下载。Mac已签名、公证、装订；Windows EXE未签名；TV为开发补充包，未做电视实机测试。
+以下为7.3下载。Mac已签名、公证、装订；Windows EXE未签名。
 
-| 平台 | 下载7.2 | 使用方式 |
+| 平台 | 下载7.3 | 使用方式 |
 |---|---|---|
-| Apple芯片Mac，macOS 13+ | [DMG](https://github.com/jackotom/hongguo-drama/releases/download/v7.2/Hongguo-7.2-mac-arm64.dmg) | 拖入应用程序；已签名、公证、装订 |
-| Intel Mac，macOS 13+ | [DMG](https://github.com/jackotom/hongguo-drama/releases/download/v7.2/Hongguo-7.2-mac-x64.dmg) | 同上；验收仅Rosetta |
-| Windows x64 | [安装版](https://github.com/jackotom/hongguo-drama/releases/download/v7.2/hongguo-downloader-7.2-win-x64-setup.exe) · [便携EXE](https://github.com/jackotom/hongguo-drama/releases/download/v7.2/hongguo-downloader-7.2-win-x64.exe) · [便携ZIP](https://github.com/jackotom/hongguo-drama/releases/download/v7.2/hongguo-downloader-7.2-win-x64.zip) | 安装版支持应用内更新；EXE未签名 |
-| Linux x64 | [AppImage](https://github.com/jackotom/hongguo-drama/releases/download/v7.2/hongguo-downloader-7.2-linux-x64.AppImage) | 赋予执行权限；手动更新 |
-| Docker Linux amd64 / NAS | [镜像](https://github.com/jackotom/hongguo-drama/releases/download/v7.2/hongguo-drama-7.2-docker-amd64.tar.gz) · [部署包](https://github.com/jackotom/hongguo-drama/releases/download/v7.2/hongguo-drama-7.2-docker-deploy.zip) | 按[部署文档](docs/docker.md)设置令牌与挂载目录 |
-| Android TV／Google TV，Android10+ | [TV APK](https://github.com/jackotom/hongguo-drama/releases/download/v7.2/hongguo-downloader-7.2-android-tv-dev.apk) | 开发补充包；**实机未测试**，见[TV回执](docs/release-7.2-tv.md) |
+| Apple芯片Mac，macOS 13+ | [DMG](https://github.com/jackotom/hongguo-drama/releases/download/v7.3/Hongguo-7.3-mac-arm64.dmg) | 拖入应用程序；已签名、公证、装订 |
+| Intel Mac，macOS 13+ | [DMG](https://github.com/jackotom/hongguo-drama/releases/download/v7.3/Hongguo-7.3-mac-x64.dmg) | 同上；验收仅Rosetta |
+| Windows x64 | [安装版](https://github.com/jackotom/hongguo-drama/releases/download/v7.3/hongguo-downloader-7.3-win-x64-setup.exe) · [便携EXE](https://github.com/jackotom/hongguo-drama/releases/download/v7.3/hongguo-downloader-7.3-win-x64.exe) · [便携ZIP](https://github.com/jackotom/hongguo-drama/releases/download/v7.3/hongguo-downloader-7.3-win-x64.zip) | 安装版支持应用内更新；EXE未签名 |
+| Linux x64 | [AppImage](https://github.com/jackotom/hongguo-drama/releases/download/v7.3/hongguo-downloader-7.3-linux-x64.AppImage) | 赋予执行权限；手动更新 |
+| Docker Linux amd64 / NAS | [镜像](https://github.com/jackotom/hongguo-drama/releases/download/v7.3/hongguo-drama-7.3-docker-amd64.tar.gz) · [部署包](https://github.com/jackotom/hongguo-drama/releases/download/v7.3/hongguo-drama-7.3-docker-deploy.zip) | 按[部署文档](docs/docker.md)设置令牌与挂载目录 |
 
-[7.2发行页](https://github.com/jackotom/hongguo-drama/releases/tag/v7.2) · [SHA256](https://github.com/jackotom/hongguo-drama/releases/download/v7.2/SHA256SUMS.txt) · [精确源码](https://github.com/jackotom/hongguo-drama/releases/download/v7.2/hongguo-drama-7.2-source.zip)。实际状态见[7.2正式回执](docs/release-7.2.md)。TV已另附开发补充包，精确源码和独立摘要见[TV回执](docs/release-7.2-tv.md)；手机保持独立。上游部分网页片源仍可能404、只提供预览或超时，不保证所有内容永久可播。
+[7.3发行页](https://github.com/jackotom/hongguo-drama/releases/tag/v7.3) · [SHA256](https://github.com/jackotom/hongguo-drama/releases/download/v7.3/SHA256SUMS.txt) · [精确源码](https://github.com/jackotom/hongguo-drama/releases/download/v7.3/hongguo-drama-7.3-source.zip)。实际状态见[7.3记录](docs/release-7.3.md)。TV和手机保持独立。上游部分网页片源仍可能404、只提供预览或超时，不保证所有内容永久可播。
+
+<details>
+<summary>7.2 历史下载与发行说明</summary>
+
+**历史正式版：7.2**（内部`7.2.0`，桌面构建`7.2.1`）。修复外置exFAT下载身份误判、仅移除记录受阻，以及本地组件故障造成的无效重复下载；保留文件安全校验。原五平台正式包与TV开发补充包已公开；#151中文字幕未实现。验证与限制见[7.2回执](docs/release-7.2.md)。
+
+</details>
 
 <details>
 <summary>7.1 历史下载与发行说明</summary>
@@ -230,6 +236,13 @@ Mac和Windows安装版保留应用内更新入口；完整6.4→6.5自动更新�
 2. 在「发现短剧」浏览，或在「搜索与下载」输入剧名、红果分享链接或剧集 ID。
 3. 打开详情点「立即播放」，也可选择集数与清晰度加入下载队列。
 4. 下次从「我的剧库」或「观看记录」接着看；下载进度、失败重试和整剧合并在「下载管理」。
+
+## 7.3
+
+- #156：设置新增「S / D 倍速调节」，可选0.25、0.5、0.75或1倍；默认仍为0.25倍。改名后标签随当前S/D绑定显示。
+- 下载完成记录绑定文件身份，文件被替换、消失或截断时不会误认、误删或误播；NAS 目录也校验挂载与目标身份。
+- 外部媒体统一经过公网 DNS 与重定向检查；Docker 遇到挂载变化、上游拒绝或无效媒体流时停止后续队列并保留可恢复状态。
+- 手机保存设置失败不遗留运行时副作用，“全部暂停”后立即恢复不再卡住；这属于源码回归，不随本轮五平台桌面／Docker发行。
 
 ## 7.2
 
@@ -740,7 +753,7 @@ Mac和Windows安装版保留应用内更新入口；完整6.4→6.5自动更新�
 - **缓存后续 2 集**：在「我的剧库」连播按钮左侧开关，默认开启并记住选择；当前集开始播放就最多预缓存后续两集可在线播放的内容，跳过已下载和锁定分集。切到下一集时会保留更后一集的预取结果；预取失败会释放名额并在 15 秒后重试。会提前使用网络流量，关闭开关可取消全部后台预缓存。
 - **自动连播**：默认开启，可随时关闭；自动切换下一集，跳过锁定分集，本地与在线分集可衔接播放。
 - **断点续播**：按剧保存集数和播放位置，从剧库或观看记录接着看；切换到应用内其他页面，仍可继续播放并保存进度。
-- **0.25×–4× 倍速**：共 16 档。右下角倍速数字是独立按钮，每点增加 0.25×，4× 后回到 1×；三点菜单可直接选档，切集与连播保持当前倍速。
+- **0.25×–4× 倍速**：共 16 档。右下角倍速数字是独立按钮，每点增加 0.25×，4× 后回到 1×；三点菜单可直接选档，切集与连播保持当前倍速。`S` / `D` 每次调节的幅度可在「设置 → 播放快捷键」中选择 0.25×、0.5×、0.75× 或 1×。
 - **兼容播放**：默认开启兼容模式；解码失败、黑屏有声时尝试转为 H.264，也可手动「转码后播放」。显示转码进度，支持取消和清理缓存。
 - **高性能转换（7.1）**：桌面「解码方式 → 高性能显卡快速解码（老电脑请勿使用）」默认关闭。开启后优先用显卡编码H.264；ByteVC2仍由CPU解码，4线程、单队列。Mac尝试VideoToolbox，Windows／Linux尝试NVIDIA NVENC；实际输入试编码出帧，不支持或失败时明确提示并回退CPU。不是所有格式的GPU硬解，也不保证所有独显支持；实体NVIDIA尚未实跑。本轮M5样本未提速且文件更大，见[性能与验收记录](docs/release-7.1.md)。
 - **失败恢复**：可取消准备、重试本集、重新连接片源或尝试兼容转码。地址过期或传输中断时有限次刷新取址，不无限重试；硬件转码失败时尝试软件转码。
@@ -840,11 +853,11 @@ Mac和Windows安装版保留应用内更新入口；完整6.4→6.5自动更新�
 | `←` / `→` | 后退 / 前进 5 秒 |
 | `↑` / `↓` | 上一集 / 下一集 |
 | `A` | 开启 / 关闭连播 |
-| `S` / `D` | 降低 / 提高 0.25 倍速 |
+| `S` / `D` | 按设置步长降低 / 提高倍速（默认 0.25×） |
 | `F` | 切换全屏 |
 | `Esc` | 退出竖屏填满窗口状态，或关闭当前菜单 / 弹窗 |
 
-以上为默认键位，可在「设置」中点击修改，支持单键或 Shift 组合，并检查冲突、恢复默认。输入框、菜单和弹窗操作不会误触播放器快捷键。
+以上为默认键位，可在「设置」中点击修改，支持单键或 Shift 组合，并检查冲突、恢复默认；`S` / `D` 的调速步长也在同一区域设置。输入框、菜单和弹窗操作不会误触播放器快捷键。
 
 ## 界面与演示
 
@@ -904,6 +917,8 @@ https://github.com/user-attachments/assets/b95f4f60-b57c-495f-a30e-62ac2b0bda11
 到 [Issues](https://github.com/jackotom/hongguo-drama/issues) 提供应用版本、操作系统与芯片类型、来源、复现步骤和错误提示。截图与日志请移除账号信息、Cookie、代理凭据及个人文件路径。
 
 ## 版本与验证范围
+
+7.3 为当前源码／发行目标，内部7.3.0、桌面构建7.3.1。标准发行范围是双Mac、Windows x64、Linux x64 AppImage与Docker amd64；TV和手机独立。实际签名、平台验收、附件摘要和限制以[7.3记录](docs/release-7.3.md)为准。
 
 7.2 TV开发补充包已于2026-11-13 16:08:18（Asia/Shanghai）追加公开，版本7.2／code70200，沿用公开6.6 TV签名证书；TV源码冻结`2aa068f496f78114389d94c41b83dde877b174ce`。新增APK、精确TV源码和独立SHA256清单三份附件，现共28份正式附件；原25份桌面／Docker附件与原v7.2标签不变。构建、签名连续性、Manifest／包内容、定向源码检查及三附件匿名完整下载摘要核对通过。**TV实机未测试，请用户自行测试；安装、启动、实际遥控、播放和覆盖升级均未验证。** 手机保持独立，本机正式应用未替换。详见[TV补充回执](docs/release-7.2-tv.md)。以下首发五平台记录保持。
 

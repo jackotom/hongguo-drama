@@ -5,7 +5,7 @@ function fixture(t){
  const root=fs.mkdtempSync(path.join(os.tmpdir(),'hongguo-issue43-'));t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
  const source=path.resolve(__dirname,'../main.js'),req=createRequire(source),handlers={},app=new EventEmitter();
  Object.assign(app,{getVersion:()=> 'test',getPath:()=>root,commandLine:{appendSwitch(){}},requestSingleInstanceLock:()=>true,whenReady:()=>({then(){}})});
- const store=req('./src/store');store.init(path.join(root,'data.json'));store.saveSettings({root,watch_sequels_enabled:false});
+ const store=req('./src/store');store.init(path.join(root,'data.json'));store.saveSettings({root,watch_sequels_enabled:false,auto_delete_watched:true});
  const native={fetchPlayUrlSingle:async()=>({url:'https://fixture.invalid/media'})};
  const context=vm.createContext({require:n=>n==='electron'?{app,ipcMain:{handle:(n,fn)=>handlers[n]=fn},protocol:{registerSchemesAsPrivileged(){}}}:n==='./src/native/hongguo'?native:req(n),__dirname:path.dirname(source),process,Buffer,URL,Response,Request,Headers,AbortController,setTimeout,clearTimeout,console:{log(){},warn(){},error(){}}});
  vm.runInContext(fs.readFileSync(source,'utf8'),context,{filename:source});req('./scripts/fixtures/trusted-ipc.cjs')(context,handlers);
@@ -30,7 +30,7 @@ test('permanent list removal stays out of restore but history can deliberately r
 });
 test('watched cleanup removes only the exact episode across local, memory and compatible caches',async t=>{
  const h=fixture(t),local=path.join(h.root,'watched.mp4');fs.writeFileSync(local,'watched');h.context.localFixture=local;
- h.run(`downloadTasks=[{id:'watched',status:'completed',savePath:localFixture,hongguoInfo:{series_id:'1',vid_index:1}}];onlineCache.set('11',{seriesId:'1',vidIndex:1,buffer:Buffer.from('cached'),size:6});onlineCache.set('12',{seriesId:'1',vidIndex:2,buffer:Buffer.from('next'),size:4})`);
+ h.run(`downloadTasks=[{id:'watched',status:'completed',savePath:localFixture,endTime:Date.now(),fileIdentity:readFileIdentity(localFixture),hongguoInfo:{series_id:'1',vid_index:1}}];onlineCache.set('11',{seriesId:'1',vidIndex:1,buffer:Buffer.from('cached'),size:6});onlineCache.set('12',{seriesId:'1',vidIndex:2,buffer:Buffer.from('next'),size:4})`);
  const watched=h.run("compatPathFor('1',1)"),next=h.run("compatPathFor('1',2)");fs.writeFileSync(watched,'converted');fs.writeFileSync(next,'next');
  const result=await h.handlers['cleanup-watched-episode']({},'1',1);assert.equal(result.success,true,result.error);
  assert.equal(fs.existsSync(local),false);assert.equal(fs.existsSync(watched),false);assert.equal(fs.existsSync(next),true);

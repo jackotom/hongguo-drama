@@ -1,4 +1,4 @@
-# Hongguo Drama 7.2 release candidate; updater provider is unchanged.
+# Hongguo Drama 7.3 release candidate; updater provider is unchanged.
 # Hongguo Drama 7.1: public update source.
 # 红果短剧 6.4：应用内更新来源；实际版本读取发行清单。
 provider: github

@@ -383,6 +383,10 @@
 .shortcut-settings-heading h2 { font-size: 17px; letter-spacing: 0; }
 .shortcut-settings-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 28px; margin: 12px 0; }
 .shortcut-settings-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 9px 0; border-bottom: 1px solid var(--border-muted); }
+.shortcut-footer-grid { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 28px; align-items: start; }
+.shortcut-footer-grid .boss-key-row, .shortcut-footer-grid .boss-key-hint { grid-column: 1; }
+.shortcut-footer-grid .shortcut-rate-step { grid-column: 2; grid-row: 1; }
+.shortcut-rate-step .select-field { width: 120px; }
 .shortcut-record { min-width: 76px; font-variant-numeric: tabular-nums; }
 .shortcut-record.is-recording { border-color: var(--accent); color: var(--accent-text); background: var(--accent-soft); }
 .shortcut-error { color: var(--danger); }
@@ -390,7 +394,10 @@
 .boss-key-toggle { display: flex; align-items: center; gap: 6px; white-space: nowrap; }
 .boss-key-input { flex: 1; min-width: 0; }
 .boss-key-hint { grid-column: 1 / -1; }
-@media (max-width: 620px) { .shortcut-settings-list { grid-template-columns: 1fr; } }
+@media (max-width: 620px) {
+  .shortcut-settings-list, .shortcut-footer-grid { grid-template-columns: 1fr; }
+  .shortcut-footer-grid .boss-key-row, .shortcut-footer-grid .boss-key-hint, .shortcut-footer-grid .shortcut-rate-step { grid-column: 1; grid-row: auto; }
+}
 
 .settings-inline-save { display: flex; align-items: center; gap: 16px; }
 .settings-inline-save .proxy-switch-row { flex: 1; min-width: 0; }

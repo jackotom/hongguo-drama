@@ -483,6 +483,7 @@ function Browse({ onNavigate, active = true }) {
 
   const downloadSelected = async () => {
     if (!detail || selectedIdx.size === 0) return;
+    const request = detailRequest.current;
     setSubmitting(true);
     try {
       const eps = detail.episodes.filter((e) => !e.locked && selectedIdx.has(e.vid_index));
@@ -493,8 +494,12 @@ function Browse({ onNavigate, active = true }) {
       });
       if (res && res.success) {
         showToast(`已加入下载队列：${res.count} 集`);
-        setDetail(null);
-        if (onNavigate) onNavigate('manager');
+        // A stale success must not close a newer drawer or force navigation after the
+        // user closed the detail, opened another series, or left the page.
+        if (request === detailRequest.current) {
+          setDetail(null);
+          if (onNavigate) onNavigate('manager');
+        }
       } else {
         showToast((res && res.error) || '提交下载失败', 'error');
       }

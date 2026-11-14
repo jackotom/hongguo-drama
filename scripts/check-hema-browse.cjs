@@ -20,7 +20,8 @@ async function check() {
       if (failure) throw failure;
       const name = url.endsWith('/0/2') ? 'page2' : url.endsWith('/1129') ? 'genre' : 'browse';
       return { data: override ?? fixture(name) };
-    }, post: () => { throw Error('目录不得请求解锁或其他 POST 接口'); } } : require(name) };
+    }, post: () => { throw Error('目录不得请求解锁或其他 POST 接口'); } } : ['./src/native/web-media-guard', './web-media-guard'].includes(name)
+      ? require('../src/native/web-media-guard') : require(name) };
   vm.runInNewContext(fs.readFileSync(path.join(root, 'src/native/hema.js'), 'utf8'), context);
   const { browseList } = context.module.exports;
   const first = await browseList();

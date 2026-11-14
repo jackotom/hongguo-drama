@@ -11,8 +11,6 @@ on:
         description: Build and archive only; skip all functional, media, unit and platform acceptance checks
         type: boolean
         default: false
-  push:
-    branches: ['codex/features-6.1']
 permissions:
   contents: read
 jobs:

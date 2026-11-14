@@ -1,6 +1,6 @@
 {
   "name": "hongguo-downloader",
-  "version": "7.2.0",
+  "version": "7.3.0",
   "description": "红果短剧播放与下载",
   "main": "main.js",
   "license": "GPL-3.0",
@@ -63,7 +63,7 @@
       "src/store.js"
     ],
     "asar": true,
-    "artifactName": "hongguo-downloader-7.2-${os}-${arch}.${ext}",
+    "artifactName": "hongguo-downloader-7.3-${os}-${arch}.${ext}",
     "win": {
       "target": [
         {
@@ -107,7 +107,7 @@
       ]
     },
     "portable": {
-      "artifactName": "${productName}-7.2-便携版.${ext}"
+      "artifactName": "${productName}-7.3-便携版.${ext}"
     },
     "nsis": {
       "oneClick": false,
@@ -115,7 +115,7 @@
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
       "shortcutName": "红果短剧下载器",
-      "artifactName": "hongguo-downloader-7.2-win-x64-setup.${ext}"
+      "artifactName": "hongguo-downloader-7.3-win-x64-setup.${ext}"
     },
     "mac": {
       "target": [
@@ -230,7 +230,7 @@
         }
       ],
       "syncDesktopName": true,
-      "artifactName": "hongguo-downloader-7.2-linux-x64.${ext}",
+      "artifactName": "hongguo-downloader-7.3-linux-x64.${ext}",
       "extraFiles": [
         {
           "from": "build/linux-AppRun.sh",
@@ -241,7 +241,7 @@
     "appImage": {
       "executableArgs": []
     },
-    "buildVersion": "7.2.1"
+    "buildVersion": "7.3.1"
   },
   "engines": {
     "node": ">=22.12"

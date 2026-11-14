@@ -1,5 +1,6 @@
 export const SHORTCUT_STORAGE_KEY = 'hongguo:preview:playback-shortcuts:v1';
 export const SHORTCUT_EVENT = 'hongguo:playback-shortcuts-changed';
+export const SHORTCUT_SPEED_STEPS = Object.freeze([0.25, 0.5, 0.75, 1]);
 export const SHORTCUT_ACTIONS = [
   { id: 'play', label: '播放 / 暂停', key: 'space' },
   { id: 'holdSpeed', label: '长按临时 2 倍速', key: 'space' },
@@ -8,12 +9,22 @@ export const SHORTCUT_ACTIONS = [
   { id: 'previous', label: '上一集', key: 'arrowup' },
   { id: 'next', label: '下一集', key: 'arrowdown' },
   { id: 'autoNext', label: '切换连播', key: 'a' },
-  { id: 'slower', label: '减速 0.25 倍', key: 's', repeat: true },
-  { id: 'faster', label: '加速 0.25 倍', key: 'd', repeat: true },
+  { id: 'slower', label: '减速播放', key: 's', repeat: true },
+  { id: 'faster', label: '加速播放', key: 'd', repeat: true },
   { id: 'fullscreen', label: '切换全屏', key: 'f' },
 ];
-export const DEFAULT_SHORTCUTS = Object.freeze(Object.fromEntries(SHORTCUT_ACTIONS.map(action => [action.id, action.key])));
+export const DEFAULT_SHORTCUTS = Object.freeze({
+  ...Object.fromEntries(SHORTCUT_ACTIONS.map(action => [action.id, action.key])),
+  speedStep: SHORTCUT_SPEED_STEPS[0],
+});
 const KEY_PATTERN = /^(shift\+)?([a-z0-9]|space|arrowleft|arrowright|arrowup|arrowdown)$/;
+const normalizeSpeedStep = value => SHORTCUT_SPEED_STEPS.includes(Number(value)) ? Number(value) : DEFAULT_SHORTCUTS.speedStep;
+
+export function adjustPlaybackRate(rate, action, speedStep = DEFAULT_SHORTCUTS.speedStep) {
+  const current = Number.isFinite(Number(rate)) ? Number(rate) : 1;
+  const delta = action === 'slower' ? -normalizeSpeedStep(speedStep) : normalizeSpeedStep(speedStep);
+  return Math.max(0.25, Math.min(4, current + delta));
+}
 
 export function shortcutKey(event) {
   if (event.metaKey || event.ctrlKey || event.altKey || event.isComposing) return null;
@@ -46,7 +57,10 @@ export function readShortcuts() {
   try {
     const stored = JSON.parse(window.localStorage.getItem(SHORTCUT_STORAGE_KEY));
     if (stored && typeof stored === 'object' && stored.holdSpeed === undefined) stored.holdSpeed = stored.play;
-    if (!validateShortcuts(stored)) return Object.fromEntries(SHORTCUT_ACTIONS.map(({ id }) => [id, stored[id]]));
+    if (!validateShortcuts(stored)) return {
+      ...Object.fromEntries(SHORTCUT_ACTIONS.map(({ id }) => [id, stored[id]])),
+      speedStep: normalizeSpeedStep(stored.speedStep),
+    };
   } catch { /* Missing or damaged preferences use the complete default map. */ }
   return { ...DEFAULT_SHORTCUTS };
 }
@@ -54,7 +68,11 @@ export function readShortcuts() {
 export function saveShortcuts(bindings) {
   const error = validateShortcuts(bindings);
   if (error) throw new Error(error);
-  window.localStorage.setItem(SHORTCUT_STORAGE_KEY, JSON.stringify(bindings));
+  const saved = {
+    ...Object.fromEntries(SHORTCUT_ACTIONS.map(({ id }) => [id, bindings[id]])),
+    speedStep: normalizeSpeedStep(bindings.speedStep),
+  };
+  window.localStorage.setItem(SHORTCUT_STORAGE_KEY, JSON.stringify(saved));
   window.dispatchEvent(new Event(SHORTCUT_EVENT));
 }
 

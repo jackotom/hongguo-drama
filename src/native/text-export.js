@@ -2,6 +2,7 @@
 // Adapted from jayeeliu's PR #61, with path, partial-result and concurrent-write fixes (GPL-3.0).
 const fs = require('node:fs');
 const path = require('node:path');
+const { randomUUID } = require('node:crypto');
 const { fetchDanmaku } = require('./danmaku');
 const { fetchEpisodeComments } = require('./episode-comments');
 const { fetchPublicDetails } = require('./public-details');
@@ -9,11 +10,41 @@ const { fetchPublicDetails } = require('./public-details');
 const HONGGUO_ID = /^\d{6,30}$/;
 const pending = new Map();
 
-function writeJsonAtomic(target, obj) {
-  const tmp = `${target}.tmp`;
+function targetStamp(target) {
   try {
+    const stat = fs.lstatSync(target, { bigint: true });
+    if (!stat.isFile() || stat.isSymbolicLink()) return { exists: true, stamp: null };
+    return { exists: true, stamp: { dev: String(stat.dev), ino: String(stat.ino), size: String(stat.size),
+      mtimeNs: String(stat.mtimeNs), ctimeNs: String(stat.ctimeNs),
+      birthtimeNs: stat.birthtimeNs == null ? '' : String(stat.birthtimeNs) } };
+  } catch (error) { return { exists: error.code === 'ENOENT' ? false : true, stamp: null }; }
+}
+
+function sameStamp(a, b) {
+  if (a === null) return b === null;
+  if (b === null) return false;
+  return a.dev === b.dev && a.ino === b.ino && a.size === b.size
+    && a.mtimeNs === b.mtimeNs && a.ctimeNs === b.ctimeNs && a.birthtimeNs === b.birthtimeNs;
+}
+
+function targetUnchanged(target, initial) {
+  const now = targetStamp(target);
+  if (initial.exists !== now.exists) return false;
+  if (!initial.exists) return true;
+  if (initial.stamp === null || now.stamp === null) return false;
+  return sameStamp(initial.stamp, now.stamp);
+}
+
+function writeJsonAtomic(target, obj, initial) {
+  // 随机临时名 + wx：不碰可能被替换成链接的固定 .tmp，也不跟随未知文件。
+  const tmp = path.join(path.dirname(target), `.hg-json-${randomUUID()}.tmp`);
+  try {
+    if (!targetUnchanged(target, initial)) throw new Error('导出目标已变化，未覆盖');
     fs.mkdirSync(path.dirname(target), { recursive: true });
-    fs.writeFileSync(tmp, JSON.stringify(obj, null, 2) + '\n', 'utf8');
+    const fd = fs.openSync(tmp, 'wx', 0o600);
+    try { fs.writeFileSync(fd, JSON.stringify(obj, null, 2) + '\n', 'utf8'); fs.fsyncSync(fd); }
+    finally { fs.closeSync(fd); }
+    if (!targetUnchanged(target, initial)) throw new Error('导出目标已变化，未覆盖');
     fs.renameSync(tmp, target);
   } catch (error) {
     try { fs.unlinkSync(tmp); } catch (_) {}
@@ -60,25 +91,28 @@ function reviewsDoc({ seriesId, seriesTitle }, reviews, fetchedAt) {
       content: it.content, created_at: it.created_at ?? null, likes: it.likes ?? null, rating: it.rating ?? null })) };
 }
 
-async function writeOne(target, build, fetch) {
+async function writeOne(target, build, fetch, check) {
   if (typeof target !== 'string' || !path.isAbsolute(target)) return { status: 'fail' };
   target = path.resolve(target);
   if (pending.has(target)) return pending.get(target);
   const task = (async () => {
     try {
-      let retry = false;
+      let retry = false, initial;
       try {
         const previous = JSON.parse(fs.readFileSync(target, 'utf8'));
         if (previous?.partial !== true) return { status: 'skipped', itemCount: Array.isArray(previous?.items) ? previous.items.length : undefined };
         retry = true;
-      } catch (error) { if (error.code !== 'ENOENT') throw error; }
+        initial = targetStamp(target);
+      } catch (error) { if (error.code !== 'ENOENT') throw error; initial = { exists: false, stamp: null }; }
       const data = await fetch(retry);
       if (data?.success === false && data.source_limited === true && data.code === 'EPISODE_COMMENTS_UNAVAILABLE')
         return { status: 'unavailable' };
       // Failed retries preserve the original partial file, even when the retry returns some items.
       if (!data || (data.success !== true && (retry || data.partial !== true))) return { status: 'fail' };
       const doc = build(data);
-      writeJsonAtomic(target, doc);
+      // 等待期间任务/父目录/NAS 身份可能已被替换；核验失败不覆盖外来同名文件。
+      if (typeof check === 'function') check(target);
+      writeJsonAtomic(target, doc, initial);
       return { status: 'ok', partial: doc.partial === true, itemCount: doc.items.length, target };
     } catch (_) { return { status: 'fail' }; }
   })();
@@ -91,6 +125,7 @@ async function exportSeriesText(options = {}) {
   const {
     seriesId, seriesTitle, episodes = [], kinds = {}, reviewsPath,
     reviewsLimit = 1000, concurrency = 4,
+    check,
     fetchers = { fetchDanmaku, fetchEpisodeComments, fetchPublicDetails }, now = () => Date.now(),
   } = options;
   const tally = () => ({ ok: 0, fail: 0, skipped: 0, partial: 0, items: 0, empty: 0, unavailable: 0 });
@@ -117,7 +152,7 @@ async function exportSeriesText(options = {}) {
   };
   if (wantReviews) record('reviews', await writeOne(reviewsPath,
     d => reviewsDoc({ seriesId, seriesTitle }, d.reviews, now()),
-    () => fetchers.fetchPublicDetails(String(seriesId), '', { reviewsLimit })));
+    () => fetchers.fetchPublicDetails(String(seriesId), '', { reviewsLimit }), check));
 
   if (wantDanmaku || wantComments) {
     const results = await mapLimit(episodes, concurrency, async ep => {
@@ -126,10 +161,10 @@ async function exportSeriesText(options = {}) {
       const cell = {};
       if (wantDanmaku) cell.danmaku = await writeOne(stem ? `${stem}.danmaku.json` : null,
         d => danmakuDoc({ seriesId, seriesTitle, ep }, d, now()),
-        fresh => fetchers.fetchDanmaku({ seriesId: String(seriesId), vid: ep.vid, fresh }));
+        fresh => fetchers.fetchDanmaku({ seriesId: String(seriesId), vid: ep.vid, fresh }), check);
       if (wantComments) cell.comments = await writeOne(stem ? `${stem}.comments.json` : null,
         d => commentsDoc({ seriesId, seriesTitle, ep }, d, now()),
-        () => fetchers.fetchEpisodeComments({ seriesId: String(seriesId), episodeId: ep.vid, cursor: null, limit: 30 }));
+        () => fetchers.fetchEpisodeComments({ seriesId: String(seriesId), episodeId: ep.vid, cursor: null, limit: 30 }), check);
       return cell;
     });
     for (const r of results) {

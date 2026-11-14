@@ -27,7 +27,8 @@ async function check() {
       ] }] } : list;
     return { data: { ret: 0, result: structuredClone(data) } };
   } };
-  const context = { module: { exports: {} }, require: name => name === 'axios' ? axios : require(name),
+  const context = { module: { exports: {} }, require: name => name === 'axios' ? axios :
+    ['./src/native/web-media-guard', './web-media-guard'].includes(name) ? require('../src/native/web-media-guard') : require(name),
     Buffer, URL, AbortController, setTimeout, clearTimeout };
   vm.runInNewContext(fs.readFileSync(sourcePath, 'utf8'), context, { filename: sourcePath });
   const xifan = context.module.exports;

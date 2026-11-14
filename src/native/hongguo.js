@@ -642,7 +642,8 @@ function parseModelVideo(vm) {
     for (const raw of [v.main_url, v.backup_url]) {
       try {
         const candidate = new URL(normalizeVideoUrl(raw));
-        if (['https:', 'http:'].includes(candidate.protocol) && !candidate.username && !candidate.password) {
+        if (['https:', 'http:'].includes(candidate.protocol) && !candidate.username && !candidate.password
+            && isPublicMediaUrl(candidate.href)) {
           url = candidate.href;
           break;
         }

@@ -6,8 +6,8 @@ const crypto = require('node:crypto');
 const esbuild = require('../../node_modules/esbuild');
 const { buildOptions } = require('../mobile/bundle.cjs');
 
-async function bridge(initial, prepareMedia) {
-  let saved = JSON.stringify(initial);
+async function bridge(initial, prepareMedia, faults = {}) {
+  let saved = JSON.stringify(initial), writeCount = 0;
   const storage = new Map(), files = new Map([['12345678-1234-1234-1234-123456789abc.mp4', 1024]]);
   const context = {
     console, URL, Blob, URLSearchParams, TextEncoder, TextDecoder, AbortController, AbortSignal, setTimeout, clearTimeout,
@@ -16,9 +16,14 @@ async function bridge(initial, prepareMedia) {
     document: { addEventListener() {}, querySelectorAll: () => [] },
     Native: {
       random: n => crypto.randomBytes(n).toString('base64'),
-      readState: () => saved, writeState: value => { saved = value; },
+      readState: () => saved,
+      writeState: value => {
+        writeCount += 1;
+        if (faults.writeState?.(writeCount, value)) throw new Error('模拟本机保存失败');
+        saved = value;
+      },
       readMedia: token => { if (!files.has(token)) throw new Error('未登记文件'); return Buffer.alloc(files.get(token)).toString('base64'); },
-      mediaSize: token => files.get(token) || 0, deleteMedia: token => files.delete(token), awake() {},
+      mediaSize: token => files.get(token) || 0, deleteMedia: token => files.delete(token), persistMedia: () => {}, awake() {},
       request: (id, raw) => {
         const options = JSON.parse(raw);
         const html = `window._ROUTER_DATA = ${JSON.stringify({loaderData:{'player_(series_id)/page':{
@@ -37,7 +42,7 @@ async function bridge(initial, prepareMedia) {
   } });
   const result = await esbuild.build({ ...buildOptions, plugins, entryPoints:[path.join(__dirname,'../mobile/bridge.js')], format:'cjs', write:false });
   vm.runInNewContext(result.outputFiles[0].text, context);
-  return { api:context.module.exports.api, files, state:()=>JSON.parse(saved) };
+  return { api:context.module.exports.api, files, state:()=>JSON.parse(saved), writeCount:()=>writeCount };
 }
 
 test('共享页面安卓桥：真实资料持久化、历史校验、文件与任务分离、拒绝未接入功能', async () => {
@@ -172,7 +177,13 @@ test('手机播放器常用倍速直接选择，选集复用底部面板；桌�
   const { renderToStaticMarkup } = require('react-dom/server');
   const result = await esbuild.build({ ...buildOptions, entryPoints: [path.join(__dirname, '../../src/components/PlayerControls.jsx')],
     format: 'cjs', write: false, external: ['react'], loader: { '.css': 'empty' } });
-  const context = { module: { exports: {} }, require, window: { electronAPI: { platform: 'android' } } };
+  const hostRequire = require;
+  const safeReact = { ...React, useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot) {
+    return React.useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot || getSnapshot);
+  } };
+  const context = { module: { exports: {} }, require: spec => spec === 'react' ? safeReact : hostRequire(spec), navigator: { language: 'zh-CN' },
+    window: { electronAPI: { platform: 'android' }, addEventListener() {}, removeEventListener() {}, dispatchEvent() {},
+      localStorage: { getItem: () => null, setItem() {} } } };
   vm.runInNewContext(result.outputFiles[0].text, context);
   const props = { videoRef: { current: null }, stageRef: { current: null }, rate: 1.75,
     episodes: [{ vid_index: 1 }], currentIndex: 1, onOpenEpisodes() {} };
@@ -238,4 +249,104 @@ test('在线播放取消后晚到的Blob必须释放，不留下临时视频', a
   await assert.rejects(fetch(url));
   assert.equal(files.size,0);
   assert.equal((await api.onlineCacheStatus()).count,0);
+});
+
+test('saveSettings 保存失败不修改运行时设置', async () => {
+  const initial = { series:[], playback:{}, settings:{auto_delete_watched:false}, tasks:[] };
+  const { api, state } = await bridge(initial, null, { writeState: () => true });
+  const result = await api.saveSettings({ auto_delete_watched:true });
+  assert.equal(result.success,false);
+  assert.match(result.error,/本机保存失败/);
+  assert.equal((await api.getSettings()).auto_delete_watched,false);
+  assert.equal(state().settings.auto_delete_watched,false);
+});
+
+test('pauseAll 后立即 resumeAll 会在取消完成后重新启动任务', async () => {
+  const initial = { series:[{series_id:'123456789',series_title:'剧集',total:1,episodes:[{vid:'111111',vid_index:1}]}],
+    playback:{},settings:{},tasks:[{id:'task1',status:'stopped',progress:0,quality:'auto',hongguoInfo:{series_id:'123456789',vid:'111111',vid_index:1}}] };
+  let prepareCalls = 0, rejectFirst, releaseSecond, started;
+  const firstStarted = new Promise(resolve => { started = resolve; });
+  const secondGate = new Promise(resolve => { releaseSecond = resolve; });
+  const { api } = await bridge(initial, () => {
+    prepareCalls++;
+    if (prepareCalls === 1) {
+      started();
+      return new Promise((resolve,reject) => { rejectFirst = reject; });
+    }
+    return secondGate;
+  });
+  try {
+    assert.equal((await api.resumeAll()).success,true);
+    await firstStarted;
+    assert.equal((await api.pauseAll()).success,true);
+    assert.equal((await api.resumeAll()).success,true);
+    rejectFirst(Object.assign(new Error('已取消'),{ code:'ERR_CANCELED' }));
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(prepareCalls,2,'取消完成后必须重新进入下载');
+    assert.equal((await api.getQueueStatus()).paused,false);
+    assert.equal((await api.getDownloadTasks()).find(task => task.id === 'task1').status,'downloading');
+  } finally {
+    releaseSecond({ token:'12345678-1234-1234-1234-123456789abc.mp4', bytes:1024, quality:'720p' });
+    await new Promise(resolve => setImmediate(resolve));
+  }
+});
+
+test('resumeAll 恢复 failed 并清旧 error，且不触碰运行中任务', async () => {
+  const initial = { series:[{series_id:'123456789',series_title:'剧集',total:2,episodes:[{vid:'111111',vid_index:1},{vid:'222222',vid_index:2}]}],
+    playback:{},settings:{},tasks:[
+      {id:'running',status:'stopped',progress:0,quality:'auto',hongguoInfo:{series_id:'123456789',vid:'111111',vid_index:1}},
+      {id:'failed',status:'failed',error:'旧错误',progress:0,quality:'auto',hongguoInfo:{series_id:'123456789',vid:'222222',vid_index:2}},
+    ] };
+  let runningSignal, release;
+  const gate = new Promise(resolve => { release = resolve; });
+  const { api } = await bridge(initial, (vid, quality, signal) => { runningSignal = signal; return gate; });
+  try {
+    assert.equal((await api.resumeAll()).success,true);
+    let tasks = await api.getDownloadTasks();
+    assert.equal(tasks.find(task => task.id === 'running').status,'downloading','运行中任务保持下载');
+    assert.equal(tasks.find(task => task.id === 'failed').status,'pending','failed 恢复为排队');
+    assert.equal(tasks.find(task => task.id === 'failed').error,'','旧错误清空');
+    assert.equal((await api.resumeAll()).success,true);
+    tasks = await api.getDownloadTasks();
+    assert.equal(tasks.find(task => task.id === 'running').status,'downloading','再次恢复不打断运行中任务');
+    assert.equal(runningSignal.aborted,false,'再次恢复不中止运行中任务');
+  } finally {
+    release({ token:'12345678-1234-1234-1234-123456789abc.mp4', bytes:1024, quality:'720p' });
+    await new Promise(resolve => setImmediate(resolve));
+  }
+});
+
+test('pump 初始状态保存失败必须释放 controller，不吞失败且一次 retryTask 即恢复下载', async () => {
+  const storageErrors = [];
+  const initial = { series:[{series_id:'123456789',series_title:'剧集',total:1,episodes:[{vid:'111111',vid_index:1}]}],
+    playback:{},settings:{},tasks:[{id:'task1',status:'stopped',progress:0,quality:'auto',hongguoInfo:{series_id:'123456789',vid:'111111',vid_index:1}}] };
+  let prepareCalls = 0, release;
+  const gate = new Promise(resolve => { release = resolve; });
+  const { api } = await bridge(initial, () => { prepareCalls += 1; return gate; }, {
+    writeState: writeCount => writeCount === 2,
+  });
+  api.onStorageError(error => storageErrors.push(error));
+  try {
+    assert.equal((await api.resumeAll()).success,true);
+    await new Promise(resolve => setImmediate(resolve));
+    let queue = await api.getQueueStatus();
+    assert.equal(queue.active,0,'保存失败后 controller 必须释放');
+    assert.equal(queue.paused,true,'保存失败后队列应暂停');
+    let task = (await api.getDownloadTasks()).find(row => row.id === 'task1');
+    assert.equal(task.status,'stopped','任务回退为可重试的 stopped');
+    assert.equal(prepareCalls,0,'保存失败前不应进入下载');
+    assert.equal(storageErrors.length,1,'保存失败必须通过 onStorageError 上报');
+
+    const retry = await api.retryTask('task1');
+    assert.equal(retry.success,true,'retryTask 不再误报任务正在停止');
+    await new Promise(resolve => setImmediate(resolve));
+    queue = await api.getQueueStatus();
+    assert.equal(queue.paused,false,'retryTask 应解除暂停');
+    assert.equal(prepareCalls,1,'一次 retryTask 即进入 prepareMedia');
+    task = (await api.getDownloadTasks()).find(row => row.id === 'task1');
+    assert.equal(task.status,'downloading','任务进入下载中');
+  } finally {
+    release({ token:'12345678-1234-1234-1234-123456789abc.mp4', bytes:1024, quality:'720p' });
+    await new Promise(resolve => setImmediate(resolve));
+  }
 });

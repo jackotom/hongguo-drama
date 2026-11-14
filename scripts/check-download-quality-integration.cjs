@@ -383,11 +383,21 @@ const checks = [
       const series = await native.fetchEpisodeList(drama.series_id);
       const episodes = series.episodes.filter(episode => episode.vid && episode.web_available !== false);
       assert(episodes.length);
-      const episode = episodes[Math.floor(Math.random() * episodes.length)];
+      stage = 'media lookup';
+      const start = Math.floor(Math.random() * episodes.length);
+      const candidates = [...episodes.slice(start), ...episodes.slice(0, start)].slice(0, 8);
+      let episode;
+      for (const candidate of candidates) {
+        try {
+          const candidateInfo = await native.fetchPlayUrlSingle(candidate.vid, series.series_id, { force: true });
+          if (candidateInfo.url && String(candidateInfo.vid) === String(candidate.vid)) {
+            episode = candidate; info = candidateInfo; break;
+          }
+        } catch (_) { /* The public catalog can contain retired episodes; try a bounded next set. */ }
+      }
+      assert(episode && info?.url, 'No playable episode in the bounded real catalog sample');
       console.log('REAL Hongguo source ' + JSON.stringify({ seriesId: series.series_id,
         title: series.series_title, vid: episode.vid, episode: episode.vid_index }));
-      stage = 'media lookup';
-      info = await native.fetchPlayUrlSingle(episode.vid, series.series_id, { force: true });
       assert(info.url);
       assert.equal(String(info.vid), String(episode.vid));
       stage = 'media download';
@@ -585,7 +595,7 @@ const checks = [
     const h = fixture({ width:720, height:1280 });
     await h.handlers['hongguo-download-batch']({}, payload());
     const t = h.saved()[0]; fs.writeFileSync(t.savePath, Buffer.alloc(200000, 42));
-    h.run('downloadTasks[0].status = "completed"');
+    h.run('downloadTasks[0].status = "completed"; downloadTasks[0].endTime = Date.now(); downloadTasks[0].fileIdentity = readFileIdentity(downloadTasks[0].savePath)');
     const result = await h.handlers['hongguo-download-batch']({}, payload('1080p'));
     assert.equal(result.success, false);
     assert.match(result.error, /已有|本地/);

@@ -30,12 +30,15 @@ for (const [address, prefix] of [['2001:db8::', 32], ['2001::', 32], ['2002::', 
 const globalV6 = new BlockList();
 globalV6.addSubnet('2000::', 3, 'ipv6');
 globalV6.addSubnet('::ffff:0:0', 96, 'ipv6');
+const fakeV4 = new BlockList();
+fakeV4.addSubnet('198.18.0.0', 15, 'ipv4');
 
 function isPublicAddress(address) {
   const family = isIP(address);
   return family === 4 ? !blocked.check(address, 'ipv4')
     : family === 6 && globalV6.check(address, 'ipv6') && !blocked.check(address, 'ipv6');
 }
+const isFakeAddress = address => isIP(address) === 4 && fakeV4.check(address, 'ipv4');
 
 function isPublicMediaUrl(value) {
   try {
@@ -51,17 +54,18 @@ function blockedAddress() {
   return Object.assign(new Error('官网片源及其跳转、解析结果必须指向公网'), { code: 'ERR_WEB_MEDIA_ADDRESS', mediaRetryable: true });
 }
 
-// The local VPN's Fake-IP route can return a different CDN result. Resolve only this
-// exact official TLS origin through fixed HTTPS resolvers; never connect to Fake-IP.
-let officialDnsCache;
-let officialDnsPending;
-function resolveOfficialAddress() {
-  if (officialDnsCache?.expires > Date.now()) return Promise.resolve(officialDnsCache.addresses);
-  if (officialDnsPending) return officialDnsPending;
+// The local VPN's Fake-IP route can return a different CDN result. Fall back to fixed
+// HTTPS resolvers only when every system answer is Fake-IP; never connect to Fake-IP.
+const publicDnsCache = new Map(), publicDnsPending = new Map();
+function resolvePublicAddresses(hostname) {
+  const key = hostname.toLowerCase();
+  const cached = publicDnsCache.get(key);
+  if (cached?.expires > Date.now()) return Promise.resolve(cached.addresses);
+  if (publicDnsPending.has(key)) return publicDnsPending.get(key);
   const requests = [];
   // Race trusted resolvers so a blocked regional route cannot delay the usable one.
-  officialDnsPending = Promise.any(['https://1.1.1.1/dns-query', 'https://223.5.5.5/resolve'].map(endpoint => new Promise((resolve, reject) => {
-    const request = https.get(`${endpoint}?name=hongguoduanju.com&type=A`, {
+  const pending = Promise.any(['https://1.1.1.1/dns-query', 'https://223.5.5.5/resolve'].map(endpoint => new Promise((resolve, reject) => {
+    const request = https.get(`${endpoint}?name=${encodeURIComponent(hostname)}&type=A`, {
       agent: new https.Agent({ keepAlive: false }), headers: { Accept: 'application/dns-json' },
     }, response => {
       let body = '';
@@ -88,15 +92,16 @@ function resolveOfficialAddress() {
     request.on('close', () => clearTimeout(timer));
     request.on('error', reject);
   }))).then(result => {
-    officialDnsCache = result;
+    publicDnsCache.set(key, result);
     return result.addresses;
   }).catch(error => {
     throw error.errors?.find(item => item.code === 'ERR_WEB_MEDIA_ADDRESS') || error.errors?.[0] || error;
   }).finally(() => {
     requests.forEach(request => request.destroy());
-    officialDnsPending = null;
+    publicDnsPending.delete(key);
   });
-  return officialDnsPending;
+  publicDnsPending.set(key, pending);
+  return pending;
 }
 
 function webMediaRequestOptions(value, { trustedOfficialDns = false } = {}) {
@@ -117,21 +122,20 @@ function webMediaRequestOptions(value, { trustedOfficialDns = false } = {}) {
         else if (addresses.length) callback(null, addresses[0].address, addresses[0].family);
         else callback(new Error('片源域名未解析到地址'));
       };
-      if (trustedOfficialDns && hosts.get(hostname.toLowerCase())?.origin === 'https://hongguoduanju.com') {
+      const target = hosts.get(hostname.toLowerCase());
+      const official = target?.origin === 'https://hongguoduanju.com';
+      if (official && trustedOfficialDns) {
         if (settings.family === 6) return callback(blockedAddress());
-        resolveOfficialAddress().then(finish, callback);
+        resolvePublicAddresses(hostname).then(finish, callback);
         return;
       }
       dns.lookup(hostname, { ...settings, all: true }, (error, addresses) => {
         if (error) return callback(error);
-        const target = hosts.get(hostname.toLowerCase());
         // Validate actual socket resolution; a separate preflight permits rebinding.
         if (target && (!addresses.length || addresses.some(item => !isPublicAddress(item.address)))) {
-          const official = target.origin === 'https://hongguoduanju.com';
-          const fakeOnly = addresses.length && addresses.every(item => isPublicAddress(item.address) ||
-            item.family === 4 && /^198\.(18|19)\./.test(item.address));
-          if (official && fakeOnly && settings.family !== 6) {
-            resolveOfficialAddress().then(finish, callback);
+          const fakeOnly = addresses.length > 0 && addresses.every(item => isFakeAddress(item.address));
+          if (fakeOnly && target.protocol === 'https:' && settings.family !== 6) {
+            resolvePublicAddresses(hostname).then(finish, callback);
             return;
           }
           return callback(blockedAddress());
@@ -148,6 +152,6 @@ function webMediaRequestOptions(value, { trustedOfficialDns = false } = {}) {
   };
 }
 
-function warmOfficialDns() { return resolveOfficialAddress().catch(() => {}); }
+function warmOfficialDns() { return resolvePublicAddresses('hongguoduanju.com').catch(() => {}); }
 
 module.exports = { isPublicMediaUrl, webMediaRequestOptions, warmOfficialDns };

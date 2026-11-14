@@ -146,7 +146,7 @@ test('desktop routes catalog, search, share links and episodes to ReelShort; dow
     },
     getCurrentSettings: () => ({ builtin_sources: { reelshort: enabled } }), proxyStartupFallback: false,
     ipcMain: { handle: (name, handler) => handlers[name] = handler },
-    normalizeDownloadQuality: value => value || 'auto', URL,
+    normalizeDownloadQuality: value => value || 'auto', throwIfAborted: () => {}, URL,
   });
   const load = (source, name) => {
     const start = source.indexOf(`async function ${name}(`);

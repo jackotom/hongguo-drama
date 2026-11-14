@@ -164,9 +164,15 @@ function checkedWebResponse(response) {
 }
 
 function secureSessionStore({ filePath, safeStorage }) {
+  const encryptionAvailable = () => {
+    try {
+      return safeStorage?.isEncryptionAvailable?.() === true
+        && safeStorage?.getSelectedStorageBackend?.() !== 'basic_text';
+    } catch { return false; }
+  };
   return {
     save(credentials) {
-      if (!safeStorage?.isEncryptionAvailable?.()) throw new Error('系统安全存储不可用，本次登录只保留到应用退出');
+      if (!encryptionAvailable()) throw new Error('系统安全存储不可用，本次登录只保留到应用退出');
       const encrypted = safeStorage.encryptString(JSON.stringify(credentials));
       const temporary = `${filePath}.tmp`;
       fs.mkdirSync(path.dirname(filePath), { recursive: true });
@@ -178,7 +184,7 @@ function secureSessionStore({ filePath, safeStorage }) {
     },
     load() {
       if (!fs.existsSync(filePath)) return null;
-      if (!safeStorage?.isEncryptionAvailable?.()) throw new Error('系统安全存储不可用，无法读取上次登录');
+      if (!encryptionAvailable()) throw new Error('系统安全存储不可用，无法读取上次登录');
       const text = safeStorage.decryptString(fs.readFileSync(filePath));
       const value = JSON.parse(text);
       if (!value || typeof value.cookie !== 'string' || !value.cookie.trim()) throw new Error('登录态文件无效，请重新扫码');

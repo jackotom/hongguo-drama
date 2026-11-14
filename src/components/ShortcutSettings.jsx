@@ -1,6 +1,6 @@
 import { t, useLanguage } from '../i18n';
 import React, { useEffect, useRef, useState } from 'react';
-import { SHORTCUT_ACTIONS, DEFAULT_SHORTCUTS, formatShortcut, readShortcuts, saveShortcuts, shortcutKey, subscribeShortcuts, validateShortcuts } from '../shortcuts';
+import { SHORTCUT_ACTIONS, SHORTCUT_SPEED_STEPS, DEFAULT_SHORTCUTS, formatShortcut, readShortcuts, saveShortcuts, shortcutKey, subscribeShortcuts, validateShortcuts } from '../shortcuts';
 import BossKeySettings from './BossKeySettings';
 
 export default function ShortcutSettings({ active = true }) {
@@ -40,6 +40,7 @@ export default function ShortcutSettings({ active = true }) {
     if (conflict) { setError(conflict); return; }
     save(next);
   };
+  const rateLabel = `${formatShortcut(bindings.slower, t)} / ${formatShortcut(bindings.faster, t)} ${t("倍速调节")}`;
 
   return <section className="shortcut-settings settings-card" data-shortcut-settings aria-labelledby="shortcut-settings-title">
     <div className="shortcut-settings-heading">
@@ -59,7 +60,16 @@ export default function ShortcutSettings({ active = true }) {
           {t(recording === action.id ? '请按新键…' : formatShortcut(bindings[action.id], t))}
         </button>
       </div>)}
-      <BossKeySettings active={active} />
+      <div className="shortcut-footer-grid">
+        <BossKeySettings active={active} />
+        <label className="shortcut-settings-row shortcut-rate-step" htmlFor="shortcut-speed-step">
+          <span>{rateLabel}</span>
+          <select id="shortcut-speed-step" className="input-field select-field" value={bindings.speedStep}
+            onChange={event => save({ ...readShortcuts(), speedStep: Number(event.target.value) })}>
+            {SHORTCUT_SPEED_STEPS.map(step => <option key={step} value={step}>{step}×</option>)}
+          </select>
+        </label>
+      </div>
     </div>
     {error && <p className="settings-hint shortcut-error" role="alert">{t(error)}</p>}
     <p className="settings-hint" role="status" aria-live="polite">{t(recording ? `正在更改「${t(SHORTCUT_ACTIONS.find(action => action.id === recording)?.label)}」` : message)}</p>

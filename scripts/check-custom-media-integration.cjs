@@ -24,6 +24,7 @@ require('./fixtures/trusted-ipc.cjs')(context, handlers);
   const entry=run(`onlineCache.get('${vid}')`); assert.equal(entry.buffer,undefined); assert.ok(fs.existsSync(entry.filePath));
   const response=await protocols['hongguo-stream'](new Request(result.url,{headers:{Range:'bytes=2-5'}})); assert.equal(response.status,206);assert.equal((await response.arrayBuffer()).byteLength,4);
   context.testTask={id:'download',type:'hongguo',filename:'saved.mp4',customDir:root,hongguoInfo:{vid,series_id:sid}};
+  run('downloadTasks=[testTask]');
   await context.executeHongguoDownload(context.testTask); assert.equal(context.testTask.status,'completed',context.testTask.error);assert.equal(remuxes,1,'download reuses verified HLS disk cache');
   const local=context.testTask.savePath;
   let candidatesTried=[];

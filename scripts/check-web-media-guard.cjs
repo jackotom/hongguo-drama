@@ -168,24 +168,29 @@ const checks = [
         (error, result) => error ? reject(error) : resolve(result))), /公网/);
     }
   }],
-  ['Fake-IP compatibility is confined to the exact official HTTPS origin', async () => {
+  ['Fake-IP fallback resolves ordinary media through trusted DNS and still rejects mixed private answers', async () => {
     const records = [{ address: '198.18.14.190', family: 4 }];
     const lookup = (guard, host) => new Promise((resolve, reject) => guard.lookup(host, { all: true },
       (error, result) => error ? reject(error) : resolve(result)));
     const guard = guardWithDns(records).webMediaRequestOptions('https://hongguoduanju.com/video/a');
     assert.equal((await lookup(guard, 'hongguoduanju.com'))[0].address, '8.8.8.8');
-    await assert.rejects(lookup(guardWithDns(records, '127.0.0.1').webMediaRequestOptions('https://hongguoduanju.com/a'), 'hongguoduanju.com'), /公网/);
-    for (const url of ['http://hongguoduanju.com/a', 'https://hongguoduanju.com:8443/a',
-      'https://other.example/a', 'https://sub.hongguoduanju.com/a']) {
-      await assert.rejects(lookup(guardWithDns(records).webMediaRequestOptions(url), new URL(url).hostname), /公网/);
-    }
+    await assert.rejects(lookup(guardWithDns(records, '127.0.0.1').webMediaRequestOptions('https://hongguoduanju.com/a'), 'hongguoduanju.com'), /公网/,
+      'trusted resolver must not be able to return a private address');
+    const cdn = guardWithDns(records).webMediaRequestOptions('https://media.example/a');
+    assert.equal((await lookup(cdn, 'media.example'))[0].address, '8.8.8.8');
+    const redirected = await Promise.all((await Promise.all([
+      lookup(guardWithDns(records).webMediaRequestOptions('https://media.example/a'), 'media.example'),
+      lookup(guardWithDns(records).webMediaRequestOptions('https://sub.hongguoduanju.com/a'), 'sub.hongguoduanju.com'),
+    ])).map(values => values[0].address));
+    assert.deepEqual(redirected, ['8.8.8.8', '8.8.8.8']);
     assert.throws(() => guardWithDns(records).webMediaRequestOptions('https://198.18.14.190/a'), /公网/);
     for (const address of ['127.0.0.1', '10.0.0.1', '192.168.1.1']) {
       await assert.rejects(lookup(guardWithDns([...records, { address, family: 4 }])
-        .webMediaRequestOptions('https://hongguoduanju.com/a'), 'hongguoduanju.com'), /公网/);
+        .webMediaRequestOptions('https://hongguoduanju.com/a'), 'hongguoduanju.com'), /公网/,
+      `mixed Fake-IP and ${address} must be rejected`);
     }
     guard.beforeRedirect({}, { headers: { location: 'http://hongguoduanju.com/b' } }, { url: 'https://hongguoduanju.com/a' });
-    await assert.rejects(lookup(guard, 'hongguoduanju.com'), /公网/);
+    await assert.rejects(lookup(guard, 'hongguoduanju.com'), /公网/, 'downgraded redirect must not use trusted DNS');
   }],
   ['official secure DNS survives an unavailable or hanging resolver and cancels the loser', async () => {
     for (const hanging of [false, true]) {
@@ -308,7 +313,8 @@ const checks = [
       assert.equal(result.status, 200); assert.equal(calls.length, 1); assert.deepEqual(marked, ['11']);
       assert.equal(calls[0].url, 'https://media.example/safe');
       assert.equal(calls[0].headers['User-Agent'], 'app');
-      assert.equal(calls[0].lookup, undefined, 'App source retains existing transport policy');
+      assert.equal(typeof calls[0].lookup, 'function', 'App source also validates public DNS');
+      assert.equal(typeof calls[0].beforeRedirect, 'function', 'App source also validates redirects');
       await main.requestMedia({ url: 'https://fc-cdn.example/safe', source: 'web' });
       assert.equal(typeof calls[1].lookup, 'function');
       assert.equal(typeof calls[1].beforeRedirect, 'function');

@@ -134,6 +134,26 @@ test('media getters stay safe while source analysis is pending', async () => {
   adapter.destroy();
 });
 
+test('destroy flags the element so a later persist cannot write the native clock', async () => {
+  const { video, adapter } = fixture();
+  adapter.load('hongguo-local://first'); await tick();
+  video.currentTime = 37.25;
+  assert.equal(video.currentTime, 37.25, 'decoder position is readable before destroy');
+  adapter.destroy();
+  assert.equal(video.currentTime, 0, 'removing the accessor exposes the media-free native clock');
+  assert.equal(video.__softwareDestroyed, true, 'callers can detect the accessor removal');
+});
+
+test('re-attach on the same element clears the destroy flag', async () => {
+  const { video, adapter, instances } = fixture();
+  adapter.load('hongguo-local://first'); await tick();
+  adapter.destroy();
+  assert.equal(video.__softwareDestroyed, true);
+  const second = attachSoftwareVideo(video, async () => instances[0].constructor, 'file:///software');
+  assert.equal(video.__softwareDestroyed, undefined, 'a fresh adapter must not inherit the old destroy flag');
+  second.destroy();
+});
+
 test('a timed-out load cannot later fire metadata or autoplay', async () => {
   const nativeTimeout = globalThis.setTimeout;
   let finish;

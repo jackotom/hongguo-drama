@@ -11,6 +11,9 @@ const context = vm.createContext({ fs, path, downloadTasks: [], mergeTasks: [],
   pathInside: (dir, file) => { const rel = path.relative(fs.realpathSync(dir), fs.realpathSync(file)); return !rel.startsWith('..') && !path.isAbsolute(rel); },
 });
 vm.runInContext(source.match(/function isRecordedMediaFile\([\s\S]*?\n\}/)[0], context);
+for (const name of ['readFileIdentity', 'fileIdentityMatches', 'legacyFileMatches', 'isRegularFile']) {
+  vm.runInContext(source.match(new RegExp(`function ${name}\\([\\s\\S]*?\\n\\}`))[0], context);
+}
 vm.runInContext(source.match(/function hasCompleteTaskFile\([\s\S]*?\n\}/)[0], context);
 vm.runInContext(handler[0], context);
 const open = (sid = '123456', index = 1) => handlers['open-episode-external']({}, sid, index);
@@ -18,7 +21,8 @@ const open = (sid = '123456', index = 1) => handlers['open-episode-external']({}
   try {
     assert.equal((await open()).success, false);
     const file = path.join(root, 'episode.mp4'); fs.writeFileSync(file, Buffer.alloc(110000));
-    const task = { status: 'completed', savePath: file, customDir: root, hongguoInfo: { series_id: '123456', vid_index: 1, vid: '987654' } };
+    const task = { status: 'completed', savePath: file, customDir: root, endTime: Date.now(), fileIdentity: context.readFileIdentity(file),
+      hongguoInfo: { series_id: '123456', vid_index: 1, vid: '987654' } };
     context.downloadTasks.push(task);
     assert.equal((await open()).success, true); assert.deepEqual(opened, [file]);
     assert.equal((await open('123456', 2)).success, false);

@@ -10,6 +10,7 @@ const { createRequire } = require('node:module');
 const root = fs.mkdtempSync(path.join(os.tmpdir(), 'hongguo-stream-'));
 const source = path.resolve(__dirname, '../main.js');
 const req = createRequire(source);
+const realSignal = req('./src/native/request-signal');
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 function load(fetchPlayUrlSingle, overrides = {}) {
   const handlers = {}, protocols = {}, app = new EventEmitter();
@@ -62,17 +63,18 @@ function load(fetchPlayUrlSingle, overrides = {}) {
   let failures=0; const harnesses=[];
   const harness = (fn, overrides) => { const h=load(fn, overrides); harnesses.push(h); return h; };
   const task = id => ({id, type:'hongguo',filename:id+'.mp4',customDir:root,hongguoInfo:{vid:'11',series_id:'1'}});
+  const execute = async (h, t) => { h.context.fixtureTask=t; h.run('downloadTasks=[fixtureTask]'); return h.context.executeHongguoDownload(t); };
   async function check(name, fn) { try { await fn(); console.log('PASS '+name); } catch(e) { failures++; console.error('FAIL '+name+': '+e.message); } }
   await check('download refreshes a failed address without another click',async()=>{
     const calls=[]; const h=harness(async(_v,_s,o)=>{ calls.push(o); return calls.length===1?info('/missing','web'):info('/ok'); });
-    const t=task('refresh'); await h.context.executeHongguoDownload(t);
+    const t=task('refresh'); await execute(h,t);
     assert.equal(t.status,'completed',t.error); assert.equal(fs.readFileSync(t.savePath,'utf8'),'complete-media');
     assert.equal(calls[1].force,true);
   });
   await check('download tries valid backup after primary HTTP 404',async()=>{
     let lookups=0; const first=info('/missing'); first.variants=[first,info('/ok')];
     const h=harness(async()=>{ lookups++; return first; }); const t=task('backup');
-    await h.context.executeHongguoDownload(t); assert.equal(t.status,'completed',t.error); assert.equal(lookups,1);
+    await execute(h,t); assert.equal(t.status,'completed',t.error); assert.equal(lookups,1);
   });
   await check('transient network source is refreshed during playback preparation',async()=>{
     let lookups=0; const h=harness(async()=>++lookups===1?{url:null,code:'SOURCE_UNAVAILABLE',sources:[{source:'app',code:'NETWORK_ERROR'}],error:'temporary'}:info('/ok'));
@@ -98,7 +100,7 @@ function load(fetchPlayUrlSingle, overrides = {}) {
   });
   await check('broken download retries without keeping partial bytes',async()=>{
     let lookups=0; const h=harness(async()=>++lookups===1?info('/broken'):info('/ok')), t=task('broken');
-    await h.context.executeHongguoDownload(t); assert.equal(t.status,'completed',t.error);
+    await execute(h,t); assert.equal(t.status,'completed',t.error);
     assert.equal(fs.readFileSync(t.savePath,'utf8'),'complete-media');
     assert.ok(!fs.existsSync(t.savePath+'.enc.tmp'));
   });
@@ -159,32 +161,36 @@ function load(fetchPlayUrlSingle, overrides = {}) {
   });
   await check('HTML error page tries backup and never becomes completed media',async()=>{
     const first=info('/html'); first.variants=[info('/ok')]; const h=harness(async()=>first), t=task('html');
-    await h.context.executeHongguoDownload(t); assert.equal(t.status,'completed',t.error); assert.equal(fs.readFileSync(t.savePath,'utf8'),'complete-media');
+    await execute(h,t); assert.equal(t.status,'completed',t.error); assert.equal(fs.readFileSync(t.savePath,'utf8'),'complete-media');
   });
   await check('media request retains provider UA and Referer',async()=>{
     const h=harness(async()=>({...info('/identity'), userAgent:'app-provider',referer:'https://novel.snssdk.com/'})), t=task('identity');
-    await h.context.executeHongguoDownload(t); assert.equal(t.status,'completed',t.error);
+    await execute(h,t); assert.equal(t.status,'completed',t.error);
   });
   await check('permanent failure stops within bounded attempts and leaves no file',async()=>{
     let lookups=0; const before=hits.length; const h=harness(async()=>{lookups++;return info('/missing','web');}),t=task('permanent');
-    await h.context.executeHongguoDownload(t); assert.equal(t.status,'failed');
+    await execute(h,t); assert.equal(t.status,'failed');
     assert.ok(lookups<=3); assert.ok(hits.length-before<=8); assert.ok(!fs.existsSync(t.savePath)); assert.ok(!fs.existsSync(t.savePath+'.enc.tmp'));
   });
   await check('stop during retry wait cancels all later requests',async()=>{
     let lookups=0;const h=harness(async()=>{lookups++;return info('/missing','web');}),t=task('cancel');
+    h.context.fixtureTask=t; h.run('downloadTasks=[fixtureTask]');
     const pending=h.context.executeHongguoDownload(t); await sleep(40);
     t.cancelled=true; t.cancelSource?.cancel('stop'); await pending; const after=lookups; await sleep(40);
     assert.equal(t.status,'stopped'); assert.equal(lookups,after); assert.ok(!fs.existsSync(t.savePath));
   });
   await check('unresponsive source lookup has a finite wait instead of leaving playback loading',async()=>{
-    const h=harness(()=>new Promise(()=>{}));
     const deadlines=[];
-    h.context.setTimeout=(fn,ms)=>{ deadlines.push(ms); assert.ok(ms>0 && ms<=30000); return setTimeout(fn,Math.min(ms,5)); };
+    const h=harness(()=>new Promise(()=>{}), {
+      './src/native/request-signal': { ...realSignal, boundedSignal(parent, timeout) {
+        deadlines.push(timeout); return realSignal.boundedSignal(parent, 25);
+      } },
+    });
     const pending=h.handlers['prepare-online-play']({}, {vid:'11',seriesId:'1',requestId:'timeout'});
     // Several scaled retries run here; Windows CI timer granularity is not the source timeout.
     const result=await Promise.race([pending,sleep(2000).then(()=>({unbounded:true}))]);
     await h.handlers['release-online-play']({}, {requestId:'timeout'});await pending;
-    assert.ok(deadlines.includes(30000),'source lookup must retain its 30-second deadline');
+    assert.ok(deadlines.includes(30000),`source lookup must retain its 30-second deadline: ${deadlines.join(',')}`);
     assert.ok(!result.unbounded,'source lookup never settled within its time budget');assert.equal(result.success,false);assert.match(result.error,/超时/);
   });
   for(const h of harnesses) {

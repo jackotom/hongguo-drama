@@ -131,6 +131,8 @@ test('NAS IPC downloads into the selected directory and opens that same director
   assert.equal(h.run('downloadTasks[0].nasTargets'), undefined);
   const task = h.run('downloadTasks[0]');
   fs.mkdirSync(path.dirname(task.savePath), { recursive: true }); fs.writeFileSync(task.savePath, Buffer.alloc(120000, 3));
+  h.context.fixtureTask = task;
+  h.run('fixtureTask.endTime=Date.now();fixtureTask.fileIdentity=readFileIdentity(fixtureTask.savePath)');
   await h.run('executeHongguoDownload(downloadTasks[0])');
   assert.equal(task.status, 'completed');
   assert.ok(h.events.some(event => event.channel === 'nas-export-done' && event.data.success));
@@ -151,7 +153,7 @@ test('NAS reuses completed local tasks and does not restart video transfer for m
   const source = path.join(h.root, 'old.mp4'); fs.writeFileSync(source, Buffer.alloc(120000, 3));
   h.context.oldTask = { id: 'old', type: 'hongguo', status: 'completed', savePath: source, customDir: h.root,
     downloadQuality: 'auto', hongguoInfo: { ...series.episodes[0], series_id: seriesId, series_title: series.series_title } };
-  h.run('downloadTasks = [oldTask];');
+  h.run('oldTask.endTime=Date.now();oldTask.fileIdentity=readFileIdentity(oldTask.savePath);downloadTasks = [oldTask];');
   let result = await h.handlers['download-series-to-nas']({}, seriesId, 'auto');
   assert.equal(result.success, true); assert.equal(result.copied, 1); assert.equal(result.count, 1);
   assert.equal(path.dirname(h.run('downloadTasks.find(task => task.id === "old").savePath')), h.target);
@@ -229,8 +231,13 @@ test('ordinary downloads retain their original directory and legacy NAS tasks op
   assert.equal(ordinary.nasDestination, undefined);
   const legacy = path.join(h.target, 'legacy'); fs.mkdirSync(legacy);
   ordinary.nasTargets = [{ directory: legacy }];
+  const rejected = await h.handlers['open-folder']({}, ordinary.id);
+  assert.equal(rejected.success, false, 'a directory-only legacy NAS copy must be safely rejected');
+  assert.match(rejected.error, /重新挂载|重新选择|不可用/, 'the rejection must prompt reselecting the export directory');
+  ordinary.nasTargets = [{ root: fs.realpathSync(h.target), directory: fs.realpathSync(legacy), flat: false,
+    device: fs.statSync(legacy).dev, seriesId, title: series.series_title, season: 1 }];
   await h.handlers['open-folder']({}, ordinary.id);
-  assert.equal(h.opened.at(-1), legacy);
+  assert.equal(h.opened.at(-1), legacy, 'a complete legacy NAS receipt must still open its export directory');
   fs.rmdirSync(legacy);
   assert.equal((await h.handlers['open-folder']({}, ordinary.id)).success, false, 'a missing NAS export must not silently open the ordinary directory');
 });
@@ -292,7 +299,7 @@ test('a copied video recovers its identity after index writing fails, without ma
   const source=path.join(h.root,'recover-source.mp4');fs.writeFileSync(source,Buffer.alloc(120000,8));
   const task={id:'recover',type:'hongguo',status:'completed',savePath:source,customDir:h.root,downloadQuality:'auto',
     hongguoInfo:{...series.episodes[0],series_id:seriesId,series_title:series.series_title}};
-  h.context.recoverTask=task;h.run('downloadTasks=[recoverTask]');
+  h.context.recoverTask=task;h.run('recoverTask.endTime=Date.now();recoverTask.fileIdentity=readFileIdentity(recoverTask.savePath);downloadTasks=[recoverTask]');
   const rename=fs.renameSync;
   try {
     fs.renameSync=(from,to)=>{if(path.basename(to)==='.hongguo-nas.json')throw Object.assign(Error('index write failure'),{code:'ENOSPC'});return rename(from,to);};

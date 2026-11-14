@@ -2,6 +2,9 @@
 export function attachSoftwareVideo(video, loadPlayer, wasmBaseUrl) {
   const nativePlay = video.play.bind(video), nativePause = video.pause.bind(video);
   const removeAttribute = video.removeAttribute.bind(video);
+  // StrictMode re-runs layout effects on the same element; clear a previous destroy flag
+  // so the fresh adapter can persist positions again.
+  try { delete video.__softwareDestroyed; } catch {}
   let session, source = '', rate = video.playbackRate || 1, seeking = false, ended = false, error = null;
   let destroyed = false, desiredPlayback = false, playPromise, playIntent = 0;
   const emit = name => video.dispatchEvent(new Event(name));
@@ -132,6 +135,9 @@ export function attachSoftwareVideo(video, loadPlayer, wasmBaseUrl) {
   Object.defineProperties(video, descriptors);
   return { load, destroy() {
     destroyed = true; desiredPlayback = false;
+    // Player persists the position after unmount; once these accessors are removed the
+    // element falls back to its native (media-free) clock, so flag the transition first.
+    try { video.__softwareDestroyed = true; } catch {}
     nativePause(); video.srcObject = null;
     release(session);
     for (const name of Object.keys(descriptors)) delete video[name];

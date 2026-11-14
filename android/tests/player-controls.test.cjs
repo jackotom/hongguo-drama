@@ -52,24 +52,21 @@ function mount(platform = 'android') {
   };
 }
 
-test('手机轻触切换控制层，长按和滑动不抢走视频手势；桌面保持原样', () => {
+test('手机点按立即显示控制层，滑动只恢复计时；桌面保留鼠标移动控制', () => {
   const ui = mount();
   ui.advance(2000); assert.equal(ui.hidden(), true);
   ui.emit(ui.stage, 'pointerdown', { target: ui.video });
-  assert.equal(ui.hidden(), true, '按下不立刻改变控制层，留给长按识别');
-  ui.emit(ui.stage, 'click', { target: ui.video, detail: 1 });
-  assert.equal(ui.hidden(), false);
-  ui.emit(ui.stage, 'pointerdown', { target: ui.video });
-  ui.emit(ui.stage, 'click', { target: ui.video, detail: 1 });
-  assert.equal(ui.hidden(), true, '再次轻触立即收起');
+  assert.equal(ui.hidden(), false, '点按必须立即显示控制层');
+  ui.advance(2000); assert.equal(ui.hidden(), true);
   ui.emit(ui.stage, 'pointermove', { pointerType: 'touch', screenX: 100, screenY: 100, movementX: 50 });
-  assert.equal(ui.hidden(), true, '滑动不显示控件');
+  assert.equal(ui.hidden(), false, '滑动视频时恢复控制层');
+  ui.advance(2000); assert.equal(ui.hidden(), true);
   ui.video.paused = true; ui.emit(ui.video, 'pause');
-  ui.emit(ui.stage, 'click', { target: ui.video, detail: 1 });
-  assert.equal(ui.hidden(), false, '暂停时播放按钮保持可用');
+  assert.equal(ui.hidden(), false, '暂停时控制层保持显示');
   ui.unmount();
   const desktop = mount('darwin');
-  assert.equal(desktop.stage.listeners.has('click'), false, '不接管桌面视频单击');
+  desktop.emit(desktop.stage, 'pointermove', { screenX: 10, screenY: 10, movementX: 5 });
+  assert.equal(desktop.hidden(), false);
   desktop.unmount();
 });
 
@@ -82,13 +79,13 @@ test('拖动进度不隐藏，释放后恢复计时；手机菜单可明确关�
   ui.emit(ui.window, 'pointerup'); ui.advance(2000); assert.equal(ui.hidden(), true);
   ui.find('更多播放选项').props.onClick(); ui.render();
   assert.ok(ui.find('播放选项')); assert.equal(ui.hidden(), false);
-  ui.find('关闭').props.onClick(); ui.render(); assert.equal(ui.find('播放选项'), undefined);
+  ui.find('更多播放选项').props.onClick(); ui.render(); assert.equal(ui.find('播放选项'), undefined);
   ui.find('选集').props.onClick(); ui.render(); assert.ok(ui.find('选集面板'));
-  ui.find('关闭选集').props.onClick(); ui.render(); assert.equal(ui.find('选集面板'), undefined);
+  ui.find('选集').props.onClick(); ui.render(); assert.equal(ui.find('选集面板'), undefined);
   ui.unmount();
 });
 
-test('手机返回优先关闭弹层，再退出全屏，最后回上一页', () => {
+test('手机返回依次处理全屏、更多、选集、通用弹层和页面历史', () => {
   const source = fs.readFileSync(path.join(root, 'src/App.jsx'), 'utf8');
   const body = source.match(/window\.appBack = \(\) => \{([\s\S]*?)\n    \};/)[1];
   let dialogs = true;
@@ -100,65 +97,56 @@ test('手机返回优先关闭弹层，再退出全屏，最后回上一页', ()
     document: { fullscreenElement: {}, querySelectorAll: () => dialogs ? [{ getClientRects: () => [1] }] : [], dispatchEvent: event => actions.push(event.key), exitFullscreen: () => { actions.push('fullscreen'); return Promise.resolve(); } },
   };
   const back = vm.runInNewContext(`() => {${body}}`, context);
-  assert.equal(back(), true); assert.deepEqual(actions, ['Escape']);
-  dialogs = false; assert.equal(back(), true); assert.deepEqual(actions, ['Escape', 'fullscreen']);
+  assert.equal(back(), true); assert.deepEqual(actions, ['fullscreen']);
   context.document.fullscreenElement = null;
+  context.moreOpen = true; assert.equal(back(), true); assert.deepEqual(actions, ['fullscreen', 'more']);
+  context.moreOpen = false; context.episodesOpen = true; assert.equal(back(), true);
+  assert.deepEqual(actions, ['fullscreen', 'more', 'episodes']);
+  context.episodesOpen = false; assert.equal(back(), true);
+  assert.deepEqual(actions, ['fullscreen', 'more', 'episodes', 'Escape']);
+  dialogs = false;
   assert.equal(back(), true); assert.equal(actions.at(-1), 'browse');
   assert.equal(back(), false);
 });
 
 
-test('沉浸播放器：20集分页、真实状态、抽屉互斥及已有回调', () => {
+test('手机播放器：倍速直选、父页面选集抽屉和更多菜单互斥', () => {
   const ui = mount();
   const selected = [];
-  ui.props.currentIndex = 41;
-  ui.props.episodes = Array.from({ length: 49 }, (_, index) => ({ vid_index: index + 1, locked: index === 41, status: index === 42 ? 'completed' : 'pending' }));
-  ui.props.onEpisodeChange = value => selected.push(['episode', value]);
+  ui.props.currentIndex = 1;
+  ui.props.onOpenEpisodes = () => selected.push(['episodes']);
   ui.props.onRateChange = value => selected.push(['rate', value]);
   ui.props.onQualityChange = value => selected.push(['quality', value]);
-  ui.props.onBack = () => selected.push(['back']);
-  ui.props.onCloseEpisodes = () => { ui.props.episodesOpen = false; };
   ui.props.supportsOnlineQuality = true;
   ui.render();
   ui.find('选集').props.onClick(); ui.render();
-  assert.equal(ui.find('第 41 至 49 集').props['aria-pressed'], true);
-  assert.equal(ui.find('播放第 41 集').props['aria-current'], 'true');
-  assert.equal(ui.find('播放第 42 集').props.disabled, true);
-  assert.equal(ui.find('播放第 1 集'), undefined, '只显示当前20集区间');
-  assert.ok(ui.find('播放第 43 集').children.some(node => node?.children?.includes('已下载')));
-  ui.find('第 1 至 20 集').props.onClick(); ui.render();
-  assert.ok(ui.find('播放第 1 集')); assert.equal(ui.find('播放第 21 集'), undefined);
-  ui.find('播放第 2 集').props.onClick(); ui.render();
-  assert.deepEqual(selected.pop(), ['episode', 2]); assert.equal(ui.find('选集面板'), undefined);
-  ui.find('播放速度').props.onClick(); ui.render();
-  assert.equal(ui.nodes().filter(node => node.props.role === 'dialog').length, 1);
-  ui.find('播放速度 1.5×').props.onClick(); ui.render();
-  assert.deepEqual(selected.pop(), ['rate', 1.5]); assert.equal(ui.nodes().filter(node => node.props.role === 'dialog').length, 0);
-  ui.find('清晰度').props.onClick(); ui.render();
-  ui.nodes().find(node => node.type === 'button' && node.children.some(child => child?.children?.includes('720P'))).props.onClick(); ui.render();
+  assert.deepEqual(selected.pop(), ['episodes']);
+  ui.find('播放速度').props.onChange({ target: { value: '1.5' }, currentTarget: { blur() {} } }); ui.render();
+  assert.deepEqual(selected.pop(), ['rate', 1.5]);
+  ui.find('更多播放选项').props.onClick(); ui.render();
+  assert.ok(ui.find('播放选项'));
+  const qualityMenu = ui.nodes().find(node => node.type === 'button' && node.children?.[0] === '清晰度 · ');
+  assert.ok(qualityMenu);
+  qualityMenu.props.onClick(); ui.render();
+  assert.equal(ui.find('播放选项'), undefined);
+  assert.ok(ui.find('清晰度面板'));
+  ui.find('选择 720P').props.onClick(); ui.render();
   assert.deepEqual(selected.pop(), ['quality', '720p']);
-  ui.find('返回上一页').props.onClick(); assert.deepEqual(selected.pop(), ['back']);
-  ui.props.episodesOpen = true; ui.render();
-  assert.ok(ui.find('选集面板'));
-  assert.equal(ui.props.episodesOpen, false, '父页面打开选集的请求已被抽屉接管，返回不会多一层');
-  ui.find('关闭选集').props.onClick(); ui.render();
-  assert.equal(ui.find('选集面板'), undefined);
   assert.equal(ui.video.currentTime, 12, '抽屉不修改媒体进度');
   assert.equal(ui.video.paused, false, '抽屉不改变播放状态');
   ui.unmount();
 });
 
-test('手机拖动显示目标时间，松手与取消后不跳回旧显示值', () => {
+test('手机拖动进度时不自动隐藏，松手后恢复计时', () => {
   const ui = mount();
-  ui.find('播放进度').props.onPointerDown({ currentTarget: { value: '12' } }); ui.render();
+  ui.emit(ui.stage, 'pointerdown', { target: { closest: () => ({}) } });
+  ui.advance(4000); assert.equal(ui.hidden(), false);
   ui.find('播放进度').props.onChange({ target: { value: '72.5' } }); ui.render();
+  assert.equal(ui.video.currentTime, 72.5);
+  ui.emit(ui.video, 'timeupdate');
   assert.equal(ui.find('播放进度').props.value, 72.5);
-  assert.ok(ui.nodes().some(node => node.type === 'output' && node.children.includes('1:12')));
-  ui.find('播放进度').props.onPointerUp(); ui.render();
+  ui.emit(ui.window, 'pointerup');
   assert.equal(ui.find('播放进度').props.value, 72.5);
-  assert.equal(ui.nodes().some(node => node.type === 'output'), false);
-  ui.find('播放进度').props.onPointerDown({ currentTarget: { value: '72.5' } }); ui.render();
-  ui.find('播放进度').props.onPointerCancel(); ui.render();
-  assert.equal(ui.find('播放进度').props.value, 72.5);
+  ui.advance(2000); assert.equal(ui.hidden(), true);
   ui.unmount();
 });

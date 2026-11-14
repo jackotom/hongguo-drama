@@ -1,9 +1,9 @@
-<!-- 7.2 release target. -->
+<!-- 7.3 release target. -->
 # 第三方组件许可说明
 
-适用源码版本：红果短剧 7.2（已正式发布）；沿用 follow-redirects 1.16.3 与固定 nv-codec-headers 12.1.14.0；其余第三方组件保留各自的版本、作者与许可。实际发行状态见 `docs/release-7.2.md`。
+适用源码版本：红果短剧 7.3（源码／发行目标）；沿用 follow-redirects 1.16.3 与固定 nv-codec-headers 12.1.14.0；其余第三方组件保留各自的版本、作者与许可。实际发行状态见 `docs/release-7.3.md`。
 
-7.1采纳anupam-orbis在PR #140提供的实际依赖锁更新：follow-redirects从1.16.1升至1.16.3；本项目另补重定向安全回归。该依赖更新继续用于7.2，完整协作记录见 `CONTRIBUTORS.md`。
+7.1采纳anupam-orbis在PR #140提供的实际依赖锁更新：follow-redirects从1.16.1升至1.16.3；本项目另补重定向安全回归。该依赖更新继续用于7.3，完整协作记录见 `CONTRIBUTORS.md`。
 
 本软件（红果短剧下载器）使用了以下第三方组件。各组件的版权归其各自作者所有，
 本软件对这些组件的使用均遵循其原始许可证。

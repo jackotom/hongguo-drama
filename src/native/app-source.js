@@ -399,8 +399,9 @@ async function fetchAppPlayUrl(vid, options = {}) {
         try { return await fetchAppPlayUrlFresh(vid, options); }
         catch (error) {
             // An explicit refusal also stops work queued before it was received.
-            if ([403, 429].includes(error.status) || error.code === 'BUSINESS_REJECTED' || error.code === 'DEVICE_REGISTRATION_FAILED'
-                && ['BUSINESS_REJECTED', 'HTTP_403', 'HTTP_429'].includes(error.registrationFailure)) playbackRejection = error;
+            if ([403, 429].includes(error.status) || error.code === 'BUSINESS_REJECTED'
+                || (error.code === 'DEVICE_REGISTRATION_FAILED'
+                  && ['BUSINESS_REJECTED', 'HTTP_403', 'HTTP_429'].includes(error.registrationFailure))) playbackRejection = error;
             throw error;
         }
         finally { playbackReadyAt = Date.now() + 1000; }
