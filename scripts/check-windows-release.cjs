@@ -109,25 +109,44 @@ async function realFootage(mediaDir, ffmpeg, ffprobe, dataFile) {
   const native = require('../src/native/hongguo');
   const catalog = await require('../src/native/hongguo-app-catalog').browseList({ category: 'hot-real-drama' });
   assert(catalog.success && catalog.results.length, 'Real Hongguo catalog unavailable; do not substitute footage');
-  const drama = catalog.results[Math.floor(Math.random() * catalog.results.length)];
-  const series = await native.fetchEpisodeList(drama.series_id);
-  assert(series.episodes.length >= 2, 'Real acceptance drama needs two episodes');
-  const start = Math.floor(Math.random() * Math.min(10, series.episodes.length - 1));
-  const episodes = series.episodes.slice(start, start + 2), samples = [];
-  const downloaded = await require('./windows-download-acceptance.cjs')({ evaluate, result, dataFile, mediaDir, series, episodes, ffprobe, ffmpeg, delay });
-  for (const [index, original] of downloaded.entries()) {
-    const sample = path.join(mediaDir, `windows-sample-${index + 1}.mp4`);
-    const decoded = spawnSync(ffmpeg, ['-y', '-v', 'error',
-      '-i', original, '-t', '15', '-map', '0:v:0', '-map', '0:a:0', '-vf', 'scale=640:-2,setsar=1',
-      '-c:v', 'libx264', '-preset', 'ultrafast', '-crf', '20', '-pix_fmt', 'yuv420p', '-c:a', 'aac', sample],
-      { timeout: 60000, windowsHide: true, stdio: 'pipe' });
-    assert.equal(decoded.status, 0, 'Real Hongguo acceptance video could not be decoded');
-    samples.push(sample);
+  let lastError;
+  const dramas = [...catalog.results].sort(() => Math.random() - 0.5).slice(0, 6);
+  for (const drama of dramas) {
+    try {
+      const series = await native.fetchEpisodeList(drama.series_id);
+      const unlocked = series.episodes.filter(episode => !episode.locked);
+      if (unlocked.length < 2) continue;
+      const start = Math.floor(Math.random() * unlocked.length);
+      const ordered = [...unlocked.slice(start), ...unlocked.slice(0, start)];
+      const episodes = [];
+      for (const episode of ordered.slice(0, 12)) {
+        try {
+          const info = await native.fetchPlayUrlSingle(episode.vid, series.series_id, { force: true });
+          if (info?.url) episodes.push(episode);
+        } catch (_) { /* Retired public episodes are skipped within the bounded random sample. */ }
+        if (episodes.length === 2) break;
+      }
+      if (episodes.length !== 2) continue;
+      const downloaded = await require('./windows-download-acceptance.cjs')({ evaluate, result, dataFile, mediaDir, series, episodes, ffprobe, ffmpeg, delay });
+      const samples = [];
+      for (const [index, original] of downloaded.entries()) {
+        const sample = path.join(mediaDir, `windows-sample-${index + 1}.mp4`);
+        const decoded = spawnSync(ffmpeg, ['-y', '-v', 'error',
+          '-i', original, '-t', '15', '-map', '0:v:0', '-map', '0:a:0', '-vf', 'scale=640:-2,setsar=1',
+          '-c:v', 'libx264', '-preset', 'ultrafast', '-crf', '20', '-pix_fmt', 'yuv420p', '-c:a', 'aac', sample],
+          { timeout: 60000, windowsHide: true, stdio: 'pipe' });
+        assert.equal(decoded.status, 0, 'Real Hongguo acceptance video could not be decoded');
+        samples.push(sample);
+      }
+      result.realMedia = { seriesId: series.series_id, title: series.series_title,
+        episodes: episodes.map(episode => ({ vid: episode.vid, index: episode.vid_index })),
+        downloadedFromOfficialSource: true, downloadedThroughAppQueue: true, muted: true, durationPerSampleSeconds: 15 };
+      return samples;
+    } catch (error) {
+      lastError = error;
+    }
   }
-  result.realMedia = { seriesId: series.series_id, title: series.series_title,
-    episodes: episodes.map(episode => ({ vid: episode.vid, index: episode.vid_index })),
-    downloadedFromOfficialSource: true, downloadedThroughAppQueue: true, muted: true, durationPerSampleSeconds: 15 };
-  return samples;
+  throw lastError || new Error('No two playable real Hongguo episodes in the bounded random sample');
 }
 (async () => {
   assert.equal(process.platform, 'win32');

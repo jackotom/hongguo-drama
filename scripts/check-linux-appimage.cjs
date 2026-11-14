@@ -86,8 +86,19 @@ function safeDownloadFailure(value) {
       const drama=catalog.results[Math.floor(Math.random()*catalog.results.length)];
       const resolved=await api.searchResolve(drama.series_id);
       if(!resolved.success||String(resolved.data?.series_id)!==String(drama.series_id))throw Error('Real drama registration failed');
-      const episodes=resolved.data.episodes.filter(ep=>!ep.locked).slice(0,2);
-      if(episodes.length!==2)throw Error('Two unlocked real episodes required');
+      const unlocked=resolved.data.episodes.filter(ep=>!ep.locked);
+      if(unlocked.length<2)throw Error('Two unlocked real episodes required');
+      const episodes=[];
+      for(const episode of unlocked.slice(0,12)){
+        const requestId=crypto.randomUUID();
+        const prepared=await api.prepareOnlinePlay({vid:episode.vid,seriesId:drama.series_id,vidIndex:episode.vid_index,
+          quality:'compat',requestId,prefetch:false});
+        if(!prepared?.success)continue;
+        await api.releaseOnlinePlay({requestId,streamId:prepared.streamId});
+        episodes.push(episode);
+        if(episodes.length===2)break;
+      }
+      if(episodes.length!==2)throw Error('Two playable real episodes required');
       const states=[];
       localStorage.setItem('hongguo:online-quality','compat');
       localStorage.setItem('hongguo:software-decode','true');

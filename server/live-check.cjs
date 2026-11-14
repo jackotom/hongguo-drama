@@ -19,18 +19,7 @@ async function main() {
     if (!catalog.success || !catalog.results?.length) throw new Error(catalog.error || '目录为空');
     const candidates = catalog.results.filter(item => /^\d{1,30}$/.test(String(item.series_id)));
     if (!candidates.length) throw new Error('目录没有红果剧集');
-    const candidate = candidates[crypto.randomInt(candidates.length)];
-    receipt.catalogSelection = { seriesId: String(candidate.series_id), title: candidate.series_title, random: true };
-    const search = await api(`/api/search?q=${encodeURIComponent(candidate.series_title)}`);
-    if (!search.results.some(item => item.series_id === String(candidate.series_id))) throw new Error('搜索未找到随机选择的目录剧集');
-    receipt.steps.push('search');
-    const { series } = await api(`/api/series/${candidate.series_id}`);
-    if (series.episodes.length < 2) throw new Error('随机剧集少于两集');
-    const offset = crypto.randomInt(Math.min(10, series.episodes.length - 1)), selected = series.episodes.slice(offset, offset + 2);
-    receipt.episodes = selected.map(item => ({ vid: item.vid, index: item.vid_index }));
-    // Verify the repaired App source directly; random web availability is recorded separately.
     receipt.quality = '1080p';
-    const added = await api('/api/downloads', { seriesId: series.series_id, episodeIds: selected.map(item => item.vid), quality: receipt.quality });
     const wait = async ids => {
       const deadline = Date.now() + 5 * 60000;
       while (Date.now() < deadline) {
@@ -41,7 +30,30 @@ async function main() {
       }
       throw new Error('真实素材任务超时');
     };
-    const downloads = await wait(added.tasks.map(task => task.id)); receipt.steps.push('two-real-downloads');
+    let candidate, series, selected, downloads, lastError;
+    const randomCandidates = [...candidates].sort(() => Math.random() - 0.5).slice(0, 4);
+    for (const item of randomCandidates) {
+      try {
+        const search = await api(`/api/search?q=${encodeURIComponent(item.series_title)}`);
+        if (!search.results.some(result => result.series_id === String(item.series_id))) throw new Error('搜索未找到随机选择的目录剧集');
+        const detail = await api(`/api/series/${item.series_id}`);
+        if (detail.series.episodes.length < 2) throw new Error('随机剧集少于两集');
+        const offset = crypto.randomInt(Math.min(10, detail.series.episodes.length - 1));
+        const pair = detail.series.episodes.slice(offset, offset + 2);
+        const added = await api('/api/downloads', { seriesId: detail.series.series_id,
+          episodeIds: pair.map(episode => episode.vid), quality: receipt.quality });
+        const tasks = await wait(added.tasks.map(task => task.id));
+        candidate = item; series = detail.series; selected = pair; downloads = tasks;
+        break;
+      } catch (error) {
+        lastError = error;
+        receipt.attempts = [...(receipt.attempts || []), safeError(error)];
+      }
+    }
+    if (!downloads) throw lastError || new Error('四个随机剧集均未取得两集可下载素材');
+    receipt.catalogSelection = { seriesId: String(candidate.series_id), title: candidate.series_title, random: true };
+    receipt.episodes = selected.map(item => ({ vid: item.vid, index: item.vid_index }));
+    receipt.steps.push('search', 'two-real-downloads');
     const { task } = await api('/api/merge', { taskIds: downloads.map(item => item.id) });
     const [merged] = await wait([task.id]); receipt.steps.push('merge');
     receipt.tasks = [];
