@@ -42,4 +42,9 @@ const { execFileSync } = require('node:child_process');
   assert(fs.statSync(path.join(dist, executable)).isFile());
   fs.writeFileSync(path.join(root, 'node_modules/electron/path.txt'), executable);
   console.log(`PASS pinned official Electron ${version} ${process.platform}/${process.arch}: exact asset size and SHA256`);
-})().catch(() => { console.error('Verified official Electron runtime preparation failed'); process.exitCode = 1; });
+})().catch(error => {
+  const detail = String(error?.stderr || error?.message || error || '')
+    .replace(/https?:\/\/[^\s"']+/g, '[URL]').replace(/\s+/g, ' ').trim().slice(0, 400);
+  console.error(`Verified official Electron runtime preparation failed${detail ? `: ${detail}` : ''}`);
+  process.exitCode = 1;
+});
