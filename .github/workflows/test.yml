@@ -23,4 +23,5 @@ jobs:
         env:
           ELECTRON_OVERRIDE_DIST_PATH: ${{ runner.temp }}/unused-electron
       - run: node --test server/*.test.cjs
+      - run: npm ci --prefix android --no-audit --no-fund
       - run: npm --prefix android test
