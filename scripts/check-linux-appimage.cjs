@@ -88,26 +88,16 @@ function safeDownloadFailure(value) {
       let lastFailure='no playable pair';
       const dramas=[...catalog.results].sort(()=>Math.random()-0.5).slice(0,6);
       for(const drama of dramas){
-        try{
-          const resolved=await api.searchResolve(drama.series_id);
-          if(!resolved.success||String(resolved.data?.series_id)!==String(drama.series_id))throw Error('Real drama registration failed');
-          const unlocked=resolved.data.episodes.filter(ep=>!ep.locked);
-          if(unlocked.length<2)continue;
-          const start=Math.floor(Math.random()*unlocked.length);
-          const ordered=[...unlocked.slice(start),...unlocked.slice(0,start)];
-          const episodes=[];
-          for(const episode of ordered.slice(0,12)){
-            const requestId=crypto.randomUUID();
-            const prepared=await api.prepareOnlinePlay({vid:episode.vid,seriesId:drama.series_id,vidIndex:episode.vid_index,
-              quality:'compat',requestId,prefetch:false});
-            if(!prepared?.success)continue;
-            await api.releaseOnlinePlay({requestId,streamId:prepared.streamId});
-            episodes.push(episode);
-            if(episodes.length===2)break;
-          }
-          if(episodes.length!==2){lastFailure='series has fewer than two playable episodes';continue}
-          const states=[];
-          for(const episode of episodes){
+        const resolved=await api.searchResolve(drama.series_id);
+        if(!resolved.success||String(resolved.data?.series_id)!==String(drama.series_id)){lastFailure='Real drama registration failed';continue}
+        const unlocked=resolved.data.episodes.filter(ep=>!ep.locked);
+        if(unlocked.length<2)continue;
+        const start=Math.floor(Math.random()*unlocked.length);
+        const episodes=[...unlocked.slice(start),...unlocked.slice(0,start)].slice(0,10);
+        const states=[];
+        for(const episode of episodes){
+          if(states.length===2)break;
+          try{
             const queued=await api.downloadSingleEpisode(drama.series_id,episode.vid_index,'auto');
             if(!queued.success)throw Error('Real Hongguo download submission failed');
             const deadline=performance.now()+120000;
@@ -154,10 +144,12 @@ function safeDownloadFailure(value) {
                 time:video?.currentTime,width:video?.videoWidth,readyState:video?.readyState,paused:video?.paused,error:video?.error?.code,
                 decoder:document.querySelector('select[aria-label="解码方式"]')?.value,visibility:document.visibilityState}));
             }
+          }catch(error){
+            lastFailure=error.message;
           }
+        }
+        if(states.length===2){
           return {seriesId:drama.series_id,title:drama.series_title,completeDownloads:true,downloadedFromOfficialSource:true,states};
-        }catch(error){
-          lastFailure=error.message;
         }
       }
       throw Error('No two playable real episodes in six dramas: '+lastFailure);
