@@ -4,7 +4,12 @@ Built from unmodified, SHA256-pinned upstream source using scripts/build-ffmpeg-
 Only x264 is linked as an external codec library. Windows system DLLs are checked during the build.
 The release includes ffmpeg-9.0.2-x264-b35605a-win-x64-corresponding-source.tar.gz with both full source archives, the exact build script, configuration logs, toolchain versions and binary hashes.
 No Gyan essentials binaries or its additional codec dependencies are included in this release.
-Software H.264 encoding uses libx264. Hardware encoders are not bundled in this minimal build.
+Software H.264 encoding uses libx264. NVIDIA NVENC and AMD AMF hardware paths load
+the user's installed driver at runtime; no hardware codec runtime is bundled.
 Source: https://ffmpeg.org/releases/ffmpeg-9.0.2.tar.xz
 Source: https://code.videolan.org/videolan/x264.git
-License texts: COPYING.GPLv3, COPYING.GPLv2, LICENSE.md, WINDOWS-X264-LICENSE.txt.
+Source: https://github.com/GPUOpen-LibrariesAndSDKs/AMF
+AMF version: v1.5.3
+AMF commit: 57ee0cfb0e1a08d9041f77435653794c1b012be0
+AMF headers SHA256: 0f521ad98041f8001147cded4a660127f18b1c27a801a5cd691bda1fa48381be
+License texts: COPYING.GPLv3, COPYING.GPLv2, LICENSE.md, WINDOWS-X264-LICENSE.txt, WINDOWS-AMF-LICENSE.txt.

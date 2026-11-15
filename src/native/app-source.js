@@ -404,7 +404,7 @@ async function fetchAppPlayUrl(vid, options = {}) {
                   && ['BUSINESS_REJECTED', 'HTTP_403', 'HTTP_429'].includes(error.registrationFailure))) playbackRejection = error;
             throw error;
         }
-        finally { playbackReadyAt = Date.now() + 1000; }
+        finally { playbackReadyAt = Math.max(playbackReadyAt, Date.now() + 1000); }
     });
     playbackQueue = pending.catch(() => {});
     if (!options.signal) return pending;

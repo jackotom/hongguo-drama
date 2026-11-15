@@ -1,6 +1,6 @@
-<!-- 7.3 source and release target; TV and phone remain independent. -->
+<!-- 7.4 source and release target; TV and phone remain independent. -->
 
-7.3 为当前源码／发行目标，内部7.3.0、桌面构建7.3.1。新增可配置的 S / D 倍速调节，并加强下载文件身份、外部媒体地址、NAS 目录和 Docker 队列保护。标准发行范围是双Mac、Windows x64、Linux x64 AppImage与Docker amd64；实际状态见[7.3记录](docs/release-7.3.md)。
+7.4 为当前源码／发行目标，内部7.4.0、桌面构建7.4.1。修复 Windows/移动存储临时文件身份误判和匿名注册超时后的批量重试，并增加按剧筛选与 Windows AMD AMF 硬件编码。标准发行范围是双Mac、Windows x64、Linux x64 AppImage与Docker amd64；实际状态见[7.4记录](docs/release-7.4.md)。
 
 <!-- 7.2 published; frozen application source remains unchanged. -->
 

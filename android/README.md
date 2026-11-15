@@ -1,4 +1,4 @@
-<!-- 7.2 desktop/Docker release; mobile and TV versions remain independent. -->
+<!-- 7.4 desktop/Docker release; mobile and TV versions remain independent. -->
 
 TV 7.2／code70200开发补充包已公开，沿用6.6 TV签名；**电视实机未测试**，下载及验证边界见[7.2 TV发行记录](../docs/release-7.2-tv.md)。手机个人版保持1.1/code2，本轮不构建或安装手机。
 <!-- 6.8 desktop/Docker release; this directory keeps its existing scope. -->

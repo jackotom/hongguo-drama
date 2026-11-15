@@ -22,8 +22,10 @@ which contains both pinned upstream archives, the complete build script,
 and librempeg-videotoolbox-prototype.patch. The patch adds the missing internal
 ff_videotoolbox_buffer_append declaration in the pinned upstream source.
 Both macOS targets enable VideoToolbox H.264 encoding alongside x264.
-Windows and Linux x64 targets enable NVIDIA NVENC H.264 encoding alongside
-x264. ByteVC2 decoding remains on the CPU; this is not GPU ByteVC2 decoding.
+Windows enables NVIDIA NVENC and AMD AMF H.264 encoding alongside x264.
+Linux x64 enables NVIDIA NVENC H.264 encoding alongside x264 and does not
+build AMD AMF. ByteVC2 decoding remains on the CPU; this is not GPU ByteVC2
+decoding.
 The optional fast-conversion preference defaults to off. When enabled, it
 uses four CPU decoder threads in the existing single conversion queue,
 tests the hardware encoder against the actual input, and reports a bounded
@@ -42,7 +44,18 @@ Pinned commit: 1889e62e2d35ff7aa9baca2bceb14f053785e6f1
 Source archive SHA256: e30d4791fd386de8b5c9f88dec781e546ec148b8808440dd421da5f26c2700ae
 The bundled license file retains each header's complete copyright and MIT
 notice. No NVIDIA runtime or driver is bundled; the user's installed driver
-is loaded dynamically. Native NVIDIA GPU execution has not yet been verified
-for this 7.1 source candidate.
+is loaded dynamically.
+
+Windows corresponding-source archives additionally contain:
+  prepare-amf-headers.sh
+  AMF-headers-v1.5.3.tar.gz
+  AMF-LICENSE.txt
+These official AMD AMF v1.5.3 headers are MIT licensed.
+Upstream: https://github.com/GPUOpen-LibrariesAndSDKs/AMF
+Pinned commit: 57ee0cfb0e1a08d9041f77435653794c1b012be0
+Source archive SHA256: 0f521ad98041f8001147cded4a660127f18b1c27a801a5cd691bda1fa48381be
+No AMD runtime or driver is bundled; the user's installed driver is loaded
+dynamically.
+Physical NVIDIA and AMD GPU execution is not verified by the build contract.
 
 This source change is not itself a signed or published release.

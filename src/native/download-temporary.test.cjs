@@ -64,6 +64,41 @@ test('removable input and decoded output survive truncation with exact persisted
   });
 });
 
+test('an initially positive output reservation follows its first-write identity', async t => {
+  const { root, owner } = fixture(t);
+  const promises = require('node:fs/promises');
+  const original = { open:promises.open, lstat:promises.lstat };
+  const target = file => path.dirname(path.resolve(file)) !== path.resolve(root)
+    && path.basename(file) === 'decoded.mp4';
+  const transient = (file, stat) => {
+    if (!target(file) || !stat.isFile()) return stat;
+    const copy = Object.create(Object.getPrototypeOf(stat));
+    Object.defineProperties(copy, Object.getOwnPropertyDescriptors(stat));
+    Object.defineProperty(copy, 'ino', { value:stat.size === 0n ? 101n : stat.size === 1n ? 202n : 303n, enumerable:true });
+    return copy;
+  };
+  promises.open = async (file, ...args) => {
+    const handle = await original.open(file, ...args);
+    if (!target(file)) return handle;
+    const stat = handle.stat.bind(handle);
+    handle.stat = async (...options) => transient(file, await stat(...options));
+    return handle;
+  };
+  promises.lstat = async (file, ...args) => transient(file, await original.lstat(file, ...args));
+  try {
+    const temporary = await createDownloadTemporary(root, { owner });
+    try {
+      await temporary.reserveOutput();
+      assert.equal(temporary.record.files['decoded.mp4'].ino, '202');
+      fs.writeFileSync(temporary.output, 'first external write');
+      await temporary.checkOutput();
+      assert.equal(temporary.record.files['decoded.mp4'].ino, '303');
+    } finally { await temporary.cleanup(); }
+  } finally {
+    Object.assign(promises, { open:original.open, lstat:original.lstat });
+  }
+});
+
 test('removable cancellation before writing cleans only its reserved files', async t => {
   const { root, owner } = fixture(t);
   await withTransientFileIds(root, async () => {
@@ -71,6 +106,19 @@ test('removable cancellation before writing cleans only its reserved files', asy
     await temporary.reserveOutput();
     assert.equal((await temporary.cleanup()).missing, true);
   });
+});
+
+test('an active output reservation rejects a symbolic-link replacement', async t => {
+  const { root, owner } = fixture(t);
+  const temporary = await createDownloadTemporary(root, { owner });
+  try {
+    await temporary.reserveOutput();
+    fs.renameSync(temporary.output, temporary.output + '.original');
+    fs.symlinkSync(temporary.output + '.original', temporary.output);
+    await assert.rejects(temporary.checkOutput(), error => error.code === 'EEXIST');
+  } finally { await temporary.cleanup(); }
+  assert.equal(fs.lstatSync(temporary.output).isSymbolicLink(), true);
+  assert.equal(fs.existsSync(temporary.output + '.original'), true);
 });
 
 test('removable files truncated back to empty can be verified and safely removed', async t => {
@@ -118,6 +166,46 @@ test('persisted negative identities never authorize deletion without a live rese
   } finally { await temporary.cleanup(); }
 });
 
+test('persistently negative file identities can use and clean their live reservation', async t => {
+  const { root, owner } = fixture(t);
+  const promises = require('node:fs/promises');
+  const original = { open:promises.open, lstat:promises.lstat, lstatSync:fs.lstatSync };
+  const target = file => path.dirname(path.dirname(path.resolve(file))) === path.resolve(root)
+    && ['input.enc.tmp', 'decoded.mp4'].includes(path.basename(file));
+  const negative = stat => {
+    const copy = Object.create(Object.getPrototypeOf(stat));
+    Object.defineProperties(copy, Object.getOwnPropertyDescriptors(stat));
+    Object.defineProperty(copy, 'ino', { value:-123n, enumerable:true });
+    return copy;
+  };
+  promises.open = async (file, ...args) => {
+    const handle = await original.open(file, ...args);
+    if (!target(file)) return handle;
+    const stat = handle.stat.bind(handle);
+    handle.stat = async (...options) => negative(await stat(...options));
+    return handle;
+  };
+  promises.lstat = async (file, ...args) => {
+    const stat = await original.lstat(file, ...args);
+    return target(file) && stat.isFile() ? negative(stat) : stat;
+  };
+  fs.lstatSync = (file, ...args) => {
+    const stat = original.lstatSync(file, ...args);
+    return target(file) && stat.isFile() ? negative(stat) : stat;
+  };
+  try {
+    const temporary = await createDownloadTemporary(root, { owner });
+    assert.equal(BigInt(temporary.record.files['input.enc.tmp'].ino) < 0n, true);
+    fs.writeFileSync(temporary.input, 'downloaded');
+    await temporary.checkInput();
+    const result = await temporary.cleanup();
+    assert.equal(result.missing, true);
+  } finally {
+    Object.assign(promises, { open:original.open, lstat:original.lstat });
+    fs.lstatSync = original.lstatSync;
+  }
+});
+
 test('a persistently negative exFAT directory identity still cleans its owned files', async t => {
   const { root, owner } = fixture(t);
   await withPersistentNegativeDirectory(root, async () => {
@@ -139,19 +227,21 @@ test('a persistently negative exFAT directory identity still cleans its owned fi
 test('a replaced stable directory never inherits a copied owner marker', async t => {
   const { root, owner } = fixture(t);
   const temporary = await createDownloadTemporary(root, { owner });
-  fs.writeFileSync(temporary.input, 'original');
-  const restored = JSON.parse(JSON.stringify(temporary.record));
-  const marker = fs.readFileSync(path.join(restored.directory, '.hongguo-owner'));
-  fs.renameSync(restored.directory, restored.directory + '.original');
-  fs.mkdirSync(restored.directory);
-  fs.writeFileSync(path.join(restored.directory, 'input.enc.tmp'), 'replacement');
-  fs.writeFileSync(path.join(restored.directory, '.hongguo-owner'), marker);
-  assert.equal(inspectDownloadTemporary(restored, owner).directoryVerified, false);
-  const result = await cleanupDownloadTemporary(restored, owner);
-  assert.equal(result.directoryVerified, false);
-  assert.equal(result.count, 0);
-  assert.equal(fs.readFileSync(path.join(restored.directory, 'input.enc.tmp'), 'utf8'), 'replacement');
-  assert.deepEqual(fs.readFileSync(path.join(restored.directory, '.hongguo-owner')), marker);
+  try {
+    fs.writeFileSync(temporary.input, 'original');
+    const restored = JSON.parse(JSON.stringify(temporary.record));
+    const marker = fs.readFileSync(path.join(restored.directory, '.hongguo-owner'));
+    fs.renameSync(restored.directory, restored.directory + '.original');
+    fs.mkdirSync(restored.directory);
+    fs.writeFileSync(path.join(restored.directory, 'input.enc.tmp'), 'replacement');
+    fs.writeFileSync(path.join(restored.directory, '.hongguo-owner'), marker);
+    assert.equal(inspectDownloadTemporary(restored, owner).directoryVerified, false);
+    const result = await cleanupDownloadTemporary(restored, owner);
+    assert.equal(result.directoryVerified, false);
+    assert.equal(result.count, 0);
+    assert.equal(fs.readFileSync(path.join(restored.directory, 'input.enc.tmp'), 'utf8'), 'replacement');
+    assert.deepEqual(fs.readFileSync(path.join(restored.directory, '.hongguo-owner')), marker);
+  } finally { await temporary.cleanup().catch(() => {}); }
 });
 
 test('negative directory fallback never adopts replacement files from a copied marker', async t => {

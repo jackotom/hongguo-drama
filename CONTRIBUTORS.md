@@ -1,10 +1,12 @@
 # 贡献者与问题反馈致谢
 
+7.4开放PR致谢：[@j2-cuong](https://github.com/j2-cuong)（[#159](https://github.com/jackotom/hongguo-drama/pull/159) 下载取源重试与剧集筛选）、[@aaaasssddfgh](https://github.com/aaaasssddfgh)（[#152](https://github.com/jackotom/hongguo-drama/pull/152) Windows AMD AMF编码）；[@roytjus](https://github.com/roytjus)（#92、#143）和[@xinbaojian](https://github.com/xinbaojian)（#129）继续列入。列名代表代码提交，不代表PR已原样合并。
+
 7.3本轮公开反馈致谢：[@zzm-note](https://github.com/zzm-note)（[#156](https://github.com/jackotom/hongguo-drama/issues/156) S/D倍速调节建议，采用解决方案1）。以下保留7.2历史核对快照，不将反馈者伪列为代码作者。
 
 7.2本轮公开反馈致谢：[@Zxiaoming90](https://github.com/Zxiaoming90)（#153外置盘）、[@zhangyibin8111](https://github.com/zhangyibin8111)（#150下载与删除）、[@darki2k](https://github.com/darki2k)（#151字幕建议，本轮仅核实来源，尚未实现）。以下保留7.1历史核对快照，不将反馈者伪列为代码作者。
 
-核对日期：2026-11-12。收录本轮开发期间默认分支提交快照的作者，以及冻结时全部开放／已关闭 PR、Issue 的提交账号。共核对 264 个提交、10 个 PR、137 个 Issue；本轮发行及后置文档新增提交不回填该历史快照。仅展示公开账号与提交编号，不收录邮箱等私人资料。
+核对日期：2026-11-15。收录本轮开发期间默认分支提交快照的作者，以及冻结时全部开放／已关闭 PR、Issue 的提交账号。历史快照含 264 个提交、10 个 PR、137 个 Issue；本轮补充开放 PR #152、#159 后共 12 个 PR。仅展示公开账号与提交编号，不收录邮箱等私人资料。
 
 ## 代码提交作者
 
@@ -13,14 +15,16 @@
 
 ## PR 提交者
 
-感谢 8 位提交者提供代码方案。列出 PR 不代表已经合并或原样采用；具体采用情况以代码、提交历史与审查记录为准。
+感谢 10 位提交者提供代码方案。列出 PR 不代表已经合并或原样采用；具体采用情况以代码、提交历史与审查记录为准。
 
 | 账号 | 提交的 PR |
 | --- | --- |
+| [@aaaasssddfgh](https://github.com/aaaasssddfgh) | [#152](https://github.com/jackotom/hongguo-drama/pull/152) |
 | [@anupam-orbis](https://github.com/anupam-orbis) | [#140](https://github.com/jackotom/hongguo-drama/pull/140) |
 | [@ceco3000](https://github.com/ceco3000) | [#18](https://github.com/jackotom/hongguo-drama/pull/18) |
 | [@jackotom](https://github.com/jackotom) | [#29](https://github.com/jackotom/hongguo-drama/pull/29)、[#88](https://github.com/jackotom/hongguo-drama/pull/88) |
 | [@jayeeliu](https://github.com/jayeeliu) | [#61](https://github.com/jackotom/hongguo-drama/pull/61) |
+| [@j2-cuong](https://github.com/j2-cuong) | [#159](https://github.com/jackotom/hongguo-drama/pull/159) |
 | [@jjay5520](https://github.com/jjay5520) | [#87](https://github.com/jackotom/hongguo-drama/pull/87) |
 | [@roytjus](https://github.com/roytjus) | [#92](https://github.com/jackotom/hongguo-drama/pull/92)、[#143](https://github.com/jackotom/hongguo-drama/pull/143) |
 | [@xinbaojian](https://github.com/xinbaojian) | [#129](https://github.com/jackotom/hongguo-drama/pull/129) |

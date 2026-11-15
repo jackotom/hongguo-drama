@@ -705,13 +705,15 @@ function sourceFailure(source, error) {
     ? { networkFailure: error.networkFailure } : {};
   if (code === 'DEVICE_REGISTRATION_FAILED') {
     const reason = String(error.registrationFailure || '');
+    const safeReason = /^(?:TIMEOUT|NETWORK_ERROR|EMPTY_RESPONSE|INVALID_RESPONSE|BUSINESS_REJECTED|SECURITY_BLOCKED|HTTP_[3-5]\d{2})$/.test(reason)
+      ? reason : 'INVALID_RESPONSE';
     const descriptions = { TIMEOUT: '请求超时', NETWORK_ERROR: '网络连接失败', EMPTY_RESPONSE: '上游返回空响应',
       INVALID_RESPONSE: '上游未返回有效设备编号', BUSINESS_REJECTED: '上游拒绝注册', SECURITY_BLOCKED: '注册请求被安全校验阻止' };
     const detail = reason === 'NETWORK_ERROR' && network.networkFailure ? networkDetails[network.networkFailure]
       : Object.hasOwn(descriptions, reason) ? descriptions[reason]
       : /^HTTP_[3-5]\d{2}$/.test(reason) ? `HTTP ${reason.slice(5)}` : '';
     const transient = /^(?:TIMEOUT|NETWORK_ERROR|HTTP_(?:408|5\d\d))$/.test(reason);
-    return { source, code: /^(?:TIMEOUT|NETWORK_ERROR|HTTP_[3-5]\d{2})$/.test(reason) ? reason : code,
+    return { source, code: /^(?:TIMEOUT|NETWORK_ERROR|HTTP_[3-5]\d{2})$/.test(safeReason) ? safeReason : code, registrationFailure:safeReason,
       ...(reason === 'NETWORK_ERROR' ? network : {}),
       message: `匿名播放设备注册失败${detail ? `（${detail}）` : ''}${transient ? '，请检查网络，10 秒后重试' : '；本机冷却 10 秒后可手动重试，上游何时恢复暂无法确认'}` };
   }

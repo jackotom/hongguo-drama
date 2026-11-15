@@ -6,7 +6,7 @@ const vm = require('node:vm');
 const main = fs.readFileSync(path.join(__dirname, '../main.js'), 'utf8');
 const native = fs.readFileSync(path.join(__dirname, '../src/native/hongguo.js'), 'utf8');
 const context = vm.createContext({ normalizeDownloadQuality: value => value || 'auto' });
-vm.runInContext(main.slice(main.indexOf('function sourceFailureIsTransient('), main.indexOf('function armSourceRetry(')), context);
+vm.runInContext(main.slice(main.indexOf('function isTransientRegistrationFailure('), main.indexOf('function armSourceRetry(')), context);
 vm.runInContext(native.slice(native.indexOf('function sourceFailure('), native.indexOf('function unavailableSources(')), context);
 const task = { hongguoInfo: { vid: '11' }, downloadQuality: 'auto' };
 const unavailable = code => ({ code: 'SOURCE_UNAVAILABLE', sources: [

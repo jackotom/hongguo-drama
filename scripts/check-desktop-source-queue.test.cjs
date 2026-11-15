@@ -41,16 +41,20 @@ test('failed pause persistence rolls status back and does not abort the source b
 });
 
 for (const code of ['DEVICE_REGISTRATION_FAILED', 'HTTP_403', 'HTTP_429']) {
-    test(`explicit ${code} still stops the pending queue without fallback, lowering quality or retry`, async t => {
+    test(`explicit ${code} retries only the failed episode while the pending queue remains available`, async t => {
         const h = desktop(t), active = h.add('11'), waiting = h.add('12');
         h.pump(); await h.entered;
         const error = code === 'DEVICE_REGISTRATION_FAILED' ? { code, registrationFailure: 'BUSINESS_REJECTED' }
             : { status: Number(code.slice(5)) };
-        h.calls[0].reject(error); await h.drain();
-        assert.equal(active.status, 'failed'); assert.equal(waiting.status, 'stopped');
+        h.calls[0].reject(error); await turn();
+        assert.equal(active.status, 'failed'); assert.ok(active.retryAt);
+        assert.equal(waiting.status, 'pending');
         assert.equal(h.lookups.length, 1); assert.equal(h.state.transfers.length, 0);
-        assert.equal(h.liveTimers().length, 0); assert.equal(h.run('downloadQueue.length'), 0);
-        assert.equal(h.state.saved.find(item => item.id === waiting.id).status, 'stopped');
+        assert.equal(h.liveTimers().length, 1); assert.equal(h.run('downloadQueue.length'), 1);
+        assert.equal(h.state.saved.find(item => item.id === waiting.id).status, 'pending');
+        h.run('pauseAllTasks()'); await turn();
+        assert.equal(active.status, 'stopped'); assert.equal(waiting.status, 'stopped');
+        assert.equal(h.liveTimers().length, 0);
         h.run('loadDownloadTasks(); enqueuePendingTasks(); pumpQueue()'); await turn();
         assert.equal(h.lookups.length, 1);
     });

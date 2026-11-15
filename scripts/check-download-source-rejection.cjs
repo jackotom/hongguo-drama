@@ -12,6 +12,12 @@ const roots = [];
 const info = vid => ({ url: 'https://fixture.invalid/video.mp4', source: 'app', vid });
 const rejected = code => ({ url: null, code: 'SOURCE_UNAVAILABLE', error: '取源被拒绝',
   sources: [{ source: 'web', code: 'TIMEOUT' }, { source: 'app', code }] });
+const registrationTimeout = () => ({ url: null, code: 'SOURCE_UNAVAILABLE', error: '注册超时',
+  sources: [
+    { source: 'web', code: 'TIMEOUT' },
+    { source: 'app', code: 'TIMEOUT', registrationFailure: 'TIMEOUT' },
+    { source: 'api', code: 'TIMEOUT' },
+  ] });
 const deferred = () => { let resolve; const promise = new Promise(done => { resolve = done; }); return { promise, resolve }; };
 
 function fixture(concurrency = 1, { requestSignal = req('./src/native/request-signal') } = {}) {
@@ -90,48 +96,137 @@ function fixture(concurrency = 1, { requestSignal = req('./src/native/request-si
 async function tick() { await new Promise(resolve => setTimeout(resolve, 25)); }
 
 const checks = [
-  ['registration and App HTTP rejection preserve unstarted tasks instead of failing the queue', async () => {
+  ['rejection retries only the failing episode; waiting episodes stay queued', async () => {
     for (const code of ['DEVICE_REGISTRATION_FAILED', 'HTTP_403', 'HTTP_429']) {
-      const h = fixture(); h.add('1'); const next = h.add('2'), later = h.add('3');
+      const h = fixture(); const first = h.add('1'), next = h.add('2'), later = h.add('3');
       h.state.load = async () => rejected(code);
-      h.pump(); await h.drain();
-      assert.equal(next.status, 'stopped', `${code}: next task must stay unstarted`);
-      assert.equal(later.status, 'stopped');
-      assert.equal(h.state.calls.length, 1, `${code}: no fallback or subsequent source lookup`);
-      assert.match(next.error, /暂停.*手动/);
-      assert.equal(h.run('downloadQueue.length'), 0);
-      assert.equal(h.liveTimers().length, 0);
-      assert.equal(h.state.saved.find(task => task.id === '2').status, 'stopped');
-      h.run('loadDownloadTasks(); enqueuePendingTasks(); pumpQueue()'); await h.drain();
-      assert.equal(h.state.calls.length, 1, 'restart must not automatically probe paused tasks');
+      h.pump(); await tick();
+      assert.equal(first.status, 'failed', code);
+      assert.equal(first.sourceRetries, 1); assert.equal(first.sourceRetryLimit, 6);
+      assert.ok(first.retryAt > Date.now());
+      assert.equal(next.status, 'pending'); assert.equal(later.status, 'pending');
+      assert.equal(h.state.calls.length, 1);
+      assert.ok(h.run('hongguoDownloadReadyAt') > Date.now());
+      h.state.load = async vid => info(vid);
+      h.run('sourceRetryTimers.get("1").fn()'); await h.drain();
+      assert.equal(first.status, 'completed');
+      assert.equal(next.status, 'completed');
+      assert.equal(later.status, 'completed');
     }
   }],
-  ['thrown registration failures stop before quality fallback without inspecting error text', async () => {
-    for (const registrationFailure of ['HTTP_403', 'HTTP_429', 'INVALID_RESPONSE']) {
-      const h = fixture(); h.add('1'); const next = h.add('2');
-      h.state.load = async () => { throw Object.assign(new Error('注册失败'), { code: 'DEVICE_REGISTRATION_FAILED', registrationFailure }); };
-      h.pump(); await h.drain();
-      assert.equal(next.status, 'stopped'); assert.equal(h.state.calls.length, 1);
+  ['transient registration timeouts gate numeric work instead of failing the queue', async () => {
+    const h = fixture(); const first = h.add('1'), next = h.add('2'), later = h.add('3');
+    h.state.load = async vid => vid === '1' ? registrationTimeout() : info(vid);
+    h.pump(); await tick();
+    assert.equal(first.status, 'failed');
+    assert.equal(next.status, 'pending');
+    assert.equal(later.status, 'pending');
+    assert.equal(h.state.calls.length, 1, JSON.stringify({
+      calls:h.state.calls,
+      tasks:h.tasks.map(task => ({ id:task.id, status:task.status, retryAt:task.retryAt, error:task.error })),
+      readyIn:h.run('hongguoDownloadReadyAt') - Date.now(),
+    }));
+    assert.match(first.error, /1\/6/);
+    assert.ok(first.retryAt > Date.now());
+    assert.ok(h.run('hongguoDownloadReadyAt') > Date.now());
+    const retry = h.timers.find(timer => !timer.cleared && timer.ms >= 15000);
+    assert.ok(retry);
+    h.state.load = async vid => info(vid);
+    retry.fn(); await h.drain();
+    assert.equal(first.status, 'completed');
+    assert.equal(next.status, 'completed');
+    assert.equal(later.status, 'completed');
+  }],
+  ['non-Hongguo success keeps the shared Hongguo rejection backoff', async () => {
+    for (const cached of [false, true]) {
+      const h = fixture(2), failed = h.add('1'), other = h.add('other', cached ? 'custom:fixture:2' : 'xifan:2');
+      const success = deferred();
+      h.state.load = async vid => vid === '1' ? rejected('HTTP_429') : success.promise;
+      if (cached) {
+        fs.writeFileSync(other.savePath, 'complete fixture');
+        h.run('hasCompleteTaskFile = () => true');
+      }
+      h.pump(); await tick();
+      assert.equal(failed.status, 'failed');
+      assert.equal(h.run('sourceRejectionStreak'), 1);
+      success.resolve(info(other.hongguoInfo.vid)); await tick();
+      assert.equal(other.status, 'completed');
+      assert.equal(h.run('sourceRejectionStreak'), 1, `${cached ? 'cached' : 'transfer'} success must not reset Hongguo backoff`);
     }
   }],
-  ['rejection cancels numeric-source retry timers but keeps other-source timers', async () => {
-    const h = fixture(); h.add('1');
-    const numeric = h.add('2', '2', 'failed'), other = h.add('x', 'xifan:2', 'failed');
-    for (const task of [numeric, other]) { task.retryAt = Date.now() + 60000; task.sourceRetries = 1; }
-    h.run('for (const task of downloadTasks.filter(t => t.retryAt)) armSourceRetry(task)');
-    const staleTimer = h.timers[0];
+  ['only a fresh Hongguo source clears rejection backoff', async () => {
+    const existing = fixture(), local = existing.add('1');
+    fs.writeFileSync(local.savePath, 'complete fixture');
+    existing.run('sourceRejectionStreak = 3; hongguoDownloadReadyAt = Date.now() + 600000; hasCompleteTaskFile = () => true');
+    await existing.run('executeHongguoDownload(downloadTasks[0])');
+    assert.equal(local.status, 'completed');
+    assert.equal(existing.run('sourceRejectionStreak'), 3, 'an existing local file is not a source recovery');
+    assert.ok(existing.run('hongguoDownloadReadyAt') > Date.now(), 'an existing local file must not release the source gate');
+
+    const fresh = fixture(), task = fresh.add('1');
+    fresh.run('sourceRejectionStreak = 3; hongguoDownloadReadyAt = Date.now() + 600000');
+    fresh.state.load = async vid => info(vid);
+    await fresh.run('executeHongguoDownload(downloadTasks[0])');
+    assert.equal(task.status, 'completed');
+    assert.equal(fresh.run('sourceRejectionStreak'), 0);
+    assert.equal(fresh.run('hongguoDownloadReadyAt'), 0);
+  }],
+  ['source retry exhaustion stops after six attempts without a seventh timer', async () => {
+    const h = fixture(), task = h.add('1');
     h.state.load = async () => rejected('HTTP_429');
-    h.pump(); await h.drain();
-    assert.equal(numeric.status, 'stopped'); assert.equal(numeric.retryAt, undefined);
-    assert.equal(numeric.sourceRetries, undefined); assert.equal(staleTimer.cleared, true);
-    const savedAt = h.state.operations.findIndex(op => op.event === 'saved' && op.tasks.find(task => task.id === '2')?.status === 'stopped');
-    const clearedAt = h.state.operations.findIndex(op => op.event === 'clear' && op.timer === staleTimer);
-    assert.ok(savedAt >= 0 && savedAt < clearedAt, 'paused state must be saved before cancelling its timer');
-    assert.equal(other.status, 'failed'); assert.ok(other.retryAt); assert.equal(h.liveTimers().length, 1);
-    staleTimer.fn(); await h.drain();
-    assert.equal(h.state.calls.length, 1, 'late cancelled timer cannot restart a paused task');
+    h.pump(); await tick();
+    for (let retries = 1; retries <= 6; retries++) {
+      assert.equal(task.sourceRetries, Math.min(retries, 6));
+      const timer = h.run('sourceRetryTimers.get("1")');
+      assert.ok(timer, `missing retry timer ${retries}`);
+      timer.cleared = true;
+      timer.fn();
+      h.run('hongguoDownloadReadyAt = 0; enqueuePendingTasks(); pumpQueue()');
+      await tick();
+    }
+    assert.equal(task.sourceRetries, 6);
+    assert.equal(h.state.calls.length, 7);
+    assert.equal(h.run('sourceRetryTimers.has("1")'), false, JSON.stringify({
+      status:task.status, retryAt:task.retryAt, timer:h.run('sourceRetryTimers.get("1")')?.ms,
+    }));
+    assert.equal(h.liveTimers().length, 0);
+    h.run('hongguoDownloadReadyAt = 0; enqueuePendingTasks(); pumpQueue()'); await tick();
+    assert.equal(h.state.calls.length, 7);
   }],
-  ['active transfer completes while pending numeric tasks stop and another source continues', async () => {
+  ['manual pause cancels its timer and a late callback cannot revive stopped work', async () => {
+    const h = fixture(), task = h.add('1');
+    h.state.load = async () => rejected('HTTP_429');
+    h.pump(); await tick();
+    const stale = h.liveTimers().find(item => item.ms >= 15000);
+    assert.ok(stale);
+    assert.equal(h.run('pauseAllTasks()'), 1);
+    assert.equal(task.status, 'stopped');
+    assert.equal(stale.cleared, true);
+    stale.fn(); await tick();
+    assert.equal(task.status, 'stopped');
+    assert.equal(h.state.calls.length, 1);
+    assert.equal(h.run('sourceRetryTimers.has("1")'), false);
+  }],
+  ['thrown registration failures and empty replies schedule per-episode retries', async () => {
+    const errors = [
+      ...['HTTP_403', 'HTTP_429', 'INVALID_RESPONSE'].map(registrationFailure =>
+        Object.assign(new Error('注册失败'), { code: 'DEVICE_REGISTRATION_FAILED', registrationFailure })),
+      Object.assign(new Error('播放接口返回空响应'), {
+        code: 'SOURCE_UNAVAILABLE',
+        sources: [{ source: 'web', code: 'TIMEOUT' }, { source: 'app', code: 'EMPTY_RESPONSE' }],
+      }),
+    ];
+    for (const error of errors) {
+      const h = fixture(); const first = h.add('1'), next = h.add('2');
+      h.state.load = async () => { throw error; };
+      h.pump(); await tick();
+      assert.equal(first.status, 'failed');
+      assert.ok(first.retryAt);
+      assert.equal(first.sourceRetries, 1);
+      assert.equal(next.status, 'pending');
+    }
+  }],
+  ['active transfer completes while a gated numeric task and another source continue', async () => {
     const h = fixture(2), lookup = deferred(), transfer = deferred();
     h.add('1'); const active = h.add('2'), pending = h.add('3'), other = h.add('x', 'xifan:4');
     h.state.load = async vid => vid === '1' ? lookup.promise : info(vid);
@@ -142,10 +237,11 @@ const checks = [
       tasks: h.tasks.map(task => ({ id: task.id, status: task.status, error: task.error })),
     }));
     lookup.resolve(rejected('HTTP_403')); await tick();
-    assert.equal(pending.status, 'stopped'); assert.equal(active.status, 'downloading');
+    assert.equal(pending.status, 'pending'); assert.equal(active.status, 'downloading');
     assert.equal(active.cancelSource.token.reason, undefined);
-    transfer.resolve(); await h.drain();
+    transfer.resolve(); await tick();
     assert.equal(active.status, 'completed'); assert.equal(other.status, 'completed');
+    assert.equal(pending.status, 'pending');
     assert.equal(h.run('activeDownloads'), 0); assert.equal(h.run('runningDownloads.size'), 0);
   }],
   ['ordinary episode errors and media HTTP errors do not pause the source', async () => {
@@ -170,33 +266,19 @@ const checks = [
     h.state.load = async vid => vid === 'xifan:1' ? rejected('HTTP_429') : info(vid);
     h.pump(); await h.drain(); assert.equal(next.status, 'completed');
   }],
-  ['manual retry, selected retry and resume keep the same paused task identity and quality', async () => {
+  ['manual retry, selected retry and resume take over a waiting retry', async () => {
     for (const channel of ['retry-task', 'retry-tasks', 'resume-all']) {
-      const h = fixture(); h.add('1'); const next = h.add('2');
-      h.state.load = async () => rejected('HTTP_429'); h.pump(); await h.drain();
-      assert.equal(next.status, 'stopped');
+      const h = fixture(); const first = h.add('1'), next = h.add('2');
+      h.state.load = async () => rejected('HTTP_429'); h.pump(); await tick();
+      assert.equal(first.status, 'failed'); assert.ok(first.retryAt);
+      assert.equal(next.status, 'pending');
       h.state.load = async vid => info(vid);
-      const result = await h.handlers[channel]({}, channel === 'retry-tasks' ? ['2'] : '2');
+      const result = await h.handlers[channel]({}, channel === 'retry-tasks' ? ['1'] : '1');
       assert.equal(result.success, true); await h.drain();
-      assert.equal(next.status, 'completed'); assert.equal(next.downloadQuality, '1080p');
-      assert.equal(h.tasks.filter(task => task.id === '2').length, 1);
+      assert.equal(first.status, 'completed'); assert.equal(first.downloadQuality, '1080p');
+      assert.equal(first.retryAt, undefined);
+      assert.equal(next.status, 'completed');
     }
-  }],
-  ['save failure keeps rejected-source work stopped in memory without automatic retries', async () => {
-    const h = fixture(); h.add('1'); const next = h.add('2');
-    const delayed = h.add('3', '3', 'failed'); delayed.retryAt = Date.now() + 60000;
-    h.run('armSourceRetry(downloadTasks[2])');
-    const staleTimer = h.timers[0];
-    h.state.load = async () => { h.state.saveError = new Error('disk full'); return rejected('HTTP_429'); };
-    h.pump(); await h.drain();
-    assert.equal(next.status, 'stopped'); assert.equal(delayed.status, 'stopped');
-    assert.equal(h.state.calls.length, 1);
-    assert.equal(staleTimer.cleared, false, 'failed persistence must not cancel resources');
-    assert.equal(h.state.saved.find(task => task.id === '3').status, 'failed', 'paused state was not persisted');
-    assert.equal(delayed.retryAt, undefined); assert.equal(delayed.sourceRetries, undefined);
-    staleTimer.fn(); await h.drain();
-    assert.equal(delayed.status, 'stopped'); assert.equal(h.state.calls.length, 1, 'late timer must not fetch again');
-    assert.equal(h.run('sourceRetryTimers.has("3")'), false);
   }],
   ['source rejection raised during consumption stops before trying quality alternatives', async () => {
     const h = fixture(); h.state.load = async vid => ({ ...info(vid), variants: [info('backup')] });

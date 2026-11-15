@@ -18,6 +18,12 @@ const sameIdentity = (stat, identity) => {
   const a = identityOf(stat), b = typeof identity?.ino === 'bigint' ? identityOf(identity) : identity;
   return !!b && a.dev === b.dev && a.ino === b.ino && a.birthtimeNs === b.birthtimeNs;
 };
+// A live handle can prove a signed file ID exactly; persisted negative IDs remain unverified after restart.
+const sameLiveIdentity = (stat, identity) => {
+  if (typeof stat.ino !== 'bigint' || stat.ino === 0n || typeof stat.birthtimeNs !== 'bigint') return false;
+  const a = identityOf(stat), b = typeof identity?.ino === 'bigint' ? identityOf(identity) : identity;
+  return !!b && a.dev === b.dev && a.ino === b.ino && a.birthtimeNs === b.birthtimeNs;
+};
 // Negative exFAT directory IDs can change; only those receipts fall back to the task-bound marker.
 function directoryIsOwned(record, current) {
   try {
@@ -140,20 +146,17 @@ async function removeOwnedFile(file, identity, canRemove = () => true) {
 
 async function reserveOwnedFile(file, onChange = () => {}) {
   const handle = await fs.open(file, 'wx', 0o600);
-  let identity, held = false;
+  let identity, open = true;
   const inspect = async () => {
-    let stat = identity;
-    if (held) {
+    let stat = await handle.stat({ bigint:true });
+    // Some removable filesystems allocate their durable ID when the first byte is written.
+    if (stat.size === 0n) {
+      await handle.write(Buffer.alloc(1), 0, 1, 0);
       stat = await handle.stat({ bigint:true });
-      // exFAT assigns the durable ID on allocation, and changes it again after truncation.
-      if (stat.ino < 0n && stat.size === 0n) {
-        await handle.write(Buffer.alloc(1), 0, 1, 0);
-        stat = await handle.stat({ bigint:true });
-      }
     }
     const current = await fs.lstat(file, statOptions(stat));
-    if (!current.isFile() || !sameIdentity(current, stat)) return null;
-    if (held) { identity = stat; onChange(stat); }
+    if (!current.isFile() || !sameLiveIdentity(current, stat)) return null;
+    identity = stat; onChange(stat);
     return stat;
   };
   const check = async () => {
@@ -162,10 +165,7 @@ async function reserveOwnedFile(file, onChange = () => {}) {
     throw Object.assign(new Error('下载临时文件已变化，已有文件已保留，请重试'), { code:'EEXIST' });
   };
   try {
-    identity = await handle.stat({ bigint:true });
-    held = typeof identity.ino === 'bigint' && identity.ino < 0n;
-    if (held) await check();
-    else { onChange(identity); await handle.close(); }
+    await check();
   } catch (error) { await handle.close().catch(() => {}); throw error; }
   return { check,
     remove: async () => {
@@ -175,7 +175,7 @@ async function reserveOwnedFile(file, onChange = () => {}) {
         return true;
       } catch (error) { if (error.code === 'ENOENT') return true; throw error; }
     },
-    close: async () => { if (held) { held = false; await handle.close(); } } };
+    close: async () => { if (open) { open = false; await handle.close(); } } };
 }
 
 async function createDownloadTemporary(directory, { owner, onChange = () => {} } = {}) {
@@ -188,9 +188,11 @@ async function createDownloadTemporary(directory, { owner, onChange = () => {} }
   const input = path.join(root, 'input.enc.tmp'), output = path.join(root, 'decoded.mp4');
   const reservations = new Map();
   const reserve = async file => {
-    reservations.set(path.basename(file), await reserveOwnedFile(file, stat => {
+    const reservation = await reserveOwnedFile(file, stat => {
       record.files[path.basename(file)] = identityOf(stat); onChange(record);
-    }));
+    });
+    reservations.set(path.basename(file), reservation);
+    return reservation;
   };
   const removeOutput = async () => {
     if (record.files['decoded.mp4']) {
@@ -204,8 +206,15 @@ async function createDownloadTemporary(directory, { owner, onChange = () => {} }
   };
   const cleanup = async () => {
     try {
-      if (inspectDownloadTemporary(record, owner).directoryVerified) {
-        for (const reserved of reservations.values()) await reserved.check().catch(() => {});
+      const directoryVerified = inspectDownloadTemporary(record, owner).directoryVerified;
+      for (const [name, reserved] of reservations) {
+        try {
+          if (directoryVerified && directoryIsOwned(record)) await reserved.remove();
+        } catch (_) { /* Keep the marker and receipt when live ownership is uncertain. */ }
+        finally {
+          await reserved.close().catch(() => {});
+          reservations.delete(name);
+        }
       }
       return await cleanupDownloadTemporary(record, owner);
     } finally { await Promise.all([...reservations.values()].map(reserved => reserved.close())); }
@@ -213,7 +222,7 @@ async function createDownloadTemporary(directory, { owner, onChange = () => {} }
   try { onChange(record); await reserve(input); }
   catch (error) { await cleanup().catch(() => {}); throw error; }
   return { input, output, record, reserveOutput: () => reserve(output),
-    outputCreated: stat => { record.files['decoded.mp4'] = identityOf(stat); onChange(record); }, removeOutput, cleanup,
+    removeOutput, cleanup,
     checkInput: async () => {
       if (reservations.has('input.enc.tmp')) return reservations.get('input.enc.tmp').check();
       if (!record.files['input.enc.tmp'] || !await isOwnedFile(input, record.files['input.enc.tmp'])) {

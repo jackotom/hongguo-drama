@@ -1,6 +1,6 @@
 {
   "repository": "jackotom/hongguo-drama",
-  "asOf": "2026-11-12",
+  "asOf": "2026-11-15",
   "codeAuthors": [
     {
       "login": "jackotom",
@@ -73,7 +73,7 @@
     {
       "number": 140,
       "author": "anupam-orbis",
-      "state": "open",
+      "state": "closed",
       "merged": false,
       "url": "https://github.com/jackotom/hongguo-drama/pull/140"
     },
@@ -83,9 +83,30 @@
       "state": "open",
       "merged": false,
       "url": "https://github.com/jackotom/hongguo-drama/pull/143"
+    },
+    {
+      "number": 152,
+      "author": "aaaasssddfgh",
+      "state": "open",
+      "merged": false,
+      "url": "https://github.com/jackotom/hongguo-drama/pull/152"
+    },
+    {
+      "number": 159,
+      "author": "j2-cuong",
+      "state": "open",
+      "merged": false,
+      "url": "https://github.com/jackotom/hongguo-drama/pull/159"
     }
   ],
   "pullRequestAuthors": [
+    {
+      "login": "aaaasssddfgh",
+      "url": "https://github.com/aaaasssddfgh",
+      "submissions": [
+        152
+      ]
+    },
     {
       "login": "anupam-orbis",
       "url": "https://github.com/anupam-orbis",
@@ -113,6 +134,13 @@
       "url": "https://github.com/jayeeliu",
       "submissions": [
         61
+      ]
+    },
+    {
+      "login": "j2-cuong",
+      "url": "https://github.com/j2-cuong",
+      "submissions": [
+        159
       ]
     },
     {

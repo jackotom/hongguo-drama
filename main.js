@@ -1,4 +1,4 @@
-// Hongguo Drama 7.3: desktop runtime; server entry is server/index.cjs.
+// Hongguo Drama 7.4: desktop runtime; server entry is server/index.cjs.
 /**
  * main.js - 红果短剧 6.2 下载器（独立版）主进程
  *
@@ -759,7 +759,9 @@ async function runTask(task) {
   } catch (error) {
     console.error('[Download Queue] 下载失败:', error);
   } finally {
-    if (/^\d{1,30}$/.test(String(task.hongguoInfo?.vid || ''))) hongguoDownloadReadyAt = Date.now() + 1000;
+    if (/^\d{1,30}$/.test(String(task.hongguoInfo?.vid || ''))) {
+      hongguoDownloadReadyAt = Math.max(hongguoDownloadReadyAt, Date.now() + 1000);
+    }
     activeDownloads--;
     runningDownloads.delete(task.id);
     runningDownloadPaths.delete(destination);
@@ -785,27 +787,31 @@ function enqueuePendingTasks() {
 // Give temporary source/transport failures a bounded recovery window.
 const SOURCE_RETRY_DELAYS = [3, 8, 15].map(minutes => minutes * 60000);
 const TRANSFER_RETRY_DELAYS = [10, 30, 60].map(seconds => seconds * 1000);
+const REJECTION_RETRY_DELAYS = [15, 30, 60, 120, 300, 600].map(seconds => seconds * 1000);
 const sourceRetryTimers = new Map();
+let sourceRejectionStreak = 0;
+
+function isTransientRegistrationFailure(error) {
+  const app = error?.code === 'DEVICE_REGISTRATION_FAILED' ? error
+    : error?.code === 'SOURCE_UNAVAILABLE' && Array.isArray(error.sources)
+      ? error.sources.find(item => item.source === 'app') : null;
+  return /^(?:TIMEOUT|NETWORK_ERROR|HTTP_(?:408|5\d\d))$/.test(app?.registrationFailure || '');
+}
 
 function isDownloadSourceRejection(error) {
-  return error?.code === 'DEVICE_REGISTRATION_FAILED' || error?.code === 'SOURCE_UNAVAILABLE'
-    && Array.isArray(error.sources) && error.sources.some(item => item.source === 'app'
+  if (error?.code === 'DEVICE_REGISTRATION_FAILED') return !isTransientRegistrationFailure(error);
+  return error?.code === 'SOURCE_UNAVAILABLE' && Array.isArray(error.sources)
+    && error.sources.some(item => item.source === 'app'
       && /^(?:DEVICE_REGISTRATION_FAILED|HTTP_(?:403|429))$/.test(item.code));
 }
 
-function pausePendingHongguoTasks() {
-  const paused = [];
-  for (const task of downloadTasks) {
-    if (task.type !== 'hongguo' || !/^\d{1,30}$/.test(String(task.hongguoInfo?.vid || ''))
-      || runningDownloads.has(task.id) || !(task.status === 'pending'
-        || task.status === 'failed' && (task.retryAt || sourceRetryTimers.has(task.id)))) continue;
-    delete task.retryAt; delete task.sourceRetries;
-    task.status = 'stopped'; task.cancelled = true; task.endTime = Date.now();
-    task.error = '匿名设备注册失败或 App 取源被拒绝，已暂停后续下载；请手动重试，上游恢复时间无法确认';
-    paused.push(task);
-  }
-  downloadQueue = downloadQueue.filter(task => task.status === 'pending');
-  return paused;
+function holdHongguoLookups(delay) {
+  hongguoDownloadReadyAt = Math.max(hongguoDownloadReadyAt, Date.now() + delay);
+}
+
+function clearHongguoSourceBackoff() {
+  sourceRejectionStreak = 0;
+  hongguoDownloadReadyAt = 0;
 }
 
 function sourceFailureIsTransient(error) {
@@ -817,12 +823,18 @@ function sourceFailureIsTransient(error) {
     || /^(?:TIMEOUT|NETWORK_ERROR|HTTP_(?:408|5\d\d))$/.test(item.code));
 }
 
+function sourceFailureHasEmpty(error) {
+  return Array.isArray(error?.sources) && error.sources.some(item => item.code === 'EMPTY_RESPONSE');
+}
+
 function isDeferrableSourceError(task, error) {
   if (!/^\d{1,30}$/.test(String(task.hongguoInfo?.vid || ''))) return false;
-  if (error?.code === 'EMPTY_RESPONSE') return false;
+  if (isTransientRegistrationFailure(error)) return true;
+  if (error?.code === 'EMPTY_RESPONSE') return true;
   if (error?.code === 'SOURCE_UNAVAILABLE') {
     const sources = Array.isArray(error.sources) ? error.sources : [];
-    return !sources.some(item => item.code === 'SECURITY_BLOCKED') && sourceFailureIsTransient(error);
+    return !sources.some(item => item.code === 'SECURITY_BLOCKED')
+      && (sourceFailureIsTransient(error) || sourceFailureHasEmpty(error));
   }
   if (error?.mediaStatus === 408 || error?.mediaStatus >= 500 && error?.mediaStatus <= 599) return true;
   if (['ECONNRESET', 'ECONNABORTED', 'ETIMEDOUT', 'EPIPE', 'ERR_BAD_RESPONSE', 'ERR_STREAM_PREMATURE_CLOSE', 'EAI_AGAIN',
@@ -859,8 +871,7 @@ function armSourceRetry(task) {
 function clearSourceRetry(task) {
   clearTimeout(sourceRetryTimers.get(task.id));
   sourceRetryTimers.delete(task.id);
-  delete task.retryAt;
-  delete task.sourceRetries;
+  delete task.retryAt; delete task.sourceRetries; delete task.sourceRetryLimit;
 }
 
 function cancelScheduledRetries(tasks) {
@@ -884,7 +895,7 @@ function pauseAllTasks() {
   const snapshot = snapshotQueueTasks(tasks);
   for (const task of tasks) {
     task.status = 'stopped'; task.error = '已手动暂停'; task.endTime = Date.now(); task.cancelled = true;
-    delete task.retryAt; delete task.sourceRetries;
+    delete task.retryAt; delete task.sourceRetries; delete task.sourceRetryLimit;
   }
   downloadQueue = [];
   try { saveDownloadTasks(); }
@@ -1036,6 +1047,7 @@ async function executeHongguoDownload(task) {
   const source = axios.CancelToken.source();
   task.cancelSource = source;
   let tmpPath, writer, temporary;
+  const numeric = /^\d{1,30}$/.test(String(vid));
   try {
     task.status = 'downloading'; task.cancelled = false; task.progress = 0; delete task.retryAt;
     delete task.qualityNotice; delete task.actualQuality;
@@ -1043,7 +1055,7 @@ async function executeHongguoDownload(task) {
     const settings = getCurrentSettings();
     // Old and retried tasks retain their original policy, independent of new defaults.
     const quality = normalizeDownloadQuality(task.downloadQuality);
-    const allowLowerQuality = quality !== 'auto' && /^\d{1,30}$/.test(String(vid));
+    const allowLowerQuality = quality !== 'auto' && numeric;
     const notifyQuality = pixels => {
       const lower = allowLowerQuality && pixels > 0 && pixels < Number.parseInt(quality, 10);
       const notice = lower ? `正在下载更低质量片源：${pixels}P（原选 ${quality.toUpperCase()}）` : '';
@@ -1086,7 +1098,8 @@ async function executeHongguoDownload(task) {
       await completeNasExports(task);
       source.token.throwIfRequested();
       task.fileIdentity = readFileIdentity(finalPath);
-      task.status = 'completed'; task.progress = 100; task.endTime = Date.now(); delete task.sourceRetries;
+      task.status = 'completed'; task.progress = 100; task.endTime = Date.now();
+      delete task.sourceRetries; delete task.sourceRetryLimit;
       saveDownloadTasks(); sendToRenderer('download-completed', { id, path: finalPath });
       return;
     }
@@ -1137,7 +1150,7 @@ async function executeHongguoDownload(task) {
       return false;
     };
     let reusedCache = await reuseCache();
-    if (!reusedCache && /^\d{1,30}$/.test(String(vid))) {
+    if (!reusedCache && numeric) {
       const qualities = new Set([quality, 'auto', '1080p', ...(quality === '1080p' ? [] : ['720p'])]);
       const pending = [...qualities].map(value => onlinePreparing.get(onlineCacheKey(vid, value))).find(job => job
         && !job.controller.signal.aborted && [...onlineSessions.values()].some(session => session.job === job
@@ -1159,7 +1172,8 @@ async function executeHongguoDownload(task) {
       }
       reusedCache = await reuseCache();
     }
-    if (!reusedCache) await withMediaRecovery(vid, hongguoInfo?.series_id, { playInfo: checkedPlayInfo, quality, allowLowerQuality, force: true, cancelToken: source.token }, async playInfo => {
+    if (!reusedCache) await withMediaRecovery(vid, hongguoInfo?.series_id, { playInfo: checkedPlayInfo, quality, allowLowerQuality, force: true, cancelToken: source.token,
+      onSourceReady: numeric ? clearHongguoSourceBackoff : null }, async playInfo => {
       source.token.throwIfRequested();
       const bytevc2Executable = playInfo.codec === 'bytevc2' ? requireBytevc2Executable() : null;
       notifyQuality(Math.min(Number(playInfo.width), Number(playInfo.height)));
@@ -1208,7 +1222,7 @@ async function executeHongguoDownload(task) {
               await convertBytevc2({ executable: bytevc2Executable, input: tmpPath, output: decodedPath,
                 fastConversion: getCurrentSettings().fast_conversion,
                 contentKey: playInfo.contentKey, duration: playInfo.duration, cancelToken: source.token, onProgress: progress,
-                onPhase: (phase, meta) => progress(0, phase, meta), onOutputCreated: temporary.outputCreated });
+                onPhase: (phase, meta) => progress(0, phase, meta), reserveOutput: temporary.reserveOutput });
             } finally { task.qualityNotice = notice || ''; }
           } else {
             await temporary.reserveOutput();
@@ -1243,12 +1257,12 @@ async function executeHongguoDownload(task) {
     task.fileIdentity = readFileIdentity(finalPath);
     await completeNasExports(task);
     source.token.throwIfRequested();
-    task.status = 'completed'; task.progress = 100; task.endTime = Date.now(); delete task.sourceRetries;
+    task.status = 'completed'; task.progress = 100; task.endTime = Date.now();
+    delete task.sourceRetries; delete task.sourceRetryLimit;
     if (task.qualityNotice) task.qualityNotice = task.qualityNotice.replace('正在下载', '已下载');
     saveDownloadTasks(); sendToRenderer('download-completed', { id, path: finalPath, actualQuality: task.actualQuality, qualityNotice: task.qualityNotice || '' });
   } catch (error) {
     if (writer && !writer.destroyed) writer.destroy();
-    let paused = [];
     task.qualityNotice = '';
     // A retry may already be queued; the cancelled old run must not overwrite it.
     if (source.token.reason || axios.isCancel(error) || task.cancelled) {
@@ -1259,20 +1273,27 @@ async function executeHongguoDownload(task) {
     } else {
       const retries = task.sourceRetries || 0;
       task.status = 'failed'; task.error = error.code === 'EEXIST' ? '下载临时文件发生冲突或已变化，已有文件已保留，请重试' : error.message; task.endTime = Date.now();
-      if (/^\d{1,30}$/.test(String(vid)) && isDownloadSourceRejection(error)) paused = pausePendingHongguoTasks();
-      else if (retries < SOURCE_RETRY_DELAYS.length && isDeferrableSourceError(task, error)) {
-        const delays = error.code === 'SOURCE_UNAVAILABLE' || [404, 410].includes(error.mediaStatus)
+      const rejection = numeric && isDownloadSourceRejection(error);
+      const rejectionRetry = rejection || isTransientRegistrationFailure(error)
+        || error.code === 'EMPTY_RESPONSE' || error.code === 'SOURCE_UNAVAILABLE' && sourceFailureHasEmpty(error);
+      const delays = rejectionRetry ? REJECTION_RETRY_DELAYS
+        : error.code === 'SOURCE_UNAVAILABLE' || [404, 410].includes(error.mediaStatus)
           ? SOURCE_RETRY_DELAYS : TRANSFER_RETRY_DELAYS;
+      if (rejectionRetry) {
+        holdHongguoLookups(REJECTION_RETRY_DELAYS[Math.min(sourceRejectionStreak, REJECTION_RETRY_DELAYS.length - 1)]);
+        sourceRejectionStreak++;
+      }
+      if (retries < delays.length && (rejection || isDeferrableSourceError(task, error))) {
         const delay = delays[retries];
-        task.sourceRetries = retries + 1; task.retryAt = Date.now() + delay;
-        const wait = delays === SOURCE_RETRY_DELAYS ? `${delay / 60000} 分钟` : `${delay / 1000} 秒`;
-        task.error = `${error.message} 将在 ${wait}后自动重试（${retries + 1}/${SOURCE_RETRY_DELAYS.length}）。`;
+        task.sourceRetries = retries + 1; task.retryAt = Date.now() + delay; task.sourceRetryLimit = delays.length;
+        const wait = delay >= 120000 ? `${delay / 60000} 分钟` : `${delay / 1000} 秒`;
+        task.error = `${error.message} 将在 ${wait}后自动重试（${retries + 1}/${delays.length}）。`;
         armSourceRetry(task);
       }
-      sendToRenderer('download-failed', { id, error: task.error, retryAt: task.retryAt || null, sourceRetries: task.sourceRetries || 0, qualityNotice: '' });
+      sendToRenderer('download-failed', { id, error: task.error, retryAt: task.retryAt || null,
+        sourceRetries: task.sourceRetries || 0, sourceRetryLimit: task.sourceRetryLimit || 3, qualityNotice: '' });
     }
     saveDownloadTasks();
-    for (const task of paused) clearSourceRetry(task);
   } finally {
     if (temporary) {
       const result = await temporary.cleanup().catch(() => null);
@@ -3049,7 +3070,8 @@ async function withMediaRecovery(vid, seriesId, options, consume) {
     options.cancelToken?.throwIfRequested();
     if (options.signal?.aborted || controller.signal.aborted) throw Object.assign(new Error('已取消媒体请求'), { code: 'ERR_CANCELED' });
   };
-  const recoverable = error => isDownloadSourceRejection(error) ? false : error?.code === 'SOURCE_UNAVAILABLE'
+  const recoverable = error => isDownloadSourceRejection(error) || isTransientRegistrationFailure(error)
+    || error?.code === 'EMPTY_RESPONSE' || sourceFailureHasEmpty(error) ? false : error?.code === 'SOURCE_UNAVAILABLE'
     ? sourceFailureIsTransient(error)
     : error?.mediaRetryable || error?.code === 'MEDIA_DECODE_ERROR'
       || ['ECONNRESET', 'ECONNABORTED', 'ETIMEDOUT', 'EPIPE', 'ERR_BAD_RESPONSE', 'ERR_STREAM_PREMATURE_CLOSE', 'EAI_AGAIN'].includes(error?.code);
@@ -3088,6 +3110,7 @@ async function withMediaRecovery(vid, seriesId, options, consume) {
         if (!recoverable(lastError) || info?.locked) throw lastError;
         continue;
       }
+      options.onSourceReady?.();
       const seen = new Set();
       for (const candidate of [info, ...(options.recover === false ? [] : info.variants || info.candidates || [])]) {
         const identity = JSON.stringify([candidate.url, candidate.contentKey, candidate.spadeA, candidate.userAgent, candidate.referer]);
@@ -5406,7 +5429,7 @@ ipcMain.handle('stop-download', async (event, taskId) => {
 
   const snapshot = snapshotQueueTasks([task]);
   task.cancelled = true;
-  delete task.retryAt; delete task.sourceRetries;
+  delete task.retryAt; delete task.sourceRetries; delete task.sourceRetryLimit;
   task.status = 'stopped';
   task.error = '';
   task.endTime = Date.now();

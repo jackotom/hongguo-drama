@@ -224,7 +224,7 @@ async function realFootage(mediaDir, ffmpeg, ffprobe, dataFile) {
   }
   await delay(800);
 
-  for (const file of ['LICENSE.txt', 'NOTICE.txt', 'THIRD-PARTY-NOTICES.md', 'LICENSE.electron.txt', 'LICENSES.chromium.html', 'resources/bin/WINDOWS-NOTICE.txt', 'resources/bin/WINDOWS-X264-LICENSE.txt', 'resources/bin/WINDOWS-MINGW-LICENSE.txt', 'resources/bin/WINDOWS-GCC-LICENSE.txt', 'resources/bin/COPYING.GPLv3']) assert(fs.statSync(path.join(packaged, file)).size > 20, file);
+  for (const file of ['LICENSE.txt', 'NOTICE.txt', 'THIRD-PARTY-NOTICES.md', 'LICENSE.electron.txt', 'LICENSES.chromium.html', 'resources/bin/WINDOWS-NOTICE.txt', 'resources/bin/WINDOWS-AMF-LICENSE.txt', 'resources/bin/WINDOWS-X264-LICENSE.txt', 'resources/bin/WINDOWS-MINGW-LICENSE.txt', 'resources/bin/WINDOWS-GCC-LICENSE.txt', 'resources/bin/COPYING.GPLv3']) assert(fs.statSync(path.join(packaged, file)).size > 20, file);
   result.checks.push('Application, Electron, Chromium, FFmpeg and x264 notices present');
   result.ffmpeg = execFileSync(ffmpeg, ['-version'], { encoding: 'utf8', windowsHide: true }).split('\n')[0];
   const sid = 'windows-smoke';

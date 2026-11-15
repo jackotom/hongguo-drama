@@ -81,8 +81,17 @@ const runningMerge = () => ({ id: 'm', status: 'running', total: 2, done: 0, pro
     assert.ok(ui.text().includes('失败/停止 0'));
     assert.equal(ui.button('重试失败').props.disabled, true);
     assert.ok(ui.text().includes('自动重试 1/3'));
-    const retry = ui.find(n => n.type === 'button' && n.props.title === '立即重试');
-    assert.ok(retry); await retry.props.onClick(); assert.equal(retried, 't1');
+    const guidance = ui.text();
+    assert.match(guidance, /普通故障最多追加 3 次重试，分别等待 10、30、60 秒/);
+    assert.match(guidance, /注册拒绝或空响应最多追加 6 轮重试，分别等待 15、30、60、120、300、600 秒/);
+    assert.match(guidance, /来源暂不可用时等待 3、8、15 分钟/);
+    assert.match(guidance, /等待期间可停止或手动重试/);
+    assert.match(guidance, /共享冷却可能让手动重试延后开始/);
+    assert.doesNotMatch(guidance, /等待期间可停止或立即重试/);
+    const retry = ui.find(n => n.type === 'button' && n.props.title?.includes('手动重试'));
+    assert.ok(retry, 'waiting retries should offer a manual retry without promising immediate start');
+    assert.ok(!retry.props.title.includes('立即'));
+    await retry.props.onClick(); assert.equal(retried, 't1');
     const stop = ui.find(n => n.type === 'button' && n.props.title === '停止自动重试');
     assert.ok(stop); await stop.props.onClick(); assert.equal(stopped, 't1');
     ui.emit('onDownloadFailed', {id:'t1',error:'重试耗尽',retryAt:null,sourceRetries:3});
@@ -150,6 +159,70 @@ const runningMerge = () => ({ id: 'm', status: 'running', total: 2, done: 0, pro
     assert.equal(rows(ui).length, 5); assert.ok(rows(ui).every(r => r.props.className.includes('selected')));
     ui.button('取消全选').props.onClick(); ui.render(); assert.ok(rows(ui).every(r => !r.props.className.includes('selected'))); assert.equal(ui.button('删除已选').props.disabled, true);
     rows(ui)[0].props.onClick(); ui.render(); ui.button('全选').props.onClick(); ui.render(); assert.ok(ui.text().includes('已选 205 项')); ui.unmount();
+  });
+  await test('series filter scopes rows, counts, selection and batch retry', async () => {
+    let retried = [];
+    const item = (series, title, index, status) => ({
+      id:`${series}-${index}`, title:`${title} 第${index}集`, status, progress:0, startTime:index,
+      hongguoInfo:{ series_id:series, series_title:title, vid_index:index },
+    });
+    const list = [
+      ...Array.from({ length:105 }, (_, i) => item('A', '长剧 A', i + 1, i < 2 ? 'failed' : 'completed')),
+      item('B', '短剧 B', 1, 'failed'),
+      item('B', '短剧 B', 2, 'stopped'),
+    ];
+    const ui = mount({
+      getDownloadTasks: async () => list,
+      retryTasks: async ids => { retried = ids; return { success:true, count:ids.length }; },
+    });
+    await ui.flush();
+    const filter = ui.find(n => n.type === 'select' && n.props.className?.includes('dm-series-select'));
+    assert.ok(filter, 'multi-series downloads must expose a series filter');
+    filter.props.onChange({ target:{ value:'series:A' } }); ui.render();
+    assert.ok(ui.text().includes('长剧 A 第1集'));
+    assert.ok(!ui.text().includes('短剧 B 第1集'));
+    assert.ok(ui.text().includes('共 105 项'));
+    assert.equal(ui.button('重试失败 (2)').props.disabled, false);
+    await ui.button('重试失败 (2)').props.onClick(); await ui.flush();
+    assert.deepEqual(retried.sort(), ['A-1', 'A-2']);
+
+    ui.setProps({}); ui.render();
+    const scoped = ui.find(n => n.type === 'select' && n.props.className?.includes('dm-series-select'));
+    scoped.props.onChange({ target:{ value:'series:B' } }); ui.render();
+    assert.ok(ui.text().includes('短剧 B 第1集'));
+    assert.ok(!ui.text().includes('长剧 A 第1集'));
+    assert.ok(ui.text().includes('共 2 项'));
+    assert.equal(ui.button('重试失败 (2)').props.disabled, false);
+    ui.unmount();
+  });
+  await test('all-drama pause remains available and global when the selected series is complete', async () => {
+    let paused = 0;
+    const stopped = [];
+    const item = (series, title, index, status, extra = {}) => ({
+      id:`${series}-${index}`, title:`${title} 第${index}集`, status, progress:0, startTime:index,
+      hongguoInfo:{ series_id:series, series_title:title, vid_index:index }, ...extra,
+    });
+    const ui = mount({
+      getDownloadTasks: async () => [
+        item('A', '已完成剧 A', 1, 'completed'),
+        item('B', '下载中剧 B', 1, 'downloading'),
+        item('B', '下载中剧 B', 2, 'failed', { retryAt:Date.now() + 30000 }),
+      ],
+      pauseAll: async () => { paused++; return { success:true, count:2 }; },
+      stopDownload: async id => { stopped.push(id); return { success:true }; },
+    });
+    await ui.flush();
+    const filter = ui.find(n => n.type === 'select' && n.props.className?.includes('dm-series-select'));
+    filter.props.onChange({ target:{ value:'series:A' } }); ui.render();
+    const pause = ui.button('全部暂停');
+    const start = ui.button('全部开始');
+    assert.ok(!pause.props.disabled, 'a complete selected series must not disable the all-drama pause button');
+    assert.match(start.props.title, /所有剧/);
+    assert.match(pause.props.title, /所有剧/);
+    await pause.props.onClick(); await ui.flush();
+    assert.equal(paused, 1, 'pause must use the global pauseAll IPC');
+    assert.deepEqual(stopped, [], 'pause must not target only the filtered tasks');
+    ui.unmount();
   });
   await test('whole-series merge needs no checked tasks and identifies its series', async () => {
     let sent;

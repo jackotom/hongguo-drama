@@ -7,6 +7,7 @@ const cp = require('node:child_process');
 const { EventEmitter } = require('node:events');
 const { PassThrough } = require('node:stream');
 const vm = require('node:vm');
+const { createDownloadTemporary, downloadTemporaryOwner } = require('./download-temporary');
 
 function fixture(t, { code = 0, seconds = 60, wait = false, hardware = false, codes = [], errors = [], outputBytes = [], probedEncoder = null, probeError = null } = {}) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'hg-bytevc2-'));
@@ -237,19 +238,106 @@ test('conversion never overwrites an existing output', async t => {
   assert.equal(fs.readFileSync(f.output, 'utf8'), 'keep'); assert.equal(f.calls.length, 0);
 });
 
-test('output reservation reports ownership before writing and cleans a failed close', async t => {
+test('output reservation is owned before writing and a failed final close removes it', async t => {
   const f = fixture(t), promises = require('node:fs/promises'), open = promises.open;
   let identity;
   mock.method(promises, 'open', async (...args) => {
     const file = await open(...args);
-    return { stat: () => file.stat(), close: async () => {
+    return { stat: (...options) => file.stat(...options), write: (...args) => file.write(...args), close: async () => {
       await file.close(); throw Object.assign(new Error('fixture close failure'), { code: 'EIO' });
     } };
   });
   await assert.rejects(f.run({ onOutputCreated: stat => { identity = stat; } }), error => error.code === 'EIO');
   assert.ok(identity?.isFile(), 'the exclusive creation must establish cleanup ownership');
   assert.equal(fs.existsSync(f.output), false, 'failed close must not leave an owned reservation');
-  assert.equal(f.calls.length, 0);
+  assert.equal(f.calls.length, 1);
+});
+
+test('external output reservation is acquired only after the conversion slot and remains caller-owned', async t => {
+  const f = fixture(t, { wait:true });
+  let factoryCalls = 0;
+  const reservation = {
+    checks:0, removes:0, closes:0,
+    check: async () => { reservation.checks++; },
+    remove: async () => { reservation.removes++; return true; },
+    close: async () => { reservation.closes++; },
+  };
+  const first = f.run();
+  while (!f.calls.length) await new Promise(resolve => setImmediate(resolve));
+  const second = f.run({ output:f.output + '-external', reserveOutput: async () => {
+    factoryCalls++;
+    return reservation;
+  } });
+  assert.equal(factoryCalls, 0, 'a queued conversion must not reserve its external output');
+  f.finish(0);
+  await first;
+  for (let index = 0; index < 50 && (!factoryCalls || f.calls.length < 2); index++) await new Promise(resolve => setImmediate(resolve));
+  assert.equal(factoryCalls, 1);
+  f.finish(1);
+  await second;
+  assert.equal(reservation.checks, 1);
+  assert.equal(reservation.closes, 0, 'the temporary-file manager owns the external reservation');
+});
+
+test('external reservation removes a failed output without closing the caller handle', async t => {
+  const f = fixture(t, { code:9 });
+  const reservation = {
+    removes:0, closes:0,
+    check: async () => {},
+    remove: async () => { reservation.removes++; fs.rmSync(f.output, { force:true }); return true; },
+    close: async () => { reservation.closes++; },
+  };
+  await assert.rejects(f.run({ reserveOutput:async () => reservation }), error => error.code === 'BYTEVC2_CONVERSION_FAILED');
+  assert.equal(reservation.removes, 1);
+  assert.equal(reservation.closes, 0, 'the caller must release its handle after cleanup');
+  assert.equal(fs.existsSync(f.output), false);
+});
+
+test('download conversion keeps a negative-ID output reservation through outer verification and publish', async t => {
+  const f = fixture(t);
+  const temporary = await createDownloadTemporary(path.dirname(f.output), { owner:downloadTemporaryOwner({
+    id:'bytevc2-negative', hongguoInfo:{ series_id:'1', vid:'11', vid_index:1 }, savePath:f.output,
+  }) });
+  const promises = require('node:fs/promises');
+  const original = { open:promises.open, lstat:promises.lstat, lstatSync:fs.lstatSync };
+  const target = file => path.dirname(path.resolve(file)) === temporary.record.directory
+    && path.basename(file) === 'decoded.mp4';
+  const negative = stat => {
+    const copy = Object.create(Object.getPrototypeOf(stat));
+    Object.defineProperties(copy, Object.getOwnPropertyDescriptors(stat));
+    Object.defineProperty(copy, 'ino', { value:-157n, enumerable:true });
+    return copy;
+  };
+  promises.open = async (file, ...args) => {
+    const handle = await original.open(file, ...args);
+    if (!target(file)) return handle;
+    const stat = handle.stat.bind(handle);
+    handle.stat = async (...options) => negative(await stat(...options));
+    return handle;
+  };
+  promises.lstat = async (file, ...args) => {
+    const stat = await original.lstat(file, ...args);
+    return target(file) && stat.isFile() ? negative(stat) : stat;
+  };
+  fs.lstatSync = (file, ...args) => {
+    const stat = original.lstatSync(file, ...args);
+    return target(file) && stat.isFile() ? negative(stat) : stat;
+  };
+  const published = path.join(path.dirname(temporary.record.directory), 'published.mp4');
+  try {
+    await f.run({ output:temporary.output, reserveOutput:temporary.reserveOutput });
+    assert.equal(BigInt(temporary.record.files['decoded.mp4'].ino) < 0n, true);
+    await temporary.checkOutput();
+    fs.renameSync(temporary.output, published);
+    await temporary.removeOutput();
+    assert.equal((await temporary.cleanup()).missing, true);
+    assert.equal(fs.readFileSync(published, 'utf8'), 'process output');
+  } finally {
+    Object.assign(promises, { open:original.open, lstat:original.lstat });
+    fs.lstatSync = original.lstatSync;
+    await temporary.cleanup().catch(() => {});
+    fs.rmSync(published, { force:true });
+  }
 });
 
 test('failed conversion preserves an output replaced by an unrelated file', async t => {
@@ -266,14 +354,20 @@ test('failed conversion preserves an output replaced by an unrelated file', asyn
 test('an unavailable file identity never authorizes deleting a replaced output', async t => {
   const f = fixture(t, { wait: true }), promises = require('node:fs/promises');
   const open = promises.open, lstat = promises.lstat;
+  let unknownIdentity = false;
   const unknown = stat => Object.assign(Object.create(Object.getPrototypeOf(stat)), stat, { ino: 0, birthtimeMs: 0 });
   mock.method(promises, 'open', async (...args) => {
     const file = await open(...args);
-    return { stat: async () => unknown(await file.stat()), close: () => file.close() };
+    return { stat: async (...options) => unknownIdentity ? unknown(await file.stat(...options)) : file.stat(...options),
+      write: (...args) => file.write(...args), close: () => file.close() };
   });
-  mock.method(promises, 'lstat', async file => unknown(await lstat(file)));
+  mock.method(promises, 'lstat', async (file, ...args) => {
+    const stat = await lstat(file, ...args);
+    return unknownIdentity ? unknown(stat) : stat;
+  });
   const pending = f.run(), rejected = assert.rejects(pending, error => error.code === 'BYTEVC2_CONVERSION_FAILED');
   while (!f.calls.length) await new Promise(resolve => setImmediate(resolve));
+  unknownIdentity = true;
   fs.renameSync(f.output, f.output + '-original'); fs.writeFileSync(f.output, 'keep unknown identity');
   f.finish(0, 9); await rejected;
   assert.equal(fs.readFileSync(f.output, 'utf8'), 'keep unknown identity');
@@ -383,7 +477,7 @@ test('fast conversion uses VideoToolbox on an actually probed Mac encoder', asyn
   assert.equal(f.calls[0].args[f.calls[0].args.indexOf('-allow_sw') + 1], '0');
 });
 
-for (const [message, reason] of [['Cannot load nvcuda.dll', 'encoder-failed'], ['', 'output-too-large']]) {
+for (const [message, reason] of [['Cannot load nvcuda.dll', 'encoder-failed'], ['Cannot load amfrt64.dll', 'encoder-failed'], ['AMF CreateComponent(XMemory) failed', 'encoder-failed'], ['', 'output-too-large']]) {
   test(`fast conversion makes one software fallback and reports ${reason}`, async t => {
     const f = fixture(t, { probedEncoder: 'h264_nvenc', codes: message ? [1, 0] : [], errors: [message], outputBytes: message ? [] : [20, 10] }), phases = [];
     const result = await f.run({ fastConversion: true, ...(message ? {} : { maxBytes: 15 }), onPhase: (phase, meta) => phases.push({ phase, meta }) });

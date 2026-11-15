@@ -19,6 +19,9 @@ mkdir -p "$ROOT"/{archives,sources,prefix,build-x264,build-librempeg,logs,artifa
 if [[ "$TARGET" == win-x64 || "$TARGET" == linux-x64 ]]; then
   bash "$(dirname "$SCRIPT")/prepare-nv-codec-headers.sh" "$ROOT"
 fi
+if [[ "$TARGET" == win-x64 ]]; then
+  bash "$(dirname "$SCRIPT")/prepare-amf-headers.sh" "$ROOT"
+fi
 LIBREMPEG_ARCHIVE="$ROOT/archives/librempeg-$LIBREMPEG_COMMIT.tar.gz"
 X264_ARCHIVE="$ROOT/archives/x264-$X264_COMMIT.tar.gz"
 [[ -f "$LIBREMPEG_ARCHIVE" ]] || curl -fsSL --retry 2 "https://codeload.github.com/librempeg/librempeg/tar.gz/$LIBREMPEG_COMMIT" -o "$LIBREMPEG_ARCHIVE"
@@ -47,11 +50,11 @@ export PKG_CONFIG_PATH=
 export PKG_CONFIG_LIBDIR="$ROOT/prefix/lib/pkgconfig"
 unset CPATH C_INCLUDE_PATH CPLUS_INCLUDE_PATH LIBRARY_PATH DYLD_LIBRARY_PATH LDFLAGS CFLAGS CPPFLAGS || true
 if [[ "$TARGET" == win-x64 ]]; then
-  ENCODERS+=,h264_nvenc
+  ENCODERS+=,h264_nvenc,h264_amf
   THREAD_ARGS=(--enable-w32threads --disable-pthreads)
   X264_ARGS=(--host=x86_64-w64-mingw32 --cross-prefix=x86_64-w64-mingw32- --disable-asm --extra-ldflags=-static)
   MEDIA_ARGS=(--arch=x86_64 --target-os=mingw32 --enable-cross-compile --cross-prefix=x86_64-w64-mingw32- --disable-asm --extra-cflags=-I../prefix/include --extra-ldflags='-static -L../prefix/lib')
-  MEDIA_ARGS+=(--enable-ffnvcodec --enable-nvenc)
+  MEDIA_ARGS+=(--enable-ffnvcodec --enable-nvenc --enable-amf)
   SUFFIX=.exe
 elif [[ "$TARGET" == linux-x64 ]]; then
   ENCODERS+=,h264_nvenc
@@ -106,6 +109,7 @@ assert 'pei-x86-64' in s
 assert all(x.lower() in allowed for x in re.findall(r'DLL Name:\s*(\S+)', s))
 PY
   grep -q '^#define CONFIG_H264_NVENC_ENCODER 1' config_components.h
+  grep -q '^#define CONFIG_H264_AMF_ENCODER 1' config_components.h
 elif [[ "$TARGET" == linux-x64 ]]; then
   ldd "$TOOL" > "$ROOT/logs/imports.txt"
   ! grep -q 'not found' "$ROOT/logs/imports.txt"
