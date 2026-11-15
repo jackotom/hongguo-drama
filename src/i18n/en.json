@@ -1318,5 +1318,10 @@
   "TLS 证书或握手失败，请稍后重试": "TLS certificate verification or handshake failed. Try again later.",
   "本集取源失败：App：TLS 证书或握手失败，请稍后重试。请重试或在官方 App 确认可播情况。": "Could not retrieve a source for this episode: App: TLS certificate verification or handshake failed. Try again later. Retry, or confirm playback in the official app.",
   "匿名播放设备注册失败（TLS 证书或握手失败），请检查网络，10 秒后重试": "Anonymous playback device registration failed (TLS certificate verification or handshake failed). Check your network and retry in 10 seconds.",
-  "本集取源失败：App：匿名播放设备注册失败（TLS 证书或握手失败），请检查网络，10 秒后重试。请重试或在官方 App 确认可播情况。": "Could not retrieve a source for this episode: App: Anonymous playback device registration failed (TLS certificate verification or handshake failed). Check your network and retry in 10 seconds. Retry, or confirm playback in the official app."
+  "本集取源失败：App：匿名播放设备注册失败（TLS 证书或握手失败），请检查网络，10 秒后重试。请重试或在官方 App 确认可播情况。": "Could not retrieve a source for this episode: App: Anonymous playback device registration failed (TLS certificate verification or handshake failed). Check your network and retry in 10 seconds. Retry, or confirm playback in the official app.",
+  "按剧集查看": "View by series",
+  "选择一部剧后，列表与「重试失败」只作用于该剧；不选则作用于全部": "Pick a series to limit the list and \"Retry failed\" to it; leave it unselected to apply to all",
+  "待重试": "to retry",
+  "把所选剧集中失败/已停止的任务重新加入下载队列": "Re-queue failed/stopped tasks of the selected series",
+  "该剧": "this series"
 }

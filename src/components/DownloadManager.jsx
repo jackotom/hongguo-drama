@@ -23,8 +23,11 @@ const STATUS_ORDER = {
 const isWaitingRetry = task => task.status === 'failed' && !!task.retryAt;
 const needsManualRetry = task => task.status === 'stopped' || task.status === 'failed' && !isWaitingRetry(task);
 
+const seriesKey = task => task.hongguoInfo?.series_id != null ? `series:${task.hongguoInfo.series_id}` : `task:${task.id}`;
+const seriesLabel = task => task.hongguoInfo?.series_title || task.title || task.filename || '';
+
 function sortTasks(list) {
-  const key = task => task.hongguoInfo?.series_id != null ? `series:${task.hongguoInfo.series_id}` : `task:${task.id}`;
+  const key = seriesKey;
   const groups = new Map();
   for (const task of list) {
     const group = groups.get(key(task)) || { rank: 99, time: 0 };
@@ -72,6 +75,7 @@ function DownloadManager({ onNavigate, active = true }) {
   const [confirmAsk, setConfirmAsk] = useState(null); // 删除确认（可勾选删除本地文件）
   const [mergeAsk, setMergeAsk] = useState(false);    // 合并格式选择
   const [page, setPage] = useState(1);
+  const [seriesFilter, setSeriesFilter] = useState(''); // ''：不限剧集
   const [orderVersion, setOrderVersion] = useState(0);
   const [loadError, setLoadError] = useState('');
   const toastTimerRef = useRef(null);
@@ -255,8 +259,7 @@ function DownloadManager({ onNavigate, active = true }) {
   };
 
   const clearSelection = () => setSelected(new Set());
-  const selectAll = () => setSelected(new Set(tasks.map((task) => task.id)));
-  const allSelected = tasks.length > 0 && tasks.every((task) => selected.has(task.id));
+  const selectAll = () => setSelected(new Set(scopedTasks.map((task) => task.id)));
 
   const fmtSize = (b) => {
     if (!b || b <= 0) return '0 B';
@@ -408,7 +411,7 @@ function DownloadManager({ onNavigate, active = true }) {
 
   // 重试失败/已停止的任务
   const retryAllFailed = async () => {
-    const ids = tasks.filter(needsManualRetry).map((t) => t.id);
+    const ids = scopedTasks.filter(needsManualRetry).map((t) => t.id);
     if (ids.length === 0) return;
     const res = await window.electronAPI.retryTasks(ids);
     await refresh();
@@ -421,7 +424,7 @@ function DownloadManager({ onNavigate, active = true }) {
 
   // 一键选中全部失败/已停止的任务（选中后可再点「重试选中」）
   const selectAllFailed = () => {
-    const ids = tasks.filter(needsManualRetry).map((t) => t.id);
+    const ids = scopedTasks.filter(needsManualRetry).map((t) => t.id);
     if (ids.length === 0) {
       showToast('没有失败或已停止的任务');
       return;
@@ -440,16 +443,31 @@ function DownloadManager({ onNavigate, active = true }) {
   const sortedIds = useMemo(() => sortTasks(tasks).map(task => task.id), [orderVersion]);
   const taskById = useMemo(() => new Map(tasks.map(task => [task.id, task])), [tasks]);
   taskIndex.current = taskById;
-  const pageCount = Math.max(1, Math.ceil(sortedIds.length / PAGE_SIZE));
+  // 剧集下拉：每部剧一项，附带总集数与待手动重试数。
+  const seriesOptions = useMemo(() => {
+    const groups = new Map();
+    for (const task of tasks) {
+      const key = seriesKey(task);
+      const group = groups.get(key) || { key, label: seriesLabel(task), count: 0, failed: 0 };
+      group.count++; if (needsManualRetry(task)) group.failed++;
+      groups.set(key, group);
+    }
+    return [...groups.values()].sort((a, b) => b.failed - a.failed || a.label.localeCompare(b.label, 'zh-CN', { numeric: true }));
+  }, [tasks]);
+  const activeFilter = seriesOptions.some(option => option.key === seriesFilter) ? seriesFilter : '';
+  const scopedTasks = useMemo(() => activeFilter ? tasks.filter(task => seriesKey(task) === activeFilter) : tasks, [tasks, activeFilter]);
+  const scopedIds = useMemo(() => activeFilter ? sortedIds.filter(id => { const task = taskById.get(id); return task && seriesKey(task) === activeFilter; }) : sortedIds, [sortedIds, taskById, activeFilter]);
+  const allSelected = scopedTasks.length > 0 && scopedTasks.every((task) => selected.has(task.id));
+  const pageCount = Math.max(1, Math.ceil(scopedIds.length / PAGE_SIZE));
   const currentPage = Math.min(page, pageCount);
-  const visibleTasks = sortedIds.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE).map(id => taskById.get(id)).filter(Boolean);
+  const visibleTasks = scopedIds.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE).map(id => taskById.get(id)).filter(Boolean);
 
   const activeCount = tasks.filter((t) => t.status === 'downloading' || t.status === 'pending').length;
   const completedCount = tasks.filter((t) => t.status === 'completed').length;
   const retryingCount = tasks.filter(isWaitingRetry).length;
   const failedTasks = useMemo(
-    () => tasks.filter(needsManualRetry),
-    [tasks]
+    () => scopedTasks.filter(needsManualRetry),
+    [scopedTasks]
   );
   const failedCount = failedTasks.length;
 
@@ -509,7 +527,7 @@ function DownloadManager({ onNavigate, active = true }) {
           className="btn btn-outline"
           onClick={retryAllFailed}
           disabled={failedCount === 0}
-          title={t("把所有失败/已停止的任务一次性重新加入下载队列")}
+          title={t(activeFilter ? "把所选剧集中失败/已停止的任务重新加入下载队列" : "把所有失败/已停止的任务一次性重新加入下载队列")}
         >
           <Zap size={15} />
           {t(failedCount > 0 ? `重试失败 (${failedCount})` : '重试失败')}
@@ -654,16 +672,31 @@ function DownloadManager({ onNavigate, active = true }) {
       )}
 
       {loadError && <div className="alert alert-error" role="alert">{t(loadError)}<button className="btn btn-outline btn-sm" onClick={refresh}>{t("重新加载")}</button></div>}
+      {seriesOptions.length > 1 && (
+        <div className="dm-series-filter">
+          <label htmlFor="dm-series-select">{t("按剧集查看")}</label>
+          <select id="dm-series-select" className="input-field" value={activeFilter}
+            onChange={(event) => { setSeriesFilter(event.target.value); setPage(1); }}
+            title={t("选择一部剧后，列表与「重试失败」只作用于该剧；不选则作用于全部")}>
+            <option value="">{t(`全部剧集（${tasks.length} 项）`)}</option>
+            {seriesOptions.map(option => (
+              <option key={option.key} value={option.key}>
+                {option.label} · {option.count}{option.failed > 0 ? ` · ${t('待重试')} ${option.failed}` : ''}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
       {tasks.length > 0 && <div className="dm-pagination">
         <div className="dm-selection-summary">
           <button className="btn btn-outline btn-sm" onClick={allSelected ? clearSelection : selectAll}
-            title={t(allSelected ? '取消所有分页中的选择' : `选中全部 ${tasks.length} 项，包含其他分页`)}>
+            title={t(allSelected ? '取消所有分页中的选择' : `选中${activeFilter ? '该剧' : '全部'} ${scopedTasks.length} 项，包含其他分页`)}>
             <CheckSquare size={15} />{t(allSelected ? '取消全选' : '全选')}
           </button>
           <button className="btn btn-outline btn-sm" onClick={deleteSelected} disabled={selected.size === 0}
             title={t("删除所有分页中已选的任务，确认时可选择是否同时删除本地文件")}>
             <Trash2 size={15} />{t("删除已选（")}{t(selected.size)}{t("项）")}</button>
-        <span>{t("共 ")}{t(tasks.length)}{t(" 项 · 当前 ")}{t((currentPage - 1) * PAGE_SIZE + 1)}-{t(Math.min(currentPage * PAGE_SIZE, tasks.length))}{t(" 项")}{t(selected.size > 0 ? ` · 已选 ${selected.size} 项（跨页保留）` : '')}</span>
+        <span>{t("共 ")}{t(scopedIds.length)}{t(" 项 · 当前 ")}{t(scopedIds.length ? (currentPage - 1) * PAGE_SIZE + 1 : 0)}-{t(Math.min(currentPage * PAGE_SIZE, scopedIds.length))}{t(" 项")}{t(selected.size > 0 ? ` · 已选 ${selected.size} 项（跨页保留）` : '')}</span>
         </div>
         <nav aria-label={t("下载任务分页")}>
           <button className="btn btn-outline btn-sm" disabled={currentPage <= 1} onClick={() => setPage(currentPage - 1)}>{t("上一页")}</button>
@@ -702,7 +735,7 @@ function DownloadManager({ onNavigate, active = true }) {
                   <div className="dm-task-title">{(task.title || task.filename)}</div>
                   <div className="dm-task-meta">
                     <span className={`status-tag status-${waitingRetry ? 'pending' : task.status}`}>{t(waitingRetry ? '等待重试' : STATUS_TEXT[task.status] || task.status)}</span>
-                    {waitingRetry && <span className="dm-size">{t("自动重试 ")}{t(task.sourceRetries)}/3 · {t(new Date(task.retryAt).toLocaleTimeString(getLanguage(), { hour12: false }))}{t(" 后排队")}</span>}
+                    {waitingRetry && <span className="dm-size">{t("自动重试 ")}{t(task.sourceRetries)}/{t(task.sourceRetryLimit || 3)} · {t(new Date(task.retryAt).toLocaleTimeString(getLanguage(), { hour12: false }))}{t(" 后排队")}</span>}
                     {task.status === 'downloading' && task.totalBytes > 0 && (
                       <span className="dm-size">{t(fmtBytes(task.receivedBytes))} / {t(fmtBytes(task.totalBytes))}</span>
                     )}

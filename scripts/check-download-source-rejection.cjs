@@ -89,63 +89,66 @@ function fixture(concurrency = 1, { requestSignal = req('./src/native/request-si
 }
 async function tick() { await new Promise(resolve => setTimeout(resolve, 25)); }
 
+const gateMs = h => h.run('hongguoDownloadReadyAt - Date.now()');
 const checks = [
-  ['registration and App HTTP rejection preserve unstarted tasks instead of failing the queue', async () => {
+  ['rejection retries only the failing episode with spacing; waiting episodes stay queued', async () => {
     for (const code of ['DEVICE_REGISTRATION_FAILED', 'HTTP_403', 'HTTP_429']) {
-      const h = fixture(); h.add('1'); const next = h.add('2'), later = h.add('3');
+      const h = fixture(); const first = h.add('1'), next = h.add('2'), later = h.add('3');
       h.state.load = async () => rejected(code);
-      h.pump(); await h.drain();
-      assert.equal(next.status, 'stopped', `${code}: next task must stay unstarted`);
-      assert.equal(later.status, 'stopped');
-      assert.equal(h.state.calls.length, 1, `${code}: no fallback or subsequent source lookup`);
-      assert.match(next.error, /暂停.*手动/);
-      assert.equal(h.run('downloadQueue.length'), 0);
-      assert.equal(h.liveTimers().length, 0);
-      assert.equal(h.state.saved.find(task => task.id === '2').status, 'stopped');
-      h.run('loadDownloadTasks(); enqueuePendingTasks(); pumpQueue()'); await h.drain();
-      assert.equal(h.state.calls.length, 1, 'restart must not automatically probe paused tasks');
+      h.pump(); await tick();
+      assert.equal(first.status, 'failed', code); assert.ok(first.retryAt > Date.now());
+      assert.equal(first.sourceRetries, 1); assert.equal(first.sourceRetryLimit, 6);
+      assert.equal(next.status, 'pending', `${code}: waiting episode must not be stopped`);
+      assert.equal(later.status, 'pending');
+      assert.equal(h.state.calls.length, 1, `${code}: no lookup while the gate is closed`);
+      assert.ok(gateMs(h) >= 10000, 'new lookups are held back');
+      assert.equal(h.run('downloadQueue.length'), 2);
+      assert.ok(h.run('sourceRetryTimers.has("1")'), 'retry timer for the failing episode');
+      assert.equal(h.run('sourceRetryTimers.size'), 1);
+      h.state.load = async vid => info(vid);
+      h.run('sourceRetryTimers.get("1")').fn(); await h.drain();
+      for (const task of h.tasks) assert.equal(task.status, 'completed', `${code}: ${task.id}`);
     }
   }],
-  ['thrown registration failures stop before quality fallback without inspecting error text', async () => {
-    for (const registrationFailure of ['HTTP_403', 'HTTP_429', 'INVALID_RESPONSE']) {
-      const h = fixture(); h.add('1'); const next = h.add('2');
-      h.state.load = async () => { throw Object.assign(new Error('注册失败'), { code: 'DEVICE_REGISTRATION_FAILED', registrationFailure }); };
-      h.pump(); await h.drain();
-      assert.equal(next.status, 'stopped'); assert.equal(h.state.calls.length, 1);
+  ['thrown registration failures and empty replies schedule per-episode retries', async () => {
+    const errors = [...['HTTP_403', 'HTTP_429', 'INVALID_RESPONSE'].map(registrationFailure =>
+      Object.assign(new Error('注册失败'), { code: 'DEVICE_REGISTRATION_FAILED', registrationFailure })),
+      { code: 'SOURCE_UNAVAILABLE', error: '空响应', message: '空响应', sources: [{ source: 'app', code: 'EMPTY_RESPONSE' }] }];
+    for (const error of errors) {
+      const h = fixture(); const first = h.add('1'), next = h.add('2');
+      h.state.load = async () => { throw error; };
+      h.pump(); await tick();
+      assert.equal(first.status, 'failed'); assert.ok(first.retryAt); assert.equal(next.status, 'pending');
+      if (error.code === 'DEVICE_REGISTRATION_FAILED') assert.equal(h.state.calls.length, 1, 'no quality fallback after a registration rejection');
     }
   }],
-  ['rejection cancels numeric-source retry timers but keeps other-source timers', async () => {
-    const h = fixture(); h.add('1');
-    const numeric = h.add('2', '2', 'failed'), other = h.add('x', 'xifan:2', 'failed');
-    for (const task of [numeric, other]) { task.retryAt = Date.now() + 60000; task.sourceRetries = 1; }
-    h.run('for (const task of downloadTasks.filter(t => t.retryAt)) armSourceRetry(task)');
-    const staleTimer = h.timers[0];
+  ['retry spacing grows and ends in a manual failure after the last round', async () => {
+    const h = fixture(); const first = h.add('1');
     h.state.load = async () => rejected('HTTP_429');
-    h.pump(); await h.drain();
-    assert.equal(numeric.status, 'stopped'); assert.equal(numeric.retryAt, undefined);
-    assert.equal(numeric.sourceRetries, undefined); assert.equal(staleTimer.cleared, true);
-    const savedAt = h.state.operations.findIndex(op => op.event === 'saved' && op.tasks.find(task => task.id === '2')?.status === 'stopped');
-    const clearedAt = h.state.operations.findIndex(op => op.event === 'clear' && op.timer === staleTimer);
-    assert.ok(savedAt >= 0 && savedAt < clearedAt, 'paused state must be saved before cancelling its timer');
-    assert.equal(other.status, 'failed'); assert.ok(other.retryAt); assert.equal(h.liveTimers().length, 1);
-    staleTimer.fn(); await h.drain();
-    assert.equal(h.state.calls.length, 1, 'late cancelled timer cannot restart a paused task');
+    const waits = [];
+    h.pump();
+    for (let round = 0; round < 6; round++) {
+      await tick(); assert.equal(first.status, 'failed'); waits.push(first.retryAt - Date.now());
+      h.run('sourceRetryTimers.get("1")').fn(); h.run('hongguoDownloadReadyAt=0; pumpQueue()');
+    }
+    await tick();
+    assert.ok(waits.every((wait, i) => i === 0 || wait > waits[i - 1] - 1000), JSON.stringify(waits));
+    assert.ok(waits[5] > 5 * 60000, 'last wait is minutes long');
+    assert.equal(first.status, 'failed'); assert.equal(first.retryAt, undefined, 'budget exhausted: manual retry only');
   }],
-  ['active transfer completes while pending numeric tasks stop and another source continues', async () => {
+  ['active transfer is unaffected and another source continues while the App gate is closed', async () => {
     const h = fixture(2), lookup = deferred(), transfer = deferred();
     h.add('1'); const active = h.add('2'), pending = h.add('3'), other = h.add('x', 'xifan:4');
     h.state.load = async vid => vid === '1' ? lookup.promise : info(vid);
     h.state.holdTransfer = async playInfo => { if (playInfo.vid === '2') await transfer.promise; };
     h.pump(); await tick();
-    assert.ok(h.state.transfers.includes('2'), JSON.stringify({
-      calls: h.state.calls, transfers: h.state.transfers,
-      tasks: h.tasks.map(task => ({ id: task.id, status: task.status, error: task.error })),
-    }));
+    assert.ok(h.state.transfers.includes('2'));
     lookup.resolve(rejected('HTTP_403')); await tick();
-    assert.equal(pending.status, 'stopped'); assert.equal(active.status, 'downloading');
+    assert.equal(pending.status, 'pending'); assert.equal(active.status, 'downloading');
     assert.equal(active.cancelSource.token.reason, undefined);
-    transfer.resolve(); await h.drain();
+    transfer.resolve(); await tick();
     assert.equal(active.status, 'completed'); assert.equal(other.status, 'completed');
+    assert.equal(pending.status, 'pending', 'gate still closed for App lookups');
     assert.equal(h.run('activeDownloads'), 0); assert.equal(h.run('runningDownloads.size'), 0);
   }],
   ['ordinary episode errors and media HTTP errors do not pause the source', async () => {
@@ -170,33 +173,17 @@ const checks = [
     h.state.load = async vid => vid === 'xifan:1' ? rejected('HTTP_429') : info(vid);
     h.pump(); await h.drain(); assert.equal(next.status, 'completed');
   }],
-  ['manual retry, selected retry and resume keep the same paused task identity and quality', async () => {
+  ['manual retry, selected retry and resume take over a waiting retry without changing identity or quality', async () => {
     for (const channel of ['retry-task', 'retry-tasks', 'resume-all']) {
-      const h = fixture(); h.add('1'); const next = h.add('2');
-      h.state.load = async () => rejected('HTTP_429'); h.pump(); await h.drain();
-      assert.equal(next.status, 'stopped');
+      const h = fixture(); const first = h.add('1');
+      h.state.load = async () => rejected('HTTP_429'); h.pump(); await tick();
+      assert.equal(first.status, 'failed'); assert.ok(first.retryAt);
       h.state.load = async vid => info(vid);
-      const result = await h.handlers[channel]({}, channel === 'retry-tasks' ? ['2'] : '2');
+      const result = await h.handlers[channel]({}, channel === 'retry-tasks' ? ['1'] : '1');
       assert.equal(result.success, true); await h.drain();
-      assert.equal(next.status, 'completed'); assert.equal(next.downloadQuality, '1080p');
-      assert.equal(h.tasks.filter(task => task.id === '2').length, 1);
+      assert.equal(first.status, 'completed'); assert.equal(first.downloadQuality, '1080p');
+      assert.equal(first.retryAt, undefined); assert.equal(h.tasks.filter(task => task.id === '1').length, 1);
     }
-  }],
-  ['save failure keeps rejected-source work stopped in memory without automatic retries', async () => {
-    const h = fixture(); h.add('1'); const next = h.add('2');
-    const delayed = h.add('3', '3', 'failed'); delayed.retryAt = Date.now() + 60000;
-    h.run('armSourceRetry(downloadTasks[2])');
-    const staleTimer = h.timers[0];
-    h.state.load = async () => { h.state.saveError = new Error('disk full'); return rejected('HTTP_429'); };
-    h.pump(); await h.drain();
-    assert.equal(next.status, 'stopped'); assert.equal(delayed.status, 'stopped');
-    assert.equal(h.state.calls.length, 1);
-    assert.equal(staleTimer.cleared, false, 'failed persistence must not cancel resources');
-    assert.equal(h.state.saved.find(task => task.id === '3').status, 'failed', 'paused state was not persisted');
-    assert.equal(delayed.retryAt, undefined); assert.equal(delayed.sourceRetries, undefined);
-    staleTimer.fn(); await h.drain();
-    assert.equal(delayed.status, 'stopped'); assert.equal(h.state.calls.length, 1, 'late timer must not fetch again');
-    assert.equal(h.run('sourceRetryTimers.has("3")'), false);
   }],
   ['source rejection raised during consumption stops before trying quality alternatives', async () => {
     const h = fixture(); h.state.load = async vid => ({ ...info(vid), variants: [info('backup')] });

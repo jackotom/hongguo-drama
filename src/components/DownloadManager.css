@@ -471,3 +471,7 @@
 
 .dm-selection-summary { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; }
 .dm-merge-hint { margin-top: 12px; }
+
+.dm-series-filter { display: flex; align-items: center; gap: 10px; margin: 0 0 12px; }
+.dm-series-filter label { font-size: 13px; color: var(--text-muted, inherit); white-space: nowrap; }
+.dm-series-filter select { height: 35px; min-width: 0; max-width: min(520px, 100%); flex: 1; }
