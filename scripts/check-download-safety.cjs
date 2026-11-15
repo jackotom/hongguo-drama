@@ -1023,7 +1023,8 @@ async function crashedTemporary(overrides = {}) {
     let finishLookup;
     const h = load({}, { './src/native/hongguo': { fetchPlayUrlSingle: () => new Promise(resolve => { finishLookup = resolve; }) } });
     const one = task('one', h.dir, 'pending'); h.set('downloadTasks', [one]); h.set('downloadQueue', [one]); h.pump();
-    for (let i = 0; i < 100 && !finishLookup; i++) await new Promise(setImmediate);
+    const deadline = Date.now() + 3000;
+    while (!finishLookup && Date.now() < deadline) await new Promise(resolve => setTimeout(resolve, 10));
     assert.equal(typeof finishLookup, 'function', 'the source lookup must be active before deletion');
     const deleting = h.handlers['delete-task']({}, 'one', { deleteFiles: true });
     assert.equal(h.run('downloadTasks.length'), 1, 'record removed before its active run settled');
