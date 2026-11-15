@@ -1,6 +1,6 @@
-# 7.3 源码／发行目标
+# 7.3 正式发行回执
 
-用户于2026-11-15明确授权：修复已确认问题；没问题则发布7.3，并构建、上传全部标准平台附件到GitHub。当前内部版本7.3.0、桌面构建7.3.1。标准发行范围是macOS arm64、macOS x64、Windows x64、Linux x64 AppImage、Docker amd64；TV和手机独立，不随本轮发行。
+7.3已于2026-11-15 12:16:01（Asia/Shanghai）正式公开并设Latest，内部版本7.3.0、桌面构建7.3.1，标签`v7.3`，冻结源码`782fb21cbddf1be46f88e97af5e788c99e30beae`，Release ID `445601123`。标准范围是macOS arm64、macOS x64、Windows x64、Linux x64 AppImage、Docker amd64；TV和手机独立，不随本轮发行。
 
 ## 本轮变化
 
@@ -39,3 +39,13 @@
 - Docker为linux/amd64，不冒称ARM64或fnOS硬件验收。
 - TV和手机不包含在本轮Release；本次Android回归不等同手机正式包或TV实机验收。
 - 不替换本机正式安装，不回复或关闭Issue／PR。实际冻结提交、平台证据、Release ID和附件摘要在本文件后置回执中补齐。
+
+## 正式发行回执
+
+- 五类共25份附件已公开，远端状态25/25为`uploaded`，大小和SHA256逐项匹配本地`asset-manifest.json`；`SHA256SUMS.txt`、`latest-mac.yml`、`latest.yml`公开可读，10个程序／源码匿名下载入口均返回可读数据。
+- 源码CI [43641704078](https://github.com/jackotom/hongguo-drama/actions/runs/43641704078)、Windows [43641733984](https://github.com/jackotom/hongguo-drama/actions/runs/43641733984)、Linux [43641732820](https://github.com/jackotom/hongguo-drama/actions/runs/43641732820)、Docker [43641733956](https://github.com/jackotom/hongguo-drama/actions/runs/43641733956)均成功并绑定冻结提交。
+- 双Mac App及DMG本轮四份Apple公证Accepted，回执ID为`c5e30e89-f847-4cd8-8af3-8ec5ad413ecb`、`4c45cd3f-c019-4d04-bb96-1c3c25d837aa`、`dc028133-e028-47d6-8765-f1db169b7ba2`、`373eafa2-0402-4039-9fc3-ba17dbc32a68`。最终App／DMG严格签名、票据、包内90份源码、61份前端文件和更新ZIP恢复核对通过。
+- arm64最终App实测「S / D 倍速调节」名称、位置、四档选项与持久化，真实两集1080P静音播放10.04／10.08秒，D/S实测1→2→1倍；x64仅Rosetta启动，不是实体Intel验收。
+- Windows最终便携包真实两集App队列暂停恢复与逆序重试、完成分集回绑、两段640×1138兼容样本各约10秒静音播放、新装、重装和真实1.80升级通过；EXE未签名。
+- Linux原生AppImage真实两集1080P静音软件解码播放10.176／10.106秒；Docker amd64认证、真实下载合并和重启持久化通过。
+- 本机未替换正式安装；TV／手机不随本轮发行。后置文档提交不移动`v7.3`标签，不改变已发布安装包或附件字节。

@@ -1,6 +1,6 @@
-# 7.3 五平台发行目标
+# 7.3 五平台正式发行
 
-7.3为当前源码／发行目标，内部7.3.0、桌面构建7.3.1。标准五类为macOS arm64、macOS x64、Windows x64、Linux x64 AppImage、Docker amd64；TV和手机独立。双Mac须本轮新签名、公证、装订。实际构建与验收状态见[7.3记录](release-7.3.md)。
+7.3已于2026-11-15 12:16:01（Asia/Shanghai）正式公开并设Latest，内部7.3.0、桌面构建7.3.1，冻结源码`782fb21cbddf1be46f88e97af5e788c99e30beae`。双Mac、Windows x64、Linux x64 AppImage、Docker amd64五类共25份正式附件，远端大小／SHA256、两份更新清单、总校验及匿名入口核对通过；双Mac本轮四份公证Accepted、签名和装订，Windows EXE未签名，Intel仅Rosetta。未替换本机正式安装；TV和手机独立。完整回执见[7.3记录](release-7.3.md)。
 
 # 7.2 五平台与TV补充发行（历史）
 
