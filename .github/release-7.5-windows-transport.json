@@ -17,7 +17,12 @@
     "hongguo-downloader-7.5-win-x64-setup.exe": {
       "size": 137980561,
       "sha256": "404192748cff041984ad9ab46f28fc44734cdbd196154256192f7d4225ccab95",
-      "replace": null
+      "replace": {
+        "id": 755072141,
+        "state": "starter",
+        "size": 137980561,
+        "digest": null
+      }
     },
     "hongguo-downloader-7.5-win-x64-setup.exe.blockmap": {
       "size": 146174,

@@ -13,7 +13,7 @@ jobs:
     timeout-minutes: 25
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      TRANSPORT_PLAN_SHA256: '5d579980a4735e6b1f1aa8366f09ba0982557b029b6aea00cf829cfb817c9471'
+      TRANSPORT_PLAN_SHA256: '2a6653e38e812e384d61b017ccaff83969270409e14f26c804d354f9c1cc7337'
     steps:
       - uses: actions/checkout@v4
         with:
