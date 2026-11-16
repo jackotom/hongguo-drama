@@ -32,6 +32,7 @@ Apple回执：arm64 App `9d0f5bef-32c6-49a8-a928-9c47f3d40724`、x64 App `1b2da9
 
 - 云端原抽样明确记录网页404／预览、App及旧接口空响应。后置工作流`4a57a46e9806b0b062247f74605a0b9546941231`只新增测试，冻结应用包／标签不变；校验不可变artifact和成品摘要，使用本轮Mac随机样本同剧1、2集，各平台重新真实解析、下载并等待有retryAt的正常自动重试。
 - 独立验收仍失败：Windows为`Single real App episode exceeded 180 seconds including automatic retries`，Linux为`Real complete download timed out`。不以Mac、Docker、安装检查或故障注入替代这两项。
+- 后置测试提交的源码CI `43850750310`也因真实片源查询失败而未全绿：下载集成64/65，失败项为真实解码恢复用例，报`Real Hongguo media lookup failed`。它不改变此前冻结提交CI通过的记录，也不能被省略为当前全部通过。
 - 本机Node26初跑曾有旧两次请求断言、延后清理ctime失效及模拟崩溃夹具遗留FileHandle失败。前两项已修复；夹具在Node24复测通过但仍有回收警告。最终冻结源码Node22 CI已全绿，不宣称本机Node26全量全绿。
 - 用户同意Windows使用GitHub虚拟机，**非实体Windows电脑；EXE未签名**。实体AMD／NVIDIA及实体Intel未验；Docker为linux/amd64，不外推ARM64或fnOS实体硬件。
 
