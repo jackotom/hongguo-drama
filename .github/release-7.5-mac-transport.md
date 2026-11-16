@@ -21,3 +21,5 @@
 沿用已注册的release-7.2-upload.yml文件，仅运输分支增加显式mode。将正式plan提交到运输分支并核对其SHA256后，才能选择mode=mac-delta并填mac_plan_sha256调度。Windows选择mode=windows，仍使用原精确Windows计划，不参与Mac替换。concurrency按模式隔离；同一模式串行，不取消运行中任务。
 
 本地可运行release-7.5-mac-cloud.py --self-check，仅用临时普通字节验证计划拒绝边界、zstd恢复、错误SHA拒绝和双ZIP更新清单，不访问网络、不使用真实剧集、不运行应用测试。运行证据放忽略的.planning/transport-7.5/；工作流回执为transport-mac-result.json。
+
+运输分支的后续提交须加[skip ci]：仓库Test监听全部push，避免仅运输改动自动触发应用测试。Mac运输仍只允许主控给出新最终plan及其SHA后手动dispatch。
