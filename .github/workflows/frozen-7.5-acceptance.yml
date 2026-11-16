@@ -1,0 +1,495 @@
+name: Frozen 7.5 final-package acceptance (no rebuild)
+'on':
+  workflow_dispatch:
+    inputs:
+      platform:
+        description: Run only platforms that still need final acceptance
+        type: choice
+        required: true
+        default: all
+        options:
+          - all
+          - linux
+          - windows
+  push:
+    branches: ['codex/7-5-download-recovery']
+    paths: ['.github/workflows/frozen-7.5-acceptance.yml']
+permissions:
+  contents: read
+  actions: read
+env:
+  FROZEN_SHA: c5cc9bcc33d5bca18f096056f4c9a51f51e5a2b5
+  WORKFLOW_COMMIT: ${{ github.sha }}
+  WORKFLOW_REF: ${{ github.ref }}
+  PYTHONUTF8: '1'
+jobs:
+  linux:
+    if: ${{ github.event_name == 'push' || inputs.platform == 'all' || inputs.platform == 'linux' }}
+    runs-on: ubuntu-22.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: c5cc9bcc33d5bca18f096056f4c9a51f51e5a2b5
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Download and verify immutable final candidate
+        shell: bash
+        run: |-
+          python - <<'PY'
+          import hashlib,json,os,subprocess,zipfile
+          from pathlib import Path
+          INPUT = json.loads('{"frozenSha": "c5cc9bcc33d5bca18f096056f4c9a51f51e5a2b5", "version": "7.5.0", "input": {"seriesId": "7701935931787316286", "episodes": [{"index": 1, "vid": "7701937936731737112"}, {"index": 2, "vid": "7701937814501346328"}], "origin": "Same batch randomly selected during this release Mac acceptance; each platform resolves and downloads again", "macEvidenceSha256": "3a3d5d9e89836c5e5b7c5e8e39e7c397afe86fc9d809c74afcc9c8a5f78a2d63"}, "sourceHarnessSha256": {"scripts/check-linux-appimage.cjs": "0fa9960574cba0641edc83409b3810d5713c950d2dc48c0ffc3fbe6cc69b3dec", "scripts/check-windows-release.cjs": "47a62bc31847621640ae07940df0f0abbd1d56bd5eaf2897449276bc2f03e72c", "scripts/windows-download-acceptance.cjs": "7d526f6553a509f0b5db0a8e419f82d66dcffd4100dd5e44258a6c8e2a11b7ce", "scripts/check-windows-installer.cjs": "6a24928dd61c83c385cb93fadc7644f9322aeb9e1d5f6baf55216ef000cac645"}, "windows": {"artifactId": 14215576310, "runId": 43846011437, "name": "windows-release-candidate", "archiveSha256": "a7ee017d9e12d6cab57e4839c35559c1167847f657ab626d01c1ee7017d14d26", "files": {"SOURCE-SHA.txt": {"bytes": 42, "sha256": "1ee534e8ebdf5a19f0761680ac7f2640225c930f7f81424fb0df31730a256349"}, "WINDOWS-SHA256SUMS.txt": {"bytes": 961, "sha256": "3ed76557dce2bf7b117f02f3e03a51145d61429dfb3caa3c1fed61cf896aa320"}, "ffmpeg-9.0.2-x264-b35605a-win-x64-corresponding-source.tar.gz": {"bytes": 13376708, "sha256": "4e89495e22dccbb3030b04812449e861332f0389e9401de2f9d4d6fbbfea4681"}, "hongguo-downloader-7.5-win-x64-setup.exe": {"bytes": 137963884, "sha256": "891f5e5857a977ec770e8d03f470d2210da5f324bc95f8d380faeb0a97a3ee7d"}, "hongguo-downloader-7.5-win-x64-setup.exe.blockmap": {"bytes": 146086, "sha256": "43e33770ab188a882a1bce8cf549758639e38b98be873d50028fc20dbcfe783f"}, "hongguo-downloader-7.5-win-x64.exe": {"bytes": 114271357, "sha256": "20650b0a239500e8eb968483fba43c86b8b6568aeecf20552f905ad2868e49d7"}, "hongguo-downloader-7.5-win-x64.zip": {"bytes": 114282555, "sha256": "28adb142608a046df2fc3fcaf44f3a961f05d452ff34c1f3c719e74d8e6e675c"}, "hongguo-downloader-7.5-windows-source.zip": {"bytes": 5785880, "sha256": "5372e7f7609f7fccdeba6b02fc72569e2cf169b9875562800ea0fe2377ec40da"}, "latest.yml": {"bytes": 377, "sha256": "80b3c0e429d7e9a205000b18101a73209aace08c5f68a831f0271079b3bcc69c"}, "librempeg-cb1f8f3-x264-b35605a-win-x64-corresponding-source.tar.gz": {"bytes": 20049852, "sha256": "17911db016f346df87f7e90a4300cd9ff96f99400f9e1fbeafe8ffec346af1f1"}}, "cacheKey": "windows-update-v2-c5cc9bcc33d5bca18f096056f4c9a51f51e5a2b5-b9c363fb4c3ee259a26d07bf2c5a8f313b94ef3c9909f17c1dabcb404e7d15a8", "cacheId": 10590320755, "cacheRef": "refs/heads/codex/7-5-download-recovery"}, "linux": {"artifactId": 14214673569, "runId": 43841076558, "name": "linux-appimage-candidate", "archiveSha256": "34e0c1981f49b20e8610559d27ae7a4a8bcbd74a14c7522e56fbb39cb334ce0f", "files": {"hongguo-downloader-7.5-linux-x64.AppImage": {"bytes": 160079692, "sha256": "0e27c8f61eb894ac195060e172df474074c34fa81e5d5ca80925c86b7a3a8b67"}}}}')
+          platform='linux'
+          frozen=INPUT['frozenSha']; spec=INPUT[platform]
+          assert subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip()==frozen
+          assert json.loads(Path('package.json').read_text())['version']==INPUT['version']
+          def digest(path):
+              h=hashlib.sha256()
+              with path.open('rb') as f:
+                  for block in iter(lambda:f.read(1024*1024),b''):h.update(block)
+              return h.hexdigest()
+          route=f"repos/jackotom/hongguo-drama/actions/artifacts/{spec['artifactId']}"
+          meta=json.loads(subprocess.check_output(['gh','api',route],text=True))
+          assert meta['id']==spec['artifactId'] and meta['name']==spec['name'] and not meta['expired']
+          assert meta['workflow_run']['id']==spec['runId'] and meta['workflow_run']['head_sha']==frozen
+          assert meta['digest']=='sha256:'+spec['archiveSha256']
+          archive=Path(os.environ['RUNNER_TEMP'])/('frozen-'+platform+'.zip')
+          with archive.open('wb') as f:subprocess.run(['gh','api',route+'/zip'],stdout=f,check=True,timeout=300)
+          assert digest(archive)==spec['archiveSha256'] and archive.stat().st_size==meta['size_in_bytes']
+          destination=Path(os.environ['RUNNER_TEMP'])/('frozen-'+platform) if platform=='windows' else Path('dist')
+          destination.mkdir(parents=True,exist_ok=True)
+          with zipfile.ZipFile(archive) as z:
+              names=z.namelist()
+              assert len(names)==len(set(names)), 'Duplicate artifact archive members'
+              if platform=='windows':assert set(names)==set(spec['files']), 'Windows candidate members changed'
+              for name,expected in spec['files'].items():
+                  assert '/' not in name and '\\' not in name and name not in ('.','..')
+                  with z.open(name) as src,(destination/name).open('wb') as dst:
+                      while True:
+                          block=src.read(1024*1024)
+                          if not block:break
+                          dst.write(block)
+                  target=destination/name
+                  assert target.stat().st_size==expected['bytes'] and digest(target)==expected['sha256'], name
+          if platform=='windows':
+              assert (destination/'SOURCE-SHA.txt').read_text(encoding='utf-8-sig').strip()==frozen
+              name='hongguo-downloader-7.5-win-x64.exe'
+              with zipfile.ZipFile(destination/'hongguo-downloader-7.5-win-x64.zip') as z:
+                  assert z.namelist()==[name]
+                  assert hashlib.sha256(z.read(name)).hexdigest()==spec['files'][name]['sha256']
+          else:(destination/next(iter(spec['files']))).chmod(0o755)
+          out=Path('dist')/(platform+'-verification');out.mkdir(parents=True,exist_ok=True)
+          receipt={'sourceCommit':frozen,'workflowCommit':os.environ['WORKFLOW_COMMIT'],'workflowRef':os.environ['WORKFLOW_REF'],
+                   'artifactId':spec['artifactId'],'artifactRunId':spec['runId'],'archiveSha256':spec['archiveSha256'],
+                   'files':spec['files'],'testInput':INPUT['input'],'originalHarnessSha256':INPUT['sourceHarnessSha256'],
+                   'artifactVerified':True,'execution':'GitHub Windows virtual machine, not a physical Windows PC' if platform=='windows' else 'Native Linux x64 GitHub runner'}
+          (out/'frozen-artifact-binding.json').write_text(json.dumps(receipt,ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
+          print('PASS frozen artifact metadata, archive digest and all selected final file digests')
+          PY
+        env:
+          GH_TOKEN: ${{ github.token }}
+      - name: Install Linux runtime dependencies only
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq xvfb libgtk-3-0 libnss3 libasound2 libgbm1 libfuse2
+      - name: Install harness dependencies without build or lifecycle scripts
+        shell: bash
+        run: npm ci --no-audit --no-fund --ignore-scripts
+      - name: Prepare only input and retry-wait acceptance harness changes
+        shell: bash
+        run: |-
+          python - <<'PY'
+          from pathlib import Path
+          import hashlib,json
+          INPUT=json.loads('{"frozenSha": "c5cc9bcc33d5bca18f096056f4c9a51f51e5a2b5", "version": "7.5.0", "input": {"seriesId": "7701935931787316286", "episodes": [{"index": 1, "vid": "7701937936731737112"}, {"index": 2, "vid": "7701937814501346328"}], "origin": "Same batch randomly selected during this release Mac acceptance; each platform resolves and downloads again", "macEvidenceSha256": "3a3d5d9e89836c5e5b7c5e8e39e7c397afe86fc9d809c74afcc9c8a5f78a2d63"}, "sourceHarnessSha256": {"scripts/check-linux-appimage.cjs": "0fa9960574cba0641edc83409b3810d5713c950d2dc48c0ffc3fbe6cc69b3dec", "scripts/check-windows-release.cjs": "47a62bc31847621640ae07940df0f0abbd1d56bd5eaf2897449276bc2f03e72c", "scripts/windows-download-acceptance.cjs": "7d526f6553a509f0b5db0a8e419f82d66dcffd4100dd5e44258a6c8e2a11b7ce", "scripts/check-windows-installer.cjs": "6a24928dd61c83c385cb93fadc7644f9322aeb9e1d5f6baf55216ef000cac645"}, "windows": {"artifactId": 14215576310, "runId": 43846011437, "name": "windows-release-candidate", "archiveSha256": "a7ee017d9e12d6cab57e4839c35559c1167847f657ab626d01c1ee7017d14d26", "files": {"SOURCE-SHA.txt": {"bytes": 42, "sha256": "1ee534e8ebdf5a19f0761680ac7f2640225c930f7f81424fb0df31730a256349"}, "WINDOWS-SHA256SUMS.txt": {"bytes": 961, "sha256": "3ed76557dce2bf7b117f02f3e03a51145d61429dfb3caa3c1fed61cf896aa320"}, "ffmpeg-9.0.2-x264-b35605a-win-x64-corresponding-source.tar.gz": {"bytes": 13376708, "sha256": "4e89495e22dccbb3030b04812449e861332f0389e9401de2f9d4d6fbbfea4681"}, "hongguo-downloader-7.5-win-x64-setup.exe": {"bytes": 137963884, "sha256": "891f5e5857a977ec770e8d03f470d2210da5f324bc95f8d380faeb0a97a3ee7d"}, "hongguo-downloader-7.5-win-x64-setup.exe.blockmap": {"bytes": 146086, "sha256": "43e33770ab188a882a1bce8cf549758639e38b98be873d50028fc20dbcfe783f"}, "hongguo-downloader-7.5-win-x64.exe": {"bytes": 114271357, "sha256": "20650b0a239500e8eb968483fba43c86b8b6568aeecf20552f905ad2868e49d7"}, "hongguo-downloader-7.5-win-x64.zip": {"bytes": 114282555, "sha256": "28adb142608a046df2fc3fcaf44f3a961f05d452ff34c1f3c719e74d8e6e675c"}, "hongguo-downloader-7.5-windows-source.zip": {"bytes": 5785880, "sha256": "5372e7f7609f7fccdeba6b02fc72569e2cf169b9875562800ea0fe2377ec40da"}, "latest.yml": {"bytes": 377, "sha256": "80b3c0e429d7e9a205000b18101a73209aace08c5f68a831f0271079b3bcc69c"}, "librempeg-cb1f8f3-x264-b35605a-win-x64-corresponding-source.tar.gz": {"bytes": 20049852, "sha256": "17911db016f346df87f7e90a4300cd9ff96f99400f9e1fbeafe8ffec346af1f1"}}, "cacheKey": "windows-update-v2-c5cc9bcc33d5bca18f096056f4c9a51f51e5a2b5-b9c363fb4c3ee259a26d07bf2c5a8f313b94ef3c9909f17c1dabcb404e7d15a8", "cacheId": 10590320755, "cacheRef": "refs/heads/codex/7-5-download-recovery"}, "linux": {"artifactId": 14214673569, "runId": 43841076558, "name": "linux-appimage-candidate", "archiveSha256": "34e0c1981f49b20e8610559d27ae7a4a8bcbd74a14c7522e56fbb39cb334ce0f", "files": {"hongguo-downloader-7.5-linux-x64.AppImage": {"bytes": 160079692, "sha256": "0e27c8f61eb894ac195060e172df474074c34fa81e5d5ca80925c86b7a3a8b67"}}}}')
+          def prepare_harness(platform):
+              def read(name):
+                  raw = Path(name).read_bytes().replace(b'\r\n', b'\n')
+                  assert hashlib.sha256(raw).hexdigest() == INPUT['sourceHarnessSha256'][name], name
+                  return raw.decode('utf-8')
+
+              def replace(source, old, new):
+                  assert source.count(old) == 1, 'Frozen harness anchor changed: ' + old[:100]
+                  return source.replace(old, new)
+
+              selected = json.dumps(INPUT['input'], ensure_ascii=False)
+              if platform == 'windows':
+                  source = read('scripts/check-windows-release.cjs')
+                  start = source.index('async function realFootage(')
+                  body = source.index('      const downloaded = await', start)
+                  end = source.index('\n      return samples;', body) + len('\n      return samples;')
+                  tail = source.index('\n(async () => {', end)
+                  preserved = source[body:end]
+                  preserved = replace(preserved, "require('./windows-download-acceptance.cjs')", "require('./frozen-windows-download-acceptance.cjs')")
+                  selection = '''async function realFootage(mediaDir, ffmpeg, ffprobe, dataFile) {
+            const selected = SELECTED;
+            result.testInput = selected;
+            const resolved = await evaluate(`window.electronAPI.searchResolve(${JSON.stringify(selected.seriesId)})`, 60000);
+            assert.equal(resolved.success, true, 'The real final App must resolve this release test series');
+            assert.equal(String(resolved.data?.series_id), selected.seriesId);
+            const series = resolved.data;
+            const episodes = selected.episodes.map(expected => {
+              const episode = series.episodes.find(item => Number(item.vid_index) === expected.index);
+              assert(episode && !episode.locked, 'Selected real episode must be unlocked');
+              assert.equal(String(episode.vid), expected.vid, 'Live episode identity must match this release input');
+              return episode;
+            });
+          '''.replace('SELECTED', selected)
+                  source = source[:start] + selection + preserved + '\n}\n' + source[tail:]
+                  source = replace(source, 'function cdp(method, params = {}) {', 'function cdp(method, params = {}, timeout = 20000) {')
+                  source = replace(source, '}, 20000);', '}, timeout);')
+                  source = replace(source, 'async function evaluate(expression) {', 'async function evaluate(expression, timeout = 20000) {')
+                  source = replace(source, "cdp('Runtime.evaluate', { expression, awaitPromise: true, returnByValue: true });", "cdp('Runtime.evaluate', { expression, awaitPromise: true, returnByValue: true }, timeout);")
+                  Path('scripts/frozen-check-windows-release.cjs').write_text(source, encoding='utf-8')
+
+                  queue = read('scripts/windows-download-acceptance.cjs')
+                  queue = replace(queue, '  const settle = async predicate => {\n    const deadline = Date.now() + 180000;', '''  const acceptanceDeadline = Date.now() + 420000;
+            const settle = async predicate => {
+              const deadline = acceptanceDeadline;
+              const episodeDeadlines = new Map();''')
+                  queue = replace(queue, "      assert(!tasks.some(task => task.status === 'failed'), 'App download failed; no media URL logged');", '''      assert(!tasks.some(task => task.status === 'failed' && !(Number(task.retryAt) > 0)), 'App download failed without a scheduled retry; no media URL logged');
+                for (const task of tasks) {
+                  if (task.status === 'downloading' || task.status === 'failed' && Number(task.retryAt) > 0) {
+                    if (!episodeDeadlines.has(task.id)) episodeDeadlines.set(task.id, Math.min(acceptanceDeadline, Date.now() + 180000));
+                    assert(Date.now() < episodeDeadlines.get(task.id), 'Single real App episode exceeded 180 seconds including automatic retries');
+                  }
+                  if (task.status === 'failed' && Number(task.retryAt) > 0) {
+                    receipt.automaticRetries ||= [];
+                    if (!receipt.automaticRetries.some(item => item.taskId === task.id && item.retryAt === task.retryAt)) {
+                      receipt.automaticRetries.push({ taskId: task.id, index: task.hongguoInfo.vid_index, retryAt: task.retryAt });
+                    }
+                  }
+                }''')
+                  queue = replace(queue, '    const deadline = Date.now() + 180000;', '    const deadline = Math.min(acceptanceDeadline, Date.now() + 180000);')
+                  Path('scripts/frozen-windows-download-acceptance.cjs').write_text(queue, encoding='utf-8')
+                  read('scripts/check-windows-installer.cjs')  # Original installer harness remains unchanged.
+              else:
+                  source = read('scripts/check-linux-appimage.cjs')
+                  source = replace(source, "      const catalog=await api.browseList({source:'hongguo',category:'hot-real-drama'});\n      if(!catalog.success||!catalog.results?.length)throw Error('Real Hongguo catalog unavailable');", '      const selected=' + selected + ';')
+                  source = replace(source, '      const dramas=[...catalog.results].sort(()=>Math.random()-0.5).slice(0,6);', '      const overallDeadline=performance.now()+420000;\n      const dramas=[{series_id:selected.seriesId}];')
+                  source = replace(source, '        const start=Math.floor(Math.random()*unlocked.length);\n        const episodes=[...unlocked.slice(start),...unlocked.slice(0,start)].slice(0,10);', '''        const episodes=selected.episodes.map(expected=>{
+                    const episode=unlocked.find(item=>Number(item.vid_index)===expected.index);
+                    if(!episode||String(episode.vid)!==expected.vid)throw Error('Selected live episode identity or unlock status changed');
+                    return episode;
+                  });''')
+                  source = replace(source, "episode.vid_index,'auto'", "episode.vid_index,'1080p'")
+                  source = replace(source, '            const deadline=performance.now()+120000;', '            const deadline=Math.min(overallDeadline,performance.now()+180000);')
+                  source = replace(source, "if(task&&['failed','stopped'].includes(task.status)){", "if(task&&(task.status==='stopped'||task.status==='failed'&&!(Number(task.retryAt)>0))){")
+                  source = replace(source, '            const playDeadline=performance.now()+60000;', '            const playDeadline=Math.min(overallDeadline,performance.now()+60000);')
+                  source = replace(source, "            if(!downloaded)throw Error('Real complete download timed out');", "            if(!downloaded)throw Error('Real complete download timed out');\n            if(downloaded.actualQuality!=='1080p')throw Error('Selected real download did not meet 1080p');")
+                  source = replace(source, '            lastFailure=error.message;', '            lastFailure=error.message;throw error;')
+                  source = replace(source, '    result.realPlayback = await cdp.evaluate', '    result.testInput = ' + selected + ';\n    result.realPlayback = await cdp.evaluate')
+                  source = replace(source, 'No two playable real episodes in six dramas: ', 'Selected release pair did not complete: ')
+                  source = replace(source, 'Fresh random Hongguo episodes 1 and 2: real source preparation and ten seconds muted playback each', 'Same release Mac random sample, episodes 1 and 2: fresh App downloads and ten seconds muted playback each')
+                  Path('scripts/frozen-check-linux-appimage.cjs').write_text(source, encoding='utf-8')
+
+          prepare_harness('linux')
+          out=Path('dist')/('linux-verification')/'frozen-artifact-binding.json'
+          receipt=json.loads(out.read_text())
+          receipt['runtimeHarnessSha256']={str(p):hashlib.sha256(p.read_bytes()).hexdigest() for p in Path('scripts').glob('frozen-*.cjs')}
+          out.write_text(json.dumps(receipt,ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
+          print('PASS only standalone acceptance harnesses were generated; frozen App packages unchanged')
+          PY
+        id: prepare
+      - name: Run final AppImage with the release random sample
+        id: acceptance
+        timeout-minutes: 10
+        run: GITHUB_SHA="$FROZEN_SHA" xvfb-run -a node scripts/frozen-check-linux-appimage.cjs
+      - name: Bind fresh result receipts to frozen source
+        shell: bash
+        run: |-
+          python - <<'PY'
+          import json,os
+          from pathlib import Path
+          out=Path('dist')/('linux'+'-verification');out.mkdir(parents=True,exist_ok=True)
+          names=['result.json','installer-result.json'] if 'linux'=='windows' else ['appimage-result.json']
+          observed={}
+          for name in names:
+              p=out/name
+              if p.is_file():
+                  d=json.loads(p.read_text());observed[name]={'passed':d.get('passed'),'sourceCommit':d.get('sourceCommit'),'version':d.get('version')}
+          passed=(os.environ['ACCEPTANCE_OUTCOME']=='success' and ('linux'!='windows' or os.environ['INSTALLER_OUTCOME']=='success')
+                  and len(observed)==len(names) and all(d['passed'] is True and d['sourceCommit']==os.environ['FROZEN_SHA'] and d['version']=='7.5.0' for d in observed.values()))
+          (out/'frozen-acceptance-status.json').write_text(json.dumps({'passed':passed,'sourceCommit':os.environ['FROZEN_SHA'],
+           'workflowCommit':os.environ['WORKFLOW_COMMIT'],'platform':'linux','acceptanceOutcome':os.environ['ACCEPTANCE_OUTCOME'],
+           'installerOutcome':os.environ.get('INSTALLER_OUTCOME'),'results':observed},indent=2)+'\n')
+          assert passed, 'Final frozen acceptance did not pass; see independent evidence artifact'
+          print('PASS fresh final-package acceptance receipts bind the exact frozen source')
+          PY
+        if: ${{ always() }}
+        env:
+          ACCEPTANCE_OUTCOME: ${{ steps.acceptance.outcome }}
+          INSTALLER_OUTCOME: not-applicable
+      - name: Upload independent final-package acceptance evidence
+        uses: actions/upload-artifact@v4
+        if: ${{ always() }}
+        with:
+          name: frozen-7.5-linux-acceptance-${{ github.run_id }}-${{ github.run_attempt }}
+          path: dist/linux-verification/*.json
+          if-no-files-found: error
+  windows:
+    if: ${{ github.event_name == 'push' || inputs.platform == 'all' || inputs.platform == 'windows' }}
+    runs-on: windows-2022
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: c5cc9bcc33d5bca18f096056f4c9a51f51e5a2b5
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Download and verify immutable final candidate
+        shell: bash
+        run: |-
+          python - <<'PY'
+          import hashlib,json,os,subprocess,zipfile
+          from pathlib import Path
+          INPUT = json.loads('{"frozenSha": "c5cc9bcc33d5bca18f096056f4c9a51f51e5a2b5", "version": "7.5.0", "input": {"seriesId": "7701935931787316286", "episodes": [{"index": 1, "vid": "7701937936731737112"}, {"index": 2, "vid": "7701937814501346328"}], "origin": "Same batch randomly selected during this release Mac acceptance; each platform resolves and downloads again", "macEvidenceSha256": "3a3d5d9e89836c5e5b7c5e8e39e7c397afe86fc9d809c74afcc9c8a5f78a2d63"}, "sourceHarnessSha256": {"scripts/check-linux-appimage.cjs": "0fa9960574cba0641edc83409b3810d5713c950d2dc48c0ffc3fbe6cc69b3dec", "scripts/check-windows-release.cjs": "47a62bc31847621640ae07940df0f0abbd1d56bd5eaf2897449276bc2f03e72c", "scripts/windows-download-acceptance.cjs": "7d526f6553a509f0b5db0a8e419f82d66dcffd4100dd5e44258a6c8e2a11b7ce", "scripts/check-windows-installer.cjs": "6a24928dd61c83c385cb93fadc7644f9322aeb9e1d5f6baf55216ef000cac645"}, "windows": {"artifactId": 14215576310, "runId": 43846011437, "name": "windows-release-candidate", "archiveSha256": "a7ee017d9e12d6cab57e4839c35559c1167847f657ab626d01c1ee7017d14d26", "files": {"SOURCE-SHA.txt": {"bytes": 42, "sha256": "1ee534e8ebdf5a19f0761680ac7f2640225c930f7f81424fb0df31730a256349"}, "WINDOWS-SHA256SUMS.txt": {"bytes": 961, "sha256": "3ed76557dce2bf7b117f02f3e03a51145d61429dfb3caa3c1fed61cf896aa320"}, "ffmpeg-9.0.2-x264-b35605a-win-x64-corresponding-source.tar.gz": {"bytes": 13376708, "sha256": "4e89495e22dccbb3030b04812449e861332f0389e9401de2f9d4d6fbbfea4681"}, "hongguo-downloader-7.5-win-x64-setup.exe": {"bytes": 137963884, "sha256": "891f5e5857a977ec770e8d03f470d2210da5f324bc95f8d380faeb0a97a3ee7d"}, "hongguo-downloader-7.5-win-x64-setup.exe.blockmap": {"bytes": 146086, "sha256": "43e33770ab188a882a1bce8cf549758639e38b98be873d50028fc20dbcfe783f"}, "hongguo-downloader-7.5-win-x64.exe": {"bytes": 114271357, "sha256": "20650b0a239500e8eb968483fba43c86b8b6568aeecf20552f905ad2868e49d7"}, "hongguo-downloader-7.5-win-x64.zip": {"bytes": 114282555, "sha256": "28adb142608a046df2fc3fcaf44f3a961f05d452ff34c1f3c719e74d8e6e675c"}, "hongguo-downloader-7.5-windows-source.zip": {"bytes": 5785880, "sha256": "5372e7f7609f7fccdeba6b02fc72569e2cf169b9875562800ea0fe2377ec40da"}, "latest.yml": {"bytes": 377, "sha256": "80b3c0e429d7e9a205000b18101a73209aace08c5f68a831f0271079b3bcc69c"}, "librempeg-cb1f8f3-x264-b35605a-win-x64-corresponding-source.tar.gz": {"bytes": 20049852, "sha256": "17911db016f346df87f7e90a4300cd9ff96f99400f9e1fbeafe8ffec346af1f1"}}, "cacheKey": "windows-update-v2-c5cc9bcc33d5bca18f096056f4c9a51f51e5a2b5-b9c363fb4c3ee259a26d07bf2c5a8f313b94ef3c9909f17c1dabcb404e7d15a8", "cacheId": 10590320755, "cacheRef": "refs/heads/codex/7-5-download-recovery"}, "linux": {"artifactId": 14214673569, "runId": 43841076558, "name": "linux-appimage-candidate", "archiveSha256": "34e0c1981f49b20e8610559d27ae7a4a8bcbd74a14c7522e56fbb39cb334ce0f", "files": {"hongguo-downloader-7.5-linux-x64.AppImage": {"bytes": 160079692, "sha256": "0e27c8f61eb894ac195060e172df474074c34fa81e5d5ca80925c86b7a3a8b67"}}}}')
+          platform='windows'
+          frozen=INPUT['frozenSha']; spec=INPUT[platform]
+          assert subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip()==frozen
+          assert json.loads(Path('package.json').read_text())['version']==INPUT['version']
+          def digest(path):
+              h=hashlib.sha256()
+              with path.open('rb') as f:
+                  for block in iter(lambda:f.read(1024*1024),b''):h.update(block)
+              return h.hexdigest()
+          route=f"repos/jackotom/hongguo-drama/actions/artifacts/{spec['artifactId']}"
+          meta=json.loads(subprocess.check_output(['gh','api',route],text=True))
+          assert meta['id']==spec['artifactId'] and meta['name']==spec['name'] and not meta['expired']
+          assert meta['workflow_run']['id']==spec['runId'] and meta['workflow_run']['head_sha']==frozen
+          assert meta['digest']=='sha256:'+spec['archiveSha256']
+          archive=Path(os.environ['RUNNER_TEMP'])/('frozen-'+platform+'.zip')
+          with archive.open('wb') as f:subprocess.run(['gh','api',route+'/zip'],stdout=f,check=True,timeout=300)
+          assert digest(archive)==spec['archiveSha256'] and archive.stat().st_size==meta['size_in_bytes']
+          destination=Path(os.environ['RUNNER_TEMP'])/('frozen-'+platform) if platform=='windows' else Path('dist')
+          destination.mkdir(parents=True,exist_ok=True)
+          with zipfile.ZipFile(archive) as z:
+              names=z.namelist()
+              assert len(names)==len(set(names)), 'Duplicate artifact archive members'
+              if platform=='windows':assert set(names)==set(spec['files']), 'Windows candidate members changed'
+              for name,expected in spec['files'].items():
+                  assert '/' not in name and '\\' not in name and name not in ('.','..')
+                  with z.open(name) as src,(destination/name).open('wb') as dst:
+                      while True:
+                          block=src.read(1024*1024)
+                          if not block:break
+                          dst.write(block)
+                  target=destination/name
+                  assert target.stat().st_size==expected['bytes'] and digest(target)==expected['sha256'], name
+          if platform=='windows':
+              assert (destination/'SOURCE-SHA.txt').read_text(encoding='utf-8-sig').strip()==frozen
+              name='hongguo-downloader-7.5-win-x64.exe'
+              with zipfile.ZipFile(destination/'hongguo-downloader-7.5-win-x64.zip') as z:
+                  assert z.namelist()==[name]
+                  assert hashlib.sha256(z.read(name)).hexdigest()==spec['files'][name]['sha256']
+          else:(destination/next(iter(spec['files']))).chmod(0o755)
+          out=Path('dist')/(platform+'-verification');out.mkdir(parents=True,exist_ok=True)
+          receipt={'sourceCommit':frozen,'workflowCommit':os.environ['WORKFLOW_COMMIT'],'workflowRef':os.environ['WORKFLOW_REF'],
+                   'artifactId':spec['artifactId'],'artifactRunId':spec['runId'],'archiveSha256':spec['archiveSha256'],
+                   'files':spec['files'],'testInput':INPUT['input'],'originalHarnessSha256':INPUT['sourceHarnessSha256'],
+                   'artifactVerified':True,'execution':'GitHub Windows virtual machine, not a physical Windows PC' if platform=='windows' else 'Native Linux x64 GitHub runner'}
+          (out/'frozen-artifact-binding.json').write_text(json.dumps(receipt,ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
+          print('PASS frozen artifact metadata, archive digest and all selected final file digests')
+          PY
+        env:
+          GH_TOKEN: ${{ github.token }}
+      - uses: actions/cache/restore@v4
+        id: prebuilt
+        with:
+          path: |
+            dist/win-unpacked
+            dist/*.exe
+            dist/*.yml
+            dist/*.blockmap
+          key: windows-update-v2-c5cc9bcc33d5bca18f096056f4c9a51f51e5a2b5-b9c363fb4c3ee259a26d07bf2c5a8f313b94ef3c9909f17c1dabcb404e7d15a8
+          fail-on-cache-miss: true
+      - name: Require exact cache hit and compare every executable binding
+        shell: bash
+        run: |-
+          python - <<'PY'
+          import hashlib,json,os,shutil
+          from pathlib import Path
+          INPUT=json.loads('{"frozenSha": "c5cc9bcc33d5bca18f096056f4c9a51f51e5a2b5", "version": "7.5.0", "input": {"seriesId": "7701935931787316286", "episodes": [{"index": 1, "vid": "7701937936731737112"}, {"index": 2, "vid": "7701937814501346328"}], "origin": "Same batch randomly selected during this release Mac acceptance; each platform resolves and downloads again", "macEvidenceSha256": "3a3d5d9e89836c5e5b7c5e8e39e7c397afe86fc9d809c74afcc9c8a5f78a2d63"}, "sourceHarnessSha256": {"scripts/check-linux-appimage.cjs": "0fa9960574cba0641edc83409b3810d5713c950d2dc48c0ffc3fbe6cc69b3dec", "scripts/check-windows-release.cjs": "47a62bc31847621640ae07940df0f0abbd1d56bd5eaf2897449276bc2f03e72c", "scripts/windows-download-acceptance.cjs": "7d526f6553a509f0b5db0a8e419f82d66dcffd4100dd5e44258a6c8e2a11b7ce", "scripts/check-windows-installer.cjs": "6a24928dd61c83c385cb93fadc7644f9322aeb9e1d5f6baf55216ef000cac645"}, "windows": {"artifactId": 14215576310, "runId": 43846011437, "name": "windows-release-candidate", "archiveSha256": "a7ee017d9e12d6cab57e4839c35559c1167847f657ab626d01c1ee7017d14d26", "files": {"SOURCE-SHA.txt": {"bytes": 42, "sha256": "1ee534e8ebdf5a19f0761680ac7f2640225c930f7f81424fb0df31730a256349"}, "WINDOWS-SHA256SUMS.txt": {"bytes": 961, "sha256": "3ed76557dce2bf7b117f02f3e03a51145d61429dfb3caa3c1fed61cf896aa320"}, "ffmpeg-9.0.2-x264-b35605a-win-x64-corresponding-source.tar.gz": {"bytes": 13376708, "sha256": "4e89495e22dccbb3030b04812449e861332f0389e9401de2f9d4d6fbbfea4681"}, "hongguo-downloader-7.5-win-x64-setup.exe": {"bytes": 137963884, "sha256": "891f5e5857a977ec770e8d03f470d2210da5f324bc95f8d380faeb0a97a3ee7d"}, "hongguo-downloader-7.5-win-x64-setup.exe.blockmap": {"bytes": 146086, "sha256": "43e33770ab188a882a1bce8cf549758639e38b98be873d50028fc20dbcfe783f"}, "hongguo-downloader-7.5-win-x64.exe": {"bytes": 114271357, "sha256": "20650b0a239500e8eb968483fba43c86b8b6568aeecf20552f905ad2868e49d7"}, "hongguo-downloader-7.5-win-x64.zip": {"bytes": 114282555, "sha256": "28adb142608a046df2fc3fcaf44f3a961f05d452ff34c1f3c719e74d8e6e675c"}, "hongguo-downloader-7.5-windows-source.zip": {"bytes": 5785880, "sha256": "5372e7f7609f7fccdeba6b02fc72569e2cf169b9875562800ea0fe2377ec40da"}, "latest.yml": {"bytes": 377, "sha256": "80b3c0e429d7e9a205000b18101a73209aace08c5f68a831f0271079b3bcc69c"}, "librempeg-cb1f8f3-x264-b35605a-win-x64-corresponding-source.tar.gz": {"bytes": 20049852, "sha256": "17911db016f346df87f7e90a4300cd9ff96f99400f9e1fbeafe8ffec346af1f1"}}, "cacheKey": "windows-update-v2-c5cc9bcc33d5bca18f096056f4c9a51f51e5a2b5-b9c363fb4c3ee259a26d07bf2c5a8f313b94ef3c9909f17c1dabcb404e7d15a8", "cacheId": 10590320755, "cacheRef": "refs/heads/codex/7-5-download-recovery"}, "linux": {"artifactId": 14214673569, "runId": 43841076558, "name": "linux-appimage-candidate", "archiveSha256": "34e0c1981f49b20e8610559d27ae7a4a8bcbd74a14c7522e56fbb39cb334ce0f", "files": {"hongguo-downloader-7.5-linux-x64.AppImage": {"bytes": 160079692, "sha256": "0e27c8f61eb894ac195060e172df474074c34fa81e5d5ca80925c86b7a3a8b67"}}}}')
+          spec=INPUT['windows']
+          assert os.environ['CACHE_HIT']=='true', 'Exact frozen prebuilt cache is mandatory; do not rebuild'
+          assert os.environ['CACHE_MATCHED_KEY']==spec['cacheKey'], 'A prefix or other cache cannot prove this package'
+          candidate=Path(os.environ['RUNNER_TEMP'])/'frozen-windows'
+          mapping={'hongguo-downloader-7.5-win-x64.exe':'红果短剧-7.5-便携版.exe',
+           'hongguo-downloader-7.5-win-x64-setup.exe':'hongguo-downloader-7.5-win-x64-setup.exe',
+           'hongguo-downloader-7.5-win-x64-setup.exe.blockmap':'hongguo-downloader-7.5-win-x64-setup.exe.blockmap','latest.yml':'latest.yml'}
+          for original,cached in mapping.items():
+              p=Path('dist')/cached
+              assert p.is_file() and p.stat().st_size==spec['files'][original]['bytes'], cached
+              assert hashlib.sha256(p.read_bytes()).hexdigest()==spec['files'][original]['sha256'], cached
+          for name in ['红果短剧.exe','resources/app.asar','resources/bin/ffmpeg.exe','resources/bin/ffprobe.exe','resources/bin/librempeg.exe']:
+              assert (Path('dist/win-unpacked')/name).is_file(), name
+          # Actual acceptance runs the pinned portable candidate; cached tools retain the original harness comparisons.
+          for original,cached in mapping.items():shutil.copy2(candidate/original,Path('dist')/cached)
+          receipt=Path('dist/windows-verification/frozen-artifact-binding.json')
+          d=json.loads(receipt.read_text());d['cache']={'hit':True,'key':spec['cacheKey'],'id':spec['cacheId'],'ref':spec['cacheRef']}
+          receipt.write_text(json.dumps(d,ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
+          print('PASS exact frozen cache hit; cached portable, installer, blockmap and update manifest match pinned candidate')
+          PY
+        id: verify-cache
+        env:
+          CACHE_HIT: ${{ steps.prebuilt.outputs.cache-hit }}
+          CACHE_MATCHED_KEY: ${{ steps.prebuilt.outputs.cache-matched-key }}
+      - name: Install harness dependencies without build or lifecycle scripts
+        shell: bash
+        run: npm ci --no-audit --no-fund --ignore-scripts
+      - name: Prepare only input and retry-wait acceptance harness changes
+        shell: bash
+        run: |-
+          python - <<'PY'
+          from pathlib import Path
+          import hashlib,json
+          INPUT=json.loads('{"frozenSha": "c5cc9bcc33d5bca18f096056f4c9a51f51e5a2b5", "version": "7.5.0", "input": {"seriesId": "7701935931787316286", "episodes": [{"index": 1, "vid": "7701937936731737112"}, {"index": 2, "vid": "7701937814501346328"}], "origin": "Same batch randomly selected during this release Mac acceptance; each platform resolves and downloads again", "macEvidenceSha256": "3a3d5d9e89836c5e5b7c5e8e39e7c397afe86fc9d809c74afcc9c8a5f78a2d63"}, "sourceHarnessSha256": {"scripts/check-linux-appimage.cjs": "0fa9960574cba0641edc83409b3810d5713c950d2dc48c0ffc3fbe6cc69b3dec", "scripts/check-windows-release.cjs": "47a62bc31847621640ae07940df0f0abbd1d56bd5eaf2897449276bc2f03e72c", "scripts/windows-download-acceptance.cjs": "7d526f6553a509f0b5db0a8e419f82d66dcffd4100dd5e44258a6c8e2a11b7ce", "scripts/check-windows-installer.cjs": "6a24928dd61c83c385cb93fadc7644f9322aeb9e1d5f6baf55216ef000cac645"}, "windows": {"artifactId": 14215576310, "runId": 43846011437, "name": "windows-release-candidate", "archiveSha256": "a7ee017d9e12d6cab57e4839c35559c1167847f657ab626d01c1ee7017d14d26", "files": {"SOURCE-SHA.txt": {"bytes": 42, "sha256": "1ee534e8ebdf5a19f0761680ac7f2640225c930f7f81424fb0df31730a256349"}, "WINDOWS-SHA256SUMS.txt": {"bytes": 961, "sha256": "3ed76557dce2bf7b117f02f3e03a51145d61429dfb3caa3c1fed61cf896aa320"}, "ffmpeg-9.0.2-x264-b35605a-win-x64-corresponding-source.tar.gz": {"bytes": 13376708, "sha256": "4e89495e22dccbb3030b04812449e861332f0389e9401de2f9d4d6fbbfea4681"}, "hongguo-downloader-7.5-win-x64-setup.exe": {"bytes": 137963884, "sha256": "891f5e5857a977ec770e8d03f470d2210da5f324bc95f8d380faeb0a97a3ee7d"}, "hongguo-downloader-7.5-win-x64-setup.exe.blockmap": {"bytes": 146086, "sha256": "43e33770ab188a882a1bce8cf549758639e38b98be873d50028fc20dbcfe783f"}, "hongguo-downloader-7.5-win-x64.exe": {"bytes": 114271357, "sha256": "20650b0a239500e8eb968483fba43c86b8b6568aeecf20552f905ad2868e49d7"}, "hongguo-downloader-7.5-win-x64.zip": {"bytes": 114282555, "sha256": "28adb142608a046df2fc3fcaf44f3a961f05d452ff34c1f3c719e74d8e6e675c"}, "hongguo-downloader-7.5-windows-source.zip": {"bytes": 5785880, "sha256": "5372e7f7609f7fccdeba6b02fc72569e2cf169b9875562800ea0fe2377ec40da"}, "latest.yml": {"bytes": 377, "sha256": "80b3c0e429d7e9a205000b18101a73209aace08c5f68a831f0271079b3bcc69c"}, "librempeg-cb1f8f3-x264-b35605a-win-x64-corresponding-source.tar.gz": {"bytes": 20049852, "sha256": "17911db016f346df87f7e90a4300cd9ff96f99400f9e1fbeafe8ffec346af1f1"}}, "cacheKey": "windows-update-v2-c5cc9bcc33d5bca18f096056f4c9a51f51e5a2b5-b9c363fb4c3ee259a26d07bf2c5a8f313b94ef3c9909f17c1dabcb404e7d15a8", "cacheId": 10590320755, "cacheRef": "refs/heads/codex/7-5-download-recovery"}, "linux": {"artifactId": 14214673569, "runId": 43841076558, "name": "linux-appimage-candidate", "archiveSha256": "34e0c1981f49b20e8610559d27ae7a4a8bcbd74a14c7522e56fbb39cb334ce0f", "files": {"hongguo-downloader-7.5-linux-x64.AppImage": {"bytes": 160079692, "sha256": "0e27c8f61eb894ac195060e172df474074c34fa81e5d5ca80925c86b7a3a8b67"}}}}')
+          def prepare_harness(platform):
+              def read(name):
+                  raw = Path(name).read_bytes().replace(b'\r\n', b'\n')
+                  assert hashlib.sha256(raw).hexdigest() == INPUT['sourceHarnessSha256'][name], name
+                  return raw.decode('utf-8')
+
+              def replace(source, old, new):
+                  assert source.count(old) == 1, 'Frozen harness anchor changed: ' + old[:100]
+                  return source.replace(old, new)
+
+              selected = json.dumps(INPUT['input'], ensure_ascii=False)
+              if platform == 'windows':
+                  source = read('scripts/check-windows-release.cjs')
+                  start = source.index('async function realFootage(')
+                  body = source.index('      const downloaded = await', start)
+                  end = source.index('\n      return samples;', body) + len('\n      return samples;')
+                  tail = source.index('\n(async () => {', end)
+                  preserved = source[body:end]
+                  preserved = replace(preserved, "require('./windows-download-acceptance.cjs')", "require('./frozen-windows-download-acceptance.cjs')")
+                  selection = '''async function realFootage(mediaDir, ffmpeg, ffprobe, dataFile) {
+            const selected = SELECTED;
+            result.testInput = selected;
+            const resolved = await evaluate(`window.electronAPI.searchResolve(${JSON.stringify(selected.seriesId)})`, 60000);
+            assert.equal(resolved.success, true, 'The real final App must resolve this release test series');
+            assert.equal(String(resolved.data?.series_id), selected.seriesId);
+            const series = resolved.data;
+            const episodes = selected.episodes.map(expected => {
+              const episode = series.episodes.find(item => Number(item.vid_index) === expected.index);
+              assert(episode && !episode.locked, 'Selected real episode must be unlocked');
+              assert.equal(String(episode.vid), expected.vid, 'Live episode identity must match this release input');
+              return episode;
+            });
+          '''.replace('SELECTED', selected)
+                  source = source[:start] + selection + preserved + '\n}\n' + source[tail:]
+                  source = replace(source, 'function cdp(method, params = {}) {', 'function cdp(method, params = {}, timeout = 20000) {')
+                  source = replace(source, '}, 20000);', '}, timeout);')
+                  source = replace(source, 'async function evaluate(expression) {', 'async function evaluate(expression, timeout = 20000) {')
+                  source = replace(source, "cdp('Runtime.evaluate', { expression, awaitPromise: true, returnByValue: true });", "cdp('Runtime.evaluate', { expression, awaitPromise: true, returnByValue: true }, timeout);")
+                  Path('scripts/frozen-check-windows-release.cjs').write_text(source, encoding='utf-8')
+
+                  queue = read('scripts/windows-download-acceptance.cjs')
+                  queue = replace(queue, '  const settle = async predicate => {\n    const deadline = Date.now() + 180000;', '''  const acceptanceDeadline = Date.now() + 420000;
+            const settle = async predicate => {
+              const deadline = acceptanceDeadline;
+              const episodeDeadlines = new Map();''')
+                  queue = replace(queue, "      assert(!tasks.some(task => task.status === 'failed'), 'App download failed; no media URL logged');", '''      assert(!tasks.some(task => task.status === 'failed' && !(Number(task.retryAt) > 0)), 'App download failed without a scheduled retry; no media URL logged');
+                for (const task of tasks) {
+                  if (task.status === 'downloading' || task.status === 'failed' && Number(task.retryAt) > 0) {
+                    if (!episodeDeadlines.has(task.id)) episodeDeadlines.set(task.id, Math.min(acceptanceDeadline, Date.now() + 180000));
+                    assert(Date.now() < episodeDeadlines.get(task.id), 'Single real App episode exceeded 180 seconds including automatic retries');
+                  }
+                  if (task.status === 'failed' && Number(task.retryAt) > 0) {
+                    receipt.automaticRetries ||= [];
+                    if (!receipt.automaticRetries.some(item => item.taskId === task.id && item.retryAt === task.retryAt)) {
+                      receipt.automaticRetries.push({ taskId: task.id, index: task.hongguoInfo.vid_index, retryAt: task.retryAt });
+                    }
+                  }
+                }''')
+                  queue = replace(queue, '    const deadline = Date.now() + 180000;', '    const deadline = Math.min(acceptanceDeadline, Date.now() + 180000);')
+                  Path('scripts/frozen-windows-download-acceptance.cjs').write_text(queue, encoding='utf-8')
+                  read('scripts/check-windows-installer.cjs')  # Original installer harness remains unchanged.
+              else:
+                  source = read('scripts/check-linux-appimage.cjs')
+                  source = replace(source, "      const catalog=await api.browseList({source:'hongguo',category:'hot-real-drama'});\n      if(!catalog.success||!catalog.results?.length)throw Error('Real Hongguo catalog unavailable');", '      const selected=' + selected + ';')
+                  source = replace(source, '      const dramas=[...catalog.results].sort(()=>Math.random()-0.5).slice(0,6);', '      const overallDeadline=performance.now()+420000;\n      const dramas=[{series_id:selected.seriesId}];')
+                  source = replace(source, '        const start=Math.floor(Math.random()*unlocked.length);\n        const episodes=[...unlocked.slice(start),...unlocked.slice(0,start)].slice(0,10);', '''        const episodes=selected.episodes.map(expected=>{
+                    const episode=unlocked.find(item=>Number(item.vid_index)===expected.index);
+                    if(!episode||String(episode.vid)!==expected.vid)throw Error('Selected live episode identity or unlock status changed');
+                    return episode;
+                  });''')
+                  source = replace(source, "episode.vid_index,'auto'", "episode.vid_index,'1080p'")
+                  source = replace(source, '            const deadline=performance.now()+120000;', '            const deadline=Math.min(overallDeadline,performance.now()+180000);')
+                  source = replace(source, "if(task&&['failed','stopped'].includes(task.status)){", "if(task&&(task.status==='stopped'||task.status==='failed'&&!(Number(task.retryAt)>0))){")
+                  source = replace(source, '            const playDeadline=performance.now()+60000;', '            const playDeadline=Math.min(overallDeadline,performance.now()+60000);')
+                  source = replace(source, "            if(!downloaded)throw Error('Real complete download timed out');", "            if(!downloaded)throw Error('Real complete download timed out');\n            if(downloaded.actualQuality!=='1080p')throw Error('Selected real download did not meet 1080p');")
+                  source = replace(source, '            lastFailure=error.message;', '            lastFailure=error.message;throw error;')
+                  source = replace(source, '    result.realPlayback = await cdp.evaluate', '    result.testInput = ' + selected + ';\n    result.realPlayback = await cdp.evaluate')
+                  source = replace(source, 'No two playable real episodes in six dramas: ', 'Selected release pair did not complete: ')
+                  source = replace(source, 'Fresh random Hongguo episodes 1 and 2: real source preparation and ten seconds muted playback each', 'Same release Mac random sample, episodes 1 and 2: fresh App downloads and ten seconds muted playback each')
+                  Path('scripts/frozen-check-linux-appimage.cjs').write_text(source, encoding='utf-8')
+
+          prepare_harness('windows')
+          out=Path('dist')/('windows-verification')/'frozen-artifact-binding.json'
+          receipt=json.loads(out.read_text())
+          receipt['runtimeHarnessSha256']={str(p):hashlib.sha256(p.read_bytes()).hexdigest() for p in Path('scripts').glob('frozen-*.cjs')}
+          out.write_text(json.dumps(receipt,ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
+          print('PASS only standalone acceptance harnesses were generated; frozen App packages unchanged')
+          PY
+        id: prepare
+      - name: Run final portable App real queue and muted playback
+        id: acceptance
+        timeout-minutes: 12
+        shell: pwsh
+        run: |-
+          $env:GITHUB_SHA = $env:FROZEN_SHA
+          node scripts/frozen-check-windows-release.cjs
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+      - name: Run original fresh install, reinstall and real 1.80 upgrade
+        id: installer
+        timeout-minutes: 8
+        shell: pwsh
+        if: ${{ always() && steps.prepare.outcome == 'success' && steps.verify-cache.outcome == 'success' }}
+        run: |-
+          $env:GITHUB_SHA = $env:FROZEN_SHA
+          node scripts/check-windows-installer.cjs
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+      - name: Bind fresh result receipts to frozen source
+        shell: bash
+        run: |-
+          python - <<'PY'
+          import json,os
+          from pathlib import Path
+          out=Path('dist')/('windows'+'-verification');out.mkdir(parents=True,exist_ok=True)
+          names=['result.json','installer-result.json'] if 'windows'=='windows' else ['appimage-result.json']
+          observed={}
+          for name in names:
+              p=out/name
+              if p.is_file():
+                  d=json.loads(p.read_text());observed[name]={'passed':d.get('passed'),'sourceCommit':d.get('sourceCommit'),'version':d.get('version')}
+          passed=(os.environ['ACCEPTANCE_OUTCOME']=='success' and ('windows'!='windows' or os.environ['INSTALLER_OUTCOME']=='success')
+                  and len(observed)==len(names) and all(d['passed'] is True and d['sourceCommit']==os.environ['FROZEN_SHA'] and d['version']=='7.5.0' for d in observed.values()))
+          (out/'frozen-acceptance-status.json').write_text(json.dumps({'passed':passed,'sourceCommit':os.environ['FROZEN_SHA'],
+           'workflowCommit':os.environ['WORKFLOW_COMMIT'],'platform':'windows','acceptanceOutcome':os.environ['ACCEPTANCE_OUTCOME'],
+           'installerOutcome':os.environ.get('INSTALLER_OUTCOME'),'results':observed},indent=2)+'\n')
+          assert passed, 'Final frozen acceptance did not pass; see independent evidence artifact'
+          print('PASS fresh final-package acceptance receipts bind the exact frozen source')
+          PY
+        if: ${{ always() }}
+        env:
+          ACCEPTANCE_OUTCOME: ${{ steps.acceptance.outcome }}
+          INSTALLER_OUTCOME: ${{ steps.installer.outcome }}
+      - name: Upload independent final-package acceptance evidence
+        uses: actions/upload-artifact@v4
+        if: ${{ always() }}
+        with:
+          name: frozen-7.5-windows-acceptance-${{ github.run_id }}-${{ github.run_attempt }}
+          path: dist/windows-verification/*.json
+          if-no-files-found: error
