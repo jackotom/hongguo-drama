@@ -6,6 +6,27 @@ const nativeDir = path.join(__dirname, '../src/native');
 const playbackDevice = Object.freeze({ device_id: '7000000000000000001', iid: '7000000000000000002', cdid: '00000000-0000-4000-8000-000000000003' });
 const mediaUrl = name => `https://v3-reading.qznovelvod.com/${name}.mp4`;
 const stream = (name, width, height, codec_type = 'h264') => ({ main_url: mediaUrl(name), width, height, codec_type, definition: '1080p' });
+function appRoute(config) {
+  const url = new URL(config.url);
+  if (url.pathname === '/service/2/device_register/') {
+    assert.equal(config.method, 'POST');
+    assert.equal(url.hostname, 'log5-applog-lf.fqnovel.com');
+    return 'registration';
+  }
+  if (url.pathname === '/novel/player/multi_video_model/player/v1') {
+    assert.equal(config.method, 'POST');
+    assert.ok(['api5-normal-sinfonlineb.fqnovel.com', 'api5-normal-sinfonlinea.fqnovel.com'].includes(url.hostname));
+    return 'model';
+  }
+  if (url.pathname === '/novel/player/multi_video_model/v1/') {
+    assert.equal(config.method, 'POST');
+    assert.equal(url.hostname, 'api5-normal-sinfonlineb.fqnovel.com');
+    return 'legacy';
+  }
+  assert.equal(config.url, 'https://vod.snssdk.com/info', 'unexpected fixture route');
+  assert.equal(config.method || 'GET', 'GET');
+  return 'metadata';
+}
 function load(name, dependencies) {
   dependencies = { './playback-device': { registerPlaybackDevice: async () => playbackDevice }, ...dependencies };
   const context = { Buffer, URL, URLSearchParams, AbortSignal, AbortController, process: { env: {} }, module: { exports: {} },
@@ -17,9 +38,14 @@ function appFixture(videoList, model = {}) {
   const calls = [];
   const app = load('app-source.js', { axios: async config => {
     calls.push(config);
-    return { status: 200, headers: {}, data: JSON.stringify(new URL(config.url).pathname.endsWith('/multi_video_model/v1/')
-      ? { data: { '11': { video_model: { fallback_api: 'https://vod.snssdk.com/info' } } } }
-      : { video_info: { data: { ...model, video_list: videoList } } }) };
+    const route = appRoute(config);
+    let data;
+    if (route === 'registration') data = { device_id: playbackDevice.device_id, install_id: playbackDevice.iid };
+    else if (route === 'model' || route === 'legacy') {
+      for (const key of ['device_id', 'iid', 'cdid']) assert.equal(new URL(config.url).searchParams.get(key), playbackDevice[key]);
+      data = { data: { '11': { video_model: { fallback_api: 'https://vod.snssdk.com/info' } } } };
+    } else data = { video_info: { data: { ...model, video_list: videoList } } };
+    return { status: 200, headers: {}, data: JSON.stringify(data) };
   } });
   return { ...app, calls };
 }

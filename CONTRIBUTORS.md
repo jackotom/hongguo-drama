@@ -18,7 +18,7 @@
 
 7.2本轮公开反馈致谢：[@Zxiaoming90](https://github.com/Zxiaoming90)（#153外置盘）、[@zhangyibin8111](https://github.com/zhangyibin8111)（#150下载与删除）、[@darki2k](https://github.com/darki2k)（#151字幕建议，本轮仅核实来源，尚未实现）。以下保留7.1历史核对快照，不将反馈者伪列为代码作者。
 
-核对日期：2026-11-16。收录本轮开发期间默认分支提交快照的作者，以及冻结时全部开放／已关闭 PR、Issue 的提交账号。历史快照含 264 个提交、10 个 PR、137 个 Issue；本轮已回读全部 13 个本仓 PR，另列上游 PR #60 与核心作者。仅展示公开账号与提交编号，不收录邮箱等私人资料。
+核对日期：2026-11-16。收录本轮开发期间默认分支提交快照的作者，以及冻结时全部开放／已关闭 PR、Issue 的提交账号。历史快照含 264 个提交、10 个 PR、137 个 Issue；本轮回读当前列表返回的13个本仓PR，历史已核实但当前列表未返回的#140及作者继续保留；另列上游PR #60与核心作者。仅展示公开账号与提交编号，不收录邮箱等私人资料。
 
 ## 代码提交作者
 
@@ -27,11 +27,12 @@
 
 ## PR 提交者
 
-感谢 10 位提交者提供代码方案。列出 PR 不代表已经合并或原样采用；具体采用情况以代码、提交历史与审查记录为准。
+感谢 11 位提交者提供代码方案（包括当前列表未返回、但已核实的历史 PR #140）。列出 PR 不代表已经合并或原样采用；具体采用情况以代码、提交历史与审查记录为准。
 
 | 账号 | 提交的 PR |
 | --- | --- |
 | [@aaaasssddfgh](https://github.com/aaaasssddfgh) | [#152](https://github.com/jackotom/hongguo-drama/pull/152) |
+| [@anupam-orbis](https://github.com/anupam-orbis) | [#140](https://github.com/jackotom/hongguo-drama/pull/140)（历史已核对，当前列表未返回，保留署名） |
 | [@alair-s](https://github.com/alair-s) | [#163](https://github.com/jackotom/hongguo-drama/pull/163)、[#164](https://github.com/jackotom/hongguo-drama/pull/164) |
 | [@ceco3000](https://github.com/ceco3000) | [#18](https://github.com/jackotom/hongguo-drama/pull/18) |
 | [@j2-cuong](https://github.com/j2-cuong) | [#159](https://github.com/jackotom/hongguo-drama/pull/159) |
@@ -137,6 +138,6 @@
 
 ## 署名说明
 
-完整结构化名单随源码及桌面包保存在 `src/native/community-credits.json`。既有上游、组件和算法作者的署名继续保留在 README、NOTICE、THIRD-PARTY-NOTICES.md 及相应许可文件中。
+本轮公开查询快照随源码及桌面包保存在 `src/native/community-credits.json`；当前查询未返回的历史贡献继续在本文及NOTICE保留。既有上游、组件和算法作者的署名继续保留在 README、NOTICE、THIRD-PARTY-NOTICES.md 及相应许可文件中。
 
 GitHub 仓库右侧 Contributors 由平台根据实际提交历史生成，无法通过这份名单指定。Issue 反馈者和未采用 PR 的作者在此公开致谢，不伪造提交作者、共同作者或合并记录。

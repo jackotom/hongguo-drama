@@ -6,6 +6,27 @@ const http = require('node:http');
 const nativeDir = path.join(__dirname, '../src/native');
 const playbackDevice = Object.freeze({ device_id: '7000000000000000001', iid: '7000000000000000002', cdid: '00000000-0000-4000-8000-000000000003' });
 const media = name => `https://v3-reading.qznovelvod.com/${name}.mp4`;
+function appRoute(config) {
+  const url = new URL(config.url);
+  if (url.pathname === '/service/2/device_register/') {
+    assert.equal(config.method, 'POST');
+    assert.equal(url.hostname, 'log5-applog-lf.fqnovel.com');
+    return 'registration';
+  }
+  if (url.pathname === '/novel/player/multi_video_model/player/v1') {
+    assert.equal(config.method, 'POST');
+    assert.ok(['api5-normal-sinfonlineb.fqnovel.com', 'api5-normal-sinfonlinea.fqnovel.com'].includes(url.hostname));
+    return 'model';
+  }
+  if (url.pathname === '/novel/player/multi_video_model/v1/') {
+    assert.equal(config.method, 'POST');
+    assert.equal(url.hostname, 'api5-normal-sinfonlineb.fqnovel.com');
+    return 'legacy';
+  }
+  assert.equal(config.url, 'https://vod.snssdk.com/info', 'unexpected fixture route');
+  assert.equal(config.method || 'GET', 'GET');
+  return 'metadata';
+}
 const webPage = (vid = '11', sid = '1', extra = {}) => `<script>window._ROUTER_DATA=${JSON.stringify({ loaderData: {
   'player_(series_id)/(vid)/page': { isSuccess: true, vid, series_id: sid, seriesDetail: { series_id: sid, vid_list: ['11'] },
     publicVideoSeo: { available: true, itemId: vid, seriesId: sid }, ...extra },
@@ -31,9 +52,14 @@ function appFixture(rows) {
   const calls = [];
   const app = load('app-source.js', { axios: async config => {
     calls.push(config);
-    return { status: 200, headers: {}, data: JSON.stringify(new URL(config.url).pathname.endsWith('/multi_video_model/v1/')
-      ? { data: { '11': { video_model: { fallback_api: 'https://vod.snssdk.com/info' } } } }
-      : { video_info: { data: { video_list: rows } } }) };
+    const route = appRoute(config);
+    let data;
+    if (route === 'registration') data = { device_id: playbackDevice.device_id, install_id: playbackDevice.iid };
+    else if (route === 'model' || route === 'legacy') {
+      for (const key of ['device_id', 'iid', 'cdid']) assert.equal(new URL(config.url).searchParams.get(key), playbackDevice[key]);
+      data = { data: { '11': { video_model: { fallback_api: 'https://vod.snssdk.com/info' } } } };
+    } else data = { video_info: { data: { video_list: rows } } };
+    return { status: 200, headers: {}, data: JSON.stringify(data) };
   } });
   return { ...app, calls };
 }
@@ -94,6 +120,7 @@ const checks = [
         return request(...args);
       });
       const routedApp = load('app-source.js', { './playback-device': { registerPlaybackDevice }, axios: async config => {
+        assert.equal(appRoute(config), 'registration');
         if (failure.status) return { status: failure.status, headers: {}, data: 'secret' };
         throw Object.assign(new Error('secret https://signed.invalid/?token=private'), failure);
       } });
@@ -117,7 +144,8 @@ const checks = [
     for (const [code, expected] of [['ECONNABORTED', 'TIMEOUT'], ['ETIMEDOUT', 'TIMEOUT'],
       ['ENOTFOUND', 'NETWORK_ERROR'], ['ECONNRESET', 'NETWORK_ERROR'], ['ERR_NETWORK', 'NETWORK_ERROR'],
       ['secret-token-code', 'NETWORK_ERROR']]) {
-      const app = load('app-source.js', { axios: async () => {
+      const app = load('app-source.js', { axios: async config => {
+        assert.ok(['model', 'legacy'].includes(appRoute(config)));
         throw Object.assign(new Error('secret https://signed.invalid/?token=private'), { code, config: { secret: true } });
       } });
       await assert.rejects(app.fetchAppPlayUrl('11'), error => {
@@ -143,8 +171,12 @@ const checks = [
       [{ data: first }, { video_info: { data: { video_list: { one: { codec_type: 'h264', width: 720, height: 1280, main_url: 'https://127.0.0.1/private' } } } } }, 'SECURITY_BLOCKED'],
     ];
     for (const [response, second, expected] of cases) {
+      const stages = [];
       const app = load('app-source.js', { axios: async config => {
-        const result = { status: 200, headers: {}, ...(new URL(config.url).pathname.endsWith('/multi_video_model/v1/') ? response : { data: second }) };
+        const route = appRoute(config);
+        stages.push(route);
+        assert.notEqual(route, 'registration', 'registration is isolated from model failures');
+        const result = { status: 200, headers: {}, ...(route === 'model' || route === 'legacy' ? response : { data: second }) };
         if (typeof result.data !== 'string') result.data = JSON.stringify(result.data);
         return result;
       } });
@@ -152,6 +184,7 @@ const checks = [
       const result = await f.fetchPlayUrlSingle('11', '1', { quality: '720p' });
       assert.equal(result.sources[0].code, expected);
       assert.doesNotMatch(JSON.stringify(result), /secret|127\.0\.0\.1|private/);
+      assert.deepEqual(stages, second === null ? ['model'] : ['model', 'metadata'], 'explicit failures must not start another model route');
     }
   }],
   ['Web keeps null compatibility but reports actual failures on first and final fallback', async () => {
@@ -379,6 +412,7 @@ const checks = [
     }
     assert.equal(result.variants[2].contentKey, key1); assert.equal(result.variants[3].contentKey, key2);
     assert.equal(result.variants[4].contentKey, null); assert.equal(f.calls.length, 2, 'no media preflight');
+    assert.deepEqual(f.calls.map(appRoute), ['model', 'metadata']);
   }],
   ['Strict quality alternatives never include smaller or unknown-size streams', async () => {
     const f = appFixture({ low: { main_url: media('low'), codec_type: 'h264', width: 720, height: 1280 },
