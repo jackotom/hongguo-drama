@@ -1,0 +1,93 @@
+{
+  "mode": "mac-zstd-delta",
+  "status": "pending-final-plan",
+  "sourceCommit": "4ffff289d6dd289e589a0fd0e65aa7aa5c2a7567",
+  "version": "7.5.0",
+  "buildVersion": "7.5.2",
+  "releaseId": 446852363,
+  "tag": "v7.5",
+  "transportAuthorized": false,
+  "finalFilesApproved": false,
+  "assets": {
+    "Hongguo-7.5-mac-arm64.dmg": {
+      "size": null,
+      "sha256": null,
+      "base": {
+        "id": null,
+        "name": "Hongguo-7.5-mac-arm64.dmg",
+        "size": null,
+        "sha256": null
+      },
+      "delta": {
+        "id": null,
+        "name": null,
+        "size": null,
+        "sha256": null
+      }
+    },
+    "Hongguo-7.5-mac-x64.dmg": {
+      "size": null,
+      "sha256": null,
+      "base": {
+        "id": null,
+        "name": "Hongguo-7.5-mac-x64.dmg",
+        "size": null,
+        "sha256": null
+      },
+      "delta": {
+        "id": null,
+        "name": null,
+        "size": null,
+        "sha256": null
+      }
+    },
+    "hongguo-downloader-7.5-mac-arm64.zip": {
+      "size": null,
+      "sha256": null,
+      "base": {
+        "id": null,
+        "name": "hongguo-downloader-7.5-mac-arm64.zip",
+        "size": null,
+        "sha256": null
+      },
+      "delta": {
+        "id": null,
+        "name": null,
+        "size": null,
+        "sha256": null
+      }
+    },
+    "hongguo-downloader-7.5-mac-x64.zip": {
+      "size": null,
+      "sha256": null,
+      "base": {
+        "id": null,
+        "name": "hongguo-downloader-7.5-mac-x64.zip",
+        "size": null,
+        "sha256": null
+      },
+      "delta": {
+        "id": null,
+        "name": null,
+        "size": null,
+        "sha256": null
+      }
+    },
+    "latest-mac.yml": {
+      "size": null,
+      "sha256": null,
+      "base": {
+        "id": null,
+        "name": "latest-mac.yml",
+        "size": null,
+        "sha256": null
+      },
+      "input": {
+        "id": null,
+        "name": null,
+        "size": null,
+        "sha256": null
+      }
+    }
+  }
+}

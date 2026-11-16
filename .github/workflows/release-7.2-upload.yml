@@ -1,16 +1,27 @@
-name: Transport five Windows 7.5.2 assets to existing draft
+name: Transport frozen 7.5 Windows or Mac draft assets
 on:
   workflow_dispatch:
+    inputs:
+      mode:
+        description: Explicit transport scope
+        type: choice
+        required: true
+        default: mac-delta
+        options: [windows, mac-delta]
+      mac_plan_sha256:
+        description: Approved final Mac plan SHA256; required for mac-delta
+        type: string
+        default: ''
 permissions:
   actions: read
   contents: write
 concurrency:
-  group: release-446852363-windows-transport
+  group: release-446852363-${{ inputs.mode }}-transport
   cancel-in-progress: false
 jobs:
   transport:
     runs-on: ubuntu-24.04
-    timeout-minutes: 25
+    timeout-minutes: 30
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       TRANSPORT_PLAN_SHA256: '2a6653e38e812e384d61b017ccaff83969270409e14f26c804d354f9c1cc7337'
@@ -19,14 +30,34 @@ jobs:
         with:
           persist-credentials: false
       - name: Verify frozen Windows artifact and upload only five accepted files
+        if: inputs.mode == 'windows'
         run: >-
           python3 .github/release-7.5-windows-cloud.py
           --execute 4ffff289d6dd289e589a0fd0e65aa7aa5c2a7567
           --plan .github/release-7.5-windows-transport.json
           --plan-sha256 "$TRANSPORT_PLAN_SHA256"
+      - name: Restore all final Mac bytes and verify before exact asset replacement
+        if: inputs.mode == 'mac-delta'
+        env:
+          MAC_PLAN_SHA256: ${{ inputs.mac_plan_sha256 }}
+        run: >-
+          python3 .github/release-7.5-mac-cloud.py
+          --execute 4ffff289d6dd289e589a0fd0e65aa7aa5c2a7567
+          --plan .github/release-7.5-mac-transport.json
+          --plan-sha256 "$MAC_PLAN_SHA256"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: release-7.5-windows-transport-${{ github.run_id }}-${{ github.run_attempt }}
-          path: transport-result.json
+          name: release-7.5-${{ inputs.mode }}-transport-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            transport-result.json
+            transport-mac-result.json
           if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        if: failure() && inputs.mode == 'mac-delta'
+        with:
+          name: release-7.5-mac-recovery-${{ github.run_id }}-${{ github.run_attempt }}
+          path: transport-mac/
+          compression-level: 0
+          retention-days: 3
+          if-no-files-found: ignore
