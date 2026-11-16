@@ -13,7 +13,7 @@ const { spawnSync } = require('node:child_process');
 const source = path.resolve(__dirname, '../main.js');
 const req = createRequire(source);
 const dirs = [];
-function fixture({ width = 1080, height = 1920, quality = 'auto', realMedia = false } = {}) {
+function fixture({ width = 1080, height = 1920, quality = 'auto', realMedia = false, decryptInWorker } = {}) {
   const root = fs.mkdtempSync(path.join(process.env.HONGGUO_TEST_VOLUME || os.tmpdir(), 'hongguo-quality-'));
   dirs.push(root);
   const handlers = {}, calls = [], events = [], app = new EventEmitter();
@@ -23,6 +23,7 @@ function fixture({ width = 1080, height = 1920, quality = 'auto', realMedia = fa
   const context = vm.createContext({ require: n => n === 'electron'
     ? { app, ipcMain: { handle: (n, f) => handlers[n] = f }, protocol: { registerSchemesAsPrivileged() {} } }
     : n === './src/native/hongguo' ? { fetchPlayUrlSingle: async (...args) => { calls.push(args); return { url: 'https://media.example/video.mp4' }; } }
+    : n === './src/native/decrypt-worker.cjs' && decryptInWorker ? { decryptInWorker }
     : n === './src/store' ? { getSettings: () => settings, saveSettings: s => settings = s,
       saveTasks: tasks => { saved = JSON.parse(JSON.stringify(tasks)); } } : req(n),
     __dirname: path.dirname(source), console: { log() {}, warn() {}, error() {} },
@@ -113,6 +114,85 @@ async function realFootageCatalog(browseList) {
   return catalog;
 }
 const checks = [
+  ...['plain', 'ByteVC2', 'CENC', 'spadeA'].flatMap(mode => [false, true].map(persistent => [
+    `issue157 ${mode} completes despite ${persistent ? 'persistent' : 'open-handle'} EPERM cleanup`, async () => {
+      const check = async h => {
+        const promises = require('node:fs/promises');
+        const original = { open:promises.open, unlink:promises.unlink, unlinkSync:fs.unlinkSync };
+        const handles = new Set(); let blocked = 0;
+        const target = file => String(file).startsWith(h.root + path.sep)
+          && ['input.enc.tmp', 'decoded.mp4'].includes(path.basename(file));
+        const busy = file => {
+          if (target(file) && (persistent || handles.has(file))) {
+            blocked++;
+            throw Object.assign(new Error('fixture Windows file busy'), { code:'EPERM' });
+          }
+        };
+        promises.open = async (file, ...args) => {
+          const handle = await original.open(file, ...args);
+          if (target(file)) {
+            handles.add(file);
+            const close = handle.close.bind(handle);
+            handle.close = async () => { await close(); handles.delete(file); };
+          }
+          return handle;
+        };
+        promises.unlink = async file => { busy(file); return original.unlink(file); };
+        fs.unlinkSync = file => { busy(file); return original.unlinkSync(file); };
+        try {
+          await h.run('executeHongguoDownload(downloadTasks[0])');
+          const task = h.saved()[0];
+          assert.equal(task.status, 'completed', task.error);
+          assert.equal(task.progress, 100);
+          assert.equal(fs.statSync(task.savePath).size, 200000);
+          assert.equal(h.events.filter(event => event.channel === 'download-completed').length, 1);
+          assert.equal(h.events.some(event => event.channel === 'download-failed'), false);
+          assert(blocked > 0, 'cleanup must exercise EPERM');
+          assert.equal(handles.size, 0, 'cleanup must release its file handles');
+          assert.equal(task.temporaryDownloads.length, persistent ? 1 : 0);
+          if (persistent) {
+            const native = require('../src/native/download-temporary');
+            assert.equal(native.inspectDownloadTemporary(task.temporaryDownloads[0], native.downloadTemporaryOwner(task)).directoryVerified, true);
+          }
+        } finally {
+          promises.open = original.open; promises.unlink = original.unlink; fs.unlinkSync = original.unlinkSync;
+        }
+        const task = h.saved()[0];
+        for (const record of task.temporaryDownloads) {
+          const native = require('../src/native/download-temporary');
+          assert.equal((await native.cleanupDownloadTemporary(record, native.downloadTemporaryOwner(task))).missing, true);
+        }
+        assert.equal(fs.statSync(task.savePath).size, 200000, 'later cleanup must preserve the final video');
+        assert.equal(h.run('hasCompleteTaskFile(downloadTasks[0])'), true, 'cleanup must not invalidate the completed file identity');
+      };
+      if (mode === 'ByteVC2' || mode === 'CENC') await bytevc2Fixture(check, { cenc:mode === 'CENC' });
+      else {
+        const h = fixture({ decryptInWorker:async ({ dstPath }) => fs.writeFileSync(dstPath, Buffer.alloc(200000)) });
+        if (mode === 'spadeA') h.run(`hongguo.fetchPlayUrlSingle=async()=>({url:'https://media.example/video.mp4',spadeA:'fixture',duration:12});
+          hongguo.deriveKey=()=>Buffer.alloc(16);`);
+        await h.handlers['hongguo-download-batch']({}, payload());
+        await check(h);
+      }
+    },
+  ])),
+  ['issue157 copy failure keeps its original error when decoded cleanup also hits EPERM', async () => {
+    await bytevc2Fixture(async h => {
+      const promises = require('node:fs/promises'), copy = fs.copyFileSync, unlink = promises.unlink;
+      fs.copyFileSync = () => { throw Object.assign(new Error('fixture original copy failure'), { code:'EIO' }); };
+      promises.unlink = async file => {
+        if (String(file).startsWith(h.root + path.sep)) throw Object.assign(new Error('fixture cleanup failure'), { code:'EPERM' });
+        return unlink(file);
+      };
+      try {
+        await h.run('executeHongguoDownload(downloadTasks[0])');
+        assert.equal(h.saved()[0].status, 'failed');
+        assert.equal(h.saved()[0].error, 'fixture original copy failure');
+        assert.equal(fs.existsSync(h.saved()[0].savePath), false);
+      } finally { fs.copyFileSync = copy; promises.unlink = unlink; }
+      const task = h.saved()[0], native = require('../src/native/download-temporary');
+      for (const record of task.temporaryDownloads) assert.equal((await native.cleanupDownloadTemporary(record, native.downloadTemporaryOwner(task))).missing, true);
+    }, { cenc:true });
+  }],
   ['issue150 missing ByteVC2 component stops before transfer and is classified locally', async () => {
     const h = fixture();
     h.run(`globalThis.attempts=0; resolveFfmpeg=name=>name==='librempeg'?null:'/fixture/ffprobe';
@@ -846,40 +926,40 @@ const checks = [
     for (let i = 0; i < 3; i++) await h.handlers['get-download-tasks']({});
   }],
 
-  ['unsupported hard links publish through exclusive copy on removable disks', async () => {
+  ['exclusive copy publishes downloads without linking temporary file identities', async () => {
     const originalLink = fs.linkSync, originalCopy = fs.copyFileSync;
     try {
-      for (const code of ['ENOTSUP', 'EOPNOTSUPP', 'EPERM', 'EXDEV', 'ENOSYS']) {
-        const h = fixture(); let copies = 0;
-        fs.linkSync = () => { throw Object.assign(new Error('hard link unavailable'), { code }); };
-        fs.copyFileSync = (source, destination, flags) => { copies++; assert.equal(flags, fs.constants.COPYFILE_EXCL); return originalCopy(source, destination, flags); };
-        await h.handlers['hongguo-download-batch']({}, payload());
-        await h.run('executeHongguoDownload(downloadTasks[0])');
-        assert.equal(h.saved()[0].status, 'completed', `${code}: ${h.saved()[0].error}`);
-        assert.equal(copies, 1);
-        assert.equal(fs.statSync(h.saved()[0].savePath).size, 200000);
-        assert.equal(fs.existsSync(h.saved()[0].savePath + '.enc.tmp'), false);
-      }
+      const h = fixture(); let copies = 0;
+      fs.linkSync = () => assert.fail('Downloads must not share an inode with deferred temporary files');
+      fs.copyFileSync = (source, destination, flags) => { copies++; assert.equal(flags, fs.constants.COPYFILE_EXCL); return originalCopy(source, destination, flags); };
+      await h.handlers['hongguo-download-batch']({}, payload());
+      await h.run('executeHongguoDownload(downloadTasks[0])');
+      assert.equal(h.saved()[0].status, 'completed', h.saved()[0].error);
+      assert.equal(copies, 1);
+      assert.equal(fs.statSync(h.saved()[0].savePath).size, 200000);
+      assert.equal(h.run('hasCompleteTaskFile(downloadTasks[0])'), true);
     } finally { fs.linkSync = originalLink; fs.copyFileSync = originalCopy; }
   }],
-  ['publication preserves raced existing files with or without hard-link support', async () => {
-    const originalLink = fs.linkSync, originalCopy = fs.copyFileSync;
+  ['publication preserves raced existing files and reports failed copies', async () => {
+    const originalCopy = fs.copyFileSync;
     try {
-      for (const code of ['EEXIST', 'ENOTSUP', 'EIO']) {
+      for (const conflict of [true, false]) {
         const h = fixture(); let copies = 0;
-        fs.linkSync = (source, destination) => {
+        fs.copyFileSync = (source, destination, flags) => {
+          copies++;
+          assert.equal(flags, fs.constants.COPYFILE_EXCL);
+          if (!conflict) throw Object.assign(new Error('fixture copy failed'), { code:'EIO' });
           fs.writeFileSync(destination, 'preserve user file');
-          throw Object.assign(new Error('cannot link'), { code });
+          return originalCopy(source, destination, flags);
         };
-        fs.copyFileSync = (...args) => { copies++; return originalCopy(...args); };
         await h.handlers['hongguo-download-batch']({}, payload());
         await h.run('executeHongguoDownload(downloadTasks[0])');
-        assert.equal(h.saved()[0].status, 'failed', code);
-        assert.equal(copies, code === 'ENOTSUP' ? 1 : 0, 'only unsupported links may fall back');
-        assert.equal(fs.readFileSync(h.saved()[0].savePath, 'utf8'), 'preserve user file');
-        assert.equal(fs.existsSync(h.saved()[0].savePath + '.enc.tmp'), false);
+        assert.equal(h.saved()[0].status, 'failed');
+        assert.equal(copies, 1);
+        if (conflict) assert.equal(fs.readFileSync(h.saved()[0].savePath, 'utf8'), 'preserve user file');
+        else assert.equal(fs.existsSync(h.saved()[0].savePath), false);
       }
-    } finally { fs.linkSync = originalLink; fs.copyFileSync = originalCopy; }
+    } finally { fs.copyFileSync = originalCopy; }
   }],
 
 ];

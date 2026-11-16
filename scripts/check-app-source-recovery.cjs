@@ -122,15 +122,15 @@ function row(definition, width, height, suffix) {
   for (const status of [200, 403, 404]) {
     let calls = 0, registrations = 0;
     const unavailable = load(async () => { calls++; return { status, headers: {}, data: '' }; },
-      { registerPlaybackDevice: async () => identities[registrations++] });
+      { registerPlaybackDevice: async () => identities[(registrations++) % identities.length] });
     await assert.rejects(unavailable.fetchAppPlayUrl(vid), error => status === 200 ? error.code === 'EMPTY_RESPONSE' : error.status === status);
-    assert.equal(calls, status === 200 ? 2 : 1, 'one recovery only; HTTP rejection must not retry the model request');
-    assert.equal(registrations, status === 200 ? 2 : 1);
+    assert.equal(calls, status === 200 ? 3 : 1, 'bounded empty recovery only; HTTP rejection must not retry the model request');
+    assert.equal(registrations, status === 200 ? 3 : 1);
   }
   let cooldownCalls = 0;
   await assert.rejects(load(async () => { cooldownCalls++; return { status: 200, headers: {}, data: '' }; },
     { getPlaybackDevice: async () => identities[0] }).fetchAppPlayUrl(vid), error => error.code === 'EMPTY_RESPONSE');
-  assert.equal(cooldownCalls, 2, 'empty response permits one fresh-device alternate route');
+  assert.equal(cooldownCalls, 3, 'empty responses permit legacy then one fresh current request');
   let clock = Date.now(), slowCalls = 0;
   const slowRegistration = load(async config => {
     slowCalls++;

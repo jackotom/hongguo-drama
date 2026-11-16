@@ -1,4 +1,4 @@
-// Hongguo Drama 7.4: desktop runtime; server entry is server/index.cjs.
+// Hongguo Drama 7.5: desktop runtime; server entry is server/index.cjs.
 /**
  * main.js - 红果短剧 6.2 下载器（独立版）主进程
  *
@@ -1019,9 +1019,8 @@ async function verifyDownloadQuality(file, quality, existing = false, verifyDeco
 }
 
 function publishDownloadFile(temporary, destination) {
-  // Reuse merge publication: hard-link when supported, exclusive copy on FAT/exFAT.
-  require('./src/native/merge-runner').publishMergedOutput(temporary, destination);
-  fs.unlinkSync(temporary);
+  // A hard link would change the final file's ctime when deferred temporary cleanup runs.
+  fs.copyFileSync(temporary, destination, fs.constants.COPYFILE_EXCL);
 }
 
 async function completeNasExports(task) {
@@ -1232,7 +1231,10 @@ async function executeHongguoDownload(task) {
           await temporary.checkOutput();
           source.token.throwIfRequested();
           publishDownloadFile(decodedPath, finalPath);
-        } finally { await temporary.removeOutput(); }
+        } catch (error) {
+          await temporary.removeOutput().catch(() => {});
+          throw error;
+        }
       } else if (playInfo.spadeA) {
         const key = hongguo.deriveKey(playInfo.spadeA);
         if (!key) throw new Error('Key 派生失败');
@@ -1246,7 +1248,10 @@ async function executeHongguoDownload(task) {
           source.token.throwIfRequested();
           publishDownloadFile(decodedPath, finalPath);
         }
-        finally { await temporary.removeOutput(); }
+        catch (error) {
+          await temporary.removeOutput().catch(() => {});
+          throw error;
+        }
       } else {
         task.actualQuality = await verifyReceived(tmpPath, playInfo.duration);
         await temporary.checkInput();
@@ -1297,6 +1302,7 @@ async function executeHongguoDownload(task) {
   } finally {
     if (temporary) {
       const result = await temporary.cleanup().catch(() => null);
+      if (!result?.missing) console.warn('下载临时文件未清理完毕，已保留身份记录供后续安全清理');
       if (result?.missing) {
         task.temporaryDownloads = task.temporaryDownloads.filter(record => record !== temporary.record);
         try { saveDownloadTasks(); } catch (_) { /* The stored receipt remains recoverable on restart. */ }

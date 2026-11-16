@@ -1,3 +1,4 @@
+<!-- 7.5 source and release target; historical credits retained. -->
 # 贡献者与问题反馈致谢
 
 7.4开放PR致谢：[@j2-cuong](https://github.com/j2-cuong)（[#159](https://github.com/jackotom/hongguo-drama/pull/159) 下载取源重试与剧集筛选）、[@aaaasssddfgh](https://github.com/aaaasssddfgh)（[#152](https://github.com/jackotom/hongguo-drama/pull/152) Windows AMD AMF编码）；[@roytjus](https://github.com/roytjus)（#92、#143）和[@xinbaojian](https://github.com/xinbaojian)（#129）继续列入。列名代表代码提交，不代表PR已原样合并。

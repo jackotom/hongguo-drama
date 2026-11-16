@@ -53,8 +53,8 @@ test('empty playback responses keep their classification through the public sour
     assert.match(result.error, /所选清晰度 1080p，未降级/);
     assert.match(result.error, /空响应.*原因尚未确认/);
     assert.doesNotMatch(JSON.stringify(result), /签名|鉴权|请检查网络|PRIVATE_SENTINEL/);
-    assert.equal(registrations, 2, 'retain exactly one existing registration recovery');
-    assert.equal(models, 2, 'retain exactly one existing alternate-host attempt');
+    assert.equal(registrations, 3, 'empty recovery remains bounded to three registrations');
+    assert.equal(models, 3, 'empty recovery retains legacy then one fresh current attempt');
 });
 
 function app(transport, clock = Date) {

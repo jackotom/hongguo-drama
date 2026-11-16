@@ -24,19 +24,26 @@
 
 ## 下载与安装
 
-**当前源码／发行目标：7.4**（内部`7.4.0`，桌面构建`7.4.1`）。修复 Windows/移动存储临时文件身份误判和匿名注册超时后的批量重试，并增加按剧筛选与 Windows AMD AMF 硬件编码。标准发行只含双 Mac、Windows、Linux 与 Docker；TV 和手机独立。
+**当前源码／发行目标：7.5**（内部`7.5.0`，桌面构建`7.5.1`）。本轮目标为成功下载后的 EPERM 临时文件清理与间歇 EMPTY 恢复；具体实现与验收仍在进行，不能宣称上游故障全部根治。标准发行只含双 Mac、Windows、Linux 与 Docker；TV 和手机独立。
 
-以下为7.4下载。Mac已签名、公证、装订；Windows EXE未签名。
+**7.5尚未发布。以下为计划下载地址，五平台验收齐备后统一公开，当前链接可能不可用。** 本轮Windows真实下载计划在GitHub虚拟机验收，发行时须明确标注非实体电脑；EXE未签名。
 
-| 平台 | 下载7.4 | 使用方式 |
+| 平台 | 7.5计划下载（待发布） | 使用方式／待验事项 |
 |---|---|---|
-| Apple芯片Mac，macOS 13+ | [DMG](https://github.com/jackotom/hongguo-drama/releases/download/v7.4/Hongguo-7.4-mac-arm64.dmg) | 拖入应用程序；已签名、公证、装订 |
-| Intel Mac，macOS 13+ | [DMG](https://github.com/jackotom/hongguo-drama/releases/download/v7.4/Hongguo-7.4-mac-x64.dmg) | 同上；验收仅Rosetta |
-| Windows x64 | [安装版](https://github.com/jackotom/hongguo-drama/releases/download/v7.4/hongguo-downloader-7.4-win-x64-setup.exe) · [便携EXE](https://github.com/jackotom/hongguo-drama/releases/download/v7.4/hongguo-downloader-7.4-win-x64.exe) · [便携ZIP](https://github.com/jackotom/hongguo-drama/releases/download/v7.4/hongguo-downloader-7.4-win-x64.zip) | 安装版支持应用内更新；EXE未签名 |
-| Linux x64 | [AppImage](https://github.com/jackotom/hongguo-drama/releases/download/v7.4/hongguo-downloader-7.4-linux-x64.AppImage) | 赋予执行权限；手动更新 |
-| Docker Linux amd64 / NAS | [镜像](https://github.com/jackotom/hongguo-drama/releases/download/v7.4/hongguo-drama-7.4-docker-amd64.tar.gz) · [部署包](https://github.com/jackotom/hongguo-drama/releases/download/v7.4/hongguo-drama-7.4-docker-deploy.zip) | 按[部署文档](docs/docker.md)设置令牌与挂载目录 |
+| Apple芯片Mac，macOS 13+ | [DMG](https://github.com/jackotom/hongguo-drama/releases/download/v7.5/Hongguo-7.5-mac-arm64.dmg) | 拖入应用程序；本轮签名、公证、装订及实播待验 |
+| Intel Mac，macOS 13+ | [DMG](https://github.com/jackotom/hongguo-drama/releases/download/v7.5/Hongguo-7.5-mac-x64.dmg) | 同上；须注明Rosetta与实体Intel覆盖边界 |
+| Windows x64 | [安装版](https://github.com/jackotom/hongguo-drama/releases/download/v7.5/hongguo-downloader-7.5-win-x64-setup.exe) · [便携EXE](https://github.com/jackotom/hongguo-drama/releases/download/v7.5/hongguo-downloader-7.5-win-x64.exe) · [便携ZIP](https://github.com/jackotom/hongguo-drama/releases/download/v7.5/hongguo-downloader-7.5-win-x64.zip) | 安装版支持应用内更新；EXE未签名，GitHub虚拟机验收待做 |
+| Linux x64 | [AppImage](https://github.com/jackotom/hongguo-drama/releases/download/v7.5/hongguo-downloader-7.5-linux-x64.AppImage) | 赋予执行权限；手动更新，本轮实播待验 |
+| Docker Linux amd64 / NAS | [镜像](https://github.com/jackotom/hongguo-drama/releases/download/v7.5/hongguo-drama-7.5-docker-amd64.tar.gz) · [部署包](https://github.com/jackotom/hongguo-drama/releases/download/v7.5/hongguo-drama-7.5-docker-deploy.zip) | 按[部署文档](docs/docker.md)设置令牌与挂载目录；本轮下载合并待验 |
 
-[7.4发行页](https://github.com/jackotom/hongguo-drama/releases/tag/v7.4) · [SHA256](https://github.com/jackotom/hongguo-drama/releases/download/v7.4/SHA256SUMS.txt) · [精确源码](https://github.com/jackotom/hongguo-drama/releases/download/v7.4/hongguo-drama-7.4-source.zip)。实际状态见[7.4记录](docs/release-7.4.md)。TV和手机保持独立。上游部分网页片源仍可能404、只提供预览或超时，不保证所有内容永久可播。
+[7.5计划发行页（待发布）](https://github.com/jackotom/hongguo-drama/releases/tag/v7.5) · [SHA256（待发布）](https://github.com/jackotom/hongguo-drama/releases/download/v7.5/SHA256SUMS.txt) · [精确源码（待发布）](https://github.com/jackotom/hongguo-drama/releases/download/v7.5/hongguo-drama-7.5-source.zip)。实际状态见[7.5记录](docs/release-7.5.md)。TV和手机保持独立。上游部分网页片源仍可能404、只提供预览或超时，不保证所有内容永久可播。
+
+<details>
+<summary>7.4 历史下载与发行说明</summary>
+
+7.4历史发行包与验收回执见[7.4发行页](https://github.com/jackotom/hongguo-drama/releases/tag/v7.4)及[7.4记录](docs/release-7.4.md)；历史签名和验收结果不代表7.5通过。
+
+</details>
 
 <details>
 <summary>7.3 历史下载与发行说明</summary>
@@ -243,6 +250,13 @@ Mac和Windows安装版保留应用内更新入口；完整6.4→6.5自动更新�
 2. 在「发现短剧」浏览，或在「搜索与下载」输入剧名、红果分享链接或剧集 ID。
 3. 打开详情点「立即播放」，也可选择集数与清晰度加入下载队列。
 4. 下次从「我的剧库」或「观看记录」接着看；下载进度、失败重试和整剧合并在「下载管理」。
+
+## 7.5（源码／发行目标，尚未发布）
+
+- 目标：成功下载后的临时文件清理遇到 EPERM 时，不把已完成分集重新标为失败；保留文件身份校验及清理失败提示，不误删冲突文件。
+- 目标：改善播放取源间歇 EMPTY 后的有界恢复，保留取消、明确拒绝和共享冷却保护；不宣称上游所有故障根治。
+- 双Mac、Windows、Linux与Docker同源齐备、完成必要验收后统一公开。Windows本轮真实下载计划在GitHub虚拟机验收，须标明非实体电脑；当前结果待补。
+- 本轮目标与验收待办见[7.5记录](docs/release-7.5.md)，历史版本说明保留。
 
 ## 7.4
 

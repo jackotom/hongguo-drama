@@ -44,6 +44,19 @@ function fixture(tabResponse, { legacyResponse, signal } = {}) {
         fetch: options => module.exports.fetchAppPlayUrl(vid, { quality: '1080p', signal, ...options }) };
 }
 
+test('two empty routes recover once through a freshly signed current request', async () => {
+    let attempts = 0;
+    const f = fixture(() => ++attempts === 1
+        ? { status: 200, headers: {}, data: '' } : response(nested(model())));
+    assert.equal((await f.fetch()).url, media);
+    assert.equal(f.calls.length, 3);
+    assert.equal(f.registrations(), 3);
+    assert.deepEqual(f.calls.map(call => call.method), ['GET', 'POST', 'GET']);
+    assertPlayerBinding(f, f.calls[2], 2);
+    assert.equal(f.calls[2].headers.Connection, 'close');
+    assert(Number(f.calls[2].headers['x-khronos']) > Number(f.calls[1].headers['x-khronos']));
+});
+
 function assertPlayerBinding(f, request, index) {
     const input = f.signatures[index], url = new URL(request.url);
     assert.ok(input, 'model must use the real PlayerSigner family');
@@ -186,8 +199,8 @@ for (const [name, result, code] of [
     test(`video_tab ${name} stops within the existing request budget`, async () => {
         const f = fixture(result);
         await assert.rejects(f.fetch(), error => code ? error.code === code : error.status === 403);
-        assert.equal(f.calls.length, code === 'EMPTY_RESPONSE' ? 2 : 1);
-        assert.equal(f.registrations(), code === 'EMPTY_RESPONSE' ? 2 : 1);
+        assert.equal(f.calls.length, code === 'EMPTY_RESPONSE' ? 3 : 1);
+        assert.equal(f.registrations(), code === 'EMPTY_RESPONSE' ? 3 : 1);
     });
 }
 

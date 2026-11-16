@@ -105,11 +105,11 @@ const checks = [
     h.fire();
     h.run(`requestMedia = async () => ({headers: {'content-length': '200000'}, data: testReadStream()});`);
     await h.download();
-    assert.equal(h.task().status, 'completed');
+    assert.equal(h.task().status, 'completed', h.task().error);
     const before = fs.readFileSync(h.task().savePath);
     h.run(`requestMedia = async () => { throw new Error('completed files must not be downloaded again'); };`);
     await h.download();
-    assert.equal(h.task().status, 'completed');
+    assert.equal(h.task().status, 'completed', h.task().error);
     assert.deepEqual(fs.readFileSync(h.task().savePath), before);
     for (const action of ['stop-download', 'pause-all']) {
       const g = fixture();

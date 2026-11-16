@@ -90,6 +90,29 @@ test('empty current responses wait one second before the single existing legacy 
     assert.equal(f.calls.length, 2); assert.equal(f.calls[1].method, 'POST');
 });
 
+test('two empty routes wait before current recovery without extending the model budget', async () => {
+    const f = fixture((config, count) => count < 3 ? { status:200, headers:{}, data:'' } : success(config));
+    const result = f.fetch(); await turn();
+    await f.advance(1000); assert.equal(f.calls.length, 2);
+    await f.advance(999); assert.equal(f.calls.length, 2);
+    await f.advance(1); await result;
+    assert.equal(f.calls.length, 3);
+    assert.equal(f.calls[2].method, 'GET');
+    assert.equal(f.calls[2].timeout, 10000);
+    assert.equal(f.registrations.length, 3);
+});
+
+test('empty legacy response cannot start current recovery after the model deadline', async () => {
+    const f = fixture(async (config, count) => {
+        if (count === 2) await f.advance(11000);
+        return { status:200, headers:{}, data:'' };
+    });
+    const result = assert.rejects(f.fetch(), { code:'EMPTY_RESPONSE' }); await turn();
+    await f.advance(1000); await result;
+    assert.equal(f.calls.length, 2);
+    assert.equal(f.registrations.length, 2);
+});
+
 for (const registrationFailure of ['HTTP_403', 'HTTP_429', 'BUSINESS_REJECTED']) {
     test(`a renewal ${registrationFailure} stops legacy recovery and already queued requests`, async () => {
         const refusal = Object.assign(new Error('registration refused'), { code: 'DEVICE_REGISTRATION_FAILED', registrationFailure });

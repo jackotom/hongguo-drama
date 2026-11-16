@@ -1,6 +1,6 @@
-<!-- 7.4 source and release target; TV and phone remain independent. -->
+<!-- 7.5 source and release target; TV and phone remain independent. -->
 
-7.4 为当前源码／发行目标，内部7.4.0、桌面构建7.4.1。修复 Windows/移动存储临时文件身份误判和匿名注册超时后的批量重试，并增加按剧筛选与 Windows AMD AMF 硬件编码。标准发行范围是双Mac、Windows x64、Linux x64 AppImage与Docker amd64；实际状态见[7.4记录](docs/release-7.4.md)。
+7.5 为当前源码／发行目标，内部7.5.0、桌面构建7.5.1。本轮目标为成功下载后的 EPERM 临时文件清理与间歇 EMPTY 恢复；7.5尚未发布，功能与最终包验收待完成，不能宣称上游故障已全部根治。Windows真实下载验收计划使用GitHub虚拟机，不等同实体电脑。标准发行范围是双Mac、Windows x64、Linux x64 AppImage与Docker amd64；实际状态见[7.5记录](docs/release-7.5.md)。
 
 <!-- 7.2 published; frozen application source remains unchanged. -->
 
