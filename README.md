@@ -1045,6 +1045,16 @@ FFmpeg 二进制不提交到 Git。重新分发编译包时，请按 GPL 要求�
 
 感谢所有代码贡献者与问题反馈者。[完整贡献记录与问题编号](CONTRIBUTORS.md)已核对至 2026-11-15，包含历史开放／已关闭的全部 12 个 PR 和 137 个 Issue。
 
+### 7.5 播放恢复特别鸣谢
+
+| 贡献者 | 实际贡献 |
+| --- | --- |
+| [N3urda（NANA）](https://github.com/N3urda) | 维护上游 hongguoTV，提交并组织 [PR #60](https://github.com/N3urda/hongguoTV/pull/60) 的播放恢复发行。 |
+| [ermilylu](https://github.com/N3urda/hongguoTV/commit/18c37c2afd0567520135abcae312352542f09083) | 纯 Kotlin Android v5 签名核心、合成向量及上游播放验证的公开 Git 作者；本项目 7.5 据此移植纯 JavaScript 实现。账号尚未关联，保留原始署名。 |
+| [WEP-56](https://github.com/WEP-56) | 在 [Issue #162](https://github.com/jackotom/hongguo-drama/issues/162#issuecomment-6915976249) 提供上游 PR 线索，帮助定位播放恢复方案。 |
+
+以上按实际贡献致谢。GitHub 右侧 Contributors 由提交历史与账号关联自动生成，此名单不改变提交作者或统计。
+
 **代码提交作者：** [@jackotom](https://github.com/jackotom)、[@ZainCheung](https://github.com/ZainCheung)。
 
 **PR 提交者（10 位）：** [@aaaasssddfgh](https://github.com/aaaasssddfgh)、[@anupam-orbis](https://github.com/anupam-orbis)、[@ceco3000](https://github.com/ceco3000)、[@jackotom](https://github.com/jackotom)、[@jayeeliu](https://github.com/jayeeliu)、[@j2-cuong](https://github.com/j2-cuong)、[@jjay5520](https://github.com/jjay5520)、[@roytjus](https://github.com/roytjus)、[@xinbaojian](https://github.com/xinbaojian)、[@ZainCheung](https://github.com/ZainCheung)。未合并的方案也保留提交致谢，不代表已经采用。
