@@ -1,0 +1,63 @@
+{
+  "sourceCommit": "4ffff289d6dd289e589a0fd0e65aa7aa5c2a7567",
+  "version": "7.5.0",
+  "buildVersion": "7.5.2",
+  "releaseId": 446852363,
+  "tag": "v7.5",
+  "transportAuthorized": true,
+  "runId": 43872907869,
+  "runAttempt": 1,
+  "artifactId": 14229555967,
+  "artifactName": "windows-release-candidate",
+  "archive": {
+    "size": 405939287,
+    "sha256": "87f0a23eca60774396488dd44d4f1c8574b2cd6287060ba8e81d7e7211c40b9c"
+  },
+  "assets": {
+    "hongguo-downloader-7.5-win-x64-setup.exe": {
+      "size": 137980561,
+      "sha256": "404192748cff041984ad9ab46f28fc44734cdbd196154256192f7d4225ccab95",
+      "replace": null
+    },
+    "hongguo-downloader-7.5-win-x64-setup.exe.blockmap": {
+      "size": 146174,
+      "sha256": "69eabe5f2a40e4c57e12e42329bfaf361930205a6044709f43a79f30e6831530",
+      "replace": {
+        "id": 754418900,
+        "state": "uploaded",
+        "size": 146086,
+        "digest": "sha256:43e33770ab188a882a1bce8cf549758639e38b98be873d50028fc20dbcfe783f"
+      }
+    },
+    "hongguo-downloader-7.5-win-x64.exe": {
+      "size": 114288172,
+      "sha256": "1dbec63f4d5d153b7975d4126060048a80fd69d88933e9502b00b891cd913ab9",
+      "replace": {
+        "id": 754419047,
+        "state": "uploaded",
+        "size": 114271357,
+        "digest": "sha256:20650b0a239500e8eb968483fba43c86b8b6568aeecf20552f905ad2868e49d7"
+      }
+    },
+    "hongguo-downloader-7.5-win-x64.zip": {
+      "size": 114298198,
+      "sha256": "1f694ff97b29a27b6ad92b8659bce31a6aa3b86991a84d086949b163e8f2f2b4",
+      "replace": {
+        "id": 754442512,
+        "state": "uploaded",
+        "size": 114282555,
+        "digest": "sha256:28adb142608a046df2fc3fcaf44f3a961f05d452ff34c1f3c719e74d8e6e675c"
+      }
+    },
+    "latest.yml": {
+      "size": 377,
+      "sha256": "7ec3a59c577a85d8f874f025ab9c54799ff7f93cbfd302b7b93dddbedac22cd3",
+      "replace": {
+        "id": 754451300,
+        "state": "uploaded",
+        "size": 377,
+        "digest": "sha256:80b3c0e429d7e9a205000b18101a73209aace08c5f68a831f0271079b3bcc69c"
+      }
+    }
+  }
+}
