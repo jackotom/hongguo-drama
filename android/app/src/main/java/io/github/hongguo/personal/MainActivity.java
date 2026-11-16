@@ -637,6 +637,28 @@ public class MainActivity extends Activity {
             try (GZIPOutputStream gzip = new GZIPOutputStream(out)) { gzip.write(Base64.decode(data,Base64.DEFAULT)); }
             return Base64.encodeToString(out.toByteArray(),Base64.NO_WRAP);
         }
+        @JavascriptInterface public String gunzip(String data, int maxOutputLength) throws IOException {
+            requireBusinessOpen();
+            final int limit = 2 * 1024 * 1024;
+            if (maxOutputLength < 1 || maxOutputLength > limit) throw new IllegalArgumentException("解压上限无效");
+            if (data == null || data.length() > (limit + 2) / 3 * 4) throw new IOException("压缩数据过大");
+            byte[] compressed = Base64.decode(data,Base64.DEFAULT);
+            if (compressed.length > limit) throw new IOException("压缩数据过大");
+            try (ByteArrayInputStream input = new ByteArrayInputStream(compressed);
+                 GZIPInputStream gzip = new GZIPInputStream(input);
+                 ByteArrayOutputStream out = new ByteArrayOutputStream(Math.min(maxOutputLength,8192))) {
+                byte[] chunk = new byte[Math.min(maxOutputLength,8192)];
+                while (true) {
+                    requireBusinessOpen();
+                    int count = gzip.read(chunk,0,Math.min(chunk.length,maxOutputLength - out.size() + 1));
+                    if (count < 0) break;
+                    if (count > maxOutputLength - out.size()) throw new IOException("解压数据过大");
+                    out.write(chunk,0,count);
+                }
+                requireBusinessOpen();
+                return Base64.encodeToString(out.toByteArray(),Base64.NO_WRAP);
+            }
+        }
         @JavascriptInterface public void cancel(int id) {
             HttpURLConnection c;
             synchronized (requestLock) {

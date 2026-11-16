@@ -9,7 +9,7 @@ const zlib = require('node:zlib');
 const publicPlayer = require('./public-player-fixture.cjs');
 
 const entry = path.join(__dirname, '../web/media.js');
-const compiled = esbuild.build({ entryPoints: [entry], bundle: true, platform: 'browser', format: 'cjs', write: false, logLevel: 'silent', plugins: [{ name: 'controlled-source', setup(build) {
+const compiled = esbuild.build({ entryPoints: [entry], nodePaths: require.resolve.paths('buffer/'), bundle: true, platform: 'browser', format: 'cjs', write: false, logLevel: 'silent', plugins: [{ name: 'controlled-source', setup(build) {
   build.onLoad({ filter: /native\/app-source\.js$/ }, () => ({ contents: 'export const fetchAppPlayUrl = (...args) => globalThis.fetchSource(...args);', loader: 'js' }));
   build.onResolve({ filter: /^android-decrypt$/ }, () => ({path:'decoder',namespace:'test'}));
   build.onLoad({ filter: /.*/, namespace:'test' }, () => ({ contents: 'export const decryptMp4Buffer = () => { throw new Error("unexpected decryption"); };', loader: 'js' }));
@@ -173,19 +173,20 @@ test('shared preparation owns exactly one token/Blob and releases failures or ca
 
 test('shared Android consumer cancels the delivered G2 registration/model/fallback transport', async t => {
   const root = path.resolve(__dirname,'..');
-  const built = await esbuild.build({entryPoints:[path.join(root,'web/media.js')],bundle:true,format:'cjs',platform:'browser',write:false,logLevel:'silent',
+  const built = await esbuild.build({entryPoints:[path.join(root,'web/media.js')],nodePaths:require.resolve.paths('buffer/'),bundle:true,format:'cjs',platform:'browser',write:false,logLevel:'silent',
     inject:[path.join(root,'web/globals.js')],alias:{'node:crypto':path.join(root,'web/crypto.js'),'node:zlib':path.join(root,'web/zlib.js'),'node:timers/promises':path.join(root,'web/timers.cjs'),axios:path.join(root,'web/axios.cjs')},
     plugins:[{name:'unused-decoder',setup(build){
       build.onResolve({filter:/^android-decrypt$/},()=>({path:'decoder',namespace:'unused'}));
       build.onLoad({filter:/.*/,namespace:'unused'},()=>({contents:'export function decryptMp4Buffer(){throw Error("decoder must not run");}'}));
     }}]});
   for (const phase of ['registration','model','fallback']) await t.test(phase,async () => {
-    const sent=[],cancelled=[]; let arrived,held;
+    const sent=[],cancelled=[]; let arrived,held,gunzips=0;
     const reached = new Promise(resolve => { arrived=resolve; });
     const context={module:{exports:{}},URL,Blob,AbortController,AbortSignal,setTimeout,clearTimeout,console:{info(){}},Native:{
       random:n=>crypto.randomBytes(n).toString('base64'),
       digest:(a,d)=>crypto.createHash(a).update(Buffer.from(d,'base64')).digest('base64'),
       gzip:d=>zlib.gzipSync(Buffer.from(d,'base64')).toString('base64'),
+      gunzip(d,maxOutputLength){gunzips++;assert.equal(maxOutputLength,2*1024*1024);return zlib.gunzipSync(Buffer.from(d,'base64'),{maxOutputLength}).toString('base64');},
       crypt(decrypt,alg,key,iv,padding,data){const c=(decrypt?crypto.createDecipheriv:crypto.createCipheriv)(alg,Buffer.from(key,'base64'),iv?Buffer.from(iv,'base64'):null);c.setAutoPadding(padding);return Buffer.concat([c.update(Buffer.from(data,'base64')),c.final()]).toString('base64');},
       cancel:id=>cancelled.push(id),
       request(id,raw){
@@ -199,7 +200,7 @@ test('shared Android consumer cancels the delivered G2 registration/model/fallba
     vm.runInNewContext(built.outputFiles[0].text,context);
     const controller=new AbortController();
     const pending=context.module.exports.prepareMedia('111111','auto',controller.signal);
-    pending.catch(()=>{}); await Promise.race([reached,pending]); assert.notEqual(held,undefined); const before=sent.length; controller.abort();
+    pending.catch(()=>{}); await Promise.race([reached,pending]); assert.notEqual(held,undefined); assert.equal(gunzips,phase==='registration'?0:1); const before=sent.length; controller.abort();
     await assert.rejects(pending,e=>e.code==='ERR_CANCELED');
     assert.deepEqual(cancelled,[held]);
     context.__nativeResponse(held,JSON.stringify({status:200,headers:{},data:'{}'}));

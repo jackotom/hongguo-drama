@@ -5,14 +5,18 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const esbuild = require('../../node_modules/esbuild');
+const zlib = require('node:zlib');
+const { spawnSync } = require('node:child_process');
 
 function load(entry) {
   const file = path.join(os.tmpdir(), `hongguo-android-${crypto.randomUUID()}.cjs`);
-  esbuild.buildSync({ entryPoints: [path.join(__dirname, '..', 'web', entry)], bundle: true, platform: 'node', format: 'cjs', outfile: file, inject:[path.join(__dirname,'../web/globals.js')], alias:{'node:crypto':path.join(__dirname,'../web/crypto.js'),'node:zlib':path.join(__dirname,'../web/zlib.js'),'axios':path.join(__dirname,'../web/axios.cjs')} });
+  esbuild.buildSync({ entryPoints: [path.join(__dirname, '..', 'web', entry)], nodePaths: require.resolve.paths('buffer/'), bundle: true, platform: 'node', format: 'cjs', outfile: file, inject:[path.join(__dirname,'../web/globals.js')], alias:{'node:crypto':path.join(__dirname,'../web/crypto.js'),'node:zlib':path.join(__dirname,'../web/zlib.js'),'axios':path.join(__dirname,'../web/axios.cjs')} });
   try { return require(file); } finally { fs.unlinkSync(file); }
 }
 
 global.Native = {
+  gzip: data => zlib.gzipSync(Buffer.from(data, 'base64')).toString('base64'),
+  gunzip: (data, maxOutputLength) => zlib.gunzipSync(Buffer.from(data, 'base64'), { maxOutputLength }).toString('base64'),
   random: n => crypto.randomBytes(n).toString('base64'),
   digest: (alg, data) => crypto.createHash(alg).update(Buffer.from(data, 'base64')).digest('base64'),
   crypt: (decrypt, alg, key, iv, padding, data) => {
@@ -21,6 +25,98 @@ global.Native = {
     return Buffer.concat([c.update(Buffer.from(data, 'base64')), c.final()]).toString('base64');
   },
 };
+
+test('Android gzip bridge exports bounded gunzipSync with Buffer semantics', () => {
+  const mobile = load('zlib.js');
+  assert.equal(typeof mobile.gunzipSync, 'function', 'shared playback requires the gunzipSync export');
+  const limit = 2 * 1024 * 1024, plain = Buffer.from('中文\0gzip\xff'), packed = zlib.gzipSync(plain);
+  const calls = [], original = Native.gunzip;
+  Native.gunzip = (data, maximum) => { calls.push(maximum); return original(data, maximum); };
+  try {
+    const output = mobile.gunzipSync(packed);
+    assert.ok(output.constructor.isBuffer(output));
+    assert.deepEqual(Buffer.from(output), plain); assert.equal(calls.at(-1), limit);
+    assert.deepEqual(Buffer.from(mobile.gunzipSync(packed, { maxOutputLength: plain.length })), plain);
+    assert.equal(calls.at(-1), plain.length);
+    assert.deepEqual(Buffer.from(mobile.gunzipSync(mobile.gzipSync(plain))), plain);
+    assert.equal(mobile.gunzipSync(zlib.gzipSync(Buffer.alloc(0)), { maxOutputLength: 1 }).length, 0);
+    const before = calls.length;
+    for (const maximum of [0, -1, 1.5, NaN, Infinity, '8', limit + 1]) {
+      assert.throws(() => mobile.gunzipSync(packed, { maxOutputLength: maximum }), /limit/);
+    }
+    assert.throws(() => mobile.gunzipSync(Buffer.alloc(limit + 1)), /limit/);
+    assert.equal(calls.length, before, 'invalid bounds never enter the Native bridge');
+    const corrupt = Buffer.from(packed); corrupt[corrupt.length - 8] ^= 1;
+    for (const bytes of [Buffer.from('not gzip'), packed.subarray(0, 10), corrupt]) assert.throws(() => mobile.gunzipSync(bytes));
+    assert.throws(() => mobile.gunzipSync(packed, { maxOutputLength: plain.length - 1 }));
+    assert.equal(mobile.gunzipSync(zlib.gzipSync(Buffer.alloc(limit))).length, limit);
+    assert.throws(() => mobile.gunzipSync(zlib.gzipSync(Buffer.alloc(limit + 1))));
+  } finally { Native.gunzip = original; }
+});
+
+test('Android gzip bridge Java method compiles and enforces bounds and closed-business checks', () => {
+  const source = fs.readFileSync(path.join(__dirname, '../app/src/main/java/io/github/hongguo/personal/MainActivity.java'), 'utf8');
+  const start = source.indexOf('@JavascriptInterface public String gunzip(');
+  assert.ok(start >= 0);
+  const method = source.slice(start, source.indexOf('\n        }', start) + 10);
+  assert.match(method, /try \(ByteArrayInputStream/);
+  assert.match(method, /GZIPInputStream gzip/);
+  assert.match(method, /ByteArrayOutputStream out/);
+  const fixture = `import java.io.*; import java.util.*; import java.util.zip.*;
+public class GunzipHarness {
+  @interface JavascriptInterface {}
+  static class Base64 {
+    static final int DEFAULT=0, NO_WRAP=2;
+    static byte[] decode(String s,int flags) { return java.util.Base64.getDecoder().decode(s); }
+    static String encodeToString(byte[] b,int flags) { return java.util.Base64.getEncoder().encodeToString(b); }
+  }
+  boolean closed; int checks, closeAt=Integer.MAX_VALUE;
+  void requireBusinessOpen() { if (++checks >= closeAt || closed) throw new IllegalStateException("closed"); }
+  ${method}
+  interface Action { void run() throws Exception; }
+  static void rejects(Class<? extends Throwable> type,Action action) throws Exception {
+    try { action.run(); } catch (Exception error) { if (type.isInstance(error)) return; throw error; }
+    throw new AssertionError("expected rejection");
+  }
+  static String pack(byte[] bytes) throws Exception {
+    ByteArrayOutputStream out=new ByteArrayOutputStream();
+    try (GZIPOutputStream gzip=new GZIPOutputStream(out)) { gzip.write(bytes); }
+    return Base64.encodeToString(out.toByteArray(),0);
+  }
+  static void check(boolean passed) { if (!passed) throw new AssertionError(); }
+  public static void main(String[] args) throws Exception {
+    GunzipHarness bridge=new GunzipHarness(); final int limit=2*1024*1024;
+    byte[] plain=new byte[]{0,1,-1,3}; String packed=pack(plain);
+    check(Arrays.equals(Base64.decode(bridge.gunzip(packed,4),0),plain));
+    check(Base64.decode(bridge.gunzip(pack(new byte[0]),1),0).length==0);
+    for (int maximum:new int[]{0,-1,limit+1}) rejects(IllegalArgumentException.class,()->bridge.gunzip(packed,maximum));
+    rejects(IOException.class,()->bridge.gunzip(packed,3));
+    rejects(IOException.class,()->bridge.gunzip(Base64.encodeToString(new byte[limit+1],0),limit));
+    rejects(IOException.class,()->bridge.gunzip(Base64.encodeToString(new byte[limit+4],0),limit));
+    rejects(IOException.class,()->bridge.gunzip(Base64.encodeToString(new byte[10],0),limit));
+    byte[] raw=Base64.decode(packed,0), corrupt=raw.clone(); corrupt[corrupt.length-8]^=1;
+    rejects(IOException.class,()->bridge.gunzip(Base64.encodeToString(corrupt,0),limit));
+    rejects(IOException.class,()->bridge.gunzip(Base64.encodeToString(Arrays.copyOf(raw,raw.length-1),0),limit));
+    check(Base64.decode(bridge.gunzip(pack(new byte[limit]),limit),0).length==limit);
+    String bomb=pack(new byte[limit+1]); rejects(IOException.class,()->bridge.gunzip(bomb,limit));
+    bridge.closed=true; rejects(IllegalStateException.class,()->bridge.gunzip(null,0)); bridge.closed=false;
+    bridge.closeAt=bridge.checks+3;
+    rejects(IllegalStateException.class,()->bridge.gunzip(pack(new byte[32768]),limit));
+    System.out.print("PASS exact gunzip method: bounds, CRC, truncation and business closure");
+  }
+}`;
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'hongguo-gunzip-'));
+  const java = process.env.JAVA_HOME || '/opt/homebrew/opt/openjdk@21/libexec/openjdk.jdk/Contents/Home';
+  try {
+    const file = path.join(dir, 'GunzipHarness.java'); fs.writeFileSync(file, fixture);
+    for (const [binary, args] of [['javac', ['--release', '8', '-encoding', 'UTF-8', '-d', dir, file]],
+      ['java', ['-cp', dir, 'GunzipHarness']]]) {
+      const result = spawnSync(path.join(java, 'bin', binary), args, { encoding: 'utf8', timeout: 20000 });
+      assert.ifError(result.error);
+      assert.equal(result.status, 0, `${binary}: ${result.stdout}${result.stderr}`);
+    }
+  } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+});
 
 test('Android密码桥与Node哈希、AES分段结果一致', () => {
   const mobile = load('crypto.js');
