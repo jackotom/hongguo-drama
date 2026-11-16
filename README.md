@@ -24,17 +24,17 @@
 
 ## 下载与安装
 
-**当前源码／发行目标：7.5**（内部`7.5.0`，新候选构建`7.5.2`）。本轮优先修复播放接口 HTTP 200 空响应，移植纯 JavaScript Android v5 签名与新播放器请求协议；保留下载临时清理EPERM修复。按用户本轮明确要求，仅发行Mac双架构与Windows。
+**当前正式版：7.5**（内部`7.5.0`，构建`7.5.2`）。本轮优先修复播放接口 HTTP 200 空响应，移植纯 JavaScript Android v5 签名与新播放器请求协议；保留下载临时清理EPERM修复。按用户本轮明确要求，仅发行Mac双架构与Windows。
 
-**7.5尚未发布，Latest仍是7.4。新修复包正在重新构建、签名／公证及真实验播；旧7.5.1回执不作为新包验收。** Windows使用GitHub虚拟机，EXE未签名；Intel Mac仅Rosetta验收，具体结果见[7.5回执](docs/release-7.5.md)。
+**7.5已正式发布并设Latest。双Mac App与DMG本轮新签名、公证Accepted和装订，arm64真实下载／静音播放、Windows队列及安装升级验收通过。** Windows使用GitHub虚拟机，EXE未签名；Intel Mac仅Rosetta验收，具体结果见[7.5回执](docs/release-7.5.md)。
 
-| 平台 | 7.5计划下载（待发布） | 本轮状态 |
+| 平台 | 7.5正式下载 | 本轮状态 |
 |---|---|---|
-| Apple芯片Mac，macOS 13+ | [DMG](https://github.com/jackotom/hongguo-drama/releases/download/v7.5/Hongguo-7.5-mac-arm64.dmg) | 待新包签名、公证、装订和真实静音播放 |
-| Intel Mac，macOS 13+ | [DMG](https://github.com/jackotom/hongguo-drama/releases/download/v7.5/Hongguo-7.5-mac-x64.dmg) | 待新包签名、公证、装订和Rosetta启动 |
-| Windows x64 | [安装版](https://github.com/jackotom/hongguo-drama/releases/download/v7.5/hongguo-downloader-7.5-win-x64-setup.exe) · [便携EXE](https://github.com/jackotom/hongguo-drama/releases/download/v7.5/hongguo-downloader-7.5-win-x64.exe) · [便携ZIP](https://github.com/jackotom/hongguo-drama/releases/download/v7.5/hongguo-downloader-7.5-win-x64.zip) | 待新包真实下载、静音播放和安装升级；EXE未签名 |
+| Apple芯片Mac，macOS 13+ | [DMG](https://github.com/jackotom/hongguo-drama/releases/download/v7.5/Hongguo-7.5-mac-arm64.dmg) | 已签名、公证、装订；arm64两集真实1080P静音播放通过 |
+| Intel Mac，macOS 13+ | [DMG](https://github.com/jackotom/hongguo-drama/releases/download/v7.5/Hongguo-7.5-mac-x64.dmg) | 已签名、公证、装订；Rosetta启动通过 |
+| Windows x64 | [安装版](https://github.com/jackotom/hongguo-drama/releases/download/v7.5/hongguo-downloader-7.5-win-x64-setup.exe) · [便携EXE](https://github.com/jackotom/hongguo-drama/releases/download/v7.5/hongguo-downloader-7.5-win-x64.exe) · [便携ZIP](https://github.com/jackotom/hongguo-drama/releases/download/v7.5/hongguo-downloader-7.5-win-x64.zip) | 真实队列下载、兼容媒体静音播放和安装升级通过；EXE未签名 |
 
-[7.5计划发行页（待发布）](https://github.com/jackotom/hongguo-drama/releases/tag/v7.5) · [SHA256（待发布）](https://github.com/jackotom/hongguo-drama/releases/download/v7.5/SHA256SUMS.txt) · [精确源码（待发布）](https://github.com/jackotom/hongguo-drama/releases/download/v7.5/hongguo-drama-7.5-source.zip)。实际状态见[7.5记录](docs/release-7.5.md)。TV和手机保持独立。上游部分网页片源仍可能404、只提供预览或超时，不保证所有内容永久可播。
+[7.5正式发行页](https://github.com/jackotom/hongguo-drama/releases/tag/v7.5) · [SHA256](https://github.com/jackotom/hongguo-drama/releases/download/v7.5/SHA256SUMS.txt) · [精确源码](https://github.com/jackotom/hongguo-drama/releases/download/v7.5/hongguo-drama-7.5-source.zip)。实际状态见[7.5记录](docs/release-7.5.md)。TV和手机保持独立。上游部分网页片源仍可能404、只提供预览或超时，不保证所有内容永久可播。
 
 <details>
 <summary>7.4 历史下载与发行说明</summary>
@@ -249,13 +249,13 @@ Mac和Windows安装版保留应用内更新入口；完整6.4→6.5自动更新�
 3. 打开详情点「立即播放」，也可选择集数与清晰度加入下载队列。
 4. 下次从「我的剧库」或「观看记录」接着看；下载进度、失败重试和整剧合并在「下载管理」。
 
-## 7.5（源码／发行目标，尚未发布）
+## 7.5（正式发布）
 
-- 目标：成功下载后的临时文件清理遇到 EPERM 时，不把已完成分集重新标为失败；保留文件身份校验及清理失败提示，不误删冲突文件。
-- 目标：采用纯 JavaScript Android v5 签名、新player/v1 gzip协议及1004模型解析，修复旧签名收到HTTP 200空响应；保留取消、明确拒绝和共享冷却保护。
-- 本轮明确只发行Mac双架构与Windows，最终新包验收齐备后统一公开；旧7.5.1候选验收不沿用。
+- 成功下载后的临时文件清理遇到 EPERM 时，不把已完成分集重新标为失败；保留文件身份校验及清理失败提示，不误删冲突文件。
+- 采用纯 JavaScript Android v5 签名、新player/v1 gzip协议及1004模型解析，修复旧签名收到HTTP 200空响应；保留取消、明确拒绝和共享冷却保护。
+- 本轮明确只发行Mac双架构与Windows，20份正式附件已统一公开；旧7.5.1候选验收不沿用。
 - 特别感谢上游N3urda／ermilylu、提供PR线索的WEP-56，以及所有PR提交者。完整署名与具体贡献见[贡献名单](CONTRIBUTORS.md)。
-- 本轮目标与验收待办见[7.5记录](docs/release-7.5.md)，历史版本说明保留。
+- 本轮正式回执与验收边界见[7.5记录](docs/release-7.5.md)，历史版本说明保留。
 
 ## 7.4
 
