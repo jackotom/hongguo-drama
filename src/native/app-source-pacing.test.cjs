@@ -58,7 +58,7 @@ test('concurrent playback and prefetch register and request serially with a one-
     await f.advance(1); await second;
     assert.equal(f.calls.length, 2); assert.equal(f.calls[1].at - f.calls[0].at, 1000);
     assert.equal(f.calls[1].timeout, 12000, 'queue waiting must not spend the actual request budget');
-    assert.equal(Number(new URL(f.calls[1].url).searchParams.get('ts')), f.calls[1].at / 1000, 'sign after the wait');
+    assert.equal(Number(f.calls[1].headers['x-khronos']), f.calls[1].at / 1000, 'sign after the wait');
 });
 
 test('cancelling a queued consumer returns immediately without consuming another consumer or registering', async () => {
@@ -83,40 +83,17 @@ test('cancelling the source cooldown does not send a request or extend the next 
 });
 
 test('empty current responses wait one second before the single existing legacy attempt', async () => {
-    const f = fixture((config, count) => count === 1 ? { status: 200, headers: {}, data: '' } : success(config));
+    const f = fixture((config, count) => count <= 2 ? { status: 200, headers: {}, data: '' } : success(config));
     const result = f.fetch(); await turn();
-    await f.advance(999); assert.equal(f.calls.length, 1, '300ms recovery still bursts the API');
+    await f.advance(999); assert.equal(f.calls.length, 2, '300ms recovery still bursts the API');
     await f.advance(1); await result;
-    assert.equal(f.calls.length, 2); assert.equal(f.calls[1].method, 'POST');
-});
-
-test('two empty routes wait before current recovery without extending the model budget', async () => {
-    const f = fixture((config, count) => count < 3 ? { status:200, headers:{}, data:'' } : success(config));
-    const result = f.fetch(); await turn();
-    await f.advance(1000); assert.equal(f.calls.length, 2);
-    await f.advance(999); assert.equal(f.calls.length, 2);
-    await f.advance(1); await result;
-    assert.equal(f.calls.length, 3);
-    assert.equal(f.calls[2].method, 'GET');
-    assert.equal(f.calls[2].timeout, 10000);
-    assert.equal(f.registrations.length, 3);
-});
-
-test('empty legacy response cannot start current recovery after the model deadline', async () => {
-    const f = fixture(async (config, count) => {
-        if (count === 2) await f.advance(11000);
-        return { status:200, headers:{}, data:'' };
-    });
-    const result = assert.rejects(f.fetch(), { code:'EMPTY_RESPONSE' }); await turn();
-    await f.advance(1000); await result;
-    assert.equal(f.calls.length, 2);
-    assert.equal(f.registrations.length, 2);
+    assert.equal(f.calls.length, 3); assert.equal(f.calls[2].method, 'POST');
 });
 
 for (const registrationFailure of ['HTTP_403', 'HTTP_429', 'BUSINESS_REJECTED']) {
     test(`a renewal ${registrationFailure} stops legacy recovery and already queued requests`, async () => {
         const refusal = Object.assign(new Error('registration refused'), { code: 'DEVICE_REGISTRATION_FAILED', registrationFailure });
-        const f = fixture((config, count) => count === 1 ? { status: 200, headers: {}, data: '' } : success(config),
+        const f = fixture((config, count) => count <= 2 ? { status: 200, headers: {}, data: '' } : success(config),
             attempt => attempt === 2 ? refusal : undefined);
         const first = f.fetch().then(value => ({ value }), error => ({ error }));
         const queued = f.fetch('12').then(value => ({ value }), error => ({ error }));
@@ -124,36 +101,36 @@ for (const registrationFailure of ['HTTP_403', 'HTTP_429', 'BUSINESS_REJECTED'])
         assert.equal((await first).error, refusal, 'renewal refusal must reach the source queue unchanged');
         assert.equal((await queued).error, refusal);
         assert.equal(f.registrations.length, 2, 'queued work must not register after the refusal');
-        assert.equal(f.calls.length, 1, 'legacy recovery must not send the previous identity after a refusal');
+        assert.equal(f.calls.length, 2, 'legacy recovery must not send the previous identity after a refusal');
     });
 }
 
 for (const registrationFailure of ['TIMEOUT', 'NETWORK_ERROR', 'HTTP_500']) {
     test(`a renewal ${registrationFailure} retains the bounded legacy recovery`, async () => {
         const failure = Object.assign(new Error('registration unavailable'), { code: 'DEVICE_REGISTRATION_FAILED', registrationFailure });
-        const f = fixture((config, count) => count === 1 ? { status: 200, headers: {}, data: '' } : success(config),
+        const f = fixture((config, count) => count <= 2 ? { status: 200, headers: {}, data: '' } : success(config),
             attempt => attempt === 2 ? failure : undefined);
         const result = f.fetch(); await turn(); await f.advance(1000);
         assert.equal((await result).url, 'https://qznovelvod.com/fixture.mp4');
-        assert.equal(f.registrations.length, 2); assert.equal(f.calls.length, 2);
-        assert.equal(f.calls[1].method, 'POST');
-        assert.equal(new URL(f.calls[1].url).searchParams.get('device_id'), new URL(f.calls[0].url).searchParams.get('device_id'));
+        assert.equal(f.registrations.length, 2); assert.equal(f.calls.length, 3);
+        assert.equal(f.calls[2].method, 'POST');
+        assert.equal(new URL(f.calls[2].url).searchParams.get('device_id'), new URL(f.calls[0].url).searchParams.get('device_id'));
     });
 }
 
 test('cancelling renewal skips legacy recovery and leaves a later request available', async () => {
     const controller = new AbortController();
-    const f = fixture((config, count) => count === 1 ? { status: 200, headers: {}, data: '' } : success(config), attempt => {
+    const f = fixture((config, count) => count <= 2 ? { status: 200, headers: {}, data: '' } : success(config), attempt => {
         if (attempt === 2) {
             controller.abort();
             return Object.assign(new Error('cancelled'), { code: 'ERR_CANCELED' });
         }
     });
     await assert.rejects(f.fetch('11', { signal: controller.signal }), { code: 'ERR_CANCELED' });
-    assert.equal(f.calls.length, 1); assert.equal(f.registrations.length, 2);
+    assert.equal(f.calls.length, 2); assert.equal(f.registrations.length, 2);
     const later = f.fetch(); await turn(); await f.advance(1000);
     assert.equal((await later).url, 'https://qznovelvod.com/fixture.mp4');
-    assert.equal(f.calls.length, 2); assert.equal(f.registrations.length, 3);
+    assert.equal(f.calls.length, 3); assert.equal(f.registrations.length, 3);
 });
 
 test('explicit rejection remains terminal and releases the queue for an independent later action', async () => {

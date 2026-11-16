@@ -19,6 +19,7 @@ function load(axios, { realDevice = false, getPlaybackDevice, registerPlaybackDe
       if (name === './sm3') return require('../src/native/sm3');
       if (name === './download-quality') return require('../src/native/download-quality');
       if (name === './request-signal') return require('../src/native/request-signal');
+      if (name === './playback-v5') return require('../src/native/playback-v5');
       if (name === './playback-signature') return require('../src/native/playback-signature');
       if (name === './playback-device') return getPlaybackDevice || registerPlaybackDevice ? {
         getPlaybackDevice: getPlaybackDevice || (async () => ({ device_id: '1000000000000001', iid: '1000000000000002', cdid: 'fixture' })),
@@ -117,20 +118,20 @@ function row(definition, width, height, suffix) {
     return identities[recoveryRegistrations - 1];
   } });
   assert.equal((await recovery.fetchAppPlayUrl(vid)).url, plain.main_url, 'empty model response renews the device and recovers');
-  assert.equal(recoverCalls, 2);
+  assert.equal(recoverCalls, 3);
   assert.equal(renewals, 1);
   for (const status of [200, 403, 404]) {
     let calls = 0, registrations = 0;
     const unavailable = load(async () => { calls++; return { status, headers: {}, data: '' }; },
-      { registerPlaybackDevice: async () => identities[(registrations++) % identities.length] });
+      { registerPlaybackDevice: async () => identities[registrations++] });
     await assert.rejects(unavailable.fetchAppPlayUrl(vid), error => status === 200 ? error.code === 'EMPTY_RESPONSE' : error.status === status);
-    assert.equal(calls, status === 200 ? 3 : 1, 'bounded empty recovery only; HTTP rejection must not retry the model request');
-    assert.equal(registrations, status === 200 ? 3 : 1);
+    assert.equal(calls, status === 200 ? 3 : 1, 'one recovery only; HTTP rejection must not retry the model request');
+    assert.equal(registrations, status === 200 ? 2 : 1);
   }
   let cooldownCalls = 0;
   await assert.rejects(load(async () => { cooldownCalls++; return { status: 200, headers: {}, data: '' }; },
     { getPlaybackDevice: async () => identities[0] }).fetchAppPlayUrl(vid), error => error.code === 'EMPTY_RESPONSE');
-  assert.equal(cooldownCalls, 3, 'empty responses permit legacy then one fresh current request');
+  assert.equal(cooldownCalls, 3, 'empty response permits one fresh-device alternate route');
   let clock = Date.now(), slowCalls = 0;
   const slowRegistration = load(async config => {
     slowCalls++;
@@ -142,20 +143,20 @@ function row(definition, width, height, suffix) {
   const routes = [];
   const alternate = load(async config => {
     routes.push([config.method, new URL(config.url).pathname]);
-    if (routes.length === 1) return { status: 200, headers: {}, data: '' };
+    if (new URL(config.url).pathname === '/novel/player/multi_video_model/player/v1') return { status: 200, headers: {}, data: '' };
     assert.equal(config.headers.Connection, 'close');
     return inlineResponse([plain]);
   }, { getPlaybackDevice: async () => identities[0] });
   assert.equal((await alternate.fetchAppPlayUrl(vid)).url, plain.main_url);
-  assert.deepEqual(routes, [['GET', '/reading/bookapi/video_tab/multi_video_model/v1/'],
-    ['POST', '/novel/player/multi_video_model/v1/']]);
+  assert.deepEqual(routes, [['POST', '/novel/player/multi_video_model/player/v1'],
+    ['POST', '/novel/player/multi_video_model/player/v1'], ['POST', '/novel/player/multi_video_model/v1/']]);
   let inlineCalls = 0;
   const direct = load(async config => {
     inlineCalls++;
     assert.equal(new URL(config.url).searchParams.get('device_id'), '1000000000000001');
-    assert.ok(Buffer.from(config.headers['x-argus'], 'base64').length > 4);
-    assert.ok(Buffer.from(config.headers['x-ladon'], 'base64').length > 4);
-    for (const name of ['x-medusa', 'x-gorgon', 'x-helios']) assert.equal(config.headers[name], undefined);
+    assert.ok(Buffer.from(config.headers['x-medusa'], 'base64').length > 4);
+    assert.ok(Buffer.from(config.headers['x-helios'], 'base64').length > 4);
+    for (const name of ['x-argus', 'x-gorgon', 'x-ladon']) assert.equal(config.headers[name], undefined);
     assert.equal(config.headers.Cookie, undefined);
     return inlineResponse([plain]);
   });

@@ -24,17 +24,15 @@
 
 ## 下载与安装
 
-**当前源码／发行目标：7.5**（内部`7.5.0`，桌面构建`7.5.1`）。EPERM清理及有界EMPTY恢复已完成修复，25份附件已汇总核对；Windows和Linux最终包真实下载验收未通过，暂留Draft，不能宣称上游故障全部根治。标准发行只含双Mac、Windows、Linux与Docker；TV和手机独立。
+**当前源码／发行目标：7.5**（内部`7.5.0`，新候选构建`7.5.2`）。本轮优先修复播放接口 HTTP 200 空响应，移植纯 JavaScript Android v5 签名与新播放器请求协议；保留下载临时清理EPERM修复。按用户本轮明确要求，仅发行Mac双架构与Windows。
 
-**7.5尚未发布，当前Latest仍是7.4。以下为计划下载地址，五平台验收齐备后统一公开，当前链接可能不可用。** Windows使用GitHub虚拟机，非实体电脑；EXE未签名。完整通过项与失败证据见[7.5回执](docs/release-7.5.md)。
+**7.5尚未发布，Latest仍是7.4。新修复包正在重新构建、签名／公证及真实验播；旧7.5.1回执不作为新包验收。** Windows使用GitHub虚拟机，EXE未签名；Intel Mac仅Rosetta验收，具体结果见[7.5回执](docs/release-7.5.md)。
 
-| 平台 | 7.5计划下载（待发布） | 使用方式／待验事项 |
+| 平台 | 7.5计划下载（待发布） | 本轮状态 |
 |---|---|---|
-| Apple芯片Mac，macOS 13+ | [DMG](https://github.com/jackotom/hongguo-drama/releases/download/v7.5/Hongguo-7.5-mac-arm64.dmg) | 本轮签名、公证、装订及真实下载／静音播放通过；尚未公开 |
-| Intel Mac，macOS 13+ | [DMG](https://github.com/jackotom/hongguo-drama/releases/download/v7.5/Hongguo-7.5-mac-x64.dmg) | 本轮签名、公证、装订；仅Rosetta启动 |
-| Windows x64 | [安装版](https://github.com/jackotom/hongguo-drama/releases/download/v7.5/hongguo-downloader-7.5-win-x64-setup.exe) · [便携EXE](https://github.com/jackotom/hongguo-drama/releases/download/v7.5/hongguo-downloader-7.5-win-x64.exe) · [便携ZIP](https://github.com/jackotom/hongguo-drama/releases/download/v7.5/hongguo-downloader-7.5-win-x64.zip) | EXE未签名；安装升级通过，真实下载未通过 |
-| Linux x64 | [AppImage](https://github.com/jackotom/hongguo-drama/releases/download/v7.5/hongguo-downloader-7.5-linux-x64.AppImage) | 构建、启动及软解资源加载通过，真实下载／播放未通过 |
-| Docker Linux amd64 / NAS | [镜像](https://github.com/jackotom/hongguo-drama/releases/download/v7.5/hongguo-drama-7.5-docker-amd64.tar.gz) · [部署包](https://github.com/jackotom/hongguo-drama/releases/download/v7.5/hongguo-drama-7.5-docker-deploy.zip) | 认证、真实下载合并及重启持久化通过；尚未公开 |
+| Apple芯片Mac，macOS 13+ | [DMG](https://github.com/jackotom/hongguo-drama/releases/download/v7.5/Hongguo-7.5-mac-arm64.dmg) | 待新包签名、公证、装订和真实静音播放 |
+| Intel Mac，macOS 13+ | [DMG](https://github.com/jackotom/hongguo-drama/releases/download/v7.5/Hongguo-7.5-mac-x64.dmg) | 待新包签名、公证、装订和Rosetta启动 |
+| Windows x64 | [安装版](https://github.com/jackotom/hongguo-drama/releases/download/v7.5/hongguo-downloader-7.5-win-x64-setup.exe) · [便携EXE](https://github.com/jackotom/hongguo-drama/releases/download/v7.5/hongguo-downloader-7.5-win-x64.exe) · [便携ZIP](https://github.com/jackotom/hongguo-drama/releases/download/v7.5/hongguo-downloader-7.5-win-x64.zip) | 待新包真实下载、静音播放和安装升级；EXE未签名 |
 
 [7.5计划发行页（待发布）](https://github.com/jackotom/hongguo-drama/releases/tag/v7.5) · [SHA256（待发布）](https://github.com/jackotom/hongguo-drama/releases/download/v7.5/SHA256SUMS.txt) · [精确源码（待发布）](https://github.com/jackotom/hongguo-drama/releases/download/v7.5/hongguo-drama-7.5-source.zip)。实际状态见[7.5记录](docs/release-7.5.md)。TV和手机保持独立。上游部分网页片源仍可能404、只提供预览或超时，不保证所有内容永久可播。
 
@@ -254,8 +252,9 @@ Mac和Windows安装版保留应用内更新入口；完整6.4→6.5自动更新�
 ## 7.5（源码／发行目标，尚未发布）
 
 - 目标：成功下载后的临时文件清理遇到 EPERM 时，不把已完成分集重新标为失败；保留文件身份校验及清理失败提示，不误删冲突文件。
-- 目标：改善播放取源间歇 EMPTY 后的有界恢复，保留取消、明确拒绝和共享冷却保护；不宣称上游所有故障根治。
-- 双Mac、Windows、Linux与Docker同源齐备后仍须通过必要验收。Windows本轮已在GitHub虚拟机执行，安装升级通过，真实下载未通过；非实体电脑。Linux真实下载也未通过，暂不公开。
+- 目标：采用纯 JavaScript Android v5 签名、新player/v1 gzip协议及1004模型解析，修复旧签名收到HTTP 200空响应；保留取消、明确拒绝和共享冷却保护。
+- 本轮明确只发行Mac双架构与Windows，最终新包验收齐备后统一公开；旧7.5.1候选验收不沿用。
+- 特别感谢上游N3urda／ermilylu、提供PR线索的WEP-56，以及所有PR提交者。完整署名与具体贡献见[贡献名单](CONTRIBUTORS.md)。
 - 本轮目标与验收待办见[7.5记录](docs/release-7.5.md)，历史版本说明保留。
 
 ## 7.4
@@ -947,7 +946,7 @@ https://github.com/user-attachments/assets/b95f4f60-b57c-495f-a30e-62ac2b0bda11
 
 ## 版本与验证范围
 
-7.3 为当前源码／发行目标，内部7.3.0、桌面构建7.3.1。标准发行范围是双Mac、Windows x64、Linux x64 AppImage与Docker amd64；TV和手机独立。实际签名、平台验收、附件摘要和限制以[7.3记录](docs/release-7.3.md)为准。
+7.5为当前源码／发行目标，内部7.5.0、候选构建7.5.2。本轮明确只发行Mac双架构与Windows，TV和手机独立。实际签名、平台验收、附件摘要和限制以[7.5记录](docs/release-7.5.md)为准。
 
 7.2 TV开发补充包已于2026-11-13 16:08:18（Asia/Shanghai）追加公开，版本7.2／code70200，沿用公开6.6 TV签名证书；TV源码冻结`2aa068f496f78114389d94c41b83dde877b174ce`。新增APK、精确TV源码和独立SHA256清单三份附件，现共28份正式附件；原25份桌面／Docker附件与原v7.2标签不变。构建、签名连续性、Manifest／包内容、定向源码检查及三附件匿名完整下载摘要核对通过。**TV实机未测试，请用户自行测试；安装、启动、实际遥控、播放和覆盖升级均未验证。** 手机保持独立，本机正式应用未替换。详见[TV补充回执](docs/release-7.2-tv.md)。以下首发五平台记录保持。
 

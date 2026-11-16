@@ -1,6 +1,6 @@
 {
   "repository": "jackotom/hongguo-drama",
-  "asOf": "2026-11-15",
+  "asOf": "2026-11-16",
   "codeAuthors": [
     {
       "login": "jackotom",
@@ -24,7 +24,7 @@
     {
       "number": 29,
       "author": "jackotom",
-      "state": "closed",
+      "state": "merged",
       "merged": true,
       "url": "https://github.com/jackotom/hongguo-drama/pull/29"
     },
@@ -45,58 +45,65 @@
     {
       "number": 88,
       "author": "jackotom",
-      "state": "closed",
+      "state": "merged",
       "merged": true,
       "url": "https://github.com/jackotom/hongguo-drama/pull/88"
     },
     {
       "number": 92,
       "author": "roytjus",
-      "state": "open",
+      "state": "closed",
       "merged": false,
       "url": "https://github.com/jackotom/hongguo-drama/pull/92"
     },
     {
       "number": 129,
       "author": "xinbaojian",
-      "state": "open",
+      "state": "closed",
       "merged": false,
       "url": "https://github.com/jackotom/hongguo-drama/pull/129"
     },
     {
       "number": 133,
       "author": "ZainCheung",
-      "state": "closed",
+      "state": "merged",
       "merged": true,
       "url": "https://github.com/jackotom/hongguo-drama/pull/133"
     },
     {
-      "number": 140,
-      "author": "anupam-orbis",
-      "state": "closed",
-      "merged": false,
-      "url": "https://github.com/jackotom/hongguo-drama/pull/140"
-    },
-    {
       "number": 143,
       "author": "roytjus",
-      "state": "open",
+      "state": "closed",
       "merged": false,
       "url": "https://github.com/jackotom/hongguo-drama/pull/143"
     },
     {
       "number": 152,
       "author": "aaaasssddfgh",
-      "state": "open",
+      "state": "closed",
       "merged": false,
       "url": "https://github.com/jackotom/hongguo-drama/pull/152"
     },
     {
       "number": 159,
       "author": "j2-cuong",
-      "state": "open",
+      "state": "closed",
       "merged": false,
       "url": "https://github.com/jackotom/hongguo-drama/pull/159"
+    },
+    {
+      "number": 163,
+      "author": "alair-s",
+      "state": "closed",
+      "merged": false,
+      "url": "https://github.com/jackotom/hongguo-drama/pull/163"
+    },
+    {
+      "number": 164,
+      "author": "alair-s",
+      "state": "open",
+      "merged": false,
+      "url": "https://github.com/jackotom/hongguo-drama/pull/164"
     }
   ],
   "pullRequestAuthors": [
@@ -108,10 +115,11 @@
       ]
     },
     {
-      "login": "anupam-orbis",
-      "url": "https://github.com/anupam-orbis",
+      "login": "alair-s",
+      "url": "https://github.com/alair-s",
       "submissions": [
-        140
+        163,
+        164
       ]
     },
     {
@@ -119,6 +127,13 @@
       "url": "https://github.com/ceco3000",
       "submissions": [
         18
+      ]
+    },
+    {
+      "login": "j2-cuong",
+      "url": "https://github.com/j2-cuong",
+      "submissions": [
+        159
       ]
     },
     {
@@ -134,13 +149,6 @@
       "url": "https://github.com/jayeeliu",
       "submissions": [
         61
-      ]
-    },
-    {
-      "login": "j2-cuong",
-      "url": "https://github.com/j2-cuong",
-      "submissions": [
-        159
       ]
     },
     {
@@ -809,6 +817,25 @@
       "login": "cursoragent",
       "url": "https://github.com/cursoragent",
       "basis": "用户提供的仓库 Contributors 页面截图；当前默认分支提交作者查询未列出该账号，不计入本次代码作者统计"
+    }
+  ],
+  "upstreamContributors": [
+    {
+      "name": "N3urda (NANA)",
+      "login": "N3urda",
+      "url": "https://github.com/N3urda/hongguoTV/pull/60",
+      "contribution": "上游hongguoTV维护、PR #60与播放恢复发行"
+    },
+    {
+      "name": "ermilylu",
+      "url": "https://github.com/N3urda/hongguoTV/commit/18c37c2afd0567520135abcae312352542f09083",
+      "contribution": "纯Kotlin Android v5签名核心实现、合成向量与上游真实播放验收；按公开Git提交名署名，未关联未经确认的账号"
+    },
+    {
+      "name": "WEP-56",
+      "login": "WEP-56",
+      "url": "https://github.com/jackotom/hongguo-drama/issues/162#issuecomment-6915976249",
+      "contribution": "及时提供上游PR #60线索"
     }
   ]
 }

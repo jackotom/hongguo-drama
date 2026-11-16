@@ -16,6 +16,7 @@ for (const [target, depth] of [['model', 2], ['fallback', 2], ['encryption-metad
     test(`same-realm ${target} handoff rejects cancellation at microtask ${depth}`, async () => {
         const controller = new AbortController(), modules = new Map();
         let calls = 0, canceledCalls = 0, armed = true;
+        const stages = [];
         const cancelAfterHandoff = remaining => queueMicrotask(() => {
             if (remaining > 1) cancelAfterHandoff(remaining - 1);
             else {
@@ -25,14 +26,25 @@ for (const [target, depth] of [['model', 2], ['fallback', 2], ['encryption-metad
         });
         function transport(config) {
             calls++;
-            if (config.url.includes('device_register')) {
+            const url = new URL(config.url);
+            let stage;
+            if (url.pathname.includes('device_register')) stage = 'registration';
+            else if (config.url === fallback) stage = 'metadata';
+            else {
+                assert.equal(config.method, 'POST');
+                assert.equal(url.pathname, '/novel/player/multi_video_model/player/v1');
+                assert.ok(['api5-normal-sinfonlineb.fqnovel.com', 'api5-normal-sinfonlinea.fqnovel.com'].includes(url.hostname));
+                stage = url.hostname === 'api5-normal-sinfonlineb.fqnovel.com' ? 'primary' : 'alternate';
+            }
+            stages.push(stage);
+            if (stage === 'registration') {
                 if (armed && target === 'registration') { armed = false; cancelAfterHandoff(depth); }
                 return Promise.resolve(response({ device_id: '123', install_id: '456' }));
             }
-            if (armed && calls === 2 && target === 'alternate') {
+            if (armed && stage === 'primary' && target === 'alternate') {
                 return Promise.resolve({ status: 200, headers: {}, data: '' });
             }
-            if (armed && calls === 2 && ['fallback', 'encryption-metadata'].includes(target)) {
+            if (armed && stage === 'primary' && ['fallback', 'encryption-metadata'].includes(target)) {
                 const initial = target === 'fallback' ? { fallback_api: fallback }
                     : { ...model, fallback_api: fallback, video_list: [{ ...model.video_list[0], encrypt_info: undefined }] };
                 return Promise.resolve(response({ data: { '11': { video_model: initial } } }));
@@ -62,10 +74,14 @@ for (const [target, depth] of [['model', 2], ['fallback', 2], ['encryption-metad
         });
         assert.equal(controller.signal.aborted, true);
         assert.equal(calls, canceledCalls, 'no request may start after handoff cancellation');
-        const expectedCalls = target === 'registration' ? 1 : target === 'model' ? 2 : target === 'alternate' ? 4 : 3;
-        assert.equal(calls, expectedCalls);
+        const expectedStages = target === 'registration' ? ['registration'] : target === 'model'
+            ? ['registration', 'primary'] : target === 'alternate'
+                ? ['registration', 'primary', 'alternate'] : ['registration', 'primary', 'metadata'];
+        assert.deepEqual(stages, expectedStages, 'cancellation must occur at the intended response handoff');
+        assert.equal(calls, expectedStages.length);
         const beforeRecovery = calls;
         assert.equal((await api.fetchAppPlayUrl('11')).source, 'app', 'same module still accepts an independent no-signal lookup');
         assert.equal(calls, beforeRecovery + 2, 'recovery has one registration and one model request');
+        assert.deepEqual(stages.slice(beforeRecovery), ['registration', 'primary']);
     });
 }

@@ -1,8 +1,8 @@
-# 7.5 release target.
+# 7.4 release target.
 NOTICE —— 来源与修改说明
 =========================
 
-当前源码／发行目标：7.5；实际状态与验收边界见 docs/release-7.5.md。
+当前源码／发行目标：7.4；实际状态与验收边界见 docs/release-7.4.md。
 
 本软件（红果短剧下载器 / hongguo-downloader）是基于他人开源项目的**修改版本**。
 依照 GNU General Public License v3.0 第 5(a) 条，特此声明如下。
@@ -176,3 +176,14 @@ https://github.com/dawei233/hongguo-drama
 7.1采纳 anupam-orbis 在 PR #140 提交的 follow-redirects 依赖锁更新（实际1.16.3）；新增本项目重定向安全回归。完整协作记录见 CONTRIBUTORS.md。
 
 7.1新增huihui278在Issue #149提出的高性能转换入口，默认关闭；ByteVC2仍由CPU解码，显卡仅优先编码H.264。双Mac使用VideoToolbox，Windows／Linux使用NVIDIA NVENC并保留明确CPU回退。NVENC头文件来自官方FFmpeg/nv-codec-headers 12.1.14.0，固定1889e62e2d35ff7aa9baca2bceb14f053785e6f1；MIT完整声明和精确源码随相应媒体包提供，不包含NVIDIA驱动或运行库。构建与实际平台验收状态见docs/release-7.1.md。
+
+二十六、7.5 Android v5 播放请求兼容
+播放签名 playback-v5.js 改编自 N3urda/hongguoTV（GPL-3.0-only）提交
+18c37c2afd0567520135abcae312352542f09083 的 Signer.kt、AesV3.kt、V5Constants.kt；
+请求结构参考同提交 MobilePlayback.kt，合成回归向量来自 signing-v5-f13.json、
+signing-v5-carrier.json。保留上游 drpys 22261adfa31435e3b3ef5a730b8a2a75bcaf1715 归属。
+感谢 WEP-56 在 Issue #162 提供 PR #60 线索及上游贡献者的纯代码实现。
+仅移植本地 JavaScript 播放签名与模型协议，不包含官方 SDK、JNI、字节码解释器、
+远程签名服务、捕获的设备会话或任何第三方 PolyForm 实现。
+最终 query、实际 gzip 正文及统一时间戳共同签名，原分集、媒体和解密校验保留。
+发行及真实平台验证状态见 docs/release-7.5.md。

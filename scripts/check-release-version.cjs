@@ -23,7 +23,7 @@ for (const flags of [{ prerelease: true }, { draft: true }]) {
 const pkg = require('../package.json');
 const lock = require('../package-lock.json');
 assert.equal(pkg.version, '7.5.0', 'Current source release target must be 7.5.0');
-assert.equal(pkg.build.buildVersion, '7.5.1', 'Current desktop build target must be 7.5.1');
+assert.equal(pkg.build.buildVersion, '7.5.2', 'Current desktop build target must be 7.5.2');
 assert.equal(lock.version, pkg.version, 'Lockfile version must match the release');
 assert.equal(lock.packages[''].version, pkg.version, 'Lockfile root package must match the release');
 assert.match(pkg.version, /^\d+\.\d+\.0$/, 'Release versions use two public components and an internal zero patch');

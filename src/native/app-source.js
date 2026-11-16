@@ -11,6 +11,7 @@ const { gzipSync } = require('node:zlib');
 const { setTimeout: delay } = require('node:timers/promises');
 const { registerPlaybackDevice } = require('./playback-device');
 const { signPlayer } = require('./playback-signature');
+const { signPlaybackV5 } = require('./playback-v5');
 const { abortError, throwIfAborted, boundedSignal, networkFailure } = require('./request-signal');
 const sm3 = require('./sm3');
 const { normalizeDownloadQuality, meetsDownloadQuality } = require('./download-quality');
@@ -21,7 +22,7 @@ let playbackQueue = Promise.resolve();
 let playbackReadyAt = 0;
 let playbackRejection = null;
 const VIDEO_API = 'https://api5-normal-sinfonlineb.fqnovel.com/novel/player/multi_video_model/v1/';
-const VIDEO_TAB_API = 'https://api5-normal-sinfonlineb.fqnovel.com/reading/bookapi/video_tab/multi_video_model/v1/';
+const PLAYER_API = 'https://api5-normal-sinfonlineb.fqnovel.com/novel/player/multi_video_model/player/v1';
 const SEARCH_API = 'https://api5-normal-sinfonlinea.fqnovel.com/reading/bookapi/search/tab/v';
 const VIDEO_UA = 'com.phoenix.read/71332 (Linux; U; Android 16; zh_CN; 25053RT47C; Build/BP2A.250605.031.A3; Cronet/TTNetVersion:04657795 2026-01-23 QuicVersion:c67e9834 2025-09-08)';
 const SEARCH_UA = 'com.phoenix.read/72232 (Linux; U; Android 16; zh_CN; 25053RT47C; Build/BP2A.250605.031.A3)';
@@ -35,8 +36,6 @@ const DEVICE = {
 };
 const PLAYBACK_DEVICE = { ...DEVICE, version_code: '74332', version_name: '7.4.3.32',
     manifest_version_code: '74332', update_version_code: '74332', pv_player: '74332' };
-const VIDEO_TAB_DEVICE = { ...DEVICE, version_code: '73932', version_name: '7.3.9.32',
-    manifest_version_code: '73932', update_version_code: '73932', pv_player: '73932' };
 const PLAYBACK_UA = VIDEO_UA.replace(DEVICE.version_code, PLAYBACK_DEVICE.version_code);
 function str(value, fallback = '') { return String(value == null ? fallback : value).trim(); }
 function cleanUrl(value) { return str(value).replace(/\\\//g, '/').replace(/\\u0026/g, '&').replace(/&amp;/g, '&'); }
@@ -146,29 +145,37 @@ function helios(khronos) {
 }
 
 function branchOf(url, body, khronos) { const bodyMd5 = body ? crypto.createHash('md5').update(body).digest() : Buffer.alloc(16); const q = sm3(url.split('?')[1]); const iv = getIv(getIv(getIv(0x20230928, q), bodyMd5), le32(khronos)); const low = iv & 15; return low - (((low * 171) >> 9) * 3); }
-function playbackRequest(payload, identity, videoId = '') {
+function playbackRequest(payload, identity, videoId = '', alternate = false) {
     // Sign the final query and actual gzip body; other API families retain their original signer.
-    const body = videoId ? null : gzipSync(Buffer.from(payload));
+    if (videoId) {
+        const body = gzipSync(Buffer.from(payload));
+        const signed = signPlaybackV5({ base: alternate ? PLAYER_API.replace('sinfonlineb.', 'sinfonlinea.') : PLAYER_API,
+            values: { aid: '8662', app_name: 'novelread', version_code: '74332', version_name: '7.4.3.32',
+                channel: 'vivo_8662_64', device_platform: 'android', device_type: 'PGT-AN10', os_version: '12',
+                update_version_code: '74332', iid: identity.iid, cdid: identity.cdid, device_id: identity.device_id },
+            body, now: Date.now() });
+        return { ...signed, body, method: 'POST', headers: { ...signed.headers,
+            'User-Agent': 'com.phoenix.read/73932 (Linux; U; Android 12; zh_CN_#Hans; PGT-AN10; Build/V417IR;tt-ok/3.12.13.20)',
+            Accept: 'application/json', 'Content-Type': 'application/json; charset=utf-8', 'Content-Encoding': 'gzip' } };
+    }
+    const body = gzipSync(Buffer.from(payload));
     const requestTicket = Date.now(), khronos = Math.floor(requestTicket / 1000);
-    const device = { ...(videoId ? VIDEO_TAB_DEVICE : PLAYBACK_DEVICE), ...identity };
-    const values = videoId ? { video_id: videoId, video_id_type: '0', device_level: '1',
-        need_all_video_definition: '1', need_mp4_align: '0', use_os_player: '0',
-        video_platform: '1024', source: '0', from_video_id: '' } : {};
-    const query = pythonUrlEncode({ ...device, ...values, ts: String(khronos), _rticket: String(requestTicket) });
-    const url = `${videoId ? VIDEO_TAB_API : VIDEO_API}?${query}`;
+    const device = { ...PLAYBACK_DEVICE, ...identity };
+    const query = pythonUrlEncode({ ...device, ts: String(khronos), _rticket: String(requestTicket) });
+    const api = VIDEO_API;
+    const url = `${api}?${query}`;
     const signature = signPlayer({ query, body, ts: khronos });
     const headers = {
         'User-Agent': VIDEO_UA.replace(DEVICE.version_code, device.version_code), Accept: 'application/json; charset=utf-8,application/x-protobuf',
         'x-ss-req-ticket': signature['x-ss-req-ticket'], 'sdk-version': '2', 'x-xs-from-web': '0',
-        'passport-sdk-version': videoId ? '50561' : '5051452', 'x-ss-dp': String(device.aid),
+        'passport-sdk-version': '5051452', 'x-ss-dp': String(device.aid),
         'x-khronos': signature['x-khronos'],
         'x-ladon': signature['x-ladon'], 'x-argus': signature['x-argus'], 'x-tt-dt': '',
         'x-tt-store-region': 'cn', 'x-tt-store-region-src': 'did',
     };
-    if (body) Object.assign(headers, { 'Content-Type': 'application/json; charset=UTF-8',
+    Object.assign(headers, { 'Content-Type': 'application/json; charset=UTF-8',
         'Content-Encoding': 'gzip', 'x-ss-stub': signature['x-ss-stub'] });
-    else headers['x-tt-request-tag'] = 't=0;n=0';
-    return { url, body, headers, method: videoId ? 'GET' : 'POST' };
+    return { url, body, headers, method: 'POST' };
 }
 
 function parseSearchInteger(value) {
@@ -420,8 +427,9 @@ async function fetchAppPlayUrl(vid, options = {}) {
 
 async function fetchAppPlayUrlFresh(vid, options) {
     const payload = JSON.stringify({
-        biz_param: { detail_page_version: 0, device_level: 3, disable_digg_stat: false, need_all_video_definition: true, need_mp4_align: false, use_os_player: false, use_server_dns: false, video_platform: 1024 },
+        biz_param: { detail_page_version: 0, device_level: 3, disable_digg_stat: false, disable_video_relate_book: false, need_all_video_definition: true, need_mp4_align: false, use_os_player: false, use_server_dns: false, video_platform: 1024 },
         mixed_video_id_map: { '1004': [vid] },
+        dr_scene: 'player',
     });
     // Playback identities can be single-use; search/account retain their shared device.
     let identity = await registerPlaybackDevice(requestJson, { signal: options.signal });
@@ -432,20 +440,28 @@ async function fetchAppPlayUrlFresh(vid, options) {
     const { signal } = request;
     try {
         let response;
-        for (let attempt = 0; attempt < 3; attempt++) {
+        for (let attempt = 0; attempt < 2; attempt++) {
             throwIfAborted(signal);
-            // Empty responses may recover on a fresh current request after the legacy attempt.
-            const signed = playbackRequest(payload, identity, attempt === 1 ? '' : vid);
+            // Prefer the current API; only an empty response enables one legacy attempt.
+            const signed = playbackRequest(payload, identity, attempt ? '' : vid);
             if (attempt) signed.headers.Connection = 'close';
             try {
-                response = await requestJson(signed.url, { method: signed.method, headers: signed.headers, data: signed.body }, deadline, signal);
+                try {
+                    response = await requestJson(signed.url, { method: signed.method, headers: signed.headers, data: signed.body }, deadline, signal);
+                } catch (error) {
+                    throwIfAborted(signal);
+                    if (attempt || error.code !== 'EMPTY_RESPONSE' || deadline - Date.now() < 1000) throw error;
+                    // An empty primary response can recover on the other official host with the same identity.
+                    const alternate = playbackRequest(payload, identity, vid, true);
+                    response = await requestJson(alternate.url, { method: alternate.method, headers: alternate.headers, data: alternate.body }, deadline, signal);
+                }
                 throwIfAborted(signal);
                 break;
             } catch (error) {
                 throwIfAborted(signal);
                 if (error.code === 'ERR_CANCELED') throw error;
-                if (attempt === 2 || error.code !== 'EMPTY_RESPONSE' || deadline - Date.now() < 1000) throw error;
-                // Keep recovery within the original budget even if registration is unavailable.
+                if (attempt || error.code !== 'EMPTY_RESPONSE' || deadline - Date.now() < 1000) throw error;
+                // Keep the legacy attempt even when a fresh registration fails.
                 if (deadline - Date.now() >= 8000) {
                     try { identity = await registerPlaybackDevice(requestJson, { signal }); }
                     catch (registrationError) {
@@ -464,7 +480,7 @@ async function fetchAppPlayUrlFresh(vid, options) {
             }
         }
         if (Number(response.Code || response.code || 0) !== 0) throw Object.assign(new Error('App 接口暂未提供本集播放信息'), { code: 'BUSINESS_REJECTED' });
-        const entries = response.data?.video_model_data ?? response.data;
+        const entries = response.data?.['1004'] ?? response.data?.video_model_data ?? response.data;
         const entry = entries?.[vid];
         const model = typeof entry?.video_model === 'string' ? jsonBody(entry.video_model) : entry?.video_model;
         if (!model || typeof model !== 'object' || Array.isArray(model)) throw Object.assign(new Error('App 接口未返回所选分集，已停止取址'), { code: entry?.video_model ? 'INVALID_RESPONSE' : 'MISSING_MODEL' });

@@ -32,15 +32,18 @@ function fixture({ wrongVid = false, fallback = 'https://vod.snssdk.com/info', m
   function assertPlayerSignature(config) {
     const signed = signatures.at(-1), query = new URL(config.url).searchParams;
     assert.ok(signed, 'model must use PlayerSigner');
-    assert.equal(signed.input.query, new URL(config.url).search.slice(1));
-    assert.equal(signed.input.body, config.data);
-    assert.equal(query.get('ts'), String(signed.input.ts));
-    assert.equal(config.headers['x-ss-req-ticket'], String(signed.input.ts * 1000));
-    assert.ok(Number(query.get('_rticket')) >= signed.input.ts * 1000 && Number(query.get('_rticket')) < signed.input.ts * 1000 + 1000);
-    for (const name of ['x-ss-req-ticket', 'x-khronos', 'x-argus', 'x-ladon', 'x-ss-stub']) assert.equal(config.headers[name], signed.headers[name], name);
-    for (const name of ['x-gorgon', 'x-medusa', 'x-helios']) assert.equal(config.headers[name], undefined);
-    assert.ok(Buffer.from(config.headers['x-argus'], 'base64').length > 4);
-    assert.ok(Buffer.from(config.headers['x-ladon'], 'base64').length > 4);
+    if (signed.v5) {
+      assert.equal(signed.input.body, config.data);
+      assert.equal(signed.url, config.url);
+      assert.equal(query.get('ts'), null);
+      for (const name of ['x-medusa', 'x-helios', 'x-khronos', 'x-ss-stub']) assert.equal(config.headers[name], signed.headers[name], name);
+      for (const name of ['x-gorgon', 'x-argus', 'x-ladon']) assert.equal(config.headers[name], undefined);
+    } else {
+      assert.equal(signed.input.query, new URL(config.url).search.slice(1));
+      assert.equal(signed.input.body, config.data);
+      assert.equal(query.get('ts'), String(signed.input.ts));
+      for (const name of ['x-argus', 'x-ladon', 'x-khronos', 'x-ss-stub']) assert.equal(config.headers[name], signed.headers[name], name);
+    }
   }
   const seed = Buffer.alloc(16, 7);
   const constants = Buffer.from('4dd4c2e6b83162090e52b3c7a6733ba41cb2462b829ab58a196b39db57177524f49baf7f08e8d68d26a72e37c1a95a2f1f05a51892aef2949732b62a38aadd58', 'hex');
@@ -55,14 +58,14 @@ function fixture({ wrongVid = false, fallback = 'https://vod.snssdk.com/info', m
     assert.equal(config.responseType, 'text');
     const model = { video_model: JSON.stringify({ fallback_api: fallback }) };
     const modelResponse = { status: 200, headers: {}, data: JSON.stringify({ code: 0, data: { '999': model, ...(wrongVid ? {} : { '11': model }) } }) };
-    if (new URL(config.url).pathname === '/reading/bookapi/video_tab/multi_video_model/v1/') {
-      assert.equal(config.method, 'GET');
-      assert.match(config.headers['User-Agent'], /^com\.phoenix\.read\/73932 /);
-      assert.equal(config.data, null);
-      for (const name of ['Content-Type', 'Content-Encoding', 'x-ss-stub', 'Cookie', 'Authorization']) assert.equal(config.headers[name], undefined);
-      const query = new URL(config.url).searchParams, timestamp = Number(config.headers['x-khronos']);
-      assert.equal(query.get('video_id'), '11');
-      assert.equal(query.get('ts'), String(timestamp));
+    if (new URL(config.url).pathname === '/novel/player/multi_video_model/player/v1') {
+      assert.equal(config.method, 'POST');
+      assert.equal(config.headers['Content-Encoding'], 'gzip');
+      const payload = JSON.parse(zlib.gunzipSync(config.data));
+      assert.deepEqual(payload.mixed_video_id_map['1004'], ['11']);
+      assert.equal(payload.dr_scene, 'player');
+      assert.equal(config.headers.Cookie, undefined);
+      assert.equal(config.headers.Authorization, undefined);
       assertPlayerSignature(config);
       return emptyCurrent ? { status: 200, headers: {}, data: '' } : modelResponse;
     }
@@ -92,6 +95,10 @@ function fixture({ wrongVid = false, fallback = 'https://vod.snssdk.com/info', m
         return playbackDevice;
       } };
       if (name === './sm3') return require(path.join(nativeDir, 'sm3'));
+      if (name === './playback-v5') return { signPlaybackV5: input => {
+        const signed = require(path.join(nativeDir, 'playback-v5')).signPlaybackV5(input);
+        signatures.push({ input, ...signed, v5: true }); return signed;
+      } };
       if (name === './playback-signature') return { signPlayer: input => {
         const headers = require(path.join(nativeDir, 'playback-signature')).signPlayer({ ...input, ...entropy });
         signatures.push({ input, headers }); return headers;
@@ -135,7 +142,7 @@ const checks = [
     await f.fetch('11');
     await f.fetch('11');
     await Promise.all([f.fetch('11'), f.fetch('11'), f.fetch('11')]);
-    const requests = f.calls.filter(call => new URL(call.url).pathname === '/reading/bookapi/video_tab/multi_video_model/v1/');
+    const requests = f.calls.filter(call => new URL(call.url).pathname === '/novel/player/multi_video_model/player/v1');
     assert.equal(requests.length, 5, 'one model request per lookup; no retry loop');
     for (const field of ['iid', 'device_id']) {
       const ids = requests.map(call => new URL(call.url).searchParams.get(field));
@@ -149,8 +156,8 @@ const checks = [
     assert.equal(f.calls.length, 10, 'each lookup retains its two-stage flow');
     const legacy = fixture({ emptyCurrent: true });
     await legacy.fetch('11');
-    assert.equal(legacy.calls.length, 3, 'empty current response retains one signed legacy request and its verified metadata');
-    assert.equal(legacy.calls[0].method, 'GET'); assert.equal(legacy.calls[1].method, 'POST');
+    assert.equal(legacy.calls.length, 4, 'empty current response retains one signed legacy request and its verified metadata');
+    assert.equal(legacy.calls[0].method, 'POST'); assert.equal(legacy.calls[1].method, 'POST'); assert.equal(legacy.calls[2].method, 'POST');
   }],
   ['App H264 takes priority over higher-resolution HEVC', async () => {
     const result = await appRows({ hd: { main_url: mediaUrl('hevc'), codec_type: 'hevc', quality_desc: '1080P' },
