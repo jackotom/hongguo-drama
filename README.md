@@ -24,17 +24,17 @@
 
 ## 下载与安装
 
-**当前源码／发行目标：7.5**（内部`7.5.0`，桌面构建`7.5.1`）。本轮目标为成功下载后的 EPERM 临时文件清理与间歇 EMPTY 恢复；具体实现与验收仍在进行，不能宣称上游故障全部根治。标准发行只含双 Mac、Windows、Linux 与 Docker；TV 和手机独立。
+**当前源码／发行目标：7.5**（内部`7.5.0`，桌面构建`7.5.1`）。EPERM清理及有界EMPTY恢复已完成修复，25份附件已汇总核对；Windows和Linux最终包真实下载验收未通过，暂留Draft，不能宣称上游故障全部根治。标准发行只含双Mac、Windows、Linux与Docker；TV和手机独立。
 
-**7.5尚未发布。以下为计划下载地址，五平台验收齐备后统一公开，当前链接可能不可用。** 本轮Windows真实下载计划在GitHub虚拟机验收，发行时须明确标注非实体电脑；EXE未签名。
+**7.5尚未发布，当前Latest仍是7.4。以下为计划下载地址，五平台验收齐备后统一公开，当前链接可能不可用。** Windows使用GitHub虚拟机，非实体电脑；EXE未签名。完整通过项与失败证据见[7.5回执](docs/release-7.5.md)。
 
 | 平台 | 7.5计划下载（待发布） | 使用方式／待验事项 |
 |---|---|---|
-| Apple芯片Mac，macOS 13+ | [DMG](https://github.com/jackotom/hongguo-drama/releases/download/v7.5/Hongguo-7.5-mac-arm64.dmg) | 拖入应用程序；本轮签名、公证、装订及实播待验 |
-| Intel Mac，macOS 13+ | [DMG](https://github.com/jackotom/hongguo-drama/releases/download/v7.5/Hongguo-7.5-mac-x64.dmg) | 同上；须注明Rosetta与实体Intel覆盖边界 |
-| Windows x64 | [安装版](https://github.com/jackotom/hongguo-drama/releases/download/v7.5/hongguo-downloader-7.5-win-x64-setup.exe) · [便携EXE](https://github.com/jackotom/hongguo-drama/releases/download/v7.5/hongguo-downloader-7.5-win-x64.exe) · [便携ZIP](https://github.com/jackotom/hongguo-drama/releases/download/v7.5/hongguo-downloader-7.5-win-x64.zip) | 安装版支持应用内更新；EXE未签名，GitHub虚拟机验收待做 |
-| Linux x64 | [AppImage](https://github.com/jackotom/hongguo-drama/releases/download/v7.5/hongguo-downloader-7.5-linux-x64.AppImage) | 赋予执行权限；手动更新，本轮实播待验 |
-| Docker Linux amd64 / NAS | [镜像](https://github.com/jackotom/hongguo-drama/releases/download/v7.5/hongguo-drama-7.5-docker-amd64.tar.gz) · [部署包](https://github.com/jackotom/hongguo-drama/releases/download/v7.5/hongguo-drama-7.5-docker-deploy.zip) | 按[部署文档](docs/docker.md)设置令牌与挂载目录；本轮下载合并待验 |
+| Apple芯片Mac，macOS 13+ | [DMG](https://github.com/jackotom/hongguo-drama/releases/download/v7.5/Hongguo-7.5-mac-arm64.dmg) | 本轮签名、公证、装订及真实下载／静音播放通过；尚未公开 |
+| Intel Mac，macOS 13+ | [DMG](https://github.com/jackotom/hongguo-drama/releases/download/v7.5/Hongguo-7.5-mac-x64.dmg) | 本轮签名、公证、装订；仅Rosetta启动 |
+| Windows x64 | [安装版](https://github.com/jackotom/hongguo-drama/releases/download/v7.5/hongguo-downloader-7.5-win-x64-setup.exe) · [便携EXE](https://github.com/jackotom/hongguo-drama/releases/download/v7.5/hongguo-downloader-7.5-win-x64.exe) · [便携ZIP](https://github.com/jackotom/hongguo-drama/releases/download/v7.5/hongguo-downloader-7.5-win-x64.zip) | EXE未签名；安装升级通过，真实下载未通过 |
+| Linux x64 | [AppImage](https://github.com/jackotom/hongguo-drama/releases/download/v7.5/hongguo-downloader-7.5-linux-x64.AppImage) | 构建、启动及软解资源加载通过，真实下载／播放未通过 |
+| Docker Linux amd64 / NAS | [镜像](https://github.com/jackotom/hongguo-drama/releases/download/v7.5/hongguo-drama-7.5-docker-amd64.tar.gz) · [部署包](https://github.com/jackotom/hongguo-drama/releases/download/v7.5/hongguo-drama-7.5-docker-deploy.zip) | 认证、真实下载合并及重启持久化通过；尚未公开 |
 
 [7.5计划发行页（待发布）](https://github.com/jackotom/hongguo-drama/releases/tag/v7.5) · [SHA256（待发布）](https://github.com/jackotom/hongguo-drama/releases/download/v7.5/SHA256SUMS.txt) · [精确源码（待发布）](https://github.com/jackotom/hongguo-drama/releases/download/v7.5/hongguo-drama-7.5-source.zip)。实际状态见[7.5记录](docs/release-7.5.md)。TV和手机保持独立。上游部分网页片源仍可能404、只提供预览或超时，不保证所有内容永久可播。
 
@@ -255,7 +255,7 @@ Mac和Windows安装版保留应用内更新入口；完整6.4→6.5自动更新�
 
 - 目标：成功下载后的临时文件清理遇到 EPERM 时，不把已完成分集重新标为失败；保留文件身份校验及清理失败提示，不误删冲突文件。
 - 目标：改善播放取源间歇 EMPTY 后的有界恢复，保留取消、明确拒绝和共享冷却保护；不宣称上游所有故障根治。
-- 双Mac、Windows、Linux与Docker同源齐备、完成必要验收后统一公开。Windows本轮真实下载计划在GitHub虚拟机验收，须标明非实体电脑；当前结果待补。
+- 双Mac、Windows、Linux与Docker同源齐备后仍须通过必要验收。Windows本轮已在GitHub虚拟机执行，安装升级通过，真实下载未通过；非实体电脑。Linux真实下载也未通过，暂不公开。
 - 本轮目标与验收待办见[7.5记录](docs/release-7.5.md)，历史版本说明保留。
 
 ## 7.4
