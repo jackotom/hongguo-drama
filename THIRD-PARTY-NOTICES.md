@@ -91,6 +91,10 @@ x264 是唯一非系统静态依赖（GPLv2-or-later），整体构建为 GPLv3-
 
 6.9 的播放签名 `playback-signature.js` 改编自 N3urda/hongguoTV `7444bb01aec7b0420740103e551c45f1f66101c9` 的 `Argus.kt`（GPL-3.0-only）；其原始归属为 ch6vip/fqapp 的 `rust/src/sign/{argus,simon,ladon,protobuf}.rs`。黄金向量来自同一固定提交的 `PlayerSignTest.kt`。仅播放模型使用真实551 Argus及Ladon，按最终query、实际正文与时间签名；搜索、目录、账号签名和匿名注册协议保留。未移植上游设备持久化、轮换、更大重试预算或权益修改逻辑。详细来源与改动见上述 NOTICE。
 
+2026-11-16 单集播放兼容代码 `single-playback-signature.js` 及请求格式参考 N3urda/hongguoTV `54b91e66932faad60cf12b61b38a063fa194a877` 的 `PlayerSignature.kt` 与 `ContentRepository.singleVideoModel`（GPL-3.0-only）。独立黄金向量取自该提交 `player-signing.json`，对应 Go 协议参考 qq294716498/HongguoTV-Phone-TV-NoAds `8eafa3908e9191c0a5ae186d5beff11e3a971f3c`。Argus/Simon 结构原始归属 tr4cex/TikTok-Encryption（MIT）；完整声明与 MIT 许可随 `src/native/licenses/NOTICE.txt` 提供。仅为空响应增加一次共享原12秒预算的匿名单集请求，不引入账号、Cookie、持久身份或设备池。当前真实样本仍为空响应，不代表可播修复已完成。
+
+可选 `metasec-bridge.js` 为本项目独立编写的 GPL 本机进程协议适配器，不包含外部模型提供方实现。本机 v5 研究参考的 it00021hot/hongguo-desktop 采用 PolyForm Noncommercial 1.0.0，其源码、二进制与 SDK 材料未纳入本仓库或标准构建；不重新授权为 GPL。来源、真实素材证据和交付边界见 `docs/metasec-local-provider.md`。
+
 3.6 的 App 目录复用项目已有签名实现。目录参数、返回结构与官方图片对象的 JPEG 变体参考 [aston314/hongguo-tv 公开实现](https://github.com/aston314/hongguo-tv/tree/d6a75e3d8e014d50904e24813cb23cff9aa9044c)；不使用其中的固定设备或账号身份。目录接口可访问不代表剧集获准再分发，发行包不包含测试剧集媒体。
 
 ## 西饭接口参考

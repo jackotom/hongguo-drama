@@ -721,7 +721,9 @@ function sourceFailure(source, error) {
   if (status >= 300 && status <= 599) return { source, code: `HTTP_${status}`, message: `请求失败（HTTP ${status}）` };
   if (code === 'SECURITY_BLOCKED' || code.startsWith('ERR_WEB_MEDIA_')) return { source, code: 'SECURITY_BLOCKED', message: '片源地址被安全校验阻止' };
   if (code === 'EMPTY_RESPONSE' || error?.emptyResponse || /接口返回空响应/.test(message)) {
-    return { source, code: 'EMPTY_RESPONSE', message: '播放接口返回空响应，原因尚未确认' };
+    const detail = error.status === 200 && Number.isSafeInteger(error.responseBytes) && error.responseBytes >= 0 && error.responseBytes <= 2 * 1024 * 1024
+      ? `（HTTP 200，正文 ${error.responseBytes} 字节）` : '';
+    return { source, code: 'EMPTY_RESPONSE', message: `播放接口返回空响应${detail}，原因尚未确认` };
   }
   if (['ECONNABORTED', 'ETIMEDOUT', 'TIMEOUT'].includes(code) || /超时|timeout/i.test(message)) return { source, code: 'TIMEOUT', message: '请求超时' };
   if (network.networkFailure || ['ENOTFOUND', 'EAI_AGAIN', 'ECONNRESET', 'ECONNREFUSED', 'EHOSTUNREACH', 'ENETUNREACH', 'EPIPE', 'ERR_NETWORK'].includes(code)) return { source, code: 'NETWORK_ERROR', ...network,

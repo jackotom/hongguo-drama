@@ -38,6 +38,17 @@ if (hasSingleInstanceLock && !IS_PREVIEW && app.commandLine.hasSwitch?.('user-da
   }
 }
 const fs = require('fs');
+const localModelProvider = require('./src/native/metasec-bridge');
+const localModelDirectories = [process.resourcesPath && path.join(process.resourcesPath, 'metasec'),
+  path.join(__dirname, 'build', 'local-metasec')].filter(Boolean);
+for (const directory of localModelDirectories) {
+  const executable = path.join(directory, process.platform === 'win32' ? 'hongguo-metasec.exe' : 'hongguo-metasec');
+  if (!fs.existsSync(executable)) continue;
+  localModelProvider.configure({ executable, cacheDir: path.join(app.getPath('userData'), 'metasec-v5'),
+    materials: path.join(directory, 'metasec-v5-74332.cache') });
+  break;
+}
+app.once('will-quit', () => localModelProvider.close());
 const fsp = require('fs/promises');
 const axios = require('axios');
 const { Readable } = require('node:stream');
@@ -4162,6 +4173,7 @@ async function enqueueEpisodes({ seriesId, seriesTitle, episodes, cover, quality
 
   let created = 0;
   const changedTasks = [];
+  const resubmittedTasks = [];
   const previousQueue = downloadQueue.slice();
   for (const ep of episodes) {
     const epIndexStr = String(ep.vid_index).padStart(3, '0');
@@ -4188,6 +4200,9 @@ async function enqueueEpisodes({ seriesId, seriesTitle, episodes, cover, quality
       }
       // 已停止或失败的重新入队
       if (dup.status === 'stopped' || dup.status === 'failed' || (dup.status === 'completed' && !hasCompleteTaskFile(dup))) {
+        // Clear durable retry state now; cancel its timer only after persistence succeeds.
+        delete dup.retryAt; delete dup.sourceRetries; delete dup.sourceRetryLimit;
+        resubmittedTasks.push(dup);
         repairTaskDestination(dup);
         dup.status = 'pending';
         dup.cancelled = false;
@@ -4251,6 +4266,7 @@ async function enqueueEpisodes({ seriesId, seriesTitle, episodes, cover, quality
     restoreQueueTasks({ snapshots: changedTasks, previousQueue });
     throw error;
   }
+  for (const task of resubmittedTasks) clearSourceRetry(task);
   pumpQueue();
   return created;
 }

@@ -1,0 +1,81 @@
+{
+  "date": "2026-11-16",
+  "selection": {
+    "random": true,
+    "title": "流水线逆袭，段总一眼动心",
+    "seriesId": "7703905003462724633",
+    "vid": "7703906910138813464",
+    "index": 2
+  },
+  "quality": "1080p",
+  "audio": "No player opened; no audio output",
+  "runs": [
+    {
+      "variant": "published-7.4",
+      "startedAt": "2026-11-16T12:03:35.611Z",
+      "requests": [
+        {
+          "path": "/service/2/device_register/",
+          "status": 200,
+          "bytes": 384
+        },
+        {
+          "path": "/reading/bookapi/video_tab/multi_video_model/v1/",
+          "status": 200,
+          "bytes": 0
+        },
+        {
+          "path": "/service/2/device_register/",
+          "status": 200,
+          "bytes": 380
+        },
+        {
+          "path": "/novel/player/multi_video_model/v1/",
+          "status": 200,
+          "bytes": 0
+        }
+      ],
+      "success": false,
+      "code": "EMPTY_RESPONSE",
+      "status": 200,
+      "error": "App 接口返回空响应（HTTP 200），原因尚未确认",
+      "finishedAt": "2026-11-16T12:03:39.545Z"
+    },
+    {
+      "variant": "working-candidate",
+      "startedAt": "2026-11-16T12:03:39.546Z",
+      "requests": [
+        {
+          "path": "/service/2/device_register/",
+          "status": 200,
+          "bytes": 347
+        },
+        {
+          "path": "/reading/bookapi/video_tab/multi_video_model/v1/",
+          "status": 200,
+          "bytes": 0
+        },
+        {
+          "path": "/service/2/device_register/",
+          "status": 200,
+          "bytes": 380
+        },
+        {
+          "path": "/novel/player/multi_video_model/v1/",
+          "status": 200,
+          "bytes": 0
+        },
+        {
+          "path": "/novel/player/video_model/v1/",
+          "status": 200,
+          "bytes": 0
+        }
+      ],
+      "success": false,
+      "code": "EMPTY_RESPONSE",
+      "status": 200,
+      "error": "App 接口返回空响应（HTTP 200，正文 0 字节），原因尚未确认",
+      "finishedAt": "2026-11-16T12:03:43.650Z"
+    }
+  ]
+}

@@ -1,4 +1,4 @@
-// Current video_tab first; legacy is a single bounded recovery for an empty response.
+// Current video_tab first; only empty responses enable bounded compatibility routes.
 const assert = require('node:assert/strict');
 const { test } = require('node:test');
 const fs = require('node:fs');
@@ -17,7 +17,7 @@ const model = () => ({ video_id: 'synthetic-video', video_duration: 60, video_li
 const response = data => ({ status: 200, headers: {}, data: JSON.stringify(data) });
 const nested = value => ({ code: 0, data: { video_model_data: { [vid]: { video_model: value } } } });
 
-function fixture(tabResponse, { legacyResponse, signal } = {}) {
+function fixture(tabResponse, { legacyResponse, singleResponse, signal } = {}) {
     const calls = [], signatures = [];
     let registrations = 0;
     const module = { exports: {} };
@@ -32,6 +32,10 @@ function fixture(tabResponse, { legacyResponse, signal } = {}) {
         } };
         if (name === 'axios') return async config => {
             calls.push(config);
+            if (new URL(config.url).pathname === '/novel/player/video_model/v1/') {
+                return typeof singleResponse === 'function' ? singleResponse(config)
+                    : singleResponse || { status: 200, headers: {}, data: '' };
+            }
             if (config.method === 'POST') return legacyResponse || { status: 200, headers: {}, data: '' };
             assert.equal(config.method, 'GET');
             assert.equal(new URL(config.url).pathname, '/reading/bookapi/video_tab/multi_video_model/v1/');
@@ -186,7 +190,7 @@ for (const [name, result, code] of [
     test(`video_tab ${name} stops within the existing request budget`, async () => {
         const f = fixture(result);
         await assert.rejects(f.fetch(), error => code ? error.code === code : error.status === 403);
-        assert.equal(f.calls.length, code === 'EMPTY_RESPONSE' ? 2 : 1);
+        assert.equal(f.calls.length, code === 'EMPTY_RESPONSE' ? 3 : 1);
         assert.equal(f.registrations(), code === 'EMPTY_RESPONSE' ? 2 : 1);
     });
 }
@@ -230,3 +234,58 @@ for (const [changes, code] of [[{ main_url: 'https://127.0.0.1/private' }, 'SECU
         assert.equal(f.calls.length, 1);
     });
 }
+
+for (const encode of [value => value, JSON.stringify,
+    value => Buffer.from(JSON.stringify(value)).toString('base64')]) {
+    test('two empty batch routes recover once with the single-video protocol: ' + encode.name, async () => {
+        const f = fixture({ status: 200, headers: {}, data: '' }, {
+            singleResponse: response({ code: 0, data: { video_model: encode(model()) } }),
+        });
+        const result = await f.fetch();
+        assert.equal(result.url, media); assert.equal(result.width, 1080);
+        assert.equal(f.calls.length, 3); assert.equal(f.registrations(), 2);
+        assert.equal(f.signatures.length, 2, 'single-video must not use the batch551 signer');
+        const request = f.calls[2], url = new URL(request.url);
+        assert.equal(url.pathname, '/novel/player/video_model/v1/');
+        assert.equal(url.searchParams.get('version_name'), '7.3.5.32');
+        assert.equal(url.searchParams.get('device_id'), identity.device_id);
+        assert.equal(request.headers['Content-Encoding'], undefined, 'single-video signs and sends raw JSON');
+        assert.deepEqual(JSON.parse(request.data), { biz_param: { need_all_video_definition: true, video_platform: 3 }, content_type: 1, video_id: vid });
+        assert.equal(request.headers['x-ss-stub'], require('node:crypto').createHash('md5').update(request.data).digest('hex').toUpperCase());
+        assert.match(request.headers['x-gorgon'], /^8404401c0000[0-9a-f]{40}$/);
+        assert.equal(request.headers['x-ss-req-ticket'], url.searchParams.get('_rticket'));
+        assert.equal(request.headers.Cookie, undefined); assert.equal(request.headers.Authorization, undefined);
+        assert.equal(request.headers['x-medusa'], undefined);
+        assert.ok(request.timeout > 0 && request.timeout < f.calls[0].timeout, 'all routes share the original 12-second budget');
+    });
+}
+
+test('single-video recovery preserves explicit1080p and URL/key validation', async () => {
+    for (const [changes, code] of [[{ vwidth: 720, vheight: 1280 }, 'QUALITY_UNAVAILABLE'],
+        [{ main_url: 'https://127.0.0.1/private' }, 'SECURITY_BLOCKED'],
+        [{ encrypt_info: { encrypt: true } }, 'INVALID_RESPONSE']]) {
+        const value = model(); Object.assign(value.video_list.hd, changes);
+        const f = fixture({ status: 200, headers: {}, data: '' }, {
+            singleResponse: response({ code: 0, data: { video_model: value } }),
+        });
+        await assert.rejects(f.fetch(), { code });
+        assert.equal(f.calls.length, 3);
+    }
+});
+
+test('cancelling single-video recovery cannot return a late usable model', async () => {
+    const controller = new AbortController();
+    const f = fixture({ status: 200, headers: {}, data: '' }, {
+        signal: controller.signal, singleResponse: () => {
+            controller.abort(); return response({ code: 0, data: { video_model: model() } });
+        },
+    });
+    await assert.rejects(f.fetch(), { code: 'ERR_CANCELED' });
+    assert.equal(f.calls.length, 3); assert.equal(f.registrations(), 2);
+});
+
+test('an explicit Retry-After on an empty model response stops alternate requests', async () => {
+    const f = fixture({ status: 200, headers: { 'retry-after': '60' }, data: '' });
+    await assert.rejects(f.fetch(), { code: 'EMPTY_RESPONSE', upstreamBackoff: true });
+    assert.equal(f.calls.length, 1); assert.equal(f.registrations(), 1);
+});

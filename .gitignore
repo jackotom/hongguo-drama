@@ -11,6 +11,7 @@ dist-react/
 # 注意：许可证文本（*.txt / COPYING.* / LICENSE.md）必须随源码保留，
 #       因此这里只忽略目录内容，再用反向规则把它们重新纳入。
 build/ffmpeg/*
+build/local-metasec/
 !build/ffmpeg/*.txt
 !build/ffmpeg/COPYING.*
 !build/ffmpeg/LICENSE.md

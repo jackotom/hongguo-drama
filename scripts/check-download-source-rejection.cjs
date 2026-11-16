@@ -96,6 +96,33 @@ function fixture(concurrency = 1, { requestSignal = req('./src/native/request-si
 async function tick() { await new Promise(resolve => setTimeout(resolve, 25)); }
 
 const checks = [
+  ['player resubmission resets the old automatic retry budget only after saving', async () => {
+    for (const failSave of [false, true]) {
+      const h = fixture(), task = h.add('1');
+      h.state.load = async () => rejected('HTTP_429'); h.pump(); await tick();
+      assert.equal(task.status, 'failed'); assert.ok(task.retryAt);
+      const retryAt = task.retryAt, timer = h.run('sourceRetryTimers.get("1")');
+      h.run('hongguoDownloadReadyAt = Date.now() + 600000');
+      if (failSave) h.state.saveError = new Error('storage full');
+      const submit = () => h.run('enqueueEpisodes({ seriesId: "100", seriesTitle: "测试剧", episodes: [{ vid: "1", vid_index: 1 }], quality: "1080p" })');
+      if (failSave) {
+        await assert.rejects(submit(), /storage full/);
+        assert.equal(task.status, 'failed'); assert.equal(task.retryAt, retryAt);
+        assert.equal(task.sourceRetries, 1); assert.equal(timer.cleared, true);
+        assert.ok(h.run('sourceRetryTimers.get("1")'), 'rollback must rearm the durable retry plan');
+        assert.equal(h.run('sourceRetryTimers.get("1").cleared'), false);
+      } else {
+        assert.equal(await submit(), 1); assert.equal(task.status, 'pending');
+        assert.equal(task.retryAt, undefined); assert.equal(task.sourceRetries, undefined);
+        assert.equal(task.sourceRetryLimit, undefined); assert.equal(timer.cleared, true);
+        assert.equal(h.state.saved[0].retryAt, undefined);
+        assert.equal(h.state.saved[0].sourceRetries, undefined);
+        assert.equal(h.run('sourceRetryTimers.has("1")'), false);
+        assert.equal(h.tasks.length, 1, 'reuse the existing task and its file protections');
+        assert.equal(task.downloadQuality, '1080p');
+      }
+    }
+  }],
   ['rejection retries only the failing episode; waiting episodes stay queued', async () => {
     for (const code of ['DEVICE_REGISTRATION_FAILED', 'HTTP_403', 'HTTP_429']) {
       const h = fixture(); const first = h.add('1'), next = h.add('2'), later = h.add('3');

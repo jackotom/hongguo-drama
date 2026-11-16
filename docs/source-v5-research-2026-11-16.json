@@ -1,0 +1,66 @@
+{
+  "success": true,
+  "source": "hongguo",
+  "title": "流水线逆袭，段总一眼动心",
+  "seriesId": "7703905003462724633",
+  "vid": "7703906910138813464",
+  "index": 2,
+  "quality": "1080p",
+  "width": 1080,
+  "height": 1920,
+  "duration": 159.133333,
+  "expectedDuration": 159.134,
+  "bytes": 12140956,
+  "sha256": "65c15e85b97442f0ce3fc5cb7f2b262f7c37a9e74d0e8d4d328365ee48baf9d2",
+  "validation": "existing server media guard, decryption, exact quality/dimensions, complete duration, first3s decode",
+  "audio": "No player or audio device opened",
+  "isolatedPath": "/tmp/hg-v5-eval/downloads/episode-002-1080p.mp4",
+  "finishedAt": "2026-11-16T12:16:11.079Z",
+  "reference": {
+    "repository": "https://github.com/it00021hot/hongguo-desktop",
+    "commit": "374b1819b0c4ae2f77cf6008e1c138f92f1f16bd",
+    "license": "PolyForm-Noncommercial-1.0.0",
+    "use": "private local research and user-requested local installation; no public redistribution"
+  },
+  "sameSessionProbe": {
+    "registrations": 1,
+    "models": [
+      {
+        "bytes": 23233,
+        "code": 0,
+        "has_data": true,
+        "status": 200,
+        "success": true,
+        "vid": "7703906910138813464"
+      },
+      {
+        "bytes": 23117,
+        "code": 0,
+        "has_data": true,
+        "status": 200,
+        "success": true,
+        "vid": "7703907064573070360"
+      }
+    ],
+    "identity": "own newly registered anonymous profile, process memory only"
+  },
+  "laterEpisode": {
+    "success": true,
+    "source": "hongguo",
+    "title": "流水线逆袭，段总一眼动心",
+    "seriesId": "7703905003462724633",
+    "vid": "7703907064573070360",
+    "index": 13,
+    "quality": "1080p",
+    "width": 1080,
+    "height": 1920,
+    "duration": 176.680975,
+    "expectedDuration": 176.681,
+    "bytes": 17048278,
+    "sha256": "19c83b2accf11d74bfc95f8c0af328b8b72d37371609b2607256eccc8518e8d7",
+    "validation": "existing server media guard, decryption, exact quality/dimensions, complete duration, first3s decode",
+    "audio": "No player or audio device opened",
+    "isolatedPath": "/tmp/hg-v5-eval/downloads/episode-013-1080p.mp4",
+    "finishedAt": "2026-11-16T12:17:57.674Z"
+  }
+}

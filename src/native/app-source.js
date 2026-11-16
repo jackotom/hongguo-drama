@@ -11,6 +11,7 @@ const { gzipSync } = require('node:zlib');
 const { setTimeout: delay } = require('node:timers/promises');
 const { registerPlaybackDevice } = require('./playback-device');
 const { signPlayer } = require('./playback-signature');
+const { signSinglePlayer } = require('./single-playback-signature');
 const { abortError, throwIfAborted, boundedSignal, networkFailure } = require('./request-signal');
 const sm3 = require('./sm3');
 const { normalizeDownloadQuality, meetsDownloadQuality } = require('./download-quality');
@@ -169,6 +170,39 @@ function playbackRequest(payload, identity, videoId = '') {
         'Content-Encoding': 'gzip', 'x-ss-stub': signature['x-ss-stub'] });
     else headers['x-tt-request-tag'] = 't=0;n=0';
     return { url, body, headers, method: videoId ? 'GET' : 'POST' };
+}
+
+// Single-video protocol: raw JSON and its own Gorgon/Argus/Ladon family.
+// Reference: N3urda/hongguoTV 54b91e6, ContentRepository.singleVideoModel.
+function singlePlaybackRequest(vid, identity) {
+    const now = Date.now();
+    const fields = ['ac', 'channel', 'aid', 'app_name', 'version_code', 'version_name',
+        'device_platform', 'os', 'ssmix', 'device_type', 'device_brand', 'language', 'os_api',
+        'os_version', 'manifest_version_code', 'resolution', 'dpi', 'update_version_code'];
+    const values = Object.fromEntries(fields.map(name => [name, DEVICE[name]]));
+    Object.assign(values, { version_code: '73532', version_name: '7.3.5.32',
+        manifest_version_code: '73532', update_version_code: '73532',
+        device_id: identity.device_id, iid: identity.iid, _rticket: String(now) });
+    const query = pythonUrlEncode(Object.fromEntries(Object.entries(values).sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0)));
+    const body = Buffer.from(JSON.stringify({ biz_param: { need_all_video_definition: true, video_platform: 3 },
+        content_type: 1, video_id: vid }));
+    return { url: `https://api5-normal-sinfonlineb.fqnovel.com/novel/player/video_model/v1/?${query}`,
+        body, method: 'POST', headers: {
+            'User-Agent': VIDEO_UA.replace(DEVICE.version_code, '73532'), Accept: 'application/json',
+            'Content-Type': 'application/json; charset=utf-8', 'sdk-version': '2', 'x-xs-from-web': '0',
+            ...signSinglePlayer({ query, body, deviceId: identity.device_id, now }),
+        } };
+}
+
+function singlePlaybackModel(response) {
+    const encoded = response.data?.video_model;
+    if (encoded && typeof encoded === 'object') return encoded;
+    if (typeof encoded === 'string') {
+        const plain = jsonBody(encoded);
+        if (plain) return plain;
+        if (/^[A-Za-z0-9+/\r\n]+={0,2}$/.test(encoded)) return jsonBody(Buffer.from(encoded, 'base64').toString('utf8'));
+    }
+    return response.data?.video_list ? response.data : null;
 }
 
 function parseSearchInteger(value) {
@@ -367,9 +401,12 @@ async function requestJson(url, options, deadline, signal) {
         if (response.status !== 200) throw Object.assign(new Error(`App 片源请求失败（HTTP ${response.status}）`), { status: response.status });
         const raw = typeof response.data === 'string' ? response.data : '';
         if (!raw.trim()) {
-            throw Object.assign(new Error('App 接口返回空响应（HTTP 200），原因尚未确认'), {
+            const responseBytes = Buffer.byteLength(raw);
+            throw Object.assign(new Error(`App 接口返回空响应（HTTP 200，正文 ${responseBytes} 字节），原因尚未确认`), {
                 code: 'EMPTY_RESPONSE',
                 status: response.status,
+                responseBytes,
+                ...(String(response.headers?.['retry-after'] || '').trim() ? { upstreamBackoff: true } : {}),
             });
         }
         const normalized = preserveFields?.length ? preserveLargeJsonIntegers(raw, preserveFields) : raw;
@@ -419,6 +456,20 @@ async function fetchAppPlayUrl(vid, options = {}) {
 }
 
 async function fetchAppPlayUrlFresh(vid, options) {
+    const localProvider = require('./metasec-bridge');
+    if (localProvider.isAvailable()) {
+        const response = await localProvider.fetchModel(vid, { signal: options.signal });
+        throwIfAborted(options.signal);
+        if (Number(response.code ?? response.Code ?? 0) !== 0) throw Object.assign(new Error('App 接口暂未提供本集播放信息'), { code: 'BUSINESS_REJECTED' });
+        const model = singlePlaybackModel(response);
+        const duration = Number(model?.video_duration);
+        if (!model || Array.isArray(model) || typeof model.video_id !== 'string' || !model.video_id.trim()
+            || !Number.isFinite(duration) || duration <= 0) {
+            throw Object.assign(new Error('App 接口未返回完整分集模型'), { code: 'INVALID_RESPONSE' });
+        }
+        const info = parseAppPlayModel(model, vid, options, true);
+        return { ...info, duration, variants: info.variants.map(item => ({ ...item, duration })) };
+    }
     const payload = JSON.stringify({
         biz_param: { detail_page_version: 0, device_level: 3, disable_digg_stat: false, need_all_video_definition: true, need_mp4_align: false, use_os_player: false, use_server_dns: false, video_platform: 1024 },
         mixed_video_id_map: { '1004': [vid] },
@@ -431,11 +482,13 @@ async function fetchAppPlayUrlFresh(vid, options) {
     const request = boundedSignal(options.signal, 12000);
     const { signal } = request;
     try {
-        let response;
-        for (let attempt = 0; attempt < 2; attempt++) {
+        let response, single = false;
+        for (let attempt = 0; attempt < 3; attempt++) {
             throwIfAborted(signal);
-            // Prefer the current API; only an empty response enables one legacy attempt.
-            const signed = playbackRequest(payload, identity, attempt ? '' : vid);
+            // Only empty responses enable the legacy batch then single-video route.
+            // All three share the same deadline, pacing, identity and media checks.
+            single = attempt === 2;
+            const signed = single ? singlePlaybackRequest(vid, identity) : playbackRequest(payload, identity, attempt ? '' : vid);
             if (attempt) signed.headers.Connection = 'close';
             try {
                 response = await requestJson(signed.url, { method: signed.method, headers: signed.headers, data: signed.body }, deadline, signal);
@@ -444,9 +497,9 @@ async function fetchAppPlayUrlFresh(vid, options) {
             } catch (error) {
                 throwIfAborted(signal);
                 if (error.code === 'ERR_CANCELED') throw error;
-                if (attempt || error.code !== 'EMPTY_RESPONSE' || deadline - Date.now() < 1000) throw error;
+                if (single || error.code !== 'EMPTY_RESPONSE' || error.upstreamBackoff || deadline - Date.now() < 1500) throw error;
                 // Keep the legacy attempt even when a fresh registration fails.
-                if (deadline - Date.now() >= 8000) {
+                if (attempt === 0 && deadline - Date.now() >= 8000) {
                     try { identity = await registerPlaybackDevice(requestJson, { signal }); }
                     catch (registrationError) {
                         throwIfAborted(signal);
@@ -465,7 +518,7 @@ async function fetchAppPlayUrlFresh(vid, options) {
         }
         if (Number(response.Code || response.code || 0) !== 0) throw Object.assign(new Error('App 接口暂未提供本集播放信息'), { code: 'BUSINESS_REJECTED' });
         const entries = response.data?.video_model_data ?? response.data;
-        const entry = entries?.[vid];
+        const entry = single ? { video_model: singlePlaybackModel(response) } : entries?.[vid];
         const model = typeof entry?.video_model === 'string' ? jsonBody(entry.video_model) : entry?.video_model;
         if (!model || typeof model !== 'object' || Array.isArray(model)) throw Object.assign(new Error('App 接口未返回所选分集，已停止取址'), { code: entry?.video_model ? 'INVALID_RESPONSE' : 'MISSING_MODEL' });
         const inline = model.video_list && typeof model.video_list === 'object' && Object.keys(model.video_list).length > 0;

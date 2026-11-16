@@ -54,3 +54,41 @@ Only playback model headers use this family, bound to final query/raw body/time.
 No upstream device persistence/rotation, enlarged retry budget, privilege changes,
 account cookies or registration changes are imported. Other signing paths remain
 on their existing algorithms. Protocol constants are not user credentials.
+
+Single-video protocol compatibility candidate (2026-11-16)
+single-playback-signature.js is adapted from N3urda/hongguoTV, commit
+54b91e66932faad60cf12b61b38a063fa194a877 (GPL-3.0-only),
+kotlin-tv/core/src/main/kotlin/com/hongguotv/core/PlayerSignature.kt.
+The request fields reference ContentRepository.singleVideoModel at that commit.
+Independent Go-reference vectors are from core/src/test/resources/player-signing.json
+(blob 97d95fb528ffc8bb3fb2e78cf009fec8602f8b40).
+Protocol reference: qq294716498/HongguoTV-Phone-TV-NoAds,
+8eafa3908e9191c0a5ae186d5beff11e3a971f3c, native/core/provider_hongguo_player_sign.go.
+Argus/Simon structure originates from tr4cex/TikTok-Encryption (MIT):
+https://github.com/tr4cex/TikTok-Encryption
+Changes: Node crypto/BigInt, existing Simon/Ladon primitives; exact raw JSON,
+query, timestamp and registered anonymous device binding; one bounded recovery
+after both batch routes return empty. No cookies, device pool or persistent identity.
+Real upstream empty responses remain unresolved; this candidate is not a release.
+
+MIT License
+
+Copyright (c) 2024 TikTok Encryption Project
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.

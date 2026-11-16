@@ -93,6 +93,16 @@ function fixture({ prepare, transcode, enqueue, quality = '720p', initial = 'mis
     assert(f.ui.button('取消等待'), 'an accepted pending task must remain a usable fallback');
     assert.equal(alert(f.ui), undefined); f.ui.unmount();
   });
+  await test('explicit retry resubmits a failed existing task once without an automatic loop', async () => {
+    const f = fixture(); await f.ui.flush();
+    f.states.set('A:1', 'failed'); await poll(f.ui);
+    assert.equal(f.downloads.length, 1); assert(alert(f.ui));
+    await f.ui.button('重试本集').props.onClick(); await f.ui.flush();
+    assert.equal(f.downloads.length, 2, 'a user retry must reach enqueue despite the old task');
+    assert.equal(f.states.get('A:1'), 'pending'); assert(f.ui.button('取消等待'));
+    f.states.set('A:1', 'failed'); await poll(f.ui); await poll(f.ui);
+    assert.equal(f.downloads.length, 2, 'polling must not resubmit again'); f.ui.unmount();
+  });
   await test('retry uses refreshed local instead of a stale online choice', async () => {
     const f = fixture({ enqueue: async () => ({ success: false, error: '加入失败' }) }); await f.ui.flush();
     const attempts = f.ui.prepares.length;
