@@ -1,12 +1,18 @@
 # 7.5 正式发行回执
 
-7.5已于2026-11-17 06:40:02（Asia/Shanghai）正式公开并设Latest，内部7.5.0、桌面构建7.5.2，冻结源码`4ffff289d6dd289e589a0fd0e65aa7aa5c2a7567`，标签`v7.5`，Release ID `446852363`。本轮按明确授权仅发布双Mac和Windows x64，共20份正式附件；远端大小／SHA256、两更新清单及总校验清单已核对。
+7.5已于2026-11-17 06:40:02（Asia/Shanghai）正式公开并设Latest，内部7.5.0、桌面构建7.5.2，冻结源码`4ffff289d6dd289e589a0fd0e65aa7aa5c2a7567`，标签`v7.5`，Release ID `446852363`。首轮按明确授权发布双Mac和Windows x64共20份正式附件；2026-11-17 后按用户要求追加 Linux x64 AppImage 三份附件，现共23份正式附件。远端大小／SHA256、两更新清单及总校验清单已核对。
 
-未替换本机正式安装，未回复或关闭Issue／PR。由本版起，macOS双架构与Windows x64三平台成为长期发行范围；Linux、Docker、TV和手机不再随后续Release发布。
+未替换本机正式安装，未回复或关闭Issue／PR。由本版起，macOS双架构、Windows x64与Linux x64 AppImage四平台成为长期发行范围；Docker、TV和手机不再随后续Release发布。
+
+## Linux x64 AppImage 追加发行（2026-11-17）
+
+- 应机主要求恢复 Linux 支持，从冻结源码 `4ffff289`（标签 `v7.5`）经原生 Ubuntu x64 CI `44046848665` 重新构建 AppImage，并追加到同一 Release；不移动 `v7.5` 标签、不改变原20份附件字节，四平台规则见 `docs/RELEASING.md`。
+- 新增三份附件：`hongguo-downloader-7.5-linux-x64.AppImage`、`ffmpeg-9.0.2-x264-b35605a-linux-x64-corresponding-source.tar.gz`、`librempeg-cb1f8f3-x264-b35605a-linux-x64-corresponding-source.tar.gz`；远端匿名下载 SHA256 与 CI 生成的 `LINUX-SHA256SUMS.txt` 一致。
+- Linux 实际验收通过：AppImage 解包、ffmpeg／ffprobe／librempeg 三份媒体工具、界面启动并报告 7.5.0、CPU 播放器与 HEVC Wasm 加载；随机真实下载《少夫人来自东北3》第 86、87 集 1080P，各静音播放 10.222／10 秒，无媒体错误，软件解码，临时目录清零。
 
 ## Android手机与Android TV下载
 
-> **Android手机APK／Android TV版：** 请前往 [N3urda/hongguoTV](https://github.com/N3urda/hongguoTV) 下载。该项目独立维护；版本、兼容性与测试状态以该项目发布页为准，不计入本项目的三平台附件或验收。
+> **Android手机APK／Android TV版：** 请前往 [N3urda/hongguoTV](https://github.com/N3urda/hongguoTV) 下载。该项目独立维护；版本、兼容性与测试状态以该项目发布页为准，不计入本项目的四平台附件或验收。
 
 ## 修复与贡献
 

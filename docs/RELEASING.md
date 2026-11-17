@@ -1,19 +1,19 @@
-# 三平台发行规则（2026-11-17起）
+# 四平台发行规则（2026-11-17起）
 
-- 后续正式Release只提供macOS Apple Silicon arm64、macOS Intel x64、Windows x64三平台附件，以及这些平台必要的更新清单、精确源码、对应媒体源码和SHA256。Linux x64 AppImage、Docker、TV APK、手机APK不再发布。
-- 三个平台仍共用公开版本、GitHub标签和一次Release。附件与必要验收齐备、远端大小和SHA256核对后，一次公开并设Latest。
+- 后续正式Release提供macOS Apple Silicon arm64、macOS Intel x64、Windows x64、Linux x64 AppImage四平台附件，以及这些平台必要的更新清单、精确源码、对应媒体源码和SHA256。Docker、TV APK、手机APK不再发布。
+- 四个平台仍共用公开版本、GitHub标签和一次Release。附件与必要验收齐备、远端大小和SHA256核对后，一次公开并设Latest。
 - 每次发行页必须在附件列表前的醒目位置保留以下推荐；这是独立第三方项目，不计入本项目附件和平台验收：
-  > **Android手机APK／Android TV版：** 请前往 [N3urda/hongguoTV](https://github.com/N3urda/hongguoTV) 下载。该项目独立维护；版本、兼容性与测试状态以该项目发布页为准，不计入本项目的三平台附件或验收。
+  > **Android手机APK／Android TV版：** 请前往 [N3urda/hongguoTV](https://github.com/N3urda/hongguoTV) 下载。该项目独立维护；版本、兼容性与测试状态以该项目发布页为准，不计入本项目的四平台附件或验收。
 
 # 7.5最新正式发行
 
-7.5已于2026-11-17 06:40:02（Asia/Shanghai）正式公开并设Latest，内部7.5.0、桌面构建7.5.2，冻结源码`4ffff289d6dd289e589a0fd0e65aa7aa5c2a7567`，标签`v7.5`，Release ID `446852363`。本轮按明确授权仅发布双Mac和Windows x64，共20份正式附件；远端大小／SHA256、两更新清单及总校验清单已核对。
+7.5已于2026-11-17 06:40:02（Asia/Shanghai）正式公开并设Latest，内部7.5.0、桌面构建7.5.2，冻结源码`4ffff289d6dd289e589a0fd0e65aa7aa5c2a7567`，标签`v7.5`，Release ID `446852363`。按明确授权发布双Mac、Windows x64 与 Linux x64 AppImage 四平台，共23份正式附件；远端大小／SHA256、两更新清单及总校验清单已核对。
 
-Windows未签名、Intel仅Rosetta，实际验收及源码CI失败保留边界见[7.5回执](release-7.5.md)。自本版起，三平台为长期发行规则；下方五平台记录仅作历史。
+Windows未签名、Intel仅Rosetta，实际验收及源码CI失败保留边界见[7.5回执](release-7.5.md)。自本版起，四平台为长期发行规则；下方五平台记录仅作历史。
 
 # 同步发行规则
 
-2026-11-17起，只发行双Mac与Windows成为长期规则；Linux、Docker、TV、手机不再列入后续Release。7.5已按该范围发布双Mac与Windows。下方五平台规则及7.5.1旧回执为历史，不用于当前发行或证明新包通过。完整状态见[7.5记录](release-7.5.md)。
+2026-11-17起，发行双Mac、Windows与Linux四平台成为长期规则；Docker、TV、手机不再列入后续Release。7.5已按该范围发布双Mac、Windows与Linux。下方五平台规则及7.5.1旧回执为历史，不用于当前发行或证明新包通过。完整状态见[7.5记录](release-7.5.md)。
 
 
 ## 7.5 下载恢复发行目标（2026-11-16）
@@ -157,8 +157,9 @@ Windows未签名、Intel仅Rosetta，实际验收及源码CI失败保留边界�
 | macOS arm64 | npm run build:mac | 对应 arm64 媒体组件、Developer ID、Apple 公证 Accepted、装订验证 |
 | macOS x64 | npm run build:mac | 对应 x64 媒体组件、Developer ID、Apple 公证 Accepted、装订验证；另记录 Intel 实机覆盖 |
 | Windows x64 | Windows x64 release candidate 工作流 | NSIS 安装 EXE、latest.yml、便携 EXE/ZIP；精确 FFmpeg 对应源码；安装版安装/启动/同版本重装资料保留与便携版媒体窗口冒烟；明确签名状态 |
+| Linux x64 | Linux x64 AppImage candidate 工作流（build_only=false） | AppImage 启动、ffmpeg／ffprobe／librempeg 三份媒体工具、CPU 播放器与 HEVC Wasm 加载；随机两集真实下载静音播放约10秒 |
 
-Windows 工作流只上传 Actions 构建资产，不创建 Release，不改 latest，不覆盖总校验文件。正式版本由统一发行会话汇总三平台资产、对应源码和总 SHA256SUMS。
+Windows 工作流只上传 Actions 构建资产，不创建 Release，不改 latest，不覆盖总校验文件。正式版本由统一发行会话汇总四平台资产、对应源码和总 SHA256SUMS。
 Windows 当前未配置代码签名证书；EXE 必须明确标为未签名。Windows CI 虚拟机验证不等于用户实体电脑、GPU/HEVC、真实平台下载与长期稳定性验收。
 若某平台受阻，同版本保留，记录具体缺口及已有资产状态；不得将缺失平台写成已发布，也不得为补平台另跳版本。
 
