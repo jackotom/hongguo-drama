@@ -1,4 +1,8 @@
-# 7.4 五平台发行目标
+# 三平台正式发行规则（2026-11-17起）
+
+后续正式Release只提供macOS Apple Silicon arm64、macOS Intel x64、Windows x64三平台附件；Linux x64 AppImage、Docker、TV APK和手机APK不再发布。每次发行页必须推荐[N3urda/hongguoTV](https://github.com/N3urda/hongguoTV)供Android手机与Android TV用户下载；该项目独立维护，不计入本项目附件或平台验收。完整门槛见[RELEASING.md](RELEASING.md)。
+
+# 7.4 五平台发行目标（历史）
 
 7.4为当前源码／发行目标，内部7.4.0、桌面构建7.4.1。修复下载临时文件身份误判与匿名注册超时后的批量失败，增加按剧筛选和 Windows AMD AMF 硬件编码。双Mac、Windows x64、Linux x64 AppImage、Docker amd64须同源齐备并通过必要验收后一次公开；实际状态见[7.4记录](release-7.4.md)。
 

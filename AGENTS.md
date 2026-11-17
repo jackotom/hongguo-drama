@@ -6,13 +6,13 @@
 - 发布回复时选择不会附加该标记的可用方式；无法确认时先保留草稿并说明限制，不使用会自动附加标记的连接器提交。
 - 此规则不授权新增对外回复，也不要求修改或删除历史评论；对外写入仍须已有明确授权。
 
-## 后续五平台统一发行（2026-11-09更新）
+## 后续三平台发行与 Android／TV下载推荐（2026-11-17起）
 
-- 用户明确将TV发行替换为Docker。6.5及后续每个正式版本一次发布：macOS Apple Silicon arm64、macOS Intel x64、Windows x64、Linux x64 AppImage、Docker服务端。
-- 共用公开版本、GitHub标签与一次Release；先在Draft汇总全部包、更新清单、精确源码与SHA256，完成必要验收后一次公开并更新Latest。缺平台保留草稿，不拆版发布。
-- Docker提供浏览器Web UI与认证API，支持红果搜索、分集选择、批量下载到挂载目录和合并；复用既有取源、签名、解密与媒体校验。
-- TV不再是发行项，保留既有开发源码，不发布候选APK。手机个人版继续独立；不同平台验收不能互相代替。
-- 平台门槛见 `docs/RELEASING.md`；6.5状态见 `docs/release-6.5.md`。
+- 用户明确要求本项目以后只发布三平台附件：macOS Apple Silicon arm64、macOS Intel x64、Windows x64。Linux x64 AppImage、Docker、TV APK和手机APK不再列入后续Release附件或发布门槛。
+- 三平台共用公开版本、GitHub标签与一次Release；先在Draft汇总应用包、必要更新清单、精确源码、对应媒体源码与SHA256，完成必要验收后一次公开并更新Latest。
+- 每次GitHub Release正文的附件推荐区必须放置以下内容，放在附件列表前的醒目位置：
+  > **Android手机APK／Android TV版：** 请前往 [N3urda/hongguoTV](https://github.com/N3urda/hongguoTV) 下载。该项目独立维护；版本、兼容性与测试状态以该项目发布页为准，不计入本项目的三平台附件或验收。
+- 历史Linux、Docker、TV和手机发行包及记录保留，不补发、不改写；平台门槛见 `docs/RELEASING.md`。
 
 ## 视频测试素材与声音
 

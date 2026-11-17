@@ -2,7 +2,11 @@
 
 7.5已于2026-11-17 06:40:02（Asia/Shanghai）正式公开并设Latest，内部7.5.0、桌面构建7.5.2，冻结源码`4ffff289d6dd289e589a0fd0e65aa7aa5c2a7567`，标签`v7.5`，Release ID `446852363`。本轮按明确授权仅发布双Mac和Windows x64，共20份正式附件；远端大小／SHA256、两更新清单及总校验清单已核对。
 
-未替换本机正式安装，未回复或关闭Issue／PR。Linux、Docker、TV和手机不随本次发行；本次范围为明确例外。
+未替换本机正式安装，未回复或关闭Issue／PR。由本版起，macOS双架构与Windows x64三平台成为长期发行范围；Linux、Docker、TV和手机不再随后续Release发布。
+
+## Android手机与Android TV下载
+
+> **Android手机APK／Android TV版：** 请前往 [N3urda/hongguoTV](https://github.com/N3urda/hongguoTV) 下载。该项目独立维护；版本、兼容性与测试状态以该项目发布页为准，不计入本项目的三平台附件或验收。
 
 ## 修复与贡献
 

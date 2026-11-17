@@ -1,12 +1,19 @@
+# 三平台发行规则（2026-11-17起）
+
+- 后续正式Release只提供macOS Apple Silicon arm64、macOS Intel x64、Windows x64三平台附件，以及这些平台必要的更新清单、精确源码、对应媒体源码和SHA256。Linux x64 AppImage、Docker、TV APK、手机APK不再发布。
+- 三个平台仍共用公开版本、GitHub标签和一次Release。附件与必要验收齐备、远端大小和SHA256核对后，一次公开并设Latest。
+- 每次发行页必须在附件列表前的醒目位置保留以下推荐；这是独立第三方项目，不计入本项目附件和平台验收：
+  > **Android手机APK／Android TV版：** 请前往 [N3urda/hongguoTV](https://github.com/N3urda/hongguoTV) 下载。该项目独立维护；版本、兼容性与测试状态以该项目发布页为准，不计入本项目的三平台附件或验收。
+
 # 7.5最新正式发行
 
 7.5已于2026-11-17 06:40:02（Asia/Shanghai）正式公开并设Latest，内部7.5.0、桌面构建7.5.2，冻结源码`4ffff289d6dd289e589a0fd0e65aa7aa5c2a7567`，标签`v7.5`，Release ID `446852363`。本轮按明确授权仅发布双Mac和Windows x64，共20份正式附件；远端大小／SHA256、两更新清单及总校验清单已核对。
 
-Windows未签名、Intel仅Rosetta，实际验收及源码CI失败保留边界见[7.5回执](release-7.5.md)。下方候选记录和五平台要求保留为历史；本次三类产物为明确授权例外。
+Windows未签名、Intel仅Rosetta，实际验收及源码CI失败保留边界见[7.5回执](release-7.5.md)。自本版起，三平台为长期发行规则；下方五平台记录仅作历史。
 
 # 同步发行规则
 
-7.5本轮明确例外（2026-11-16最新授权）：只发行双Mac与Windows；Linux、Docker、TV、手机不列本轮。内部7.5.0、候选构建7.5.2。新v5播放修复须以最终新包真实下载和静音播放验收；双Mac重新签名、公证、装订。下方五平台规则及7.5.1旧回执为历史，不用于阻止本次明确例外或证明新包通过。完整状态见[7.5记录](release-7.5.md)。
+2026-11-17起，只发行双Mac与Windows成为长期规则；Linux、Docker、TV、手机不再列入后续Release。7.5已按该范围发布双Mac与Windows。下方五平台规则及7.5.1旧回执为历史，不用于当前发行或证明新包通过。完整状态见[7.5记录](release-7.5.md)。
 
 
 ## 7.5 下载恢复发行目标（2026-11-16）
@@ -52,7 +59,7 @@ Windows未签名、Intel仅Rosetta，实际验收及源码CI失败保留边界�
 
 6.3已于2026-11-08 19:46:30（Asia/Shanghai）正式公开并设Latest，内部6.3.0、桌面构建6.3.1，冻结源码`13a07e30f1e4ec5b4dd4fcc73871bc097d09d816`。用户明确授权本次先双Mac、Windows、Linux四平台，TV未实机验收、候选APK不公开。23附件远端大小/SHA256及两份更新清单已核对；双Mac签名/公证/装订，Windows便携11项和安装升级9项通过但EXE未签名；Linux原生Ubuntu CI提取AppImage后，以CPU软件解码播放两集新下载1080p红果素材各10秒。Mac真实两集静音播放及x64 Rosetta启动通过；未替换正式安装。 这是本轮明确例外；后续默认五平台规则保留。详见 [6.3说明](release-6.3.md)。
 
-## 当前规则：五平台齐备后一次发布
+## 历史规则：五平台齐备后一次发布
 
 2026-11-09用户明确更新：从6.5起，Docker服务端替换Android TV发行项。五类产物为双Mac、Windows x64、Linux x64 AppImage、Docker服务端；TV源码保留但不再构建发布。Docker须验证认证/路径隔离、真实搜索→批量下载→合并、任务持久化和容器重启，附镜像及部署说明、对应源码和SHA256。以下2026-11-06规则涉及TV部分由本条替代，其余发行门槛仍有效。
 
@@ -150,10 +157,8 @@ Windows未签名、Intel仅Rosetta，实际验收及源码CI失败保留边界�
 | macOS arm64 | npm run build:mac | 对应 arm64 媒体组件、Developer ID、Apple 公证 Accepted、装订验证 |
 | macOS x64 | npm run build:mac | 对应 x64 媒体组件、Developer ID、Apple 公证 Accepted、装订验证；另记录 Intel 实机覆盖 |
 | Windows x64 | Windows x64 release candidate 工作流 | NSIS 安装 EXE、latest.yml、便携 EXE/ZIP；精确 FFmpeg 对应源码；安装版安装/启动/同版本重装资料保留与便携版媒体窗口冒烟；明确签名状态 |
-| Linux x64 | 最新源码的Linux构建入口；本分支已同步 | AppImage、匹配媒体工具和对应源码；原生Linux启动及真实素材静音播放；单独记录发行版、GPU/FUSE与更新方式 |
-| Docker Linux amd64 | `docker build`，认证Web/API、镜像归档与部署ZIP | 非root、目录/来源边界、随机真实搜索下载合并、重启持久化、导出镜像身份和对应源码；不冒称fnOS硬件或ARM64验收 |
 
-Windows 工作流只上传 Actions 构建资产，不创建 Release，不改 latest，不覆盖总校验文件。正式版本由统一发行会话汇总五平台资产、对应源码和总 SHA256SUMS。
+Windows 工作流只上传 Actions 构建资产，不创建 Release，不改 latest，不覆盖总校验文件。正式版本由统一发行会话汇总三平台资产、对应源码和总 SHA256SUMS。
 Windows 当前未配置代码签名证书；EXE 必须明确标为未签名。Windows CI 虚拟机验证不等于用户实体电脑、GPU/HEVC、真实平台下载与长期稳定性验收。
 若某平台受阻，同版本保留，记录具体缺口及已有资产状态；不得将缺失平台写成已发布，也不得为补平台另跳版本。
 
@@ -182,7 +187,7 @@ Ubuntu 24.04 安装 gcc-mingw-w64-x86-64、make、pkg-config 后运行 `bash scr
 - Windows `latest.yml` 仅指向同名 NSIS 安装包，保留 builder 生成的 SHA512、大小和 blockmap；复制上传不得再改名。安装版与便携版共享同一版本和数据格式。
 - Windows 尚无代码签名证书。SHA512 只验证下载与官方清单一致，不提供独立的发布者身份保证；不得主动关闭签名校验或声称已签名。
 - `node scripts/check-windows-installer.cjs --config` 可本机检查发行配置；不带参数仅允许一次性 GitHub Windows CI，检查安装包元数据、安装启动、同版本重装，以及固定摘要的真实官方 1.80 安装包覆盖升级与资料保留。该检查不等于应用内自动更新端到端或实体 Windows 验收。
-- Draft 中先汇总五平台包、更新清单、准确对应源码和总校验文件，检查文件名/摘要/版本一致且各平台必要验收完成后一次发布为 latest；缺平台保留Draft。旧版 1.75 不具备下载安装能力，需要手动安装一次 1.80；后续支持自动更新的平台才使用应用内更新，Linux和Docker不得冒用Mac／Windows更新清单。
+- Draft 中先汇总三平台包、更新清单、准确对应源码和总校验文件，检查文件名/摘要/版本一致且各平台必要验收完成后一次发布为 latest；缺平台保留Draft。旧版 1.75 不具备下载安装能力，需要手动安装一次 1.80；后续支持自动更新的平台才使用应用内更新。
 
 ## 每次更新的版本与根目录一致性
 

@@ -9,7 +9,7 @@
 <p align="center">
   <a href="https://github.com/jackotom/hongguo-drama/releases/latest"><img alt="最新公开版本" src="https://img.shields.io/github/v/release/jackotom/hongguo-drama?style=flat-square"></a>
   <img alt="macOS 13 或更新版本" src="https://img.shields.io/badge/macOS-13%2B-555555?style=flat-square">
-  <img alt="M 系列 Mac、Intel Mac、Windows、Linux x64 与 Docker amd64" src="https://img.shields.io/badge/platforms-Mac_arm64_%2F_x64_%C2%B7_Windows_x64_%C2%B7_Linux_x64_%C2%B7_Docker_amd64-55746b?style=flat-square">
+  <img alt="Apple 芯片 Mac、Intel Mac 与 Windows x64" src="https://img.shields.io/badge/platforms-Mac_arm64_%2F_x64_%C2%B7_Windows_x64-55746b?style=flat-square">
   <a href="LICENSE"><img alt="GPL-3.0 许可证" src="https://img.shields.io/badge/license-GPL--3.0-555555?style=flat-square"></a>
 </p>
 
@@ -34,7 +34,9 @@
 | Intel Mac，macOS 13+ | [DMG](https://github.com/jackotom/hongguo-drama/releases/download/v7.5/Hongguo-7.5-mac-x64.dmg) | 已签名、公证、装订；Rosetta启动通过 |
 | Windows x64 | [安装版](https://github.com/jackotom/hongguo-drama/releases/download/v7.5/hongguo-downloader-7.5-win-x64-setup.exe) · [便携EXE](https://github.com/jackotom/hongguo-drama/releases/download/v7.5/hongguo-downloader-7.5-win-x64.exe) · [便携ZIP](https://github.com/jackotom/hongguo-drama/releases/download/v7.5/hongguo-downloader-7.5-win-x64.zip) | 真实队列下载、兼容媒体静音播放和安装升级通过；EXE未签名 |
 
-[7.5正式发行页](https://github.com/jackotom/hongguo-drama/releases/tag/v7.5) · [SHA256](https://github.com/jackotom/hongguo-drama/releases/download/v7.5/SHA256SUMS.txt) · [精确源码](https://github.com/jackotom/hongguo-drama/releases/download/v7.5/hongguo-drama-7.5-source.zip)。实际状态见[7.5记录](docs/release-7.5.md)。TV和手机保持独立。上游部分网页片源仍可能404、只提供预览或超时，不保证所有内容永久可播。
+[7.5正式发行页](https://github.com/jackotom/hongguo-drama/releases/tag/v7.5) · [SHA256](https://github.com/jackotom/hongguo-drama/releases/download/v7.5/SHA256SUMS.txt) · [精确源码](https://github.com/jackotom/hongguo-drama/releases/download/v7.5/hongguo-drama-7.5-source.zip)。实际状态见[7.5记录](docs/release-7.5.md)。上游部分网页片源仍可能404、只提供预览或超时，不保证所有内容永久可播。
+
+**Android手机APK／Android TV版：** 请前往 [N3urda/hongguoTV](https://github.com/N3urda/hongguoTV) 下载。该项目独立维护；版本、兼容性与测试状态以该项目发布页为准，不计入本项目的三平台附件或验收。
 
 <details>
 <summary>7.4 历史下载与发行说明</summary>
