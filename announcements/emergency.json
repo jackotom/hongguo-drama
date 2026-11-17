@@ -1,6 +1,6 @@
 {
-  "id": "emergency-placeholder-20261027",
-  "title": "紧急公告占位",
-  "body": "此文件在 4.9 源码中继续保持未启用。仅在确认需要通知时填写真实情况，更换新 ID 后启用。",
-  "active": false
+  "id": "emergency-playback-7-5-20261117-01",
+  "title": "播放异常请更新至 7.5",
+  "body": "7.5版本以前播放不了的，请更新到 7.5 最新版。",
+  "active": true
 }
