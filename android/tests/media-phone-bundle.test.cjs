@@ -43,8 +43,8 @@ test('phone bridge still uses shared preparation for online play/release and a p
   let saved=JSON.stringify(initial),url=0;
   class MediaURL extends URL {}
   MediaURL.createObjectURL=()=>`blob:phone-${++url}`;MediaURL.revokeObjectURL=value=>revoked.push(value);
-  const context={module:{exports:{}},URL:MediaURL,Blob,crypto:crypto.webcrypto,AbortController,AbortSignal,setTimeout,clearTimeout,console:{info(){}},
-    document:{addEventListener(){},querySelectorAll:()=>[]},localStorage:{getItem:()=>null,setItem(){}},
+  const context={module:{exports:{}},URL:MediaURL,Blob,crypto:crypto.webcrypto,AbortController,AbortSignal,setTimeout,clearTimeout,console:{info(){}},addEventListener(){},removeEventListener(){},
+    document:{addEventListener(){},querySelectorAll:()=>[],documentElement:{classList:{toggle(){}}}},localStorage:{getItem:()=>null,setItem(){}},
     Native:{readState:()=>saved,writeState:v=>{saved=v;},mediaSize:()=>16,readMedia:()=>Buffer.alloc(16).toString('base64'),
       deleteMedia:token=>deleted.push(token),persistMedia:token=>persisted.push(token),awake(){},
       random:n=>crypto.randomBytes(n).toString('base64'),cancel(){},

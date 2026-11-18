@@ -13,7 +13,8 @@ async function bridge(initial, prepareMedia, faults = {}) {
     console, URL, Blob, URLSearchParams, TextEncoder, TextDecoder, AbortController, AbortSignal, setTimeout, clearTimeout,
     crypto: crypto.webcrypto, module: { exports: {} },
     localStorage: { getItem: key => storage.get(key) || null, setItem: (key,value) => storage.set(key,value) },
-    document: { addEventListener() {}, querySelectorAll: () => [] },
+    addEventListener() {}, removeEventListener() {},
+    document: { addEventListener() {}, querySelectorAll: () => [], documentElement: { classList: { toggle() {} } } },
     Native: {
       random: n => crypto.randomBytes(n).toString('base64'),
       readState: () => saved,
