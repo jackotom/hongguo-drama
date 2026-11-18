@@ -134,7 +134,7 @@ test('NAS IPC downloads into the selected directory and opens that same director
   h.context.fixtureTask = task;
   h.run('fixtureTask.endTime=Date.now();fixtureTask.fileIdentity=readFileIdentity(fixtureTask.savePath)');
   await h.run('executeHongguoDownload(downloadTasks[0])');
-  assert.equal(task.status, 'completed');
+  assert.equal(task.status, 'completed', task.error);
   assert.ok(h.events.some(event => event.channel === 'nas-export-done' && event.data.success));
   const exported = await nas.inspectNasEpisode(task.nasDestination, task.hongguoInfo);
   assert.equal(exported.status, 'existing');

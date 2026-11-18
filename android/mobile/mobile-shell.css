@@ -13,8 +13,9 @@
 .platform-android .btn { font-size: 14px; border-radius: 12px; }
 .platform-android .icon-btn { width: 48px; height: 48px; flex-shrink: 0; }
 .platform-android button:active:not(:disabled) { filter: brightness(.94); }
-.platform-android .mobile-navigation { grid-template-columns: repeat(4,minmax(0,1fr)); background: var(--bg-elevated); padding: 4px 8px max(6px,env(safe-area-inset-bottom)); }
-.platform-android .mobile-navigation button { min-height: 60px; gap: 3px; font-size: 13px; }
+.platform-android .mobile-navigation { grid-template-columns: repeat(5,minmax(0,1fr)); background: var(--bg-elevated); padding: 4px 4px max(6px,env(safe-area-inset-bottom)); }
+.platform-android .mobile-navigation button { min-height: 56px; gap: 2px; font-size: 12px; white-space: nowrap; }
+.platform-android .mobile-navigation button svg { width: 19px; height: 19px; }
 .platform-android .mobile-navigation button[aria-current="page"] { color: var(--accent-text); }
 .platform-android .mobile-navigation button[aria-current="page"] svg { stroke-width: 2.5; }
 .platform-android .mobile-section-tabs { display: flex; gap: 8px; margin: 0 0 20px; padding: 4px; background: var(--bg-inset); border-radius: 12px; }

@@ -1,5 +1,6 @@
 const fs = require('node:fs/promises');
 const { removeOwnedFile, reserveOwnedFile } = require('./download-temporary');
+const { localMediaEnv } = require('./child-env');
 
 // Downloads and both prefetched episodes share one CPU budget; never restart an active conversion.
 const waiting = [];
@@ -85,7 +86,7 @@ async function convertBytevc2({ executable, input, output, contentKey, duration,
             '-c:a', 'copy', '-movflags', '+faststart', '-progress', 'pipe:1', '-nostats',
             ...(Number.isFinite(maxBytes) ? ['-fs', String(maxBytes)] : []), '-f', 'mp4', output];
           await new Promise((resolve, reject) => {
-            const child = require('node:child_process').spawn(executable, args, { windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] });
+            const child = require('node:child_process').spawn(executable, args, { windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'], env: localMediaEnv() });
             let killTimer, buffer = '', stopping = false;
             const stop = () => {
               if (stopping) return;

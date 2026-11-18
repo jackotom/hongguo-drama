@@ -12,6 +12,11 @@ import { website, parseDetail } from '../web/public.js';
 import { prepareMedia } from './media.js';
 import contract from '../build/contract.json';
 
+const syncOrientation = () => document.documentElement.classList.toggle('device-landscape', window.innerWidth > window.innerHeight);
+syncOrientation();
+window.addEventListener('resize', syncOrientation);
+window.addEventListener('orientationchange', syncOrientation);
+
 const events = new Map();
 const emit = (name, value) => events.get(name)?.forEach(fn => fn(value));
 const listen = name => callback => {
@@ -397,10 +402,15 @@ api.deleteAllDownloaded = guarded(async () => {
 });
 
 window.electronAPI = api;
+let pipResume = false;
 window.__nativePip = enabled => {
   api.nativePictureInPicture = enabled;
   document.documentElement.classList.toggle('android-pip',enabled);
   emit('onNativePictureInPicture',enabled);
+  if (enabled && pipResume) {
+    pipResume = false;
+    document.querySelectorAll('video').forEach(video => video.play().catch(() => {}));
+  }
 };
 api.onNativePictureInPicture = listen('onNativePictureInPicture');
 api.enterNativePictureInPicture = async (width,height) => Native.enterPip(width,height)
@@ -410,7 +420,12 @@ window.__nativeAccountCookie = async cookie => {
   emit('onAccountUpdated',result);
   if (!result.success) emit('onStorageError',{error:result.error});
 };
-window.pausePlayback = () => { document.querySelectorAll('video').forEach(video => video.pause()); Native.awake(false); };
+window.pausePlayback = () => {
+  const videos = [...document.querySelectorAll('video')];
+  pipResume = videos.some(video => !video.paused);
+  videos.forEach(video => video.pause());
+  Native.awake(false);
+};
 document.addEventListener('visibilitychange', () => { if (document.hidden) window.pausePlayback(); });
 document.addEventListener('play', event => { if (event.target.tagName === 'VIDEO') Native.awake(true); }, true);
 const videoTelemetry = new WeakMap();

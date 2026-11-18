@@ -115,8 +115,8 @@ async function mount(file, api, props = {}, storage = null) {
     if (!queued) break;
     render();
   }
-  const advanceTimers = (ms) => { for (const [id, timer] of [...timers]) if (timer.delay <= ms) { timers.delete(id); timer.fn(); } };
-  return { render, flush, find, nodes, button, advanceTimers, dispatchEvent: event => window.dispatchEvent(event), localStorage, setProps: next => { props = { ...props, ...next }; render(); }, text: () => text(tree), unmount: () => cleanups.forEach(fn => fn?.()) };
+  const advanceTimers = (ms, exact = false) => { for (const [id, timer] of [...timers]) if (exact ? timer.delay === ms : timer.delay <= ms) { timers.delete(id); timer.fn(); } };
+  return { render, flush, find, nodes, button, advanceTimers, timerDelays: () => [...timers.values()].map(timer => timer.delay), dispatchEvent: event => window.dispatchEvent(event), localStorage, setProps: next => { props = { ...props, ...next }; render(); }, text: () => text(tree), unmount: () => cleanups.forEach(fn => fn?.()) };
 }
 
 (async () => {
@@ -671,8 +671,11 @@ async function mount(file, api, props = {}, storage = null) {
   await test('late old online prepare cannot replace latest episode, and unmount releases it', async () => {
     const first = deferred(), second = deferred(), released = [], requested = [];
     const ui = await mount('Player', { getSeriesList: async () => [{ series_id: 'A' }], getSeriesEpisodes: async () => ok(detail('A')), getPlaybackPosition: async () => null, prepareOnlinePlay: p => { requested.push(p); return requested.length === 1 ? first.promise : second.promise; }, releaseOnlinePlay: async p => released.push(p) });
-    await ui.flush(); const firstButton = ui.find(n => n.props['aria-label'] === '第 1 集'); assert.ok(firstButton, ui.text()); firstButton.props.onClick(); ui.render();
+    await ui.flush();
+    const firstButton = ui.find(n => n.props['aria-label'] === '第 1 集'); assert.ok(firstButton, ui.text()); firstButton.props.onClick(); ui.render();
+    ui.advanceTimers(250, true); ui.render(); await ui.flush();
     ui.find(n => n.props['aria-label'] === '第 2 集').props.onClick(); ui.render();
+    ui.advanceTimers(250, true); ui.render();
     second.resolve({ success: true, url: 'hongguo-stream://new', streamId: 'new' }); await ui.flush();
     first.resolve({ success: true, url: 'hongguo-stream://old', streamId: 'old' }); await ui.flush();
     assert.equal(ui.find(n => n.type === 'video')?.props.src, 'hongguo-stream://new');

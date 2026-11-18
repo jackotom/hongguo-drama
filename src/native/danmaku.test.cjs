@@ -388,7 +388,8 @@ test('主进程与预加载桥接接入受信任 IPC，且不接受测试注入'
   const preload = fs.readFileSync(path.join(__dirname, '../../preload.js'), 'utf8');
   assert.match(main, /ipcMain\.handle\('get-episode-danmaku'/);
   assert.match(main, /fetchDanmaku\(\{ seriesId, vid, fresh, limit \}\)/);
-  assert.match(main, /rendererSecurity\.isTrustedSender\(event, mainWindow\)/);
+  assert.match(main, /createIpcBoundary\(/);
+  assert.match(main, /isTrustedSender: \(event, win\) => rendererSecurity\.isTrustedSender\(event, win\)/);
   assert.match(preload, /getEpisodeDanmaku: options => ipcRenderer\.invoke\('get-episode-danmaku', options\)/);
 });
 

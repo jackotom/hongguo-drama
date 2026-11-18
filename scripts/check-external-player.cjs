@@ -1,17 +1,18 @@
 const assert = require('node:assert/strict');
 const fs = require('node:fs'), os = require('node:os'), path = require('node:path'), vm = require('node:vm');
 const source = fs.readFileSync(path.join(__dirname, '../main.js'), 'utf8');
+const { readFileIdentity, sameFileObject } = require('../src/native/file-identity');
 const handler = source.match(/ipcMain\.handle\('open-episode-external',[\s\S]*?\n\}\);/);
 assert.ok(handler, 'downloaded episodes need an external-player entry');
 const root = fs.mkdtempSync(path.join(os.tmpdir(), 'hongguo-external-'));
 const opened = [], handlers = {};
-const context = vm.createContext({ fs, path, downloadTasks: [], mergeTasks: [],
+const context = vm.createContext({ fs, path, downloadTasks: [], mergeTasks: [], readFileIdentity, sameFileObject,
   shell: { openPath: async file => { opened.push(file); return context.openError || ''; } },
   ipcMain: { handle: (name, fn) => { handlers[name] = fn; } },
   pathInside: (dir, file) => { const rel = path.relative(fs.realpathSync(dir), fs.realpathSync(file)); return !rel.startsWith('..') && !path.isAbsolute(rel); },
 });
 vm.runInContext(source.match(/function isRecordedMediaFile\([\s\S]*?\n\}/)[0], context);
-for (const name of ['readFileIdentity', 'fileIdentityMatches', 'legacyFileMatches', 'isRegularFile']) {
+for (const name of ['fileIdentityMatches', 'fileIdentityStillSameObject', 'legacyFileMatches', 'isRegularFile']) {
   vm.runInContext(source.match(new RegExp(`function ${name}\\([\\s\\S]*?\\n\\}`))[0], context);
 }
 vm.runInContext(source.match(/function hasCompleteTaskFile\([\s\S]*?\n\}/)[0], context);

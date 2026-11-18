@@ -40,6 +40,13 @@ function fixture({ failId = '', now = Date.now(), remoteSeries = [], seasons = [
     getSettings: () => ({ watch_updates_enabled: true, watch_sequels_enabled: true, watch_notifications_enabled: notify }),
     getPlayback: () => structuredClone(playback),
     savePlayback: next => { Object.keys(playback).forEach(key => delete playback[key]); Object.assign(playback, structuredClone(next)); },
+    updatePlayback: updater => {
+      const next = structuredClone(playback);
+      const result = updater(next);
+      Object.keys(playback).forEach(key => delete playback[key]);
+      Object.assign(playback, next);
+      return result;
+    },
     saveSeries() {},
   };
   const hongguo = {

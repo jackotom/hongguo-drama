@@ -131,7 +131,17 @@ function mount({ local = false, localIndexes = [], localQuality, saved = null, t
     exitFloatingPlayer: () => document.exitPictureInPicture(),
     isFloating: () => floating,
     pictureInPictureExits: () => pipExits,
-    episode: n => find(x => x.props['aria-label'] === `第 ${n} 集`).props.onClick(),
+    episode: n => {
+      const before = new Set(timers.keys());
+      find(x => x.props['aria-label'] === `第 ${n} 集`).props.onClick();
+      for (const [id, timer] of [...timers]) {
+        if (!before.has(id) && timer.delay === 250) {
+          timers.delete(id);
+          timer.fn();
+        }
+      }
+      render();
+    },
     error: code => find(n => n.type === 'video').props.onError({ currentTarget: Object.assign(media, { error: { code } }) }),
     unmount: () => cleanups.forEach(fn => fn?.()) };
 }

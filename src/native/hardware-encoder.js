@@ -1,5 +1,6 @@
 const { spawn } = require('node:child_process');
 const path = require('node:path');
+const { localMediaEnv } = require('./child-env');
 
 const abortError = () => Object.assign(new Error('硬件编码检测已取消'), { code: 'ERR_CANCELED' });
 const inputError = () => Object.assign(new Error('硬件编码检测无法读取当前视频，请重新获取片源后重试'), { code: 'HARDWARE_PROBE_INPUT_FAILED' });
@@ -31,7 +32,7 @@ function runProbe(executable, args, { signal, cancelToken }, timeoutMs) {
       killTimer = setTimeout(() => { try { child.kill('SIGKILL'); } catch (_) {} done(null); }, 2000);
     };
     const cancel = () => stop('cancelled');
-    try { child = spawn(executable, args, { windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] }); }
+    try { child = spawn(executable, args, { windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'], env: localMediaEnv() }); }
     catch (_) { done(null); return; }
     child.stdout.on('data', data => { stdout = (stdout + data).slice(-65536); });
     child.stderr.on('data', data => { stderr = (stderr + data).slice(-65536); });

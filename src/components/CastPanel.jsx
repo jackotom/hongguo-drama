@@ -44,6 +44,10 @@ export default function CastPanel({ seriesId, episode, title, videoRef }) {
   return <div className="cast-panel">
     <button className="btn btn-outline btn-sm" disabled={!episode || episode.locked} onClick={()=>{setOpen(!open);if(!open)scan();}}>{t("投屏")}{t(target ? ` · ${target}` : '')}</button>
     {open && <section aria-label={t("电视投屏")} style={{padding:12,border:'1px solid var(--border)',borderRadius:8}}>
+      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:8,marginBottom:8}}>
+        <strong>{t("电视投屏")}</strong>
+        <button className="btn btn-outline btn-sm" onClick={()=>setOpen(false)}>{t("关闭")}</button>
+      </div>
       <p>{t("电脑与电视连接同一局域网，电视需开启 DLNA。投屏前会缓存本集；格式支持取决于电视。")}</p>
       <button className="btn btn-outline btn-sm" disabled={busy} onClick={scan}>{t(busy?'正在处理…':'重新搜索电视')}</button>
       {!busy && !devices.length && <p>{t("未发现电视，请检查电视的投屏设置和电脑防火墙。")}</p>}

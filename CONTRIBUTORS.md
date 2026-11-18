@@ -1,5 +1,7 @@
-<!-- 7.5 source and release target; historical credits retained. -->
+<!-- 7.6 source and release target; historical credits retained. -->
 # 贡献者与问题反馈致谢
+
+7.6 延续公开贡献记录；本轮代码审查与修复由维护者完成，不新增未核实的代码作者署名。
 
 ## 7.5 播放修复特别致谢（2026-11-16）
 

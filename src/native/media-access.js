@@ -1,26 +1,10 @@
 const { randomUUID } = require('node:crypto');
-const fs = require('node:fs');
 const path = require('node:path');
+const { readFileIdentity, sameFileObject } = require('./file-identity');
 
-// 文件签发身份：dev/ino/size/mtime/ctime/birthtime 用 BigInt 精确读取并转十进制字符串，
-// 仅在内存比较，不进 JSON。替换、同尺寸改写或属性回退都无法复用旧 token。
 function fileIdentity(resolved) {
-  try {
-    const stat = fs.lstatSync(resolved, { bigint: true });
-    if (!stat.isFile() || stat.isSymbolicLink()) return null;
-    return {
-      dev: String(stat.dev), ino: String(stat.ino), size: String(stat.size),
-      mtimeNs: String(stat.mtimeNs), ctimeNs: String(stat.ctimeNs),
-      birthtimeNs: stat.birthtimeNs == null ? '' : String(stat.birthtimeNs),
-    };
-  } catch (_) { return null; }
-}
-
-function sameIdentity(a, b) {
-  if (a === null) return b === null;
-  if (!b) return false;
-  return a.dev === b.dev && a.ino === b.ino && a.size === b.size
-    && a.mtimeNs === b.mtimeNs && a.ctimeNs === b.ctimeNs && a.birthtimeNs === b.birthtimeNs;
+  try { return readFileIdentity(resolved); }
+  catch (_) { return null; }
 }
 
 function createMediaAccess(devUrl) {
@@ -34,8 +18,11 @@ function createMediaAccess(devUrl) {
       let id = ids.get(resolved);
       if (id) {
         const entry = files.get(id);
-        if (!sameIdentity(entry.identity, identity)) { ids.delete(resolved); files.delete(id); id = undefined; }
-        else if (typeof validate === 'function') entry.validate = validate;
+        if (!sameFileObject(entry.identity, identity)) { ids.delete(resolved); files.delete(id); id = undefined; }
+        else {
+          entry.identity = identity;
+          if (typeof validate === 'function') entry.validate = validate;
+        }
       }
       if (!id) { id = randomUUID(); ids.set(resolved, id); files.set(id, { file:resolved, identity, validate }); }
       return `hongguo-local://f/${id}`;
@@ -52,7 +39,7 @@ function createMediaAccess(devUrl) {
         const entry = id && files.get(id);
         if (!entry) return false;
         if (entry.identity === null) return false;
-        if (!sameIdentity(entry.identity, fileIdentity(entry.file))) {
+        if (!sameFileObject(entry.identity, fileIdentity(entry.file))) {
           files.delete(id);
           if (ids.get(entry.file) === id) ids.delete(entry.file);
           return false;

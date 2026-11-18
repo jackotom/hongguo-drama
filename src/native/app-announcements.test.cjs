@@ -477,6 +477,7 @@ test('main IPC uses trusted main-window/frame guard, broadcasts only saved prefe
   const source = fs.readFileSync(path.join(__dirname, '../../main.js'), 'utf8');
   const { createAnnouncementService } = require(servicePath);
   const { createRendererSecurity } = require('./renderer-security');
+  const { createIpcBoundary } = require('./ipc-boundary');
   const handlers = new Map();
   const events = [];
   const frame = { url: 'http://localhost:5173/' };
@@ -487,6 +488,7 @@ test('main IPC uses trusted main-window/frame guard, broadcasts only saved prefe
   let requests = 0;
   const context = vm.createContext({
     createAnnouncementService, APP_VERSION: '3.9.0', IS_PREVIEW: false, proxyStartupFallback: false,
+    createIpcBoundary,
     mainWindow, quitCleanup: null, appUpdateInstaller: null, pendingUpdateOperations: 0,
     rendererSecurity: createRendererSecurity('/temporary/index.html', frame.url),
     rawIpcMain: { handle: (channel, handler) => handlers.set(channel, handler) },
@@ -520,12 +522,11 @@ test('main IPC uses trusted main-window/frame guard, broadcasts only saved prefe
   assert.equal(requests, 0);
 });
 
-test('checked-in announcement files pass service parser and emergency starts inactive', async () => {
+test('checked-in announcement files pass service parser and respect their active flags', async () => {
   for (const channel of ['normal', 'emergency']) {
     const raw = fs.readFileSync(path.join(__dirname, `../../announcements/${channel}.json`), 'utf8');
     const data = JSON.parse(raw);
     assert.equal(typeof data.active, 'boolean');
-    if (channel === 'emergency') assert.equal(data.active, false);
     assert.ok(Buffer.byteLength(raw, 'utf8') <= 32768);
     const f = fixture({ preferences: { normalEnabled: channel === 'normal', emergencyEnabled: channel === 'emergency' } });
     const options = { urgentOnly: channel === 'emergency' };

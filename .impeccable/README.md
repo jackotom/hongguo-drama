@@ -1,4 +1,4 @@
-<!-- 7.5 desktop/Docker release target; this directory keeps its existing scope. -->
+<!-- 7.6 desktop release target; this directory keeps its existing scope. -->
 <!-- 6.7 unified release. -->
 # 红果短剧 6.3 设计资料
 

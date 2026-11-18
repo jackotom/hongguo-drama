@@ -36,8 +36,8 @@ body { font-size: 15px; -webkit-tap-highlight-color: transparent; }
 .mobile-drama-description { margin-block: 16px; font-size: 14px; color: var(--text-secondary); }
 .mobile-drama-description summary { min-height: 44px; padding-block: 10px; }
 .mobile-drama-description p { max-height: 28dvh; overflow-y: auto; line-height: 1.8; }
-.mobile-navigation { display: grid; grid-template-columns: repeat(5,1fr); flex-shrink: 0; border-top: 1px solid var(--border); background: var(--bg-elevated); padding: 5px 4px max(6px,env(safe-area-inset-bottom)); }
-.mobile-navigation button { min-width: 0; min-height: 54px; border: 0; background: transparent; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; font-size: 12px; color: var(--text-secondary); }
+.mobile-navigation { display: grid; grid-template-columns: repeat(5,minmax(0,1fr)); flex-shrink: 0; border-top: 1px solid var(--border); background: var(--bg-elevated); padding: 5px 4px max(6px,env(safe-area-inset-bottom)); }
+.mobile-navigation button { min-width: 0; min-height: 54px; border: 0; background: transparent; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; font-size: 12px; color: var(--text-secondary); white-space: nowrap; }
 .mobile-navigation button[aria-current="page"], .mobile-navigation button[aria-expanded="true"] { color: var(--accent-text); font-weight: 600; }
 .mobile-more-mask { position: fixed; inset: 0; z-index: 150; background: var(--scrim); display: flex; align-items: flex-end; }
 .mobile-more { width: 100%; background: var(--bg-elevated); border-radius: 18px 18px 0 0; padding: 24px 20px max(24px,env(safe-area-inset-bottom)); }
@@ -76,7 +76,7 @@ body { font-size: 15px; -webkit-tap-highlight-color: transparent; }
 .platform-android .appearance-zoom { display: none; }
 .platform-android .series-cover { width: 112px; }
 .android-pip .window-toolbar, .android-pip .mobile-navigation { display: none; }
-.android-pip .platform-android.layout-portrait .player-stage:not(:fullscreen) { position: fixed; inset: 0; width: 100vw; height: 100dvh; min-height: 0; margin: 0; border-radius: 0; z-index: 500; }
+.android-pip .platform-android .player-stage:not(:fullscreen) { position: fixed; inset: 0; width: 100vw; height: 100dvh; min-height: 0; margin: 0; border-radius: 0; z-index: 500; }
 .android-pip .player-controls { display: none; }
 @media (orientation: landscape) {
   .platform-android.layout-portrait .player-stage:not(:fullscreen) { height: 68dvh; }
@@ -86,7 +86,7 @@ body { font-size: 15px; -webkit-tap-highlight-color: transparent; }
 @media (max-width: 350px) { .platform-android .browse-grid { grid-template-columns: repeat(2,minmax(0,1fr)); } }
 
 /* Keep playback actions in thumb reach; secondary tools remain below the video. */
-.platform-android .browse-card-item, .platform-android .search-card-item { display: flex; flex-direction: column; min-width: 0; }
+.platform-android .browse-card-item, .platform-android .search-card-item { display: flex; flex-direction: column; min-width: 0; content-visibility: auto; contain-intrinsic-size: auto 260px; }
 .platform-android .browse-card, .platform-android .search-card { width: 100%; flex: 1; }
 .mobile-drama-details { min-height: 44px; border: 0; background: transparent; color: var(--text-secondary); text-align: left; padding: 8px 0; font: inherit; font-size: 13px; }
 .mobile-drama-details:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }

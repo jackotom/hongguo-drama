@@ -11,6 +11,7 @@ const portableDir = path.join(root, 'portable');
 fs.mkdirSync(appData, { recursive: true });
 fs.mkdirSync(portableDir, { recursive: true });
 fs.writeFileSync(path.join(appData, 'data.json'), '{"settings":{"theme":"dark"}}');
+fs.writeFileSync(path.join(appData, 'data.playback.json'), '{"series":{"time":12}}');
 fs.writeFileSync(path.join(appData, 'danmaku-client.json'), '{"id":"device-1"}');
 fs.writeFileSync(path.join(appData, 'compat-cache'), 'not migrated');
 
@@ -38,6 +39,7 @@ check('portable version copies settings next to the program once', () => {
   assert.equal(result.dir, path.join(portableDir, 'data'));
   assert.deepEqual(result.copied.slice().sort(), DATA_FILES.slice().sort());
   assert.equal(fs.readFileSync(path.join(result.dir, 'data.json'), 'utf8'), '{"settings":{"theme":"dark"}}');
+  assert.equal(fs.readFileSync(path.join(result.dir, 'data.playback.json'), 'utf8'), '{"series":{"time":12}}');
   assert.equal(fs.existsSync(path.join(result.dir, 'compat-cache')), false, 'temporary cache must not move');
 
   // 用户已经在便携目录里改过配置：再次启动不得用系统目录的旧文件覆盖。

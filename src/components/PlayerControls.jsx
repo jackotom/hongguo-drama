@@ -13,10 +13,10 @@ const formatTime = seconds => {
 };
 const Icon = ({ children }) => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{t(children)}</svg>;
 
-export default function PlayerControls({ danmaku, enhancement, shortcuts = DEFAULT_SHORTCUTS, onToggleFullscreen, videoRef, stageRef, source, available, floating = false, onToggleFloating, continuing = false, autoContinue = false, rate, onRateChange, onError, pictureMode = 'fit', onPictureModeChange, portrait = false, windowFill = false, onWindowFill, seriesTitle = '', episodes = [], currentIndex, onEpisodeChange, onlineQuality = 'auto', supportsOnlineQuality = false, onQualityChange, onOpenSettings, episodesOpen = false, onOpenEpisodes, onOpenDownloads }) {
+export default function PlayerControls({ danmaku, enhancement, shortcuts = DEFAULT_SHORTCUTS, onToggleFullscreen, videoRef, stageRef, source, available, floating = false, onToggleFloating, continuing = false, autoContinue = false, rate, onRateChange, onError, pictureMode = 'fit', onPictureModeChange, portrait = false, windowFill = false, onWindowFill, seriesTitle = '', episodes = [], currentIndex, onEpisodeChange, onlineQuality = 'auto', supportsOnlineQuality = false, onQualityChange, onOpenSettings, episodesOpen = false, onOpenEpisodes, onOpenDownloads, cacheNext = false, autoNext = false, autoDelete = false, playbackSettingsBusy = false, onToggleCacheNext, onToggleAutoNext, onToggleAutoDelete, onControlsHiddenChange, decoderMode = 'auto', onDecoderChange, decoderBusy = false }) {
   useLanguage();
   const mobile = window.electronAPI?.platform === 'android';
-  const controlsIdleMs = mobile ? 2000 : 1000;
+  const controlsIdleMs = 1000;
   const [media, setMedia] = useState({ paused: true, ended: false, time: 0, duration: 0, muted: false, volume: 1 });
   const [fullscreen, setFullscreen] = useState(false);
   const [clock, setClock] = useState(() => formatClock());
@@ -32,6 +32,7 @@ export default function PlayerControls({ danmaku, enhancement, shortcuts = DEFAU
   const [danmakuHeight, setDanmakuHeight] = useState(300);
   const [menuHeight, setMenuHeight] = useState(240);
   const [controlsHidden, setControlsHidden] = useState(false);
+  useEffect(() => { onControlsHiddenChange?.(controlsHidden); }, [controlsHidden, onControlsHiddenChange]);
   const controlsRef = useRef(null);
   const menuRef = useRef(null);
   const menuButtonRef = useRef(null);
@@ -375,11 +376,18 @@ export default function PlayerControls({ danmaku, enhancement, shortcuts = DEFAU
             {mobile && <>
               {onOpenDownloads && <button type="button" onClick={() => { setMenuOpen(false); onOpenDownloads(); }}>{t("下载管理")}</button>}
               {onQualityChange && <button type="button" onClick={() => toggleSelection('quality')}>{t("清晰度 · ")}{t(onlineQuality === 'auto' ? '自动' : onlineQuality === 'compat' ? '兼容' : onlineQuality.toUpperCase())}</button>}
+              {onDecoderChange && <label>{t("解码方式")}<select value={decoderMode} disabled={decoderBusy} onChange={event => onDecoderChange(event.target.value)}>
+                <option value="auto">{t("自动（系统解码）")}</option>
+                <option value="software">{t("软件解码（CPU）")}</option>
+              </select></label>}
               <button type="button" disabled={!available} onClick={() => { setMenuOpen(false); toggleFloating(); }}>{t(floating ? '退出画中画' : '画中画')}</button>
               {danmaku && <>
                 <button type="button" disabled={!danmaku.supported} aria-pressed={danmaku.enabled} onClick={danmaku.toggle}>{t(danmaku.enabled ? '关闭弹幕' : '开启弹幕')}</button>
                 <button type="button" onClick={() => { setMenuOpen(false); setDanmakuOpen(true); }}>{t("弹幕设置")}</button>
               </>}
+              {onToggleCacheNext && <button type="button" aria-pressed={cacheNext} disabled={playbackSettingsBusy} onClick={onToggleCacheNext}>{t("缓存后续 2 集 · ")}{t(cacheNext ? '开' : '关')}</button>}
+              {onToggleAutoNext && <button type="button" aria-pressed={autoNext} onClick={onToggleAutoNext}>{t("连播 · ")}{t(autoNext ? '开' : '关')}</button>}
+              {onToggleAutoDelete && <button type="button" aria-pressed={autoDelete} disabled={playbackSettingsBusy} onClick={onToggleAutoDelete}>{t("看完自动删 · ")}{t(autoDelete ? '开' : '关')}</button>}
             </>}
             {!mobile && <label>{t("播放速度")}<select ref={speedRef} aria-label={t("播放速度")} value={rate} onChange={event => onRateChange(Number(event.target.value))}>
               {Array.from({ length: 16 }, (_, index) => (index + 1) / 4).map(value => <option key={value} value={value}>{t(value)}×</option>)}

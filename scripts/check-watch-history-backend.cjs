@@ -23,7 +23,10 @@ function load(sid, { partial = false } = {}) {
     if (partial && keyword.includes('第三季')) return { success: false, error: 'fixture offline' };
     return { success: true, results: keyword.includes('第三季') ? [{ series_id: id(3), series_title: '春日来信第三季' }] : [] };
   };
-  const store = { getSettings: () => ({}), getPlayback: () => structuredClone(playback), savePlayback: next => { playback = structuredClone(next); }, saveSeries() {} };
+  const store = { getSettings: () => ({}), getPlayback: () => structuredClone(playback),
+    savePlayback: next => { playback = structuredClone(next); },
+    updatePlayback: updater => { const next = structuredClone(playback); const result = updater(next); playback = next; return result; },
+    saveSeries() {} };
   const hongguoSearch = { searchHongguo: async keyword => {
     const result = await search('hongguo')(keyword);
     if (!result.success) throw new Error(result.error || 'fixture offline');

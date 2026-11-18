@@ -5,16 +5,17 @@ const { spawn } = require('node:child_process');
 const { pipeline } = require('node:stream/promises');
 const axios = require('axios');
 const { webMediaRequestOptions } = require('./web-media-guard');
+const { localMediaEnv } = require('./child-env');
 const diskJobs = new Set();
 const DISK_RESERVE = 512 * 1024 * 1024;
 
-async function requestHls(url, { signal, headers }) {
+async function requestHls(url, { signal, headers, useProxy = true }) {
   return axios({ url, method:'GET', responseType:'stream', timeout:30000,
-    ...webMediaRequestOptions(url), signal, headers });
+    ...webMediaRequestOptions(url), proxy: useProxy, signal, headers });
 }
 
 // The bundled FFmpeg has no HTTP transport: stage guarded HLS resources on disk and allow local protocols only.
-async function remuxHls({ url, output, ffmpeg, signal, cancelToken, request = requestHls, checkAccess = () => {}, headers = {}, onProgress, tempCapacityBytes }) {
+async function remuxHls({ url, output, ffmpeg, signal, cancelToken, request = requestHls, checkAccess = () => {}, headers = {}, onProgress, tempCapacityBytes, useProxy = true }) {
   if (!ffmpeg) throw new Error('未找到 FFmpeg，无法准备 HLS 视频');
   webMediaRequestOptions(url);
   const controller = new AbortController(), files = new Map();
@@ -51,7 +52,7 @@ async function remuxHls({ url, output, ffmpeg, signal, cancelToken, request = re
     files.set(remote,local);
     let upstream;
     try {
-      upstream = await request(remote, { signal:controller.signal, headers:{...headers,'Accept-Encoding':'identity'} });
+      upstream = await request(remote, { signal:controller.signal, headers:{...headers,'Accept-Encoding':'identity'}, useProxy });
       check();
       if (upstream.status !== 200) throw new Error('HLS 媒体请求失败或内容不完整');
       const type = String(upstream.headers['content-type'] || '');
@@ -143,7 +144,7 @@ async function remuxHls({ url, output, ffmpeg, signal, cancelToken, request = re
     await new Promise((resolve,reject) => {
       child = spawn(ffmpeg,['-v','error','-nostdin','-y','-protocol_whitelist','file,crypto','-allowed_extensions','ALL',
         '-i',input,'-map','0:v:0','-map','0:a?','-c','copy','-movflags','+faststart','-f','mp4',output],
-      {windowsHide:true,stdio:['ignore','ignore','pipe']});
+      {windowsHide:true,stdio:['ignore','ignore','pipe'],env:localMediaEnv()});
       child.stderr.on('data',() => {});
       child.once('error',() => reject(new Error('无法启动 FFmpeg')));
       child.once('close',code => { clearTimeout(killTimer); failure ? reject(failure) : code === 0 ? resolve() : reject(new Error('HLS 媒体转换失败')); });

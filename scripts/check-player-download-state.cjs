@@ -79,6 +79,17 @@ function mountApp() {
     assert.equal(source(ui), before, 'late reply must not replace the selected stream');
     assert.equal(ui.mediaCalls.play, plays); ui.unmount();
   });
+  await test('double clicking an episode cancels the delayed single-click playback', async () => {
+    const f = fixture(), ui = await start(f);
+    const chip = ui.find(n => n.props['aria-label'] === '第 2 集');
+    chip.props.onClick();
+    const pending = chip.props.onDoubleClick();
+    assert.equal([...ui.timers.values()].some(timer => timer.delay === 250), false);
+    f.finish();
+    await pending;
+    await ui.flush();
+    ui.unmount();
+  });
   for (const paused of [true, false]) await test(`download source swap retains ${paused ? 'pause' : 'play'} and second`, async () => {
     const f = fixture(), ui = await start(f); ui.media.currentTime = 37;
     if (paused) ui.media.pause();

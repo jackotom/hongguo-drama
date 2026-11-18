@@ -63,7 +63,10 @@ const checks = [
     assert.equal(h.state.quits, 1, 'approved close must not request quit recursively');
   }],
   ['repeat merge chooses a new filename and preserves existing collections', async () => {
-    const h = fixture('darwin', { mergeRunner: { runMerge: async ({ task }) => { task.status = 'completed'; } } });
+    const h = fixture('darwin', { mergeRunner: { runMerge: async ({ task }) => {
+      fs.writeFileSync(task.output, 'merged fixture'); task.totalDuration = 20; task.hasAudio = false; task.status = 'completed';
+    } } });
+    h.context.probeVideoInfo = async () => ({ duration: 20, w: 1080, h: 1920, audio: false });
     const input = path.join(h.root, 'ep.mp4'); fs.writeFileSync(input, 'original');
     h.context.collectSeriesEpisodeFiles = () => ({ dir: h.root, ordered: [{ path: input, vid_index: 1 }] });
     h.context.resolveFfmpeg = () => '/fixture/ffmpeg';

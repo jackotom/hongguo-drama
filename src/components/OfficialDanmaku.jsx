@@ -148,13 +148,15 @@ export default function OfficialDanmaku({ videoRef, source, available, danmaku }
     let { width, height } = layoutRef.current || { width: layer.clientWidth, height: layer.clientHeight };
     layoutRef.current = { width, height };
     const controls = layer.parentElement?.querySelector('.player-controls-bar');
-    const options = () => ({ width, height, settings, reducedMotion, bottomInset: Math.max(76, (controls?.clientHeight || 0) + 8) });
+    let bottomInset = Math.max(76, (controls?.clientHeight || 0) + 8);
+    const options = () => ({ width, height, settings, reducedMotion, bottomInset });
     const paint = () => state.items.forEach(item => {
       const node = nodes.current.get(item.id);
       if (node) node.style.transform = `translate(${item.x}px, ${item.y}px)`;
     });
     const canAnimate = () => !video.paused && !video.ended && !document.hidden;
     let lastFrame;
+    let lastCommit = 0, dirtyRender = false;
     const tick = now => {
       frame = 0;
       if (!canAnimate()) return;
@@ -162,7 +164,11 @@ export default function OfficialDanmaku({ videoRef, source, available, danmaku }
       const delta = lastFrame === undefined ? 0 : Math.max(0, (now - lastFrame) / 1000) * video.playbackRate;
       lastFrame = now;
       const emitting = !video.seeking && video.readyState >= 2;
-      if (advanceTimedDanmaku(state, list, video.currentTime, delta, { ...options(), emitting })) setItems([...state.items]);
+      if (advanceTimedDanmaku(state, list, video.currentTime, delta, { ...options(), emitting })) dirtyRender = true;
+      if (dirtyRender && now - lastCommit >= 100) {
+        lastCommit = now; dirtyRender = false;
+        setItems([...state.items]);
+      }
       paint();
       if (emitting || state.items.length) frame = requestAnimationFrame(tick);
     };
@@ -176,6 +182,7 @@ export default function OfficialDanmaku({ videoRef, source, available, danmaku }
       if (nextWidth === width && nextHeight === height) return;
       if (!resizeDanmaku(state, options(), { ...options(), width: nextWidth, height: nextHeight })) return;
       width = nextWidth; height = nextHeight;
+      bottomInset = Math.max(76, (controls?.clientHeight || 0) + 8);
       layoutRef.current = { width, height };
       setItems([...state.items]); paint(); start();
     };

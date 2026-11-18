@@ -17,6 +17,8 @@ async function check({ sid = 'xifan:jiuzhou:253', seriesTitle = '天龙战神', 
   const context = {
     ipcMain: { handle: (name, fn) => { handlers[name] = fn; } }, seriesRegistry, downloadTasks,
     require: name => require(path.join(__dirname, '..', name)),
+    downloadTaskView: require('../src/native/download-task-view').downloadTaskView,
+    episodeDisplayTitle: require('../src/native/xifan').episodeDisplayTitle,
     fs: { existsSync: () => complete, statSync: () => ({ size: 200000 }) },
     collectSeriesEpisodeFiles: () => ({ dir: '/fixture', ordered: [] }),
     hasCompleteTaskFile: () => complete, localPlayUrl: () => 'local-media://fixture', console,

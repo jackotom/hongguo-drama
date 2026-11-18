@@ -29,7 +29,8 @@ function fixture(initialTasks) {
   const fakeClearTimeout = timer => { if (timer && 'cleared' in timer) timer.cleared = true; else clearTimeout(timer); };
   const context = vm.createContext({ require: n => n === 'electron'
     ? { app, ipcMain: { handle: (n, f) => handlers[n] = f }, protocol: { registerSchemesAsPrivileged() {} },
-      Menu: { buildFromTemplate: items => items, setApplicationMenu() {} } }
+      Menu: { buildFromTemplate: items => items, setApplicationMenu() {} },
+      session: { defaultSession: { setProxy: async () => {}, clearAuthCache: async () => {}, closeAllConnections: async () => {} } } }
     : n === 'axios' ? Object.assign((...args) => state.transportError ? Promise.reject(state.transportError) : req(n)(...args), req(n))
     : n === './src/native/hongguo' ? { fetchPlayUrlSingle: async (_vid, _sid, options) => { state.calls++; state.qualities.push(options.quality); return state.result; }, markWebMediaFailure() {} }
     : n === './src/store' ? { getSettings: () => settings, saveSettings: s => settings = s,

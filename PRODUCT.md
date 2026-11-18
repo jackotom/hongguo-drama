@@ -1,6 +1,6 @@
-<!-- 7.5 source and release target; TV and phone remain independent. -->
+<!-- 7.6 source and release target; TV and phone remain independent. -->
 
-7.5 为当前源码／发行目标，内部7.5.0、桌面构建7.5.1。本轮目标为成功下载后的 EPERM 临时文件清理与间歇 EMPTY 恢复；7.5尚未发布，功能与最终包验收待完成，不能宣称上游故障已全部根治。Windows真实下载验收计划使用GitHub虚拟机，不等同实体电脑。标准发行范围是双Mac、Windows x64、Linux x64 AppImage与Docker amd64；实际状态见[7.5记录](docs/release-7.5.md)。
+7.6 为当前源码／发行版本，内部7.6.0、桌面构建7.6.1。本轮集中修复下载删除隔离、合并输出校验、发布后取消状态、播放进度并发覆盖、双击选集和合并交互，并收紧代理、账号会话与媒体地址边界。正式发行范围为双Mac、Windows x64、Linux x64 AppImage；Docker、TV和手机独立，实际状态见[7.6记录](docs/release-7.6.md)。
 
 <!-- 7.2 published; frozen application source remains unchanged. -->
 

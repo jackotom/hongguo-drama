@@ -186,5 +186,7 @@ test('desktop media transfer uses the existing public-network guard and source h
   assert.equal(typeof captured.lookup, 'function');
   assert.equal(captured.headers['User-Agent'], 'source-agent');
   assert.equal(captured.headers.Referer, 'https://www.reelshort.com/');
+  await context.requestMedia({ url: 'https://cdn.example.com/custom.mp4', source: 'custom', vid: 'custom:fixture:1', userAgent: 'source-agent' });
+  assert.equal(captured.proxy, false, 'remote custom-source media must use the checked direct DNS path');
   await assert.rejects(context.requestMedia({ url: 'https://127.0.0.1/episode.mp4', source: 'reelshort' }), /公网/);
 });

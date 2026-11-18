@@ -102,7 +102,8 @@ export default function CommentDanmaku({ videoRef, source, available, danmaku })
     let width = layer.clientWidth;
     let height = layer.clientHeight;
     const controls = layer.parentElement?.querySelector('.player-controls-bar');
-    const options = () => ({ width, height, settings, reducedMotion, bottomInset: Math.max(76, (controls?.clientHeight || 0) + 8) });
+    let bottomInset = Math.max(76, (controls?.clientHeight || 0) + 8);
+    const options = () => ({ width, height, settings, reducedMotion, bottomInset });
     const reset = () => {
       state.items = [];
       state.replayQueue = [];
@@ -115,12 +116,17 @@ export default function CommentDanmaku({ videoRef, source, available, danmaku })
       if (node) node.style.transform = `translate(${item.x}px, ${item.y}px)`;
     });
     const canAdvance = () => !video.paused && !video.ended && !document.hidden;
+    let lastCommit = 0, dirtyRender = false;
     const tick = now => {
       frame = 0;
       if (!canAdvance()) { previous = 0; return; }
       const delta = previous ? Math.min((now - previous) / 1000, 0.1) * video.playbackRate : 0.001;
       previous = now;
-      if (advanceDanmaku(state, comments, delta, options())) setItems([...state.items]);
+      if (advanceDanmaku(state, comments, delta, options())) dirtyRender = true;
+      if (dirtyRender && now - lastCommit >= 100) {
+        lastCommit = now; dirtyRender = false;
+        setItems([...state.items]);
+      }
       paint();
       frame = requestAnimationFrame(tick);
     };
@@ -133,6 +139,7 @@ export default function CommentDanmaku({ videoRef, source, available, danmaku })
       if (nextWidth === width && nextHeight === height) return;
       if (!resizeDanmaku(state, options(), { ...options(), width: nextWidth, height: nextHeight })) return;
       width = nextWidth; height = nextHeight;
+      bottomInset = Math.max(76, (controls?.clientHeight || 0) + 8);
       setItems([...state.items]); paint(); start();
     };
     // Settings keep current trajectories and consumption; only new arrivals use the new lanes.

@@ -1,0 +1,4 @@
+Hongguo Drama 7.6
+Internal version: 7.6.0
+Desktop build: 7.6.1
+Platforms: macOS arm64, macOS x64, Windows x64, Linux x64 AppImage

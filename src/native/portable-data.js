@@ -8,7 +8,7 @@
 const fs = require('fs');
 const path = require('path');
 
-const DATA_FILES = Object.freeze(['data.json', 'danmaku-client.json']);
+const DATA_FILES = Object.freeze(['data.json', 'data.playback.json', 'danmaku-client.json']);
 const PORTABLE_DATA_FOLDER = 'data';
 const PORTABLE_MARKER = 'portable.marker';
 const MIGRATION_SENTINEL = '.migration-incomplete';

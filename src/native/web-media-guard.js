@@ -57,10 +57,12 @@ function blockedAddress() {
 // The local VPN's Fake-IP route can return a different CDN result. Fall back to fixed
 // HTTPS resolvers only when every system answer is Fake-IP; never connect to Fake-IP.
 const publicDnsCache = new Map(), publicDnsPending = new Map();
+const PUBLIC_DNS_CACHE_LIMIT = 256;
 function resolvePublicAddresses(hostname) {
   const key = hostname.toLowerCase();
   const cached = publicDnsCache.get(key);
   if (cached?.expires > Date.now()) return Promise.resolve(cached.addresses);
+  if (cached) publicDnsCache.delete(key);
   if (publicDnsPending.has(key)) return publicDnsPending.get(key);
   const requests = [];
   // Race trusted resolvers so a blocked regional route cannot delay the usable one.
@@ -92,7 +94,9 @@ function resolvePublicAddresses(hostname) {
     request.on('close', () => clearTimeout(timer));
     request.on('error', reject);
   }))).then(result => {
+    publicDnsCache.delete(key);
     publicDnsCache.set(key, result);
+    while (publicDnsCache.size > PUBLIC_DNS_CACHE_LIMIT) publicDnsCache.delete(publicDnsCache.keys().next().value);
     return result.addresses;
   }).catch(error => {
     throw error.errors?.find(item => item.code === 'ERR_WEB_MEDIA_ADDRESS') || error.errors?.[0] || error;

@@ -11,6 +11,7 @@ import './mobile.css';
 import './mobile-shell.css';
 import './mobile-library.css';
 import './mobile-player.css';
+import './mobile-look.css';
 
 if (!localStorage.getItem('hongguo.catalog.channel.v1')) localStorage.setItem('hongguo.catalog.channel.v1', 'web');
 initializePosterSize();

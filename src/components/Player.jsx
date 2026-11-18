@@ -65,6 +65,12 @@ function Player({ target, onNavigate, onSeriesSelected, onFloatingChange, active
   const playbackSettingPending = useRef(false);
   const playbackSettingRevision = useRef(0);
   const [windowFill, setWindowFill] = useState(false);
+  const [controlsHidden, setControlsHidden] = useState(false);
+  useEffect(() => {
+    const layout = document.querySelector('.app-layout');
+    layout?.classList.toggle('player-controls-hidden', !!controlsHidden);
+    return () => layout?.classList.remove('player-controls-hidden');
+  }, [controlsHidden]);
   useEffect(() => { setWindowFill(false); }, [portrait, active]);
   const [seriesList, setSeriesList] = useState([]);
   const [activeSeriesId, setActiveSeriesId] = useState('');
@@ -158,6 +164,7 @@ function Player({ target, onNavigate, onSeriesSelected, onFloatingChange, active
   const volumeRef = useRef(playbackPreferences.volume);
   const mutedRef = useRef(playbackPreferences.muted);
   const videoClickTimer = useRef(null);
+  const episodeClickTimer = useRef(null);
   const fastForwardRef = useRef(null);
   const toastTimer = useRef(null);
   const rateNoticeTimer = useRef(null);
@@ -1329,7 +1336,7 @@ function Player({ target, onNavigate, onSeriesSelected, onFloatingChange, active
 
   // 离开页面、暂停和关闭窗口强制保存最后一秒。
   useEffect(() => {
-    const timer = setInterval(persistPosition, 5000);
+    const timer = setInterval(persistPosition, 15000);
     const save = () => persistPosition(true);
     window.addEventListener('beforeunload', save);
     return () => {
@@ -1432,7 +1439,10 @@ function Player({ target, onNavigate, onSeriesSelected, onFloatingChange, active
     } catch { restoreFullscreenScroll(); showToast('无法进入或退出全屏，请重试'); }
   }, [portrait, windowFill, floatingPlayer.floating, showToast, restoreFullscreenScroll, changeWindowFill]);
 
-  useEffect(() => () => clearTimeout(videoClickTimer.current), [videoSrc]);
+  useEffect(() => () => {
+    clearTimeout(videoClickTimer.current);
+    clearTimeout(episodeClickTimer.current);
+  }, [videoSrc, activeSeriesId]);
 
   // Capture handled keys before media controls; cancel keyup too so focused buttons cannot toggle twice.
   useEffect(() => {
@@ -1684,7 +1694,8 @@ function Player({ target, onNavigate, onSeriesSelected, onFloatingChange, active
     setMergeAsk(true);
   };
 
-  const closeMergeDialog = () => {
+  const closeMergeDialog = (force = false) => {
+    if (merging && !force) return;
     mergeDialogGenerationRef.current += 1;
     setMergeError('');
     setMergeAsk(false);
@@ -1704,7 +1715,7 @@ function Player({ target, onNavigate, onSeriesSelected, onFloatingChange, active
         setMergeError((res && res.error) || '合并失败');
         return;
       }
-      closeMergeDialog();
+      closeMergeDialog(true);
       const tip = compatible
         ? `开始兼容格式合并 ${res.count} 集（H.264，耗时较长）`
         : require1080
@@ -1783,7 +1794,7 @@ function Player({ target, onNavigate, onSeriesSelected, onFloatingChange, active
   return (
     <div className={`player-container ${episodesOpen ? '' : 'episodes-collapsed'}`}>
       {/* 剧集选择：当前剧 + 下拉管理面板（替代原来会越堆越长的横条） */}
-      <div className="player-series-row" hidden={actionsHidden}>
+      <div className="player-series-row" hidden={actionsHidden || (mobile && controlsHidden)}>
         <div className="player-series-current">
           <span className="player-series-name" title={detail ? detail.series_title : ''}>
             {detail ? detail.series_title : '—'}
@@ -1791,8 +1802,13 @@ function Player({ target, onNavigate, onSeriesSelected, onFloatingChange, active
           <span className="player-stat">{t(mobile ? `第 ${currentIndex} 集 · 共 ${episodes.length || 0} 集` : `已下载 ${playableCount} / ${episodes.length || 0} 集`)}</span>
         </div>
       </div>
-
-      <div className="player-online-quality-row" hidden={actionsHidden}>
+      {detail && detailError && (
+        <div className="alert alert-error player-detail-error" role="alert">
+          <span>{t("更新分集状态失败，当前显示上次结果：")}{t(detailError)}</span>
+          <button className="btn btn-outline btn-sm" onClick={() => loadDetail(activeSeriesId)}>{t("重试")}</button>
+        </div>
+      )}
+      {!mobile && <div className="player-online-quality-row" hidden={actionsHidden}>
           <label className="player-download-quality">
             <span>{t("在线播放清晰度")}</span>
             <select className="input-field" aria-label={t("在线播放清晰度")} value={onlineQuality}
@@ -1816,7 +1832,7 @@ function Player({ target, onNavigate, onSeriesSelected, onFloatingChange, active
             </select>
           </label>
           {!mobile && <p id="player-decoder-help" className="player-download-quality-hint">{t("优先使用显卡加速格式转换，ByteVC2仍由CPU解码；不支持时提示并回退。")}</p>}
-      </div>
+      </div>}
 
       <div className="player-header" hidden={actionsHidden}>
         <div className="player-header-right">
@@ -1829,28 +1845,28 @@ function Player({ target, onNavigate, onSeriesSelected, onFloatingChange, active
                 if (!result?.success) showToast(result?.error || '无法打开系统播放器');
               } catch { showToast('无法打开系统播放器，请稍后重试'); }
             }}>{t("系统播放器")}</button>}
-          <button aria-pressed={cacheNext} className={`btn btn-outline ${cacheNext ? 'btn-autonext-on' : ''}`}
+          {!mobile && <button aria-pressed={cacheNext} className={`btn btn-outline ${cacheNext ? 'btn-autonext-on' : ''}`}
             disabled={qualityLoading || playbackSettingSaving}
             onClick={() => savePlaybackSetting('cache_next_episode', !cacheNext, setCacheNext)}
             style={{ whiteSpace: 'nowrap' }}
             title={t("开始播放后最多预缓存后续两集，减少连续切集等待；会使用网络流量")}>
             <Download size={15} />{t("缓存后续 2 集 ")}{t(cacheNext ? '开' : '关')}
-          </button>
-          <button
+          </button>}
+          {!mobile && <button
             aria-pressed={autoNext}
             className={`btn btn-outline ${autoNext ? 'btn-autonext-on' : ''}`}
             onClick={() => setAutoNext(!autoNext)}
             title={t(`播完自动播放下一集（${formatShortcut(shortcuts.autoNext, t)}）`)}
           >
             <Layers size={15} />{t("连播 ")}{t(autoNext ? '开' : '关')}
-          </button>
+          </button>}
           {!mobile && <button aria-pressed={autoCompat} className={`btn btn-outline ${autoCompat ? 'btn-autonext-on' : ''}`}
             disabled={qualityLoading || playbackSettingSaving}
             onClick={() => savePlaybackSetting('compat_mode', !autoCompat, setAutoCompat)}
             title={t("无法解码时自动转码为 H.264 播放")}>
             <Zap size={15} />{t("兼容模式 ")}{t(autoCompat ? '开' : '关')}
           </button>}
-          <button aria-pressed={autoDelete} className={`btn btn-outline ${autoDelete ? 'btn-autonext-on' : ''}`}
+          {!mobile && <button aria-pressed={autoDelete} className={`btn btn-outline ${autoDelete ? 'btn-autonext-on' : ''}`}
             disabled={qualityLoading || playbackSettingSaving}
             title={t("看完一集后删除该集的下载文件与播放缓存；开启前需确认")}
             onClick={() => autoDelete ? savePlaybackSetting('auto_delete_watched', false, setAutoDelete) : setConfirmAsk({
@@ -1860,22 +1876,22 @@ function Player({ target, onNavigate, onSeriesSelected, onFloatingChange, active
               onOk: () => savePlaybackSetting('auto_delete_watched', true, setAutoDelete),
             })}>
             <Trash2 size={15} />{t("看完自动删 ")}{t(autoDelete ? '开' : '关')}
-          </button>
+          </button>}
         <div className="player-series-actions">
-        <button
+        {!mobile && <button
           aria-expanded={pickerOpen}
           className={`btn btn-outline series-picker-btn ${pickerOpen ? 'open' : ''}`}
           onClick={() => setPickerOpen((v) => !v)}
         >{t("切换剧集")}<span className="series-count">{t(seriesList.length)}</span>
           <ChevronDown size={15} />
-        </button>
-          <button className="btn btn-outline player-download-jump" aria-controls="player-management"
+        </button>}
+          {!mobile && <button className="btn btn-outline player-download-jump" aria-controls="player-management"
             onClick={() => {
               if (portrait) setEpisodesOpen(true);
               requestAnimationFrame(() => downloadToolsRef.current?.scrollIntoView({
                 behavior: window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches ? 'instant' : 'smooth', block: 'center',
               }));
-            }}><Download size={15} />{t("下载管理")}</button>
+            }}><Download size={15} />{t("下载管理")}</button>}
         </div>
         </div>
       </div>
@@ -2129,6 +2145,19 @@ function Player({ target, onNavigate, onSeriesSelected, onFloatingChange, active
           seriesTitle={detail?.series_title} episodes={episodes} currentIndex={currentIndex} onEpisodeChange={goToEpisode}
           episodesOpen={episodesOpen} onOpenEpisodes={mobile ? () => setEpisodesOpen(true) : undefined}
           onOpenDownloads={mobile ? () => onNavigate?.('manager') : undefined}
+          cacheNext={cacheNext} autoNext={autoNext} autoDelete={autoDelete} playbackSettingsBusy={qualityLoading || playbackSettingSaving}
+          onToggleCacheNext={mobile ? () => savePlaybackSetting('cache_next_episode', !cacheNext, setCacheNext) : undefined}
+          onToggleAutoNext={mobile ? () => setAutoNext(value => !value) : undefined}
+          onToggleAutoDelete={mobile ? () => autoDelete
+            ? savePlaybackSetting('auto_delete_watched', false, setAutoDelete)
+            : setConfirmAsk({
+              title: '开启看完自动删除',
+              message: '看完一集后，将永久删除该集已下载的视频、在线播放缓存和转码缓存。需要时可重新下载。',
+              okText: '开启自动删除', danger: true,
+              onOk: () => savePlaybackSetting('auto_delete_watched', true, setAutoDelete),
+            }) : undefined}
+          onControlsHiddenChange={setControlsHidden}
+          decoderMode={fastConversion ? 'hardware' : softwareDecode ? 'software' : 'auto'} onDecoderChange={changeDecoder} decoderBusy={qualityLoading || playbackSettingSaving}
           onlineQuality={onlineQuality} supportsOnlineQuality={supportsOnlineQuality} onQualityChange={changeOnlineQuality}
           pictureMode={pictureMode} onPictureModeChange={changePictureMode} rate={playbackRate} onRateChange={changePlaybackRate} onError={showToast} />
         {!canPlay && (
@@ -2291,7 +2320,11 @@ function Player({ target, onNavigate, onSeriesSelected, onFloatingChange, active
               aria-label={t(`第 ${ep.vid_index} 集`)}
               aria-pressed={isCurrent}
               className={`ep-chip ep-${ep.status} ${isCurrent ? 'ep-current' : ''}`}
-              onClick={() => { goToEpisode(ep.vid_index); if (mobile) setEpisodesOpen(false); }}
+              onClick={() => {
+                if (mobile) { goToEpisode(ep.vid_index); setEpisodesOpen(false); return; }
+                clearTimeout(episodeClickTimer.current);
+                episodeClickTimer.current = setTimeout(() => goToEpisode(ep.vid_index), 250);
+              }}
               title={
                 t(ep.locked ? '需在来源平台解锁' : ep.status === 'completed'
                   ? '点击播放（本地）'
@@ -2299,7 +2332,11 @@ function Player({ target, onNavigate, onSeriesSelected, onFloatingChange, active
                   ? '下载继续，点击在线播放'
                   : '点击在线播放（不下载）· 双击加入下载')
               }
-              onDoubleClick={() => !mobile && ep.status !== 'completed' && downloadEpisode(ep.vid_index)}
+              onDoubleClick={() => {
+                if (mobile || ep.status === 'completed') return;
+                clearTimeout(episodeClickTimer.current);
+                downloadEpisode(ep.vid_index);
+              }}
             >
               <span className="ep-num">{t(ep.vid_index)}</span>{ep.locked && <span className="ep-lock-label">{t("锁定")}</span>}
               {ep.status === 'completed' && <Check size={11} className="ep-badge" />}
@@ -2357,7 +2394,7 @@ function Player({ target, onNavigate, onSeriesSelected, onFloatingChange, active
       </div>
 
       <div className="player-footer" hidden={actionsHidden}>
-        <CastPanel seriesId={activeSeriesId} episode={current} title={detail?.series_title} videoRef={videoRef} />
+        {!mobile && <CastPanel seriesId={activeSeriesId} episode={current} title={detail?.series_title} videoRef={videoRef} />}
         {/^[0-9]{6,30}$/.test(String(activeSeriesId)) ? (
           <CommunityPanel seriesId={activeSeriesId} episodeId={current?.vid} title={detail?.series_title || ''} cover={detail?.cover || ''}
             trailingAction={<NasDownload seriesId={activeSeriesId} quality={downloadQuality} disabled={qualityLoading} />}>
@@ -2372,7 +2409,7 @@ function Player({ target, onNavigate, onSeriesSelected, onFloatingChange, active
 
       {/* 合并格式选择 */}
       {mergeAsk && (
-        <div className="player-confirm-mask" onClick={closeMergeDialog}>
+        <div className="player-confirm-mask" onClick={() => closeMergeDialog()}>
           <div className="player-confirm" role="dialog" aria-modal="true" aria-label={t(confirmAsk ? confirmAsk.title : '合并导出')} tabIndex={-1} onClick={(e) => e.stopPropagation()}>
             <div className="player-confirm-title" style={{ color: 'var(--accent)' }}>
               <Layers size={17} />{t("合并导出全集")}</div>
@@ -2386,7 +2423,7 @@ function Player({ target, onNavigate, onSeriesSelected, onFloatingChange, active
             </div>
             <div className="player-confirm-foot">
               <button className="btn btn-outline" onClick={() => mergeThisSeries(false, true)} disabled={merging}>{t("高质量分辨率合并")}</button>
-              <button className="btn btn-outline" onClick={closeMergeDialog}>{t("取消")}</button>
+              <button className="btn btn-outline" onClick={() => closeMergeDialog()} disabled={merging}>{t("取消")}</button>
               <button className="btn btn-outline" onClick={() => mergeThisSeries(true)} disabled={merging}>{t("兼容合并（H.264）")}</button>
               <button className="btn btn-primary" onClick={() => mergeThisSeries(false)} disabled={merging}>{t("快速合并")}</button>
             </div>
@@ -2399,7 +2436,7 @@ function Player({ target, onNavigate, onSeriesSelected, onFloatingChange, active
           <div className="player-confirm" role="dialog" aria-modal="true" aria-label={t(confirmAsk ? confirmAsk.title : '合并导出')} tabIndex={-1} onClick={(e) => e.stopPropagation()}>
             <div className="player-confirm-title">
               <Trash2 size={17} />
-              {confirmAsk.title}
+              {t(confirmAsk.title)}
             </div>
             <div className="player-confirm-msg">
               {String(confirmAsk.message).split('\n').map((line, i) => (

@@ -21,6 +21,27 @@ assert.equal(media.corsHeaders(request('http://localhost:5173', 'null')), null);
 media.clear(); assert.equal(media.resolveLocal(url), null);
 
 const root = fs.mkdtempSync(path.join(os.tmpdir(), 'hongguo-media-access-'));
+const metadataOnly = path.join(root, 'metadata-only.mp4');
+fs.writeFileSync(metadataOnly, 'stable-video-content');
+const metadataOnlyUrl = media.localUrl(metadataOnly, () => true);
+const beforeMetadata = fs.lstatSync(metadataOnly, { bigint: true });
+fs.utimesSync(metadataOnly, new Date(Date.now() - 60000), new Date(Date.now() - 60000));
+const afterMetadata = fs.lstatSync(metadataOnly, { bigint: true });
+assert.equal(String(beforeMetadata.dev), String(afterMetadata.dev));
+assert.equal(String(beforeMetadata.ino), String(afterMetadata.ino));
+assert.equal(String(beforeMetadata.size), String(afterMetadata.size));
+assert.equal(media.isValid(metadataOnlyUrl), true, 'metadata-only changes must not invalidate a playable file token');
+assert.equal(media.localUrl(metadataOnly, () => true), metadataOnlyUrl, 'metadata-only changes must keep the same opaque token');
+
+const sameSize = path.join(root, 'same-size.mp4');
+fs.writeFileSync(sameSize, 'original-video');
+const sameSizeUrl = media.localUrl(sameSize, () => true);
+const sameSizeTime = fs.lstatSync(sameSize).mtime;
+fs.writeFileSync(sameSize, 'tampered-video');
+fs.utimesSync(sameSize, sameSizeTime, sameSizeTime);
+assert.equal(media.isValid(sameSizeUrl), false, 'same-size in-place rewrite must invalidate the old token');
+assert.equal(media.resolveLocal(sameSizeUrl), null);
+
 const real = path.join(root, 'episode.mp4');
 fs.writeFileSync(real, 'original-video');
 const issued = media.localUrl(real, () => true);

@@ -2,6 +2,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { spawn } = require('node:child_process');
 const { buildMergePlan, canUseHardwareFrames } = require('./merge-plan');
+const { localMediaEnv } = require('./child-env');
 
 function publishMergedOutput(source, destination) {
   try { fs.linkSync(source, destination); }
@@ -52,7 +53,7 @@ async function runMerge({ task, ordered, outDir, ffmpegPath, ffprobePath, probe,
   const stage = (name, text) => { recordStage(); task.stage = name; task.stageText = text; task.speed = 0; task.etaSeconds = null; emit(true); };
   const run = (args, onTime) => new Promise((resolve, reject) => {
     if (task.cancelled) return reject(new Error('已取消'));
-    const child = spawn(ffmpegPath, ['-y', '-hide_banner', '-loglevel', 'error', ...args, '-progress', 'pipe:1', '-nostats'], { windowsHide: true });
+    const child = spawn(ffmpegPath, ['-y', '-hide_banner', '-loglevel', 'error', ...args, '-progress', 'pipe:1', '-nostats'], { windowsHide: true, env: localMediaEnv() });
     task.children.add(child);
     let pending = '', errors = '', spawnError;
     child.stdout.on('data', data => {
@@ -91,6 +92,7 @@ async function runMerge({ task, ordered, outDir, ffmpegPath, ffprobePath, probe,
     }
     const plan = buildMergePlan(infos, { compatible });
     task.totalDuration = plan.totalDuration;
+    task.hasAudio = plan.audioMode !== 'none';
     const normalize = plan.videoMode === 'encode' || plan.audioMode === 'encode' || plan.remux || plan.videoContainer === 'mpegts';
     task.method = plan.videoMode === 'encode' ? '统一视频编码' : plan.audioMode === 'encode' ? '保留画质，仅统一音频' : plan.remux || plan.videoContainer === 'mpegts' ? '无损统一封装' : '无损快速合并';
     task.codecWarning = plan.videoMode === 'encode' ? '分集编码不一致，按各自原分辨率统一为 H.264；原文件保留' : '';

@@ -4,6 +4,7 @@
 # 依赖
 node_modules/
 dist/
+dist-audit-final/
 dist-react/
 
 # 内置的 ffmpeg 二进制（约 167MB，从网络获取，不纳入版本管理）

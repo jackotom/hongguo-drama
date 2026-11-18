@@ -87,6 +87,8 @@ test('download fallback and proxy results preserve quality, status and raw error
   assert.doesNotMatch(certificate, /[\u4e00-\u9fff]/);
   assert.match(certificate, /UNABLE_TO_VERIFY_LEAF_SIGNATURE/);
   assert.equal(translate(' · 经由 {0}', [translate('(直连)')]), ' · Via Direct connection');
+  assert.equal(translate('删除《重生》第 1 集任务'), 'Delete task for 重生, episode 1');
+  assert.equal(translate('更新分集状态失败，当前显示上次结果：'), 'Could not refresh episode status. Showing the previous result: ');
 });
 
 test('shortcut labels translate each key and action, including Shift combinations', () => {

@@ -9,7 +9,7 @@
 <p align="center">
   <a href="https://github.com/jackotom/hongguo-drama/releases/latest"><img alt="最新公开版本" src="https://img.shields.io/github/v/release/jackotom/hongguo-drama?style=flat-square"></a>
   <img alt="macOS 13 或更新版本" src="https://img.shields.io/badge/macOS-13%2B-555555?style=flat-square">
-  <img alt="Apple 芯片 Mac、Intel Mac 与 Windows x64" src="https://img.shields.io/badge/platforms-Mac_arm64_%2F_x64_%C2%B7_Windows_x64-55746b?style=flat-square">
+  <img alt="Apple 芯片 Mac、Intel Mac、Windows x64 与 Linux x64" src="https://img.shields.io/badge/platforms-Mac_arm64_%2F_x64_%C2%B7_Windows_x64_%C2%B7_Linux_x64-55746b?style=flat-square">
   <a href="LICENSE"><img alt="GPL-3.0 许可证" src="https://img.shields.io/badge/license-GPL--3.0-555555?style=flat-square"></a>
 </p>
 
@@ -24,24 +24,32 @@
 
 ## 下载与安装
 
-**当前正式版：7.5**（内部`7.5.0`，构建`7.5.2`）。本轮优先修复播放接口 HTTP 200 空响应，移植纯 JavaScript Android v5 签名与新播放器请求协议；保留下载临时清理EPERM修复。按用户本轮明确要求，仅发行Mac双架构与Windows。
+**当前发行目标：7.6**（内部`7.6.0`，桌面构建`7.6.1`）。本轮集中修复下载与合并数据安全、并发进度覆盖、双击选集冲突、删除误操作和代理边界；统一发行双Mac、Windows x64与Linux x64 AppImage。
 
-**7.5已正式发布并设Latest。双Mac App与DMG本轮新签名、公证Accepted和装订，arm64真实下载／静音播放、Windows队列及安装升级验收通过。** Windows使用GitHub虚拟机，EXE未签名；Intel Mac仅Rosetta验收，具体结果见[7.5回执](docs/release-7.5.md)。
+7.6正在完成四平台构建、签名和验收；正式公开前不设 Latest，最终状态以[7.6记录](docs/release-7.6.md)为准。
 
-| 平台 | 7.5正式下载 | 本轮状态 |
+| 平台 | 7.6发行目标 | 本轮状态 |
 |---|---|---|
-| Apple芯片Mac，macOS 13+ | [DMG](https://github.com/jackotom/hongguo-drama/releases/download/v7.5/Hongguo-7.5-mac-arm64.dmg) | 已签名、公证、装订；arm64两集真实1080P静音播放通过 |
-| Intel Mac，macOS 13+ | [DMG](https://github.com/jackotom/hongguo-drama/releases/download/v7.5/Hongguo-7.5-mac-x64.dmg) | 已签名、公证、装订；Rosetta启动通过 |
-| Windows x64 | [安装版](https://github.com/jackotom/hongguo-drama/releases/download/v7.5/hongguo-downloader-7.5-win-x64-setup.exe) · [便携EXE](https://github.com/jackotom/hongguo-drama/releases/download/v7.5/hongguo-downloader-7.5-win-x64.exe) · [便携ZIP](https://github.com/jackotom/hongguo-drama/releases/download/v7.5/hongguo-downloader-7.5-win-x64.zip) | 真实队列下载、兼容媒体静音播放和安装升级通过；EXE未签名 |
+| Apple芯片Mac，macOS 13+ | [DMG](https://github.com/jackotom/hongguo-drama/releases/download/v7.6/Hongguo-7.6-mac-arm64.dmg) | 已签名、公证、装订 |
+| Intel Mac，macOS 13+ | [DMG](https://github.com/jackotom/hongguo-drama/releases/download/v7.6/Hongguo-7.6-mac-x64.dmg) | 已签名、公证、装订；实体Intel未验 |
+| Windows x64 | [安装版](https://github.com/jackotom/hongguo-drama/releases/download/v7.6/hongguo-downloader-7.6-win-x64-setup.exe) · [便携EXE](https://github.com/jackotom/hongguo-drama/releases/download/v7.6/hongguo-downloader-7.6-win-x64.exe) · [便携ZIP](https://github.com/jackotom/hongguo-drama/releases/download/v7.6/hongguo-downloader-7.6-win-x64.zip) | EXE未签名；验收边界见回执 |
+| Linux x64 | [AppImage](https://github.com/jackotom/hongguo-drama/releases/download/v7.6/hongguo-downloader-7.6-linux-x64.AppImage) | 赋予执行权限后运行；CI虚拟机验收 |
 
-[7.5正式发行页](https://github.com/jackotom/hongguo-drama/releases/tag/v7.5) · [SHA256](https://github.com/jackotom/hongguo-drama/releases/download/v7.5/SHA256SUMS.txt) · [精确源码](https://github.com/jackotom/hongguo-drama/releases/download/v7.5/hongguo-drama-7.5-source.zip)。实际状态见[7.5记录](docs/release-7.5.md)。上游部分网页片源仍可能404、只提供预览或超时，不保证所有内容永久可播。
+[7.6正式发行页](https://github.com/jackotom/hongguo-drama/releases/tag/v7.6) · [SHA256](https://github.com/jackotom/hongguo-drama/releases/download/v7.6/SHA256SUMS.txt) · [精确源码](https://github.com/jackotom/hongguo-drama/releases/download/v7.6/hongguo-drama-7.6-source.zip)。实际状态见[7.6记录](docs/release-7.6.md)。上游部分网页片源仍可能404、只提供预览或超时，不保证所有内容永久可播。
 
-**Android手机APK／Android TV版：** 请前往 [N3urda/hongguoTV](https://github.com/N3urda/hongguoTV) 下载。该项目独立维护；版本、兼容性与测试状态以该项目发布页为准，不计入本项目的三平台附件或验收。
+**Android手机APK／Android TV版：** 请前往 [N3urda/hongguoTV](https://github.com/N3urda/hongguoTV) 下载。该项目独立维护；版本、兼容性与测试状态以该项目发布页为准，不计入本项目的四平台附件或验收。
+
+<details>
+<summary>7.5 历史下载与发行说明</summary>
+
+7.5历史发行包与验收回执见[7.5发行页](https://github.com/jackotom/hongguo-drama/releases/tag/v7.5)及[7.5记录](docs/release-7.5.md)；历史签名、公证和平台验收不替代7.6结果。
+
+</details>
 
 <details>
 <summary>7.4 历史下载与发行说明</summary>
 
-7.4历史发行包与验收回执见[7.4发行页](https://github.com/jackotom/hongguo-drama/releases/tag/v7.4)及[7.4记录](docs/release-7.4.md)；历史签名和验收结果不代表7.5通过。
+7.4历史发行包与验收回执见[7.4发行页](https://github.com/jackotom/hongguo-drama/releases/tag/v7.4)及[7.4记录](docs/release-7.4.md)；历史签名和验收结果不代表7.6通过。
 
 </details>
 

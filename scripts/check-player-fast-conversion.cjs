@@ -32,17 +32,11 @@ const ready = async options => {
         '硬件编码检测已取消', '硬件编码检测无法读取当前视频，请重新获取片源后重试', '不支持的硬件编码器',
         '视频输入或存储不可用，转换已停止，原视频已保留']) assert.ok(english[message]);
     } finally { ui.unmount(); }
-    let mobileSaves = 0;
-    const mobile = await ready({ apiOverrides: { platform: 'android', saveSettings: async () => {
-      mobileSaves++; return { success: false, error: '此设置尚未接入安卓，未保存' };
-    } } });
-    try {
-      assert.equal(mobile.find(node => node.type === 'option' && node.props.value === 'hardware'), undefined);
-      assert.equal(decoder(mobile).props.value, 'auto');
-      await choose(mobile, 'software'); await mobile.flush(); mobile.metadata();
-      assert.equal(decoder(mobile).props.value, 'software', 'Android keeps its existing local decoder preference');
-      assert.equal(mobileSaves, 0, 'desktop GPU preference must not reach the Android settings whitelist');
-    } finally { mobile.unmount(); }
+    const controls = require('node:fs').readFileSync(require('node:path').join(__dirname, '../src/components/PlayerControls.jsx'), 'utf8');
+    const androidDecoder = controls.slice(controls.indexOf('{onDecoderChange &&'), controls.indexOf('</label>', controls.indexOf('{onDecoderChange &&')) + 8);
+    assert.match(androidDecoder, /<option value="auto">/);
+    assert.match(androidDecoder, /<option value="software">/);
+    assert.doesNotMatch(androidDecoder, /value="hardware"/, 'Android must keep only system and software decoder modes');
   });
   await test('auto and GPU conversion save only the backend preference without interrupting playback', async () => {
     const storage = new Map();

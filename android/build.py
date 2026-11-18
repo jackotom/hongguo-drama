@@ -33,11 +33,12 @@ def run(args, env=None):
 def main():
     global BUILD
     tv = '--tv' in sys.argv
+    standalone = '--standalone' in sys.argv and not tv
     if tv: BUILD = BUILD / 'tv'
     desktop_version = json.loads((ROOT.parent/'package.json').read_text())['version']
     tv_version = json.loads((ROOT/'package.json').read_text()).get('tvVersion') if tv else None
-    version, version_code = tv_version_metadata(tv_version) if tv else ('1.1', 2)
-    package_name = 'io.github.hongguo.tv' if tv else 'io.github.hongguo.personal'
+    version, version_code = tv_version_metadata(tv_version) if tv else ('1.1.1', 3) if standalone else ('1.1', 2)
+    package_name = 'io.github.hongguo.tv' if tv else 'io.github.hongguo.personal2' if standalone else 'io.github.hongguo.personal'
     sdk = Path(os.environ.get('ANDROID_HOME', '/opt/homebrew/share/android-commandlinetools'))
     java = Path(os.environ.get('JAVA_HOME', '/opt/homebrew/opt/openjdk@21/libexec/openjdk.jdk/Contents/Home'))
     tools = sdk / 'build-tools' / '36.0.0'
@@ -58,7 +59,7 @@ def main():
     if resources.exists(): shutil.rmtree(resources)
     shutil.copytree(ROOT/'app/src/main/res',resources)
     (resources/'drawable').mkdir(parents=True, exist_ok=True)
-    manifest = BUILD/'AndroidManifest.xml' if tv else ROOT/'app/src/main/AndroidManifest.xml'
+    manifest = BUILD/'AndroidManifest.xml' if tv or standalone else ROOT/'app/src/main/AndroidManifest.xml'
     if tv:
         shutil.copytree(ROOT/'app/src/main/assets',assets,dirs_exist_ok=True)
         html = (ROOT/'web/index.html').read_text().replace('红果·自用','红果短剧 TV').replace('个人版 1.1',f'TV候选版 {version}').replace('手机实播兼容性待真机验收','电视实播兼容性待真机验收')
@@ -74,6 +75,11 @@ def main():
         xml = xml.replace('<application ', '<queries><intent><action android:name="android.intent.action.VIEW" /><data android:mimeType="video/mp4" /></intent></queries><application ')
         manifest.write_text(xml)
         (resources/'drawable/tv_banner.xml').write_text('<layer-list xmlns:android="http://schemas.android.com/apk/res/android"><item android:width="320dp" android:height="180dp"><shape><solid android:color="#171b25" /></shape></item><item android:width="120dp" android:height="120dp" android:gravity="center" android:drawable="@drawable/icon" /></layer-list>')
+    elif standalone:
+        xml = (ROOT/'app/src/main/AndroidManifest.xml').read_text()
+        xml = xml.replace('package="io.github.hongguo.personal"',f'package="{package_name}"').replace('android:versionCode="2"',f'android:versionCode="{version_code}"').replace('android:versionName="1.1"',f'android:versionName="{version}"')
+        xml = xml.replace('android:label="红果·自用"','android:label="红果·自用 新版"').replace('android:name=".MainActivity"','android:name="io.github.hongguo.personal.MainActivity"')
+        manifest.write_text(xml)
     run(['node',ROOT/'bundle.cjs',*(['--tv'] if tv else [])],env)
     if not tv: run(['node',ROOT/'mobile/bundle.cjs'],env)
     shutil.copy2(ROOT.parent/'build/icon.png',resources/'drawable/icon.png')
@@ -103,7 +109,7 @@ def main():
         password.write_text(secrets.token_hex(32)); password.chmod(0o600)
         run([java/'bin/keytool','-genkeypair','-alias','personal','-keyalg','RSA','-keysize','3072','-validity','10000','-dname','CN=Personal Android','-storetype','PKCS12','-keystore',keystore,'-storepass:file',password,'-keypass:file',password],env)
         keystore.chmod(0o600)
-    output = BUILD/(f'hongguo-downloader-{version}-android-tv-dev.apk' if tv else 'hongguo-personal-1.1.apk')
+    output = BUILD/(f'hongguo-downloader-{version}-android-tv-dev.apk' if tv else f'hongguo-personal2-{version}.apk' if standalone else 'hongguo-personal-1.1.apk')
     run([tools/'apksigner','sign','--ks',keystore,'--ks-key-alias','personal','--ks-pass',f'file:{password}','--out',output,aligned],env)
     signature = run([tools/'apksigner','verify','--verbose','--print-certs',output],env)
     package = run([tools/'aapt','dump','badging',output],env)
@@ -113,7 +119,7 @@ def main():
     checksum = hashlib.sha256(output.read_bytes()).hexdigest()
     if tv and ("leanback-launchable-activity:" not in package or "uses-feature-not-required: name='android.hardware.touchscreen'" not in package):
         raise SystemExit('TV入口或无触屏声明缺失')
-    (BUILD/'verification.json').write_text(json.dumps({'file':output.name,'sha256':checksum,'bytes':output.stat().st_size,'package':package_name,'version':version,'minSdk':29,'targetSdk':34,'signature_verified':True,'device_tested':False,'source_version':desktop_version,'candidate':tv,**({'tv_version':tv_version,'version_code':version_code} if tv else {})},ensure_ascii=False,indent=2)+'\n')
+    (BUILD/'verification.json').write_text(json.dumps({'file':output.name,'sha256':checksum,'bytes':output.stat().st_size,'package':package_name,'version':version,'minSdk':29,'targetSdk':34,'signature_verified':True,'device_tested':False,'source_version':desktop_version,'candidate':tv,**({'tv_version':tv_version,'version_code':version_code} if tv else {'standalone':standalone,'version_code':version_code} if standalone else {})},ensure_ascii=False,indent=2)+'\n')
     (BUILD/'signature.txt').write_text(signature)
     print(f'APK构建与签名校验通过：{output.name} ({output.stat().st_size} bytes)')
     print(f'SHA256 {checksum}')

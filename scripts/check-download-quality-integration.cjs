@@ -429,6 +429,16 @@ const checks = [
       assert.equal(fs.existsSync(h.saved()[0].savePath), false);
     }, { replaceCenc: 'success' });
   }],
+  ['late cancellation after publishing the verified file keeps the task completed', async () => {
+    const h = fixture();
+    h.run("completeNasExports = async () => { downloadTasks[0].cancelSource.cancel('late fixture cancel'); };");
+    await h.handlers['hongguo-download-batch']({}, payload());
+    await h.run('executeHongguoDownload(downloadTasks[0])');
+    const task = h.saved()[0];
+    assert.equal(task.status, 'completed', task.error);
+    assert.equal(fs.existsSync(task.savePath), true);
+    assert.equal(h.events.filter(event => event.channel === 'download-completed').length, 1);
+  }],
   ['real footage catalog retries one timeout and preserves terminal failures', async () => {
     for (const codes of [['APP_TIMEOUT', null], ['APP_TIMEOUT', 'APP_TIMEOUT'], ['APP_SCHEMA'], ['APP_BUSINESS'], ['APP_NETWORK']]) {
       const calls = [];

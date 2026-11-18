@@ -128,6 +128,79 @@ const runningMerge = () => ({ id: 'm', status: 'running', total: 2, done: 0, pro
     const select = ui.find(n => n.type === 'select' && n.props.className?.includes('merge-select'));
     assert.equal(select.props.value, 'B'); ui.unmount();
   });
+  await test('merge can delete merged source episodes after successful output', async () => {
+    let request;
+    const ui = mount({
+      getSeriesList: async () => [{ series_id: 'A', series_title: 'A' }],
+      mergeSeries: async (...args) => {
+        request = args;
+        return { success: true, count: 2, totalBytes: 240000, totalDuration: 40 };
+      },
+    });
+    await ui.flush();
+    ui.button('合并整部剧').props.onClick();
+    ui.render();
+    const checkbox = ui.find(n => n.type === 'input' && n.props.type === 'checkbox');
+    assert.ok(checkbox, 'merge dialog must expose source deletion');
+    checkbox.props.onChange({ target: { checked: true } });
+    ui.render();
+    await ui.button('智能快速合并').props.onClick();
+    await ui.flush();
+    assert.equal(request[0], 'A');
+    assert.equal(request[2].deleteSources, true);
+    ui.emit('onMergeCompleted', { cleanedCount: 2, cleanedBytes: 240000, path: '/tmp/A.mp4' });
+    ui.render();
+    assert.match(ui.text(), /已删除 2 个分集文件/);
+    ui.unmount();
+  });
+  await test('merge source deletion requires a fresh check after cancel', async () => {
+    const ui = mount({ getSeriesList: async () => [{ series_id: 'A', series_title: 'A' }] });
+    await ui.flush();
+    ui.button('合并整部剧').props.onClick();
+    ui.render();
+    ui.find(n => n.type === 'input' && n.props.type === 'checkbox').props.onChange({ target: { checked: true } });
+    ui.render();
+    ui.button('取消').props.onClick();
+    ui.render();
+    ui.button('合并整部剧').props.onClick();
+    ui.render();
+    assert.equal(ui.find(n => n.type === 'input' && n.props.type === 'checkbox').props.checked, false);
+    ui.unmount();
+  });
+  await test('merge dialog cannot be dismissed while the submission is pending', async () => {
+    let finish;
+    const ui = mount({
+      getSeriesList: async () => [{ series_id: 'A', series_title: 'A' }],
+      mergeSeries: () => new Promise(resolve => { finish = resolve; }),
+    });
+    await ui.flush();
+    ui.button('合并整部剧').props.onClick();
+    ui.render();
+    const pending = ui.button('智能快速合并').props.onClick();
+    ui.render();
+    ui.find(n => n.props.className === 'player-confirm-mask').props.onClick();
+    assert.equal(ui.dialogOpen(), true, 'pending submission must keep the dialog blocking');
+    assert.equal(ui.button('取消').props.disabled, true);
+    finish({ success: true, count: 1, totalBytes: 120000, totalDuration: 20 });
+    await pending;
+    await ui.flush();
+    assert.equal(ui.dialogOpen(), false);
+    ui.unmount();
+  });
+  await test('merge cleanup removes the emptied series from the selector without reopening it', async () => {
+    let list = [{ series_id: 'A', series_title: 'A' }];
+    const ui = mount({
+      getSeriesList: async options => options?.downloadedOnly ? list : [],
+      getDownloadTasks: async () => [],
+    });
+    await ui.flush();
+    assert.ok(ui.button('合并整部剧'));
+    list = [];
+    ui.emit('onMergeCompleted', { cleanedCount: 2, path: '/tmp/A.mp4' });
+    await ui.flush();
+    assert.equal(ui.button('合并整部剧'), undefined);
+    ui.unmount();
+  });
   await test('one initial snapshot and no polling or focus trap while hidden', async () => {
     let calls = 0;
     const ui = mount({ getDownloadTasks: async () => { calls++; return [task(1)]; } });

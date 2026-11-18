@@ -10,7 +10,9 @@ Object.assign(app, { getVersion: () => '1.2.0', getPath: () => '/synthetic', com
 let settings = {}, response, requests = 0, requestOptions, responses = [];
 const handlers = {}, opened = [], events = [], sender = {};
 const store = { setErrorHandler() {}, getSettings: () => settings, saveSettings: v => { settings = v; } };
-const electron = { app, ipcMain: { handle: (name, fn) => { handlers[name] = fn; } }, protocol: { registerSchemesAsPrivileged() {} }, shell: { openExternal: async url => { opened.push(url); } } };
+const electron = { app, ipcMain: { handle: (name, fn) => { handlers[name] = fn; } }, protocol: { registerSchemesAsPrivileged() {} },
+  shell: { openExternal: async url => { opened.push(url); } },
+  session: { defaultSession: { setProxy: async () => {}, clearAuthCache: async () => {}, closeAllConnections: async () => {} } } };
 const axios = { get: async (url, options) => { requests++; requestOptions = { url, ...options }; const next = responses.length ? responses.shift() : response; if (next instanceof Error) throw next; return next?.httpResponse || { data: await next }; } };
 const context = vm.createContext({ require: name => name === 'electron' ? electron : name === 'axios' ? axios : name === './src/store' ? store : req(name), __dirname: path.dirname(file), process, Buffer, URL, AbortController, setTimeout, clearTimeout, console: { log() {}, warn() {}, error() {} } });
 vm.runInContext(fs.readFileSync(file, 'utf8'), context, { filename: file });

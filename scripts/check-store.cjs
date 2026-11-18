@@ -93,7 +93,7 @@ test('missing file initializes normally; successful saves retain unrelated and f
   store.init(file);
   store.savePlayback({ complete: { position: 10 } });
   assert.deepEqual(JSON.parse(fs.readFileSync(file)).futureField, { preserve: true });
-  assert.deepEqual(fs.readdirSync(dir), ['data.json']);
+  assert.deepEqual(fs.readdirSync(dir).sort(), ['data.json', 'data.playback.json']);
 }));
 
 test('interrupted write, fsync or rename keeps disk and memory at their last durable state without leaking handles', () => withStore(({ dir, file, errors }) => {

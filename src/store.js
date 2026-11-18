@@ -1,27 +1,34 @@
 /**
- * store.js - 红果短剧 3.2 持久化模块（沿用原资料格式）
- * 用单个 JSON 文件保存「设置」与「下载任务」，替代原项目里的 sql.js 数据库 + electron-store，
- * 减少依赖，方便独立打包。
+ * store.js - 红果短剧持久化模块（兼容原资料格式）
+ * 主 JSON 保存设置与资料索引；高频播放进度单独原子写入，避免拖慢播放。
  */
 const fs = require('fs');
 const path = require('path');
+const { writeJsonAtomic } = require('./native/atomic-json');
 
 let dataFile = null;
+let playbackFile = null;
 let cache = null; // { settings, tasks }
+let playbackCache = null;
 let durable = '{}';
 let errorHandler = null;
 let readError = null;
+let playbackReadError = null;
+let playbackCleanupPending = false;
 let writeError = false;
 let safeStorage = null;
 let runtimeProxyPassword = '';
 let proxyPasswordWarning = '';
+let maxBytes = 32 * 1024 * 1024;
+let playbackMaxBytes = 16 * 1024 * 1024;
 const PROXY_PASSWORD_CIPHER = 'proxy_password_ciphertext';
 const SECURE_STORAGE_UNAVAILABLE = '系统安全存储不可用；代理密码仅在本次运行期间保留，重启后需要重新输入。';
 const PROXY_PASSWORD_DECRYPT_FAILED = '已保存的代理密码无法解密；原密文已保留，可重新输入密码或清除。';
 const READ_ERROR_MESSAGE = '读取本地数据失败，已保留原文件并暂停保存；请检查文件或目录权限，恢复数据后重启应用。';
+const PLAYBACK_READ_ERROR_MESSAGE = '读取播放进度失败，已保留原文件并暂停覆盖；请检查文件或目录权限，恢复数据后重启应用。';
 
-function reportReadError() {
-  try { errorHandler?.({ error: READ_ERROR_MESSAGE }); } catch {}
+function reportReadError(message = READ_ERROR_MESSAGE) {
+  try { errorHandler?.({ error: message }); } catch {}
 }
 
 function encryptionAvailable() {
@@ -112,6 +119,7 @@ function hydrateProxyPassword(settings) {
 
 function serializableCache() {
   const copy = structuredClone(cache || {});
+  if (playbackCache !== null) delete copy.playback;
   if (copy.settings) {
     stripPublicSecretFields(copy.settings);
     if (!copy.settings[PROXY_PASSWORD_CIPHER]) delete copy.settings[PROXY_PASSWORD_CIPHER];
@@ -124,6 +132,9 @@ function loadCache() {
   if (cache) return cache;
   let secretsChanged = false;
   try {
+    if (fs.statSync(dataFile).size > maxBytes) {
+      throw Object.assign(new Error('STORE_TOO_LARGE'), { code: 'STORE_TOO_LARGE' });
+    }
     cache = JSON.parse(fs.readFileSync(dataFile, 'utf8'));
     if (!cache || typeof cache !== 'object' || Array.isArray(cache)) {
       throw new TypeError('Invalid store document');
@@ -139,9 +150,12 @@ function loadCache() {
   } catch (e) {
     cache = {};
     if (e.code !== 'ENOENT') {
-      readError = new Error(READ_ERROR_MESSAGE, { cause: e });
+      const message = e.code === 'STORE_TOO_LARGE'
+        ? `本地记录超过 ${Math.round(maxBytes / 1024 / 1024)} MB 上限；已保留原文件并暂停保存，请先备份并清理旧任务或剧库。`
+        : READ_ERROR_MESSAGE;
+      readError = new Error(message, { cause: e });
       readError.code = 'STORE_READ_FAILED';
-      reportReadError();
+      reportReadError(message);
     }
   }
   if (!Array.isArray(cache.tasks)) cache.tasks = [];
@@ -156,44 +170,113 @@ function flush() {
   if (!dataFile) return;
   if (readError) {
     cache = JSON.parse(durable);
-    reportReadError();
+    reportReadError(readError.message);
     throw readError;
   }
-  const temporary = dataFile + '.tmp';
   try {
-    fs.mkdirSync(path.dirname(dataFile), { recursive: true });
-    const serialized = JSON.stringify(serializableCache(), null, 2);
-    const fd = fs.openSync(temporary, 'w', 0o600);
-    try {
-      fs.writeFileSync(fd, serialized, 'utf8');
-      fs.fsyncSync(fd);
-    } finally {
-      fs.closeSync(fd);
-    }
-    fs.renameSync(temporary, dataFile);
+    const serialized = writeJsonAtomic(dataFile, serializableCache(), { maxBytes });
     durable = serialized;
     if (writeError) {
       writeError = false;
       try { errorHandler?.(null); } catch {}
     }
+    if (playbackCache !== null) playbackCleanupPending = false;
   } catch (e) {
-    try { fs.unlinkSync(temporary); } catch {}
     cache = JSON.parse(durable);
     writeError = true;
-    try { errorHandler?.({ error: '保存失败，请检查磁盘空间或目录权限；本次变更未能保存。' }); } catch {}
+    const message = e.code === 'STORE_TOO_LARGE'
+      ? e.message
+      : '保存失败，请检查磁盘空间或目录权限；本次变更未能保存。';
+    try { errorHandler?.({ error: message }); } catch {}
     throw e;
   }
 }
 
-function init(filePath, { safeStorage: injectedSafeStorage } = {}) {
+function playbackPathFor(filePath) {
+  const extension = path.extname(filePath);
+  return path.join(path.dirname(filePath), `${path.basename(filePath, extension)}.playback${extension || '.json'}`);
+}
+
+function playbackReadFailure(cause) {
+  const error = new Error(PLAYBACK_READ_ERROR_MESSAGE, { cause });
+  error.code = 'PLAYBACK_READ_FAILED';
+  return error;
+}
+
+function loadPlaybackCache() {
+  if (playbackCache) return playbackCache;
+  if (playbackReadError) throw playbackReadError;
+  const legacy = cache?.playback && typeof cache.playback === 'object' && !Array.isArray(cache.playback)
+    ? cache.playback : null;
+  try {
+    if (fs.existsSync(playbackFile)) {
+      if (fs.statSync(playbackFile).size > playbackMaxBytes) {
+        throw Object.assign(new Error('PLAYBACK_TOO_LARGE'), { code: 'STORE_TOO_LARGE' });
+      }
+      const parsed = JSON.parse(fs.readFileSync(playbackFile, 'utf8'));
+      if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) throw new TypeError('Invalid playback document');
+      playbackCache = { ...parsed };
+      if (legacy) {
+        let changed = false;
+        for (const [seriesId, record] of Object.entries(legacy)) {
+          const current = playbackCache[seriesId];
+          if (!current || Number(record?.updatedAt) > Number(current?.updatedAt)) {
+            playbackCache[seriesId] = record;
+            changed = true;
+          }
+        }
+        if (changed) writeJsonAtomic(playbackFile, playbackCache, { maxBytes: playbackMaxBytes });
+      }
+    } else {
+      playbackCache = legacy || {};
+      if (legacy && Object.keys(legacy).length) {
+        writeJsonAtomic(playbackFile, legacy, { maxBytes: playbackMaxBytes });
+      }
+    }
+    if (cache && Object.prototype.hasOwnProperty.call(cache, 'playback')) {
+      delete cache.playback;
+      if (!readError) {
+        try {
+          flush();
+          playbackCleanupPending = false;
+        } catch {
+          playbackCleanupPending = true;
+        }
+      }
+    }
+    return playbackCache;
+  } catch (error) {
+    if (error.code === 'ENOENT') {
+      playbackCache = legacy || {};
+      return playbackCache;
+    }
+    playbackReadError = playbackReadFailure(error);
+    reportReadError(PLAYBACK_READ_ERROR_MESSAGE);
+    throw playbackReadError;
+  }
+}
+
+function init(filePath, {
+  safeStorage: injectedSafeStorage,
+  maxBytes: injectedMaxBytes,
+  playbackMaxBytes: injectedPlaybackMaxBytes,
+} = {}) {
   dataFile = filePath;
+  playbackFile = playbackPathFor(filePath);
   safeStorage = injectedSafeStorage || null;
+  maxBytes = Number(injectedMaxBytes) > 0 ? Number(injectedMaxBytes) : 32 * 1024 * 1024;
+  playbackMaxBytes = Number(injectedPlaybackMaxBytes) > 0 ? Number(injectedPlaybackMaxBytes) : 16 * 1024 * 1024;
   cache = null;
+  playbackCache = null;
   readError = null;
+  playbackReadError = null;
+  playbackCleanupPending = false;
   writeError = false;
   runtimeProxyPassword = '';
   proxyPasswordWarning = '';
   loadCache();
+  try { loadPlaybackCache(); }
+  catch { /* The error handler has already reported it; keep the rest of the app usable. */ }
 }
 
 function getSettings() {
@@ -290,14 +373,49 @@ function saveSeries(list) {
 
 // ===== 播放进度（断点续播）=====
 function getPlayback() {
-  const c = loadCache();
-  if (!c.playback || typeof c.playback !== 'object') c.playback = {};
-  return c.playback;
+  loadCache();
+  return structuredClone(loadPlaybackCache());
 }
 
 function savePlayback(map) {
-  loadCache().playback = map || {};
-  flush();
+  loadCache();
+  if (readError) throw readError;
+  loadPlaybackCache();
+  if (playbackCleanupPending) {
+    delete cache.playback;
+    try {
+      flush();
+      playbackCleanupPending = false;
+    } catch {
+      /* Playback is saved independently; a later main save will retry the cleanup. */
+    }
+  }
+  const next = structuredClone(map || {});
+  try {
+    writeJsonAtomic(playbackFile, next, { maxBytes: playbackMaxBytes });
+    playbackCache = next;
+    if (writeError) {
+      writeError = false;
+      try { errorHandler?.(null); } catch {}
+    }
+  } catch (error) {
+    writeError = true;
+    const message = error.code === 'STORE_TOO_LARGE'
+      ? error.message
+      : '播放进度保存失败，已保留上次成功记录；请检查磁盘空间或目录权限。';
+    try { errorHandler?.({ error: message }); } catch {}
+    throw error;
+  }
+}
+
+function updatePlayback(updater) {
+  loadCache();
+  if (readError) throw readError;
+  loadPlaybackCache();
+  const next = structuredClone(playbackCache || {});
+  const result = updater(next);
+  savePlayback(next);
+  return result;
 }
 
 // ===== 合并任务记录 =====
@@ -325,6 +443,7 @@ module.exports = {
   saveSeries,
   getPlayback,
   savePlayback,
+  updatePlayback,
   getMergeTasks,
   saveMergeTasks,
 };

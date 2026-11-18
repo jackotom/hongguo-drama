@@ -12,10 +12,11 @@ const { runMerge, stopMergeChildren, publishMergedOutput } = require('../src/nat
 const { convertBytevc2 } = require('../src/native/bytevc2');
 const { fail, numericId } = require('./storage.cjs');
 const { throwIfAborted } = require('../src/native/request-signal');
+const { localMediaEnv } = require('../src/native/child-env');
 const MAX_BYTES = 1024 * 1024 * 1024;
 const tools = { ffmpeg: process.env.FFMPEG_PATH || '/usr/local/bin/ffmpeg', ffprobe: process.env.FFPROBE_PATH || '/usr/local/bin/ffprobe', librempeg: process.env.LIBREMPEG_PATH || '/usr/local/bin/librempeg' };
 function run(executable, args, signal, timeout = 60000) {
-  return new Promise((resolve, reject) => execFile(executable, args, { signal, timeout, maxBuffer: 4 * 1024 * 1024 }, (error, stdout, stderr) => {
+  return new Promise((resolve, reject) => execFile(executable, args, { signal, timeout, maxBuffer: 4 * 1024 * 1024, env: localMediaEnv() }, (error, stdout, stderr) => {
     if (error) reject(fail(signal?.aborted ? '任务已取消' : `媒体工具执行失败（${typeof error.code === 'number' ? error.code : error.code || '未知'}）`));
     else resolve({ stdout, stderr });
   }));

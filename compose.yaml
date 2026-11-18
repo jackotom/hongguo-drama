@@ -1,3 +1,4 @@
+# Hongguo Drama 7.6 release source; Docker is not a 7.6 Release attachment.
 services:
   hongguo:
     image: hongguo-drama:7.5

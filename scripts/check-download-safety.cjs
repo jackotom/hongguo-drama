@@ -28,6 +28,7 @@ function load(settings = {}, overrides = {}, env = process.env, options = {}) {
   const store = { getSettings: () => ({ ...stored }), saveTasks(tasks) { if (options.failSaveTasks) throw new Error('disk full'); savedTasks = JSON.parse(JSON.stringify(tasks)); }, saveSeries() {}, saveMergeTasks() {}, saveSettings(next) { stored = { ...next }; } };
   const context = vm.createContext({ require: name => overrides[name] || (name === 'electron' ? electron : name === './src/store' ? store : req(name)), __dirname: path.dirname(source), process: { ...process, env: { ...env } }, console: { log() {}, warn() {}, error() {} }, Buffer, URL, Response, Request, Headers, AbortController, setTimeout, clearTimeout });
   vm.runInContext(fs.readFileSync(source, 'utf8'), context, { filename: source });
+  context.readFileIdentity = req('./src/native/file-identity').readFileIdentity;
   require('./fixtures/trusted-ipc.cjs')(context, handlers);
   const pump = context.pumpQueue;
   context.pumpQueue = () => {}; // Inspect queued destinations without fetching media.
@@ -443,7 +444,10 @@ async function crashedTemporary(overrides = {}) {
     for (const channel of ['delete-series-files', 'delete-all-downloaded', 'delete-episode-file']) {
       let blocked;
       const fakeFs = Object.create(fs);
-      fakeFs.unlinkSync = p => { if (p === blocked) throw Object.assign(new Error('locked fixture'), { code: 'EBUSY' }); fs.unlinkSync(p); };
+      fakeFs.renameSync = (from, to) => {
+        if (from === blocked) throw Object.assign(new Error('locked fixture'), { code: 'EBUSY' });
+        fs.renameSync(from, to);
+      };
       const h = load({}, { fs: fakeFs }); h.set('seriesRegistry', series());
       const one = task('one', h.dir), two = task('two', h.dir, 'completed', 'two.mp4', 2);
       file(one.savePath); file(two.savePath); blocked = one.savePath; h.set('downloadTasks', [one, two]);
@@ -477,7 +481,10 @@ async function crashedTemporary(overrides = {}) {
   await check('failed temporary cleanup reports failure without counting its bytes', async () => {
     let blocked;
     const fakeFs = Object.create(fs);
-    fakeFs.unlinkSync = p => { if (p === blocked) throw Object.assign(new Error('locked fixture'), { code: 'EBUSY' }); fs.unlinkSync(p); };
+    fakeFs.renameSync = (from, to) => {
+      if (from === blocked) throw Object.assign(new Error('locked fixture'), { code: 'EBUSY' });
+      fs.renameSync(from, to);
+    };
     const h = load({}, { fs: fakeFs }); h.set('seriesRegistry', series());
     const one = task('one', h.dir); file(one.savePath); blocked = one.savePath + '.enc.tmp'; file(blocked);
     h.set('downloadTasks', [one]);
@@ -506,7 +513,7 @@ async function crashedTemporary(overrides = {}) {
       const ownedMerge = path.join(h.dir, 'my-custom-export.mp4'); file(ownedMerge);
       h.set('downloadTasks', sharedBy === 'download' ? [own, foreign] : [own]);
       const ended = Date.now() + 5000;
-      h.set('mergeTasks', [{ seriesId: 'S', output: ownedMerge, status: 'completed', endTime:ended }, { seriesId: 'OTHER', output: kept[0], status: 'completed', endTime:ended }, { seriesId: 'S', output: kept[4], status: 'completed', endTime:ended }, { seriesId: 'OTHER', output: kept[4], status: 'completed', endTime:ended }]);
+      h.set('mergeTasks', [{ seriesId: 'S', output: ownedMerge, status: 'completed', startTime:ended-5000, endTime:ended }, { seriesId: 'OTHER', output: kept[0], status: 'completed', startTime:ended-5000, endTime:ended }, { seriesId: 'S', output: kept[4], status: 'completed', startTime:ended-5000, endTime:ended }, { seriesId: 'OTHER', output: kept[4], status: 'completed', startTime:ended-5000, endTime:ended }]);
       const result = await h.handlers['delete-series-files']({}, 'S');
       assert.equal(result.success, true); assert.equal(result.count, 2); assert.equal(result.freed, 240000);
       assert.equal(fs.existsSync(ownedMerge), false);
@@ -584,14 +591,18 @@ async function crashedTemporary(overrides = {}) {
   });
   await check('shared directory ownership agrees across storage, record cleanup, listing, purge, merge and delete', async () => {
     let mergedInputs;
-    const h = load({}, { './src/native/merge-runner': { runMerge: async ({ task, ordered }) => { mergedInputs = ordered.map(item => item.path); task.status = 'completed'; } } });
+    const h = load({}, { './src/native/merge-runner': { runMerge: async ({ task, ordered }) => {
+      mergedInputs = ordered.map(item => item.path); fs.writeFileSync(task.output, Buffer.alloc(120000));
+      task.totalDuration = 20; task.hasAudio = false; task.status = 'completed';
+    } } });
+    h.set('probeVideoInfo', async () => ({ duration: 20, w: 1080, h: 1920, audio: false }));
     h.set('seriesRegistry', [...series(), { series_id: 'OTHER', series_title: 'Other', episodes: [{ vid_index: 1 }] }]);
     const dir = h.context.seriesDownloadDir(h.dir, 'S', 'Short'); fs.mkdirSync(dir, { recursive: true });
     const own = task('one', dir, 'completed', 'Short 001.mp4'); file(own.savePath);
     const foreign = task('foreign', dir, 'completed', 'Other 001.mp4'); foreign.hongguoInfo.series_id = 'OTHER'; foreign.hongguoInfo.series_title = 'Other'; file(foreign.savePath);
     const ownMerge = path.join(dir, 'custom export 009.mp4'), foreignMerge = path.join(dir, 'Other 合集.mp4'); file(ownMerge); fs.writeFileSync(foreignMerge, Buffer.alloc(240000));
     const ended = Date.now() + 5000;
-    h.set('downloadTasks', [own, foreign]); h.set('mergeTasks', [{ seriesId: 'S', output: ownMerge, status: 'completed', endTime:ended }, { seriesId: 'OTHER', output: foreignMerge, status: 'completed', endTime:ended }]);
+    h.set('downloadTasks', [own, foreign]); h.set('mergeTasks', [{ seriesId: 'S', output: ownMerge, status: 'completed', startTime:ended-5000, endTime:ended }, { seriesId: 'OTHER', output: foreignMerge, status: 'completed', startTime:ended-5000, endTime:ended }]);
     const usage = () => h.handlers['get-storage-usage']({});
     const before = (await usage()).series.find(row => row.series_id === 'S');
     assert.equal(before.files, 2); assert.equal(before.bytes, 240000); assert.equal(before.merged, 1);
@@ -603,10 +614,68 @@ async function crashedTemporary(overrides = {}) {
     assert.equal(merge.success, true, merge.error); assert.equal(JSON.stringify(mergedInputs), JSON.stringify([own.savePath]));
     const removed = await h.handlers['delete-series-files']({}, 'S');
     assert.equal(removed.success, false); assert.match(removed.error || removed.warning || '', /下载身份|保留/);
-    assert.equal(removed.count, 1);
+    assert.equal(removed.count, 2);
     assert.equal(fs.existsSync(own.savePath), true, 'file without a record must remain');
     assert.equal(fs.existsSync(foreign.savePath), true); assert.equal(fs.existsSync(foreignMerge), true);
     const after = (await usage()).series.find(row => row.series_id === 'S'); assert.equal(after.files, 1); assert.equal(after.bytes, 120000);
+  });
+  await check('merge deletes only captured source episodes after successful output', async () => {
+    for (const fail of [false, true]) {
+      const h = load({}, { './src/native/merge-runner': { runMerge: async ({ task }) => {
+        if (fail) throw new Error('fixture merge failed');
+        fs.writeFileSync(task.output, Buffer.alloc(120000));
+        task.totalDuration = 20;
+        task.hasAudio = false;
+        task.status = 'completed';
+      } } });
+      h.set('probeVideoInfo', async () => ({ duration: 20, w: 1080, h: 1920, audio: false }));
+      h.context.resolveFfmpeg = () => '/fixture/ffmpeg';
+      h.set('seriesRegistry', series());
+      const one = task('one', h.dir, 'completed', 'Short 001.mp4', 1);
+      const two = task('two', h.dir, 'completed', 'Short 002.mp4', 2);
+      file(one.savePath); file(two.savePath);
+      one.fileIdentity = h.context.readFileIdentity(one.savePath);
+      two.fileIdentity = h.context.readFileIdentity(two.savePath);
+      h.set('downloadTasks', [one, two]);
+
+      const started = await h.handlers['merge-series']({}, 'S', '', { deleteSources: true });
+      assert.equal(started.success, true, started.error);
+      await h.run('[...mergeRuns.values()][0]');
+      const merged = h.run('mergeTasks[0]');
+      assert.equal(merged.status, fail ? 'failed' : 'completed');
+      assert.equal(fs.existsSync(one.savePath), fail);
+      assert.equal(fs.existsSync(two.savePath), fail);
+      assert.equal(h.run('downloadTasks.length'), fail ? 2 : 0);
+      if (!fail) {
+        assert.equal(merged.cleanedCount, 2);
+        assert.equal(fs.existsSync(merged.output), true);
+      }
+    }
+  });
+  await check('merge output verification failure preserves every source episode', async () => {
+    const h = load({}, { './src/native/merge-runner': { runMerge: async ({ task }) => {
+      fs.writeFileSync(task.output, Buffer.alloc(120000));
+      task.totalDuration = 20; task.hasAudio = false; task.status = 'completed';
+    } } });
+    h.context.resolveFfmpeg = () => '/fixture/ffmpeg';
+    h.set('probeVideoInfo', async () => ({ duration: 5, w: 1080, h: 1920, audio: false }));
+    h.set('seriesRegistry', series());
+    const one = task('one', h.dir, 'completed', 'Short 001.mp4', 1);
+    const two = task('two', h.dir, 'completed', 'Short 002.mp4', 2);
+    file(one.savePath); file(two.savePath);
+    one.fileIdentity = h.context.readFileIdentity(one.savePath);
+    two.fileIdentity = h.context.readFileIdentity(two.savePath);
+    h.set('downloadTasks', [one, two]);
+
+    assert.equal((await h.handlers['merge-series']({}, 'S', '', { deleteSources: true })).success, true);
+    await h.run('[...mergeRuns.values()][0]');
+    const merged = h.run('mergeTasks[0]');
+    assert.equal(merged.status, 'failed');
+    assert.match(merged.error, /校验失败/);
+    assert.equal(fs.existsSync(one.savePath), true);
+    assert.equal(fs.existsSync(two.savePath), true);
+    assert.equal(h.run('downloadTasks.length'), 2);
+    assert.equal(fs.existsSync(merged.output), true, 'failed output remains inspectable');
   });
   await check('shared directory unregistered same-title episodes remain ambiguous and preserved', async () => {
     const h = load(); const entries = series(); entries.push({ ...entries[0], series_id: 'OTHER' }); h.set('seriesRegistry', entries);
@@ -724,7 +793,7 @@ async function crashedTemporary(overrides = {}) {
   });
   await check('episode cleanup retains its recovery record when only a temporary file fails deletion', async () => {
     let blocked; const fakeFs = Object.create(fs);
-    fakeFs.unlinkSync = name => { if (name === blocked) throw new Error('fixture locked'); fs.unlinkSync(name); };
+    fakeFs.renameSync = (from, to) => { if (from === blocked) throw new Error('fixture locked'); fs.renameSync(from, to); };
     const h = load({}, { fs: fakeFs }), own = task('one', h.dir); h.set('downloadTasks', [own]); h.set('seriesRegistry', series());
     file(own.savePath); blocked = own.savePath + '.enc.tmp'; file(blocked);
     const result = await h.handlers['delete-episode-file']({}, 'S', 1);
@@ -878,7 +947,10 @@ async function crashedTemporary(overrides = {}) {
     await check(`deletion cancels and persists scheduled retries even when records remain: ${channel}`, async () => {
       for (const outcome of ['deleted', 'file-failure', 'conflict', 'save-failure']) {
         let disk, blocked;
-        const fakeFs = Object.create(fs); fakeFs.unlinkSync = name => { if (name === blocked) throw new Error('fixture locked'); fs.unlinkSync(name); };
+        const fakeFs = Object.create(fs); fakeFs.renameSync = (from, to) => {
+          if (from === blocked) throw new Error('fixture locked');
+          fs.renameSync(from, to);
+        };
         const store = { getSettings: () => ({ auto_delete_watched: true }), saveTasks: rows => { if (outcome === 'save-failure') throw new Error('fixture save failure'); disk = structuredClone(rows); } };
         const h = load({ auto_delete_watched: true }, { fs: fakeFs, './src/store': store }); h.set('seriesRegistry', series());
         const own = { ...task('one', h.dir, 'failed'), retryAt: Date.now() + 60000, sourceRetries: 1, error: '来源暂不可用 将在 3 分钟后自动重试（1/3）。' };
@@ -978,6 +1050,122 @@ async function crashedTemporary(overrides = {}) {
     const added = await h.context.enqueueEpisodes({ seriesId: 'S', seriesTitle: 'Short', episodes: [series()[0].episodes[0]] });
     assert.equal(added, 1); assert.equal(h.run('downloadTasks.length'), 1); assert.equal(h.run('downloadTasks[0].status'), 'pending');
   });
+  await check('issue167 metadata-only identity drift keeps a completed file playable', async () => {
+    const h = load(); h.set('seriesRegistry', series());
+    const one = task('one', h.dir); file(one.savePath);
+    one.fileIdentity = h.context.readFileIdentity(one.savePath);
+    fs.utimesSync(one.savePath, new Date(1000000000000), new Date(1000000000000));
+    h.set('downloadTasks', [one]);
+
+    const tasks = await h.handlers['get-download-tasks']();
+    assert.equal(tasks[0].status, 'completed');
+    const detail = await h.handlers['get-series-episodes']({}, 'S');
+    assert.equal(detail.data.episodes[0].status, 'completed');
+    assert.equal(typeof detail.data.episodes[0].fileUrl, 'string');
+  });
+  await check('issue167 metadata-only identity drift cannot authorize file deletion', async () => {
+    const h = load(); h.set('seriesRegistry', series());
+    const one = task('one', h.dir); file(one.savePath);
+    one.directoryIdentity = h.context.readDirectoryIdentity(h.dir);
+    one.fileIdentity = h.context.readFileIdentity(one.savePath);
+    fs.utimesSync(one.savePath, new Date(1000000000000), new Date(1000000000000));
+    h.set('downloadTasks', [one]);
+
+    const result = await h.handlers['delete-task']({}, 'one', { deleteFiles: true });
+    assert.equal(result.success, false);
+    assert.match(result.error, /身份|保留/);
+    assert.equal(fs.existsSync(one.savePath), true);
+    assert.equal(h.run('downloadTasks.length'), 1);
+  });
+  await check('issue167 valid legacy records remain playable and can be cleaned', async () => {
+    const h = load(); h.set('seriesRegistry', series());
+    const one = task('one', h.dir); file(one.savePath);
+    one.directoryIdentity = h.context.readDirectoryIdentity(h.dir);
+    h.set('downloadTasks', [one]);
+
+    const tasks = await h.handlers['get-download-tasks']();
+    assert.equal(tasks[0].status, 'completed');
+    const detail = await h.handlers['get-series-episodes']({}, 'S');
+    assert.equal(detail.data.episodes[0].status, 'completed');
+    assert.equal(typeof detail.data.episodes[0].fileUrl, 'string');
+
+    const result = await h.handlers['delete-task']({}, 'one', { deleteFiles: true });
+    assert.equal(result.success, true);
+    assert.equal(fs.existsSync(one.savePath), false);
+    assert.equal(h.run('downloadTasks.length'), 0);
+  });
+  await check('issue167 same-millisecond legacy start and end remain recoverable', async () => {
+    const h = load(); h.set('seriesRegistry', series());
+    const one = task('one', h.dir); file(one.savePath);
+    one.endTime = one.startTime;
+    h.set('downloadTasks', [one]);
+    assert.equal((await h.handlers['get-download-tasks']())[0].status, 'completed');
+  });
+  await check('issue167 invalid legacy task dates cannot claim an arbitrary existing file', async () => {
+    const h = load(); h.set('seriesRegistry', series());
+    const one = task('one', h.dir); file(one.savePath);
+    one.endTime = 1;
+    h.set('downloadTasks', [one]);
+
+    const tasks = await h.handlers['get-download-tasks']();
+    assert.equal(tasks[0].status, 'failed');
+  });
+  await check('issue167 a file older than the legacy download start cannot be claimed', async () => {
+    const h = load(); h.set('seriesRegistry', series());
+    const one = task('one', h.dir); file(one.savePath);
+    one.startTime = Date.now() + 60000;
+    one.endTime = one.startTime + 5000;
+    h.set('downloadTasks', [one]);
+    assert.equal((await h.handlers['get-download-tasks']())[0].status, 'failed');
+  });
+  await check('deletion quarantine preserves a same-path file replaced after the identity check', async () => {
+    const h = load(); h.set('seriesRegistry', series());
+    const one = task('one', h.dir); file(one.savePath);
+    one.fileIdentity = h.context.readFileIdentity(one.savePath);
+    h.set('downloadTasks', [one]);
+    const rename = fs.renameSync;
+    fs.renameSync = (from, to) => {
+      if (from === one.savePath && path.basename(to).startsWith('.hongguo-delete-')) {
+        fs.writeFileSync(from, Buffer.alloc(120000, 7));
+      }
+      return rename(from, to);
+    };
+    let result;
+    try { result = await h.handlers['delete-task']({}, 'one', { deleteFiles: true }); }
+    finally { fs.renameSync = rename; }
+    assert.equal(result.success, false);
+    assert.equal(result.count, 0);
+    assert.match(result.error, /变化|保留/);
+    assert.equal(fs.existsSync(one.savePath), true);
+    assert.equal(fs.readFileSync(one.savePath)[0], 7);
+    assert.equal(h.run('downloadTasks.length'), 1);
+  });
+  await check('issue167 same-size in-place rewrite cannot remain completed', async () => {
+    const h = load(); h.set('seriesRegistry', series());
+    const one = task('one', h.dir); file(one.savePath);
+    one.fileIdentity = h.context.readFileIdentity(one.savePath);
+    h.set('downloadTasks', [one]);
+
+    fs.writeFileSync(one.savePath, Buffer.alloc(120000, 1));
+    const tasks = await h.handlers['get-download-tasks']();
+    assert.equal(tasks[0].status, 'failed');
+    const detail = await h.handlers['get-series-episodes']({}, 'S');
+    assert.equal(detail.data.episodes[0].status, 'missing');
+  });
+  await check('issue167 a same-path replacement still cannot remain completed', async () => {
+    const h = load(); h.set('seriesRegistry', series());
+    const one = task('one', h.dir); file(one.savePath);
+    one.directoryIdentity = h.context.readDirectoryIdentity(h.dir);
+    one.fileIdentity = h.context.readFileIdentity(one.savePath);
+    h.set('downloadTasks', [one]);
+
+    fs.renameSync(one.savePath, one.savePath + '.original');
+    file(one.savePath);
+    const tasks = await h.handlers['get-download-tasks']();
+    assert.equal(tasks[0].status, 'failed');
+    const detail = await h.handlers['get-series-episodes']({}, 'S');
+    assert.equal(detail.data.episodes[0].status, 'missing');
+  });
   await check('delete downloaded files preserves active and waiting downloads', async () => {
     const h = load(); const completed = task('one', h.dir), active = task('two', h.dir, 'downloading', 'two.mp4', 2), waiting = task('three', h.dir, 'pending', 'three.mp4', 3);
     file(completed.savePath); h.set('seriesRegistry', series()); h.set('downloadTasks', [completed, active, waiting]); h.set('downloadQueue', [waiting]);
@@ -1057,12 +1245,12 @@ async function crashedTemporary(overrides = {}) {
   });
   await check('store save failure is reported and retains the durable snapshot', () => {
     const dir = path.join(root, 'store'); fs.mkdirSync(dir); const target = path.join(dir, 'data.json');
-    let fail = false; const fakeFs = Object.create(fs); fakeFs.writeFileSync = (...args) => { if (fail) throw new Error('simulated disk full'); return fs.writeFileSync(...args); };
-    const context = vm.createContext({ require: name => name === 'fs' ? fakeFs : req(name), module: { exports: {} }, Buffer, URL, structuredClone, console: { error() {} } });
+    const context = vm.createContext({ require: name => name === './native/atomic-json' ? req('./src/native/atomic-json') : req(name), module: { exports: {} }, Buffer, URL, structuredClone, console: { error() {} } });
     vm.runInContext(fs.readFileSync(path.resolve(__dirname, '../src/store.js'), 'utf8'), context);
-    const store = context.module.exports; store.init(target); store.saveTasks([{ id: 'saved' }]); const before = fs.readFileSync(target, 'utf8'); fail = true;
-    assert.throws(() => store.saveTasks([{ id: 'unsaved' }]), /simulated disk full/);
-    assert.equal(fs.readFileSync(target, 'utf8'), before); assert.equal(store.getTasks()[0].id, 'saved');
+    const store = context.module.exports; store.init(target); store.saveTasks([{ id: 'saved' }]); const before = fs.readFileSync(target, 'utf8');
+    const moved = dir + '-moved'; fs.renameSync(dir, moved); fs.writeFileSync(dir, 'blocks directory recreation');
+    assert.throws(() => store.saveTasks([{ id: 'unsaved' }]));
+    assert.equal(fs.readFileSync(path.join(moved, 'data.json'), 'utf8'), before); assert.equal(store.getTasks()[0].id, 'saved');
   });
   await check('folder names reject Windows reserved device names without splitting emoji', () => {
     const name = load().context.sanitizeFolderName;
