@@ -24,15 +24,15 @@
 
 ## 下载与安装
 
-**当前发行目标：7.6**（内部`7.6.0`，桌面构建`7.6.1`）。本轮集中修复下载与合并数据安全、并发进度覆盖、双击选集冲突、删除误操作和代理边界；统一发行双Mac、Windows x64与Linux x64 AppImage。
+**当前正式版：7.6**（内部`7.6.0`，桌面构建`7.6.1`）。本轮集中修复下载与合并数据安全、并发进度覆盖、双击选集冲突、删除误操作和代理边界；统一发行双Mac、Windows x64与Linux x64 AppImage。
 
-7.6正在完成四平台构建、签名和验收；正式公开前不设 Latest，最终状态以[7.6记录](docs/release-7.6.md)为准。
+7.6已于2026-11-18 18:17:30（Asia/Shanghai）公开并设Latest；23份正式附件、远端SHA256与匿名下载入口均已核对，最终状态以[7.6记录](docs/release-7.6.md)为准。
 
-| 平台 | 7.6发行目标 | 本轮状态 |
+| 平台 | 7.6正式附件 | 验收状态 |
 |---|---|---|
 | Apple芯片Mac，macOS 13+ | [DMG](https://github.com/jackotom/hongguo-drama/releases/download/v7.6/Hongguo-7.6-mac-arm64.dmg) | 已签名、公证、装订 |
 | Intel Mac，macOS 13+ | [DMG](https://github.com/jackotom/hongguo-drama/releases/download/v7.6/Hongguo-7.6-mac-x64.dmg) | 已签名、公证、装订；实体Intel未验 |
-| Windows x64 | [安装版](https://github.com/jackotom/hongguo-drama/releases/download/v7.6/hongguo-downloader-7.6-win-x64-setup.exe) · [便携EXE](https://github.com/jackotom/hongguo-drama/releases/download/v7.6/hongguo-downloader-7.6-win-x64.exe) · [便携ZIP](https://github.com/jackotom/hongguo-drama/releases/download/v7.6/hongguo-downloader-7.6-win-x64.zip) | EXE未签名；验收边界见回执 |
+| Windows x64 | [安装版](https://github.com/jackotom/hongguo-drama/releases/download/v7.6/hongguo-downloader-7.6-win-x64-setup.exe) · [便携EXE](https://github.com/jackotom/hongguo-drama/releases/download/v7.6/hongguo-downloader-7.6-win-x64.exe) · [便携ZIP](https://github.com/jackotom/hongguo-drama/releases/download/v7.6/hongguo-downloader-7.6-win-x64.zip) | EXE未签名；真实下载、播放及安装升级在GitHub Windows虚拟机通过 |
 | Linux x64 | [AppImage](https://github.com/jackotom/hongguo-drama/releases/download/v7.6/hongguo-downloader-7.6-linux-x64.AppImage) | 赋予执行权限后运行；CI虚拟机验收 |
 
 [7.6正式发行页](https://github.com/jackotom/hongguo-drama/releases/tag/v7.6) · [SHA256](https://github.com/jackotom/hongguo-drama/releases/download/v7.6/SHA256SUMS.txt) · [精确源码](https://github.com/jackotom/hongguo-drama/releases/download/v7.6/hongguo-drama-7.6-source.zip)。实际状态见[7.6记录](docs/release-7.6.md)。上游部分网页片源仍可能404、只提供预览或超时，不保证所有内容永久可播。

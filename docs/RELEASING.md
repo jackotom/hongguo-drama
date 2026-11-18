@@ -5,7 +5,9 @@
 - 每次发行页必须在附件列表前的醒目位置保留以下推荐；这是独立第三方项目，不计入本项目附件和平台验收：
   > **Android手机APK／Android TV版：** 请前往 [N3urda/hongguoTV](https://github.com/N3urda/hongguoTV) 下载。该项目独立维护；版本、兼容性与测试状态以该项目发布页为准，不计入本项目的四平台附件或验收。
 
-# 7.5最新正式发行
+# 7.6最新正式发行
+
+7.6已于2026-11-18 18:17:30（Asia/Shanghai）正式公开并设Latest，内部7.6.0、桌面构建7.6.1，冻结源码`6a3df3b0b03e8a63589a73e375e9058f181930e8`，标签`v7.6`，Release ID `449788313`。双Mac、Windows x64、Linux x64 AppImage共23份正式附件；远端大小／SHA256、更新清单和全部23个匿名下载入口已核对。双Mac本轮签名、公证、装订；Windows EXE未签名，真实下载和安装升级在GitHub Windows虚拟机通过；Linux原生CI真实静音播放两集。完整回执见[7.6记录](release-7.6.md)。
 
 7.5已于2026-11-17 06:40:02（Asia/Shanghai）正式公开并设Latest，内部7.5.0、桌面构建7.5.2，冻结源码`4ffff289d6dd289e589a0fd0e65aa7aa5c2a7567`，标签`v7.5`，Release ID `446852363`。按明确授权发布双Mac、Windows x64 与 Linux x64 AppImage 四平台，共23份正式附件；远端大小／SHA256、两更新清单及总校验清单已核对。
 

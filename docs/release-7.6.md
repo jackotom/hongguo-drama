@@ -1,6 +1,6 @@
 # 7.6 四平台正式发行
 
-状态：发行目标。公开版本 `7.6`，内部版本 `7.6.0`，桌面构建 `7.6.1`。
+状态：已于 2026-11-18 18:17:30（Asia/Shanghai）正式公开并设 Latest。公开版本 `7.6`，内部版本 `7.6.0`，桌面构建 `7.6.1`，冻结源码 `6a3df3b0b03e8a63589a73e375e9058f181930e8`，标签 `v7.6`，Release ID `449788313`。
 
 发行范围：macOS Apple Silicon arm64、macOS Intel x64、Windows x64、Linux x64 AppImage。Docker、TV APK与手机APK不在本轮附件或验收范围。
 
@@ -27,4 +27,9 @@
 
 ## 最终回执
 
-正式发布结果、冻结源码、附件数量、签名公证、真实素材与平台验收边界将在公开完成后补入本节。后置文档不移动冻结标签或改变已发布附件字节。
+- 双 Mac、Windows x64、Linux x64 AppImage 共 23 份正式附件，总大小 1,560,413,823 字节；22 份文件逐项核对本地与 GitHub SHA256、远端大小及 `v7.6` 下载地址，全部 23 个匿名入口返回可下载内容。
+- 双 Mac App 与 DMG 本轮重新 Developer ID 签名、Apple 公证 Accepted 并装订；最终更新 ZIP 从签名后的 App 重新生成，`latest-mac.yml` 的双架构文件名、SHA512 与大小通过核对。arm64 最终 App 实际静音在线播放两集到 10.6／13.6 秒后暂停，应用音量 0；x64 经 Rosetta 启动并显示 7.6。
+- Windows 在 GitHub Windows 虚拟机完成真实 App 下载队列、暂停恢复、逆序重试、完成分集回绑、两集静音播放，以及新装、同版重装和真实 1.80 → 7.6 升级资料保留。EXE 未签名；该结果不是实体电脑、独显或长期稳定性验收。
+- Linux AppImage 在原生 Ubuntu x64 runner 启动，CPU 软件解码真实下载的两集 1080P 红果素材，分别静音播放 10.176／10 秒。
+- 精确源码、各平台 FFmpeg／Librempeg 对应源码、Windows 与 Mac 更新清单及 `SHA256SUMS.txt` 均随 Release 提供。未替换本机正式安装；Docker、TV 和手机 APK 不在本次附件或验收范围。
+- 后置文档不移动 `v7.6` 冻结标签，不改变已发布附件字节。
