@@ -39,6 +39,15 @@ an empty legacy POST, preserves exact episode matching and accepts both array
 and object rendition lists. No account cookies, tokens or persistent identity
 are added. Validation and scope are recorded in docs/issue-130-video-tab.md.
 
+Playback video_tab authorization updated 2026-11-20 using the bodyless V5 GET
+envelope documented and ported by ch6vip/novel-sound, commit
+619114169614f883a9a3073ba8ab31e8587b2bcd (GPL-3.0-only):
+https://github.com/ch6vip/novel-sound
+The player-family request carries x-khronos, x-helios and x-medusa, signs the
+empty-body digest, and omits body-describing headers. The local implementation
+reuses playback-v5.js, retains strict query fields, exact episode matching and
+bounded retries, and adds no account cookies or persistent identity.
+
 Playback-only 551 x-argus and x-ladon signing (6.9)
 Adapted from N3urda/hongguoTV, commit
 7444bb01aec7b0420740103e551c45f1f66101c9 (GPL-3.0-only),

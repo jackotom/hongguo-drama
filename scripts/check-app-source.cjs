@@ -69,6 +69,11 @@ function fixture({ wrongVid = false, fallback = 'https://vod.snssdk.com/info', m
       assertPlayerSignature(config);
       return emptyCurrent ? { status: 200, headers: {}, data: '' } : modelResponse;
     }
+    if (new URL(config.url).pathname === '/reading/bookapi/video_tab/multi_video_model/v1/') {
+      assert.equal(config.method, 'GET');
+      assert.equal(config.data, null);
+      return modelResponse;
+    }
     if (config.method === 'POST') {
       assert.match(config.headers['User-Agent'], /^com\.phoenix\.read\/74332 /);
       const query = new URL(config.url).searchParams;
@@ -154,10 +159,10 @@ const checks = [
     assert.ok(cdids.every(id => id === playbackDevice.cdid), 'cdid must remain stable across lookups');
     assert.match(cdids[0], /^[a-f\d]{8}(?:-[a-f\d]{4}){3}-[a-f\d]{12}$/i);
     assert.equal(f.calls.length, 10, 'each lookup retains its two-stage flow');
-    const legacy = fixture({ emptyCurrent: true });
-    await legacy.fetch('11');
-    assert.equal(legacy.calls.length, 4, 'empty current response retains one signed legacy request and its verified metadata');
-    assert.equal(legacy.calls[0].method, 'POST'); assert.equal(legacy.calls[1].method, 'POST'); assert.equal(legacy.calls[2].method, 'POST');
+    const emptyV5 = fixture({ emptyCurrent: true });
+    await emptyV5.fetch('11');
+    assert.equal(emptyV5.calls.length, 4, 'empty v5 responses recover through video_tab and its verified metadata');
+    assert.deepEqual(emptyV5.calls.map(call => call.method || 'GET'), ['POST', 'POST', 'GET', 'GET']);
   }],
   ['App H264 takes priority over higher-resolution HEVC', async () => {
     const result = await appRows({ hd: { main_url: mediaUrl('hevc'), codec_type: 'hevc', quality_desc: '1080P' },

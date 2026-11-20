@@ -32,7 +32,7 @@ function load(transport) {
     return local('./app-source');
 }
 
-for (const target of ['registration', 'model', 'renewal', 'alternate', 'fallback', 'encryption-metadata']) {
+for (const target of ['registration', 'model', 'renewal', 'alternate', 'video-tab', 'fallback', 'encryption-metadata']) {
     test(`caller cancellation closes the real axios socket during ${target}`, { timeout: 3000 }, async () => {
         const stages = [];
         let registrations = 0, enter, closed;
@@ -46,8 +46,9 @@ for (const target of ['registration', 'model', 'renewal', 'alternate', 'fallback
                 enter();
                 return;
             }
-            const emptyModel = target === 'renewal' && ['model', 'alternate'].includes(stage)
-                || target === 'alternate' && stage === 'model';
+            const emptyModel = target === 'renewal' && ['model', 'alternate', 'video-tab'].includes(stage)
+                || target === 'alternate' && stage === 'model'
+                || target === 'video-tab' && ['model', 'alternate'].includes(stage);
             let data = stage === 'registration' || stage === 'renewal'
                 ? { device_id: '123', install_id: '456' }
                 : { code: 0, data: { [vid]: { video_model: model(!['fallback', 'encryption-metadata'].includes(target)) } } };
@@ -63,6 +64,10 @@ for (const target of ['registration', 'model', 'renewal', 'alternate', 'fallback
             let stage;
             if (url.pathname.includes('device_register')) stage = ++registrations === 1 ? 'registration' : 'renewal';
             else if (config.url === metadata) stage = target;
+            else if (url.pathname === '/reading/bookapi/video_tab/multi_video_model/v1/') {
+                assert.equal(config.method, 'GET');
+                stage = 'video-tab';
+            }
             else {
                 assert.equal(config.method, 'POST');
                 assert.equal(url.pathname, '/novel/player/multi_video_model/player/v1');
@@ -84,7 +89,8 @@ for (const target of ['registration', 'model', 'renewal', 'alternate', 'fallback
             assert.equal(stages.at(-1), target, 'cancellation must not trigger another registration or route');
             const expectedStages = target === 'registration' ? ['registration'] : target === 'model'
                 ? ['registration', 'model'] : target === 'renewal'
-                    ? ['registration', 'model', 'alternate', 'renewal'] : ['registration', 'model', target];
+                    ? ['registration', 'model', 'alternate', 'video-tab', 'renewal'] : target === 'video-tab'
+                        ? ['registration', 'model', 'alternate', 'video-tab'] : ['registration', 'model', target];
             assert.deepEqual(stages, expectedStages, 'each cancellation target must be reached through its actual route');
         } finally {
             server.closeAllConnections();

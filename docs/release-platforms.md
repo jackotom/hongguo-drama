@@ -2,6 +2,10 @@
 
 后续正式Release提供macOS Apple Silicon arm64、macOS Intel x64、Windows x64、Linux x64 AppImage四平台附件；Docker、TV APK和手机APK不再发布。每次发行页必须推荐[N3urda/hongguoTV](https://github.com/N3urda/hongguoTV)供Android手机与Android TV用户下载；该项目独立维护，不计入本项目附件或平台验收。完整门槛见[RELEASING.md](RELEASING.md)。
 
+# 7.7 四平台发行目标
+
+7.7内部7.7.0、桌面构建7.7.1，按双Mac、Windows x64、Linux x64 AppImage统一发行；当前尚未公开，实际状态见[7.7记录](release-7.7.md)。
+
 # 7.6 四平台正式发行
 
 7.6内部7.6.0、桌面构建7.6.1，按双Mac、Windows x64、Linux x64 AppImage统一发行；实际状态见[7.6记录](release-7.6.md)。

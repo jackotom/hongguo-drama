@@ -22,6 +22,7 @@ let playbackQueue = Promise.resolve();
 let playbackReadyAt = 0;
 let playbackRejection = null;
 const VIDEO_API = 'https://api5-normal-sinfonlineb.fqnovel.com/novel/player/multi_video_model/v1/';
+const VIDEO_TAB_API = 'https://api5-normal-sinfonlineb.fqnovel.com/reading/bookapi/video_tab/multi_video_model/v1/';
 const PLAYER_API = 'https://api5-normal-sinfonlineb.fqnovel.com/novel/player/multi_video_model/player/v1';
 const SEARCH_API = 'https://api5-normal-sinfonlinea.fqnovel.com/reading/bookapi/search/tab/v';
 const VIDEO_UA = 'com.phoenix.read/71332 (Linux; U; Android 16; zh_CN; 25053RT47C; Build/BP2A.250605.031.A3; Cronet/TTNetVersion:04657795 2026-01-23 QuicVersion:c67e9834 2025-09-08)';
@@ -176,6 +177,26 @@ function playbackRequest(payload, identity, videoId = '', alternate = false) {
     Object.assign(headers, { 'Content-Type': 'application/json; charset=UTF-8',
         'Content-Encoding': 'gzip', 'x-ss-stub': signature['x-ss-stub'] });
     return { url, body, headers, method: 'POST' };
+}
+
+function videoTabRequest(identity, videoId) {
+    // video_tab belongs to the player family; generic Argus/Ladon signing is rejected with an empty body.
+    const signed = signPlaybackV5({
+        base: VIDEO_TAB_API,
+        values: {
+            aid: '8662', app_name: 'novelread', version_code: '74332', version_name: '7.4.3.32',
+            channel: 'vivo_8662_64', device_platform: 'android', device_type: 'PGT-AN10',
+            os_version: '12', update_version_code: '74332',
+            iid: identity.iid, cdid: identity.cdid, device_id: identity.device_id,
+            video_id: String(videoId), video_id_type: '0', device_level: '1',
+            need_all_video_definition: '1', need_mp4_align: '0', use_os_player: '0',
+            video_platform: '1024', source: '0', from_video_id: '',
+        },
+        body: null,
+        now: Date.now(),
+    });
+    return { url: signed.url, body: null, method: 'GET',
+        headers: { ...signed.headers, 'User-Agent': VIDEO_UA.replace(DEVICE.version_code, '73932'), Accept: 'application/json' } };
 }
 
 function parseSearchInteger(value) {
@@ -403,10 +424,23 @@ async function fetchAppPlayUrl(vid, options = {}) {
             catch (error) { throwIfAborted(options.signal); throw error; }
         }
         throwIfAborted(options.signal);
-        try { return await fetchAppPlayUrlFresh(vid, options); }
+        try {
+            let lastError;
+            for (let round = 0; round < 3; round++) {
+                try { return await fetchAppPlayUrlFresh(vid, options); }
+                catch (error) {
+                    throwIfAborted(options.signal);
+                    lastError = error;
+                    const anonymousEmpty = ['EMPTY_RESPONSE', 'ETIMEDOUT', 'ECONNABORTED'].includes(error.code)
+                        || error.code === 'BUSINESS_REJECTED' && Number(error.businessCode) === 110001;
+                    if (!anonymousEmpty || round === 2) throw error;
+                }
+            }
+            throw lastError;
+        }
         catch (error) {
             // An explicit refusal also stops work queued before it was received.
-            if ([403, 429].includes(error.status) || error.code === 'BUSINESS_REJECTED'
+            if ([403, 429].includes(error.status) || error.code === 'BUSINESS_REJECTED' && Number(error.businessCode) !== 110001
                 || (error.code === 'DEVICE_REGISTRATION_FAILED'
                   && ['BUSINESS_REJECTED', 'HTTP_403', 'HTTP_429'].includes(error.registrationFailure))) playbackRejection = error;
             throw error;
@@ -427,7 +461,7 @@ async function fetchAppPlayUrl(vid, options = {}) {
 
 async function fetchAppPlayUrlFresh(vid, options) {
     const payload = JSON.stringify({
-        biz_param: { detail_page_version: 0, device_level: 3, disable_digg_stat: false, disable_video_relate_book: false, need_all_video_definition: true, need_mp4_align: false, use_os_player: false, use_server_dns: false, video_platform: 1024 },
+        biz_param: { detail_page_version: 0, device_level: 1, disable_digg_stat: false, disable_video_relate_book: false, need_all_video_definition: true, need_mp4_align: false, use_os_player: false, use_server_dns: false, video_platform: 1024 },
         mixed_video_id_map: { '1004': [vid] },
         dr_scene: 'player',
     });
@@ -442,7 +476,6 @@ async function fetchAppPlayUrlFresh(vid, options) {
         let response;
         for (let attempt = 0; attempt < 2; attempt++) {
             throwIfAborted(signal);
-            // Prefer the current API; only an empty response enables one legacy attempt.
             const signed = playbackRequest(payload, identity, attempt ? '' : vid);
             if (attempt) signed.headers.Connection = 'close';
             try {
@@ -451,9 +484,15 @@ async function fetchAppPlayUrlFresh(vid, options) {
                 } catch (error) {
                     throwIfAborted(signal);
                     if (attempt || error.code !== 'EMPTY_RESPONSE' || deadline - Date.now() < 1000) throw error;
-                    // An empty primary response can recover on the other official host with the same identity.
                     const alternate = playbackRequest(payload, identity, vid, true);
-                    response = await requestJson(alternate.url, { method: alternate.method, headers: alternate.headers, data: alternate.body }, deadline, signal);
+                    try {
+                        response = await requestJson(alternate.url, { method: alternate.method, headers: alternate.headers, data: alternate.body }, deadline, signal);
+                    } catch (alternateError) {
+                        throwIfAborted(signal);
+                        if (alternateError.code !== 'EMPTY_RESPONSE' || deadline - Date.now() < 1000) throw alternateError;
+                        const tab = videoTabRequest(identity, vid);
+                        response = await requestJson(tab.url, { method: tab.method, headers: tab.headers, data: tab.body }, deadline, signal);
+                    }
                 }
                 throwIfAborted(signal);
                 break;
@@ -461,7 +500,6 @@ async function fetchAppPlayUrlFresh(vid, options) {
                 throwIfAborted(signal);
                 if (error.code === 'ERR_CANCELED') throw error;
                 if (attempt || error.code !== 'EMPTY_RESPONSE' || deadline - Date.now() < 1000) throw error;
-                // Keep the legacy attempt even when a fresh registration fails.
                 if (deadline - Date.now() >= 8000) {
                     try { identity = await registerPlaybackDevice(requestJson, { signal }); }
                     catch (registrationError) {
@@ -469,17 +507,18 @@ async function fetchAppPlayUrlFresh(vid, options) {
                         if (registrationError.code === 'ERR_CANCELED') throw registrationError;
                         if (registrationError.code === 'DEVICE_REGISTRATION_FAILED'
                             && ['BUSINESS_REJECTED', 'HTTP_403', 'HTTP_429'].includes(registrationError.registrationFailure)) throw registrationError;
-                        // Keep the previous identity for other registration failures.
                     }
                 }
                 throwIfAborted(signal);
                 if (deadline - Date.now() < 1500) throw error;
                 try { await delay(1000, undefined, { signal }); }
                 catch (waitError) { throwIfAborted(signal); throw waitError; }
-                throwIfAborted(signal);
             }
         }
-        if (Number(response.Code || response.code || 0) !== 0) throw Object.assign(new Error('App 接口暂未提供本集播放信息'), { code: 'BUSINESS_REJECTED' });
+        const businessCode = Number(response.Code || response.code || 0);
+        if (businessCode !== 0) throw Object.assign(new Error('App 接口暂未提供本集播放信息'), {
+            code: 'BUSINESS_REJECTED', businessCode,
+        });
         const entries = response.data?.['1004'] ?? response.data?.video_model_data ?? response.data;
         const entry = entries?.[vid];
         const model = typeof entry?.video_model === 'string' ? jsonBody(entry.video_model) : entry?.video_model;
@@ -503,8 +542,6 @@ async function fetchAppPlayUrlFresh(vid, options) {
         try {
             return parseAppPlayModel(model, vid, options, true);
         } catch (error) {
-            // Only absent encryption metadata enables this recovery path; the fallback
-            // must independently pass identity, duration, encryption and URL validation.
             const duration = Number(model.video_duration);
             if (!error.incompleteEncryptionMetadata || typeof model.video_id !== 'string' || !model.video_id.trim() || !Number.isFinite(duration) || duration <= 0
                 || !error.minimumPixels || !model.fallback_api) throw error;

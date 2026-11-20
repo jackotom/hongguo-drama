@@ -184,7 +184,6 @@ test('final encoded query, exact gzip bytes and original second bind all 32 clas
     assert.ok(query.includes('text=%E4%B8%AD%E6%96%87%20%21*%27%28%29~%20%2B%26%3D%25'));
     assert.equal(url.searchParams.get('ts'), null);
     assert.equal(signed.headers['x-khronos'], String(ts));
-    assert.equal(signed.headers['x-ss-req-ticket'], String(ticket));
     assert.ok(signed.headers['x-ss-stub'] === md5(BODY).toString('hex').toUpperCase());
     assert.equal(sint(message, 12), ts); assert.equal(sint(message, 17), ts);
     assert.ok(message.get(14).equals(sm3(Buffer.from(query)).subarray(0, 6)));
@@ -195,9 +194,18 @@ test('final encoded query, exact gzip bytes and original second bind all 32 clas
     for (let at = 0; at < prefix.length; at++) prefix[at] ^= time[at & 3];
     assert.equal(prefix.readUInt32LE(), 5);
     assert.ok(prefix.subarray(4).equals(Buffer.from('2d4b4fca49750d433fb5ae2c226dcc56', 'hex')));
-    assert.deepEqual(Object.keys(signed.headers).sort(), ['x-helios', 'x-khronos', 'x-medusa', 'x-ss-req-ticket', 'x-ss-stub']);
+    assert.deepEqual(Object.keys(signed.headers).sort(), ['x-helios', 'x-khronos', 'x-medusa', 'x-ss-stub']);
   }
   assert.ok(BODY.equals(beforeBody)); assert.equal(JSON.stringify(VALUES), beforeValues);
+});
+
+test('bodyless v5 uses the empty-body digest without body-describing headers', () => {
+  const api = load();
+  const { signed, message } = messageFor(api, { body: null });
+  const query = signed.url.split('?')[1], ts = Math.floor(NOW / 1000);
+  assert.deepEqual(Object.keys(signed.headers).sort(), ['x-helios', 'x-khronos', 'x-medusa']);
+  assert.equal(branch(query, Buffer.alloc(0), ts), 12);
+  assert.ok(message.get(13).equals(api.__test.hashF13(sm3(Buffer.from(query)), md5(Buffer.alloc(0)), ts)));
 });
 
 test('registered identity and profile enter both query and serialized Medusa, with no fallback identity', () => {
@@ -312,7 +320,7 @@ test('strict inputs reject malformed URLs, imprecise identities, non-string quer
       { ...VALUES, cdid: '' }, { ...VALUES, version_name: '' }, { ...VALUES, aid: '1' },
       { ...VALUES, device_id: '9'.repeat(31) }, { ...VALUES, nested: {} }, { ...VALUES, bad: '\ud800' },
       { ...VALUES, empty: undefined }, { ...VALUES, x: 'a\nb' }].map(values => ({ ...valid, values })),
-    ...[undefined, null, '', Buffer.alloc(0), new Uint8Array(BODY), Buffer.from('{}'),
+    ...[undefined, '', Buffer.alloc(0), new Uint8Array(BODY), Buffer.from('{}'),
       BODY.subarray(0, 10), Buffer.concat([BODY.subarray(0, -1), Buffer.from([BODY.at(-1) ^ 1])])].map(body => ({ ...valid, body })),
     ...[null, '1800000000000', -1, NaN, Infinity, NOW + 0.1, Number.MAX_SAFE_INTEGER, 0x100000000 * 1000]
       .map(now => ({ ...valid, now })),

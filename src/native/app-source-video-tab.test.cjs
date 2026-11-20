@@ -103,17 +103,19 @@ for (const wrap of [value => ({ code: 0, data: { [vid]: { video_model: value } }
 test('empty v5 model retains the bounded signed legacy fallback', async () => {
     const f = fixture({ status: 200, headers: {}, data: '' }, { legacyResponse: response(nested(model())) });
     assert.equal((await f.fetch()).url, media);
-    assert.equal(f.calls.length, 3); assert.equal(f.registrations(), 2);
+    assert.equal(f.calls.length, 4); assert.equal(f.registrations(), 2);
     for (let i = 0; i < 2; i++) {
         assert.equal(f.calls[i].method, 'POST');
         assert.equal(new URL(f.calls[i].url).pathname, '/novel/player/multi_video_model/player/v1');
         assert.equal(f.signatures[i].body, f.calls[i].data);
         assert.equal(f.signatures[i].signed.url, f.calls[i].url);
     }
-    const legacy = f.calls[2];
+    assert.equal(f.calls[2].method, 'GET');
+    assert.equal(new URL(f.calls[2].url).pathname, '/reading/bookapi/video_tab/multi_video_model/v1/');
+    const legacy = f.calls[3];
     assert.equal(new URL(legacy.url).pathname, '/novel/player/multi_video_model/v1/');
     assert.equal(legacy.headers.Connection, 'close');
-    assertPlayerBinding(f, legacy, 2);
+    assertPlayerBinding(f, legacy, 3);
 });
 
 for (const [name, result, code] of [
@@ -127,8 +129,8 @@ for (const [name, result, code] of [
     test(`v5 ${name} stops within the existing request budget`, async () => {
         const f = fixture(result);
         await assert.rejects(f.fetch(), error => code ? error.code === code : error.status === 403);
-        assert.equal(f.calls.length, code === 'EMPTY_RESPONSE' ? 3 : 1);
-        assert.equal(f.registrations(), code === 'EMPTY_RESPONSE' ? 2 : 1);
+        assert.equal(f.calls.length, code === 'EMPTY_RESPONSE' ? 12 : 1);
+        assert.equal(f.registrations(), code === 'EMPTY_RESPONSE' ? 6 : 1);
     });
 }
 
@@ -137,7 +139,7 @@ test('an empty current response retains the successful legacy recovery', async (
         legacyResponse: response({ code: 0, data: { [vid]: { video_model: model() } } }),
     });
     assert.equal((await f.fetch()).url, media);
-    assert.equal(f.calls.length, 3);
+    assert.equal(f.calls.length, 4);
     assert.equal(f.registrations(), 2);
 });
 
@@ -145,7 +147,7 @@ for (const legacyResponse of [response({ code: 1 }), { status: 429, headers: {},
     test(`explicit legacy rejection remains terminal (${legacyResponse.status})`, async () => {
         const f = fixture({ status: 200, headers: {}, data: '' }, { legacyResponse });
         await assert.rejects(f.fetch());
-        assert.equal(f.calls.length, 3);
+        assert.equal(f.calls.length, 4);
         assert.equal(f.registrations(), 2);
     });
 }

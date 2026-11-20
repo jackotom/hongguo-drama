@@ -77,3 +77,19 @@ git diff --check
 桌面与 Docker 的此签名取源路径共用 `src/native/app-source.js`，均得到本次修复。
 `src/native/hongguo.js` 另有独立的旧 `multi_video_model/preload/v1` 兼容路径；它在签名取源
 失败后才调用，本次保留其行为。其余同名匹配为离线测试，不增加新的网络重试。
+
+## 2026-11-20 后续：video_tab 改用 V5 GET 签名
+
+当天实网复测发现，v5 POST 与旧 Argus/Ladon `video_tab` 均可返回 HTTP 200、正文 0 字节；
+与 `ch6vip/novel-sound` 1.0.205 当前实现对照后，确认 `video_tab` 同属 player 签名族：
+
+- `video_tab` 改用 v5 bodyless GET 的 `x-khronos`、`x-helios`、`x-medusa`；
+- 正文摘要按空 body 计算，且不发送 `Content-Type`、`Content-Encoding`、`x-ss-stub`；
+- 身份、分集、画质、地址、加密和备用片源校验保持不变。
+
+修复后实网同一集返回 1080P HEVC 模型；两集完整下载、CENC 解密、ffprobe 与 FFmpeg 全片解码
+均通过。打包后的隔离测试版静音播放推进到 12.7 秒，画面与进度正常。测试不保存身份、Cookie、
+内容密钥或带签名的媒体地址。
+
+GitHub 上未找到值得新增的独立内容供应商：同类项目仍连接同一官方播放后端；第三方 HTTP 中转
+当时不可用且超出既有 HTTPS／域名安全边界，因此不接入。

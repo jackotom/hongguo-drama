@@ -189,6 +189,6 @@ for (const options of [{ status: 403 }, { status: 429 }, { code: 1 }, { empty: t
     test(`fallback failure is terminal without another model request: ${JSON.stringify(options)}`, async () => {
         const f = fixture(model(), model({ video_list: [row(1080, { encrypt: false })] }), options);
         await assert.rejects(f.fetch({ quality: 'auto' }));
-        assert.equal(f.calls.length, 2);
+        assert.equal(f.calls.length, options.empty ? 6 : 2);
     });
 }

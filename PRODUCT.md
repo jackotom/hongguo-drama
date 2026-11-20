@@ -1,4 +1,6 @@
-<!-- 7.6 published; TV and phone remain independent. -->
+<!-- 7.7 release target; TV and phone remain independent. -->
+
+7.7 当前为四平台发行目标，内部7.7.0、桌面构建7.7.1。`video_tab`恢复改用无正文 V5 GET 签名；当前候选源码已真实下载两集1080P素材并各静音播放到10秒，冻结源码仍须重新构建和平台验收。实际状态见[7.7记录](docs/release-7.7.md)。
 
 7.6 已于2026-11-18正式公开并设Latest，内部7.6.0、桌面构建7.6.1、冻结源码`6a3df3b0b03e8a63589a73e375e9058f181930e8`。本轮集中修复下载删除隔离、合并输出校验、发布后取消状态、播放进度并发覆盖、双击选集和合并交互，并收紧代理、账号会话与媒体地址边界。正式发行范围为双Mac、Windows x64、Linux x64 AppImage；Docker、TV和手机独立，实际状态见[7.6记录](docs/release-7.6.md)。
 

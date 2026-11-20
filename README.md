@@ -39,6 +39,10 @@
 
 **Android手机APK／Android TV版：** 请前往 [N3urda/hongguoTV](https://github.com/N3urda/hongguoTV) 下载。该项目独立维护；版本、兼容性与测试状态以该项目发布页为准，不计入本项目的四平台附件或验收。
 
+## 7.7 发行目标
+
+7.7 当前为四平台发行目标，内部`7.7.0`、桌面构建`7.7.1`。本轮修复 `video_tab` 恢复请求的播放器签名；当前候选源码已真实下载两集1080P素材并各静音播放到10秒。构建、签名、公证、Windows/Linux验收及正式公开完成前，7.6仍是最新正式版；状态见[7.7记录](docs/release-7.7.md)。
+
 <details>
 <summary>7.5 历史下载与发行说明</summary>
 

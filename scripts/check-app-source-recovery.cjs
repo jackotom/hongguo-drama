@@ -118,20 +118,22 @@ function row(definition, width, height, suffix) {
     return identities[recoveryRegistrations - 1];
   } });
   assert.equal((await recovery.fetchAppPlayUrl(vid)).url, plain.main_url, 'empty model response renews the device and recovers');
-  assert.equal(recoverCalls, 3);
+  assert.equal(recoverCalls, 4);
   assert.equal(renewals, 1);
   for (const status of [200, 403, 404]) {
     let calls = 0, registrations = 0;
     const unavailable = load(async () => { calls++; return { status, headers: {}, data: '' }; },
-      { registerPlaybackDevice: async () => identities[registrations++] });
+      { registerPlaybackDevice: async () => ({
+        device_id: String(100 + ++registrations), iid: String(200 + registrations), cdid: 'fixture',
+      }) });
     await assert.rejects(unavailable.fetchAppPlayUrl(vid), error => status === 200 ? error.code === 'EMPTY_RESPONSE' : error.status === status);
-    assert.equal(calls, status === 200 ? 3 : 1, 'one recovery only; HTTP rejection must not retry the model request');
-    assert.equal(registrations, status === 200 ? 2 : 1);
+    assert.equal(calls, status === 200 ? 12 : 1, 'three bounded anonymous rounds; HTTP rejection must not retry');
+    assert.equal(registrations, status === 200 ? 6 : 1);
   }
   let cooldownCalls = 0;
   await assert.rejects(load(async () => { cooldownCalls++; return { status: 200, headers: {}, data: '' }; },
     { getPlaybackDevice: async () => identities[0] }).fetchAppPlayUrl(vid), error => error.code === 'EMPTY_RESPONSE');
-  assert.equal(cooldownCalls, 3, 'empty response permits one fresh-device alternate route');
+  assert.equal(cooldownCalls, 12, 'empty responses permit three bounded anonymous rounds');
   let clock = Date.now(), slowCalls = 0;
   const slowRegistration = load(async config => {
     slowCalls++;
@@ -144,12 +146,11 @@ function row(definition, width, height, suffix) {
   const alternate = load(async config => {
     routes.push([config.method, new URL(config.url).pathname]);
     if (new URL(config.url).pathname === '/novel/player/multi_video_model/player/v1') return { status: 200, headers: {}, data: '' };
-    assert.equal(config.headers.Connection, 'close');
     return inlineResponse([plain]);
   }, { getPlaybackDevice: async () => identities[0] });
   assert.equal((await alternate.fetchAppPlayUrl(vid)).url, plain.main_url);
   assert.deepEqual(routes, [['POST', '/novel/player/multi_video_model/player/v1'],
-    ['POST', '/novel/player/multi_video_model/player/v1'], ['POST', '/novel/player/multi_video_model/v1/']]);
+    ['POST', '/novel/player/multi_video_model/player/v1'], ['GET', '/reading/bookapi/video_tab/multi_video_model/v1/']]);
   let inlineCalls = 0;
   const direct = load(async config => {
     inlineCalls++;
