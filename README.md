@@ -24,18 +24,18 @@
 
 ## 下载与安装
 
-**当前正式版：7.8**（内部`7.8.0`，桌面构建`7.8.1`）。本轮修复大量下载任务位于 SMB／外置盘时，下载管理反复同步核验导致主进程失去响应；统一发行双Mac、Windows x64与Linux x64 AppImage。
+**最新正式版：7.8；源码／发行目标：7.9**（内部`7.9.0`，桌面构建`7.9.1`）。7.9 修复网络盘剧库进入发现页、打开剧集面板时同步扫盘导致主进程失去响应；继续发行双Mac、Windows x64与Linux x64 AppImage。
 
-7.8已于2026-11-21 13:58:45（Asia/Shanghai）公开并设Latest；23份正式附件、远端大小／SHA256及匿名下载入口均已核对，最终状态以[7.8记录](docs/release-7.8.md)为准。
+7.8 的23份正式附件、远端大小／SHA256及匿名下载入口均已核对。7.9 仅在四平台包、必要验收、远端摘要核对完成后公开；最终状态以[7.9记录](docs/release-7.9.md)为准。
 
-| 平台 | 7.8正式附件 | 验收状态 |
+| 平台 | 7.9发行目标 | 验收状态 |
 |---|---|---|
-| Apple芯片Mac，macOS 13+ | [DMG](https://github.com/jackotom/hongguo-drama/releases/download/v7.8/Hongguo-7.8-mac-arm64.dmg) | 已签名、公证、装订；最终包两集静音播放通过 |
-| Intel Mac，macOS 13+ | [DMG](https://github.com/jackotom/hongguo-drama/releases/download/v7.8/Hongguo-7.8-mac-x64.dmg) | 已签名、公证、装订；Rosetta启动通过，实体Intel未验 |
-| Windows x64 | [安装版](https://github.com/jackotom/hongguo-drama/releases/download/v7.8/hongguo-downloader-7.8-win-x64-setup.exe) · [便携EXE](https://github.com/jackotom/hongguo-drama/releases/download/v7.8/hongguo-downloader-7.8-win-x64.exe) · [便携ZIP](https://github.com/jackotom/hongguo-drama/releases/download/v7.8/hongguo-downloader-7.8-win-x64.zip) | EXE未签名；真实下载、播放及安装升级在GitHub Windows虚拟机通过 |
-| Linux x64 | [AppImage](https://github.com/jackotom/hongguo-drama/releases/download/v7.8/hongguo-downloader-7.8-linux-x64.AppImage) | 赋予执行权限后运行；两集真实静音播放通过 |
+| Apple芯片Mac，macOS 13+ | v7.9 DMG | 本轮重新签名、公证、装订后更新 |
+| Intel Mac，macOS 13+ | v7.9 DMG | 本轮重新签名、公证、装订；Rosetta启动 |
+| Windows x64 | v7.9 安装版、便携EXE、便携ZIP | GitHub Windows虚拟机真实下载、播放及安装升级 |
+| Linux x64 | v7.9 AppImage | 原生CI真实两集静音播放 |
 
-[7.8发行页](https://github.com/jackotom/hongguo-drama/releases/tag/v7.8) · [SHA256](https://github.com/jackotom/hongguo-drama/releases/download/v7.8/SHA256SUMS.txt) · [精确源码](https://github.com/jackotom/hongguo-drama/releases/download/v7.8/hongguo-drama-7.8-source.zip)。实际状态见[7.8记录](docs/release-7.8.md)。上游部分网页片源仍可能404、只提供预览或超时，不保证所有内容永久可播。
+[7.8发行页](https://github.com/jackotom/hongguo-drama/releases/tag/v7.8) · [7.8记录](docs/release-7.8.md)。7.9公开后替换为本轮发行页、SHA256与精确源码入口。上游部分网页片源仍可能404、只提供预览或超时，不保证所有内容永久可播。
 
 **Android手机APK／Android TV版：** 请前往 [N3urda/hongguoTV](https://github.com/N3urda/hongguoTV) 下载。该项目独立维护；版本、兼容性与测试状态以该项目发布页为准，不计入本项目的四平台附件或验收。
 
@@ -258,6 +258,13 @@ Mac和Windows安装版保留应用内更新入口；完整6.4→6.5自动更新�
 2. 在「发现短剧」浏览，或在「搜索与下载」输入剧名、红果分享链接或剧集 ID。
 3. 打开详情点「立即播放」，也可选择集数与清晰度加入下载队列。
 4. 下次从「我的剧库」或「观看记录」接着看；下载进度、失败重试和整剧合并在「下载管理」。
+
+## 7.9（源码／发行目标）
+
+- 发现页先读取内存角标，只对当前可见卡片逐部异步预热；首屏不再为每部剧拉取完整分集。
+- 剧集面板先批量拿轻量进度，再按剧异步补齐；分集列表改为异步扫描和异步签发本地播放地址。
+- SMB／NAS 目录首轮探测限制为 4 秒，超时只延迟角标，不冻结主进程；文件身份、路径冲突、播放和删除前校验保留。
+- 修复 #177；文件被外部替换、同尺寸篡改或目录换挂载时，详情页重新核验并停止播放授权。
 
 ## 7.8（正式发布）
 

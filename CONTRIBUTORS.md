@@ -1,7 +1,7 @@
-<!-- 7.8 source and release target; historical credits retained. -->
+<!-- 7.9 source and release target; historical credits retained. -->
 # 贡献者与问题反馈致谢
 
-7.8 延续公开贡献记录；感谢 [@xiaowangbb](https://github.com/xiaowangbb) 在 [#176](https://github.com/jackotom/hongguo-drama/issues/176) 提供近千条任务、SMB 延迟和主进程 I/O 卡顿证据。详细署名与历史致谢保留在下方。
+7.9 延续公开贡献记录；感谢 [@xiaowangbb](https://github.com/xiaowangbb) 在 [#176](https://github.com/jackotom/hongguo-drama/issues/176) 与 [#177](https://github.com/jackotom/hongguo-drama/issues/177) 提供近千条任务、SMB 延迟、主进程 I/O 阻塞和发现页复现证据。详细署名与历史致谢保留在下方。
 
 ## 7.5 播放修复特别致谢（2026-11-16）
 

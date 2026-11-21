@@ -59,6 +59,21 @@ const missing = media.localUrl(path.join(root, 'not-yet.mp4'), () => true);
 assert.equal(media.isValid(missing), false, 'a file created after issuance must never become valid');
 fs.writeFileSync(path.join(root, 'not-yet.mp4'), 'late-content');
 assert.equal(media.isValid(missing), false, 'creating the file later must not revive a null-identity token');
-fs.rmSync(root, { recursive: true, force: true });
 
-console.log('PASS media access: stable opaque capability, fail-closed identity, no path fallback, origin checks, cleanup');
+(async () => {
+  const asyncFile = path.join(root, 'async.mp4');
+  fs.writeFileSync(asyncFile, 'async-video-content');
+  const asyncUrl = await media.localUrlAsync(asyncFile, () => true);
+  assert.equal(media.isValid(asyncUrl), true);
+  const knownIdentity = require('../src/native/file-identity').readFileIdentity(asyncFile);
+  assert.equal(media.localUrlWithIdentity(asyncFile, knownIdentity, () => true), asyncUrl);
+  assert.throws(() => media.localUrlWithIdentity(asyncFile, { ...knownIdentity, contentHash: '' }));
+  console.log('PASS media access async identity: non-blocking issuance and complete identity required');
+})().then(() => {
+  fs.rmSync(root, { recursive: true, force: true });
+  console.log('PASS media access: stable opaque capability, fail-closed identity, no path fallback, origin checks, cleanup');
+}).catch(error => {
+  fs.rmSync(root, { recursive: true, force: true });
+  console.error(error);
+  process.exitCode = 1;
+});

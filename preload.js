@@ -1,4 +1,4 @@
-// 红果短剧 7.8：版本及发行状态见 package.json 和 docs/release-7.8.md。
+// 红果短剧 7.9：版本及发行状态见 package.json 和 docs/release-7.9.md。
 // 红果短剧 6.2：桌面桥接入口，发行说明见 docs/release-6.0.md。
 const { contextBridge, ipcRenderer } = require('electron');
 
@@ -134,6 +134,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   },
 
   // 播放器
+  getSeriesProgress: () => ipcRenderer.invoke('get-series-progress'),
+  warmSeriesProgress: (seriesId) => ipcRenderer.invoke('warm-series-progress', seriesId),
   getSeriesEpisodes: (seriesId) => ipcRenderer.invoke('get-series-episodes', seriesId),
   downloadSingleEpisode: (seriesId, vidIndex, quality) =>
     ipcRenderer.invoke('download-single-episode', seriesId, vidIndex, quality),

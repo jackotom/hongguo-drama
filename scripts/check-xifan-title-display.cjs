@@ -1,51 +1,86 @@
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
+const os = require('node:os');
 const path = require('node:path');
 const vm = require('node:vm');
+const { EventEmitter } = require('node:events');
+const { createRequire } = require('node:module');
 
-const main = fs.readFileSync(path.join(__dirname, '../main.js'), 'utf8');
+const source = path.resolve(__dirname, '../main.js');
+const req = createRequire(source);
+const root = fs.mkdtempSync(path.join(os.tmpdir(), 'hongguo-xifan-title-'));
+
+function load(dir) {
+  const handlers = {};
+  const app = new EventEmitter();
+  Object.assign(app, {
+    getVersion: () => 'test',
+    getPath: () => dir,
+    commandLine: { appendSwitch() {}, hasSwitch: () => false },
+    requestSingleInstanceLock: () => true,
+    whenReady: () => ({ then() {} }),
+  });
+  const electron = {
+    app,
+    ipcMain: { handle: (name, fn) => { handlers[name] = fn; } },
+    protocol: { registerSchemesAsPrivileged() {} },
+    shell: { showItemInFolder() {}, openPath: async () => '' },
+    session: { defaultSession: { setProxy: async () => {} } },
+  };
+  const store = {
+    getSettings: () => ({ root: dir, name_format: '剧名 集数' }),
+    saveTasks() {}, saveSeries() {}, saveMergeTasks() {}, saveSettings() {},
+  };
+  const context = vm.createContext({
+    require: name => name === 'electron' ? electron : name === './src/store' ? store : req(name),
+    __dirname: path.dirname(source),
+    process: { ...process, env: { ...process.env } },
+    console: { log() {}, warn() {}, error() {} },
+    Buffer, URL, Response, Request, Headers, AbortController, setTimeout, clearTimeout,
+  });
+  vm.runInContext(fs.readFileSync(source, 'utf8'), context, { filename: source });
+  require('./fixtures/trusted-ipc.cjs')(context, handlers);
+  return {
+    handlers,
+    set(name, value) {
+      context.fixture = value;
+      vm.runInContext(`${name} = fixture`, context);
+    },
+  };
+}
 
 async function check({ sid = 'xifan:jiuzhou:253', seriesTitle = '天龙战神', title = '爱归良辰',
   expected = '', registered = true, complete = true } = {}) {
+  const dir = fs.mkdtempSync(path.join(root, 'case-'));
   const episode = { vid: `${sid}:65863`, vid_index: 1, title, locked: false };
   const seriesRegistry = registered ? [{ series_id: sid, series_title: seriesTitle, episodes: [episode] }] : [];
   const oldTaskTitle = `《${seriesTitle}》第001集 ${title}`;
-  const downloadTasks = [{ id: 'existing', title: oldTaskTitle, filename: 'unchanged.mp4', savePath: '/fixture/unchanged.mp4',
-    status: 'completed', hongguoInfo: { series_id: sid, series_title: seriesTitle, vid: episode.vid, vid_index: 1, ep_title: title } }];
-  const before = JSON.stringify({ seriesRegistry, downloadTasks });
-  const handlers = {};
-  const context = {
-    ipcMain: { handle: (name, fn) => { handlers[name] = fn; } }, seriesRegistry, downloadTasks,
-    require: name => require(path.join(__dirname, '..', name)),
-    downloadTaskView: require('../src/native/download-task-view').downloadTaskView,
-    pathConflicts: require('../src/native/download-task-view').pathConflicts,
-    episodeDisplayTitle: require('../src/native/xifan').episodeDisplayTitle,
-    fs: { existsSync: () => complete, statSync: () => ({ size: 200000 }) },
-    collectSeriesEpisodeFiles: () => ({ dir: '/fixture', ordered: [] }),
-    hasCompleteTaskFile: () => complete, localPlayUrl: () => 'local-media://fixture', console, setTimeout,
-  };
-  const viewStart = main.indexOf('async function currentDownloadTaskView');
-  const handlerStart = main.indexOf("ipcMain.handle('get-download-tasks'");
-  assert.ok(viewStart >= 0 && handlerStart > viewStart);
-  vm.runInNewContext(main.slice(viewStart, handlerStart), context);
-  for (const name of ['get-series-episodes', 'get-download-tasks']) {
-    const start = main.indexOf(`ipcMain.handle('${name}'`);
-    assert.ok(start >= 0);
-    vm.runInNewContext(main.slice(start, main.indexOf('\n});', start) + 4), context);
+  const savePath = path.join(dir, 'unchanged.mp4');
+  const downloadTasks = [{ id: 'existing', title: oldTaskTitle, filename: 'unchanged.mp4', savePath, status: 'completed',
+    startTime: 1000, endTime: 2000, hongguoInfo: { series_id: sid, series_title: seriesTitle, vid: episode.vid, vid_index: 1, ep_title: title } }];
+  if (complete) {
+    fs.writeFileSync(savePath, Buffer.alloc(120000, 1));
+    downloadTasks[0].fileIdentity = req('./src/native/file-identity').readFileIdentity(savePath);
   }
-  const result = await handlers['get-series-episodes']({}, sid);
+  const before = JSON.stringify({ seriesRegistry, downloadTasks: downloadTasks.map(({ fileIdentity, ...task }) => task) });
+  const h = load(dir);
+  h.set('seriesRegistry', seriesRegistry);
+  h.set('downloadTasks', downloadTasks);
+
+  const result = await h.handlers['get-series-episodes']({}, sid);
   assert.equal(result.success, true);
   assert.equal(result.data.series_title, seriesTitle);
   assert.equal(result.data.episodes[0].title, expected, '旧剧库或任务回退显示应使用同一标题兼容');
   assert.equal(result.data.episodes[0].vid, episode.vid);
-  assert.equal(result.data.episodes[0].savePath, downloadTasks[0].savePath);
+  assert.equal(result.data.episodes[0].savePath, savePath);
   assert.equal(result.data.episodes[0].status, complete ? 'completed' : 'missing');
-  const [task] = await handlers['get-download-tasks']();
+  const [task] = await h.handlers['get-download-tasks']();
   assert.equal(task.title, expected === title ? oldTaskTitle : `《${seriesTitle}》第001集`, '旧下载任务只改变显示标题');
-  assert.equal(task.filename, downloadTasks[0].filename);
-  assert.equal(task.savePath, downloadTasks[0].savePath);
+  assert.equal(task.filename, 'unchanged.mp4');
+  assert.equal(task.savePath, savePath);
   assert.equal(task.status, complete ? 'completed' : 'failed', '保留文件丢失的既有错误状态');
-  assert.equal(JSON.stringify({ seriesRegistry, downloadTasks }), before, '读取不得改写旧档案、任务、路径或文件名');
+  const after = JSON.stringify({ seriesRegistry, downloadTasks: downloadTasks.map(({ fileIdentity, ...item }) => item) });
+  assert.equal(after, before, '读取不得改写旧档案、任务、路径或文件名');
 }
 
 (async () => {
@@ -60,5 +95,10 @@ async function check({ sid = 'xifan:jiuzhou:253', seriesTitle = '天龙战神', 
     { title: '第一章：归来' },
     { title: '来源正式别名' },
   ]) await check({ ...item, expected: item.title || '爱归良辰' });
+  fs.rmSync(root, { recursive: true, force: true });
   console.log('PASS 西饭旧剧库、仅任务资料及缺失文件读取修正显示且不改原资料；其他来源、别名及已纠正标题不变（9项）');
-})().catch(error => { console.error(error.message); process.exitCode = 1; });
+})().catch(error => {
+  fs.rmSync(root, { recursive: true, force: true });
+  console.error(error.message);
+  process.exitCode = 1;
+});

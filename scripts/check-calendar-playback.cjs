@@ -126,6 +126,15 @@ for (const all of [false, true]) for (const failure of ['success', 'partial', 'i
     return { success: failure === 'success', count: 1, failed: failure === 'records' ? 0 : 2, freed: 12, error: failure === 'records' ? '任务记录保存失败' : '文件占用' };
   };
   const player = mountPlayer({ local: true, apiOverrides: {
+    getSeriesProgress: async () => ({
+      success: true,
+      progress: { A: { completed: deleted ? 2 : 3, total: 3 } },
+      pending: [],
+    }),
+    warmSeriesProgress: async () => ({
+      success: true,
+      progress: { completed: deleted ? 2 : 3, total: 3 },
+    }),
     getSeriesEpisodes: async () => {
       detailReads++;
       return { success: true, data: { series_id: 'A', series_title: '测试剧', total: 3, completedCount: deleted ? 2 : 3, episodes: [

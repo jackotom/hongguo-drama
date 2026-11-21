@@ -137,20 +137,20 @@ function Browse({ onNavigate, active = true }) {
     toastTimer.current = setTimeout(() => setToast(null), 3000);
   }, []);
 
-  const loadDownloadedMap = useCallback(async () => {
+  const loadDownloadedMap = useCallback(async (visibleIds) => {
     try {
-      const list = (await window.electronAPI.getSeriesList()) || [];
-      const map = {};
-      for (const s of list) {
-        const res = await window.electronAPI.getSeriesEpisodes(s.series_id);
-        if (res && res.success) {
-          map[String(s.series_id)] = {
-            completed: res.data.completedCount,
-            total: res.data.total,
-          };
-        }
-      }
+      const res = await window.electronAPI.getSeriesProgress();
+      if (!res?.success) return;
+      const map = { ...(res.progress || {}) };
       setDownloadedMap(map);
+      const known = new Set(visibleIds.map(String));
+      for (const seriesId of res.pending || []) {
+        if (!known.has(String(seriesId))) continue;
+        const warmed = await window.electronAPI.warmSeriesProgress(seriesId);
+        if (!warmed?.success) continue;
+        map[String(seriesId)] = warmed.progress;
+        setDownloadedMap({ ...map });
+      }
     } catch (_) {}
   }, []);
 
@@ -291,7 +291,10 @@ function Browse({ onNavigate, active = true }) {
     loadCategories();
   }, [loadCategories]);
 
-  useEffect(() => { if (active) loadDownloadedMap(); }, [active, loadDownloadedMap]);
+  useEffect(() => {
+    if (!active) return;
+    void loadDownloadedMap(results.map(item => item.series_id));
+  }, [active, results, loadDownloadedMap]);
 
   useEffect(() => {
     invalidateList(); closeDetail(); pageCache.clear(); discoveryPages.clear();

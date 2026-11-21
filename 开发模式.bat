@@ -1,6 +1,6 @@
 @echo off
-rem 7.8 release target.
-rem Hongguo Drama 7.8 source candidate - version metadata: package.json
+rem 7.9 release target.
+rem Hongguo Drama 7.9 source candidate - version metadata: package.json
 title 红果短剧下载器 - 开发模式
 cd /d "%~dp0"
 

@@ -668,20 +668,28 @@ function Player({ target, onNavigate, onSeriesSelected, onFloatingChange, active
     return savePlaybackSetting('fast_conversion', fast, apply);
   };
 
-  // 打开剧集面板或删除文件后，补全各剧的下载进度。
+  // 只读轻量缓存；当前面板内的剧逐部异步补齐，不阻塞主进程。
   useEffect(() => {
     if (!pickerOpen) return;
     let cancelled = false;
     (async () => {
-      const map = {};
-      for (const s of seriesList) {
-        try {
-          const res = await window.electronAPI.getSeriesEpisodes(s.series_id);
-          if (res && res.success) map[String(s.series_id)] = { completed: res.data.completedCount, total: res.data.total };
-        } catch (_) {}
+      try {
+        const res = await window.electronAPI.getSeriesProgress();
+        if (!res?.success || cancelled) return;
+        const map = { ...(res.progress || {}) };
+        setDownloadedMap(map);
+        for (const seriesId of res.pending || []) {
+          if (!seriesList.some(series => String(series.series_id) === String(seriesId))) continue;
+          const warmed = await window.electronAPI.warmSeriesProgress(seriesId);
+          if (cancelled) return;
+          if (warmed?.success) {
+            map[String(seriesId)] = warmed.progress;
+            setDownloadedMap({ ...map });
+          }
+        }
+      } catch (_) {
         if (cancelled) return;
       }
-      if (!cancelled) setDownloadedMap(map);
     })();
     return () => { cancelled = true; };
   }, [pickerOpen, seriesList, downloadedRevision]);
