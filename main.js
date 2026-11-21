@@ -2693,20 +2693,24 @@ function seriesEpisodeBase(seriesId, entry, tasks) {
 }
 
 function getSeriesView(seriesId) {
-  if (seriesEpisodeJobs.has(seriesId)) return seriesEpisodeJobs.get(seriesId);
+  const revision = seriesProgressRevision;
+  const existing = seriesEpisodeJobs.get(seriesId);
+  if (existing?.revision === revision) return existing.promise;
+  const jobEntry = { revision, promise: null };
   const job = (async () => {
-    const entry = seriesRegistry.find(series => String(series.series_id) === seriesId);
+    const seriesEntry = seriesRegistry.find(series => String(series.series_id) === seriesId);
     const tasks = downloadTasks.filter(task => task.hongguoInfo && String(task.hongguoInfo.series_id) === seriesId);
-    const seriesTitle = entry?.series_title || tasks[0]?.hongguoInfo?.series_title || '未命名短剧';
+    const seriesTitle = seriesEntry?.series_title || tasks[0]?.hongguoInfo?.series_title || '未命名短剧';
     return {
       at: Date.now(),
-      entry,
+      entry: seriesEntry,
       seriesTitle,
-      baseEpisodes: seriesEpisodeBase(seriesId, entry, tasks),
-      scan: await scanSeriesEpisodes(seriesId, seriesTitle, tasks, entry),
+      baseEpisodes: seriesEpisodeBase(seriesId, seriesEntry, tasks),
+      scan: await scanSeriesEpisodes(seriesId, seriesTitle, tasks, seriesEntry),
     };
-  })().finally(() => seriesEpisodeJobs.delete(seriesId));
-  seriesEpisodeJobs.set(seriesId, job);
+  })().finally(() => { if (seriesEpisodeJobs.get(seriesId) === jobEntry) seriesEpisodeJobs.delete(seriesId); });
+  jobEntry.promise = job;
+  seriesEpisodeJobs.set(seriesId, jobEntry);
   return job;
 }
 

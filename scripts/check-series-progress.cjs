@@ -116,18 +116,28 @@ function series() {
   const heldTask = episodeTask(held.dir);
   held.set('seriesRegistry', series());
   held.set('downloadTasks', [heldTask]);
-  let release;
-  held.fsPromises.readdir = () => new Promise(resolve => { release = resolve; });
+  fs.unlinkSync(heldTask.savePath);
+  delete heldTask.fileIdentity;
+  const releases = [];
+  held.fsPromises.readdir = () => new Promise(resolve => { releases.push(resolve); });
   const pending = held.handlers['warm-series-progress']({}, 'S');
   let ticked = false;
   await new Promise(resolve => setTimeout(() => { ticked = true; resolve(); }, 20));
   assert.equal(ticked, true, 'a slow network directory must yield the main event loop');
-  assert.equal(typeof release, 'function', 'the scan must reach the held readdir');
-  release([]);
+  assert.equal(releases.length, 1, 'the scan must reach the held readdir');
+
+  fs.writeFileSync(heldTask.savePath, Buffer.alloc(120000, 2));
+  heldTask.fileIdentity = req('./src/native/file-identity').readFileIdentity(heldTask.savePath);
+  held.run('saveDownloadTasks()');
+  const fresh = held.handlers['get-series-episodes']({}, 'S');
+  await new Promise(resolve => setTimeout(resolve, 20));
+  assert.equal(releases.length, 2, 'a task change must start a fresh scan instead of joining the stale job');
+  releases.forEach(resolve => resolve([]));
   assert.equal((await pending).success, true);
+  assert.equal((await fresh).data.completedCount, 1);
 
   fs.rmSync(root, { recursive: true, force: true });
-  console.log('PASS series progress: cached badge snapshot, single-series warm, async detail, invalidation');
+  console.log('PASS series progress: cached badge snapshot, single-series warm, async detail, stale-job invalidation');
 })().catch(error => {
   fs.rmSync(root, { recursive: true, force: true });
   console.error(error);
