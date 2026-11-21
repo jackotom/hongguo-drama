@@ -2545,9 +2545,11 @@ async function readDirectoryIdentityAsync(directory) {
 async function validateDirectoryIdentityAsync(identity, file) {
   try {
     const stat = await fsp.lstat(identity.directory);
+    const identityPath = await fsp.realpath(identity.directory);
+    const parentPath = await fsp.realpath(path.dirname(file));
     if (!stat.isDirectory() || stat.isSymbolicLink() || stat.dev !== identity.device
-      || await fsp.realpath(identity.directory) !== identity.directory
-      || await fsp.realpath(path.dirname(file)) !== identity.directory) throw new Error();
+      || !pathInside(identityPath, identity.directory) || !pathInside(identity.directory, identityPath)
+      || !pathInside(identityPath, parentPath) || !pathInside(parentPath, identityPath)) throw new Error();
     if (Number.isSafeInteger(identity.ino) && identity.ino > 0
       && Number.isSafeInteger(stat.ino) && stat.ino > 0
       && stat.ino !== identity.ino) throw new Error();
