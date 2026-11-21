@@ -2542,21 +2542,19 @@ async function readDirectoryIdentityAsync(directory) {
   return { directory: real, device: Number(stat.dev), ino: Number(stat.ino) };
 }
 
-async function validateDirectoryIdentityAsync(identity, file) {
+async function directoryIdentityMismatch(identity, file) {
   try {
     const stat = await fsp.lstat(identity.directory);
+    if (!stat.isDirectory() || stat.isSymbolicLink()) return 'type';
+    if (stat.dev !== identity.device) return 'device';
     const identityPath = await fsp.realpath(identity.directory);
     const parentPath = await fsp.realpath(path.dirname(file));
-    const samePath = (left, right) => process.platform === 'win32'
-      ? path.resolve(left).toLowerCase() === path.resolve(right).toLowerCase()
-      : path.resolve(left) === path.resolve(right);
-    if (!stat.isDirectory() || stat.isSymbolicLink() || stat.dev !== identity.device
-      || !samePath(identityPath, identity.directory) || !samePath(identityPath, parentPath)) throw new Error();
+    if (path.relative(identityPath, parentPath) !== '') return 'path';
     if (Number.isSafeInteger(identity.ino) && identity.ino > 0
       && Number.isSafeInteger(stat.ino) && stat.ino > 0
-      && stat.ino !== identity.ino) throw new Error();
-    return true;
-  } catch (_) { return false; }
+      && stat.ino !== identity.ino) return 'inode';
+    return '';
+  } catch (_) { return 'unavailable'; }
 }
 
 async function nasDestinationCurrentAsync(destination, file) {
@@ -2594,8 +2592,10 @@ async function completeTaskFileForList(task, conflicts) {
   if (task.pathConflict) return failed('path-conflict');
   if (conflicts.get(task.savePath)?.has(task)) return failed('task-conflict');
   if (task.nasDestination && !await nasDestinationCurrentAsync(task.nasDestination, task.savePath)) return failed('nas-identity');
-  if (!task.nasDestination && task.directoryIdentity
-    && !await validateDirectoryIdentityAsync(task.directoryIdentity, task.savePath)) return failed('directory-identity');
+  if (!task.nasDestination && task.directoryIdentity) {
+    const mismatch = await directoryIdentityMismatch(task.directoryIdentity, task.savePath);
+    if (mismatch) return failed(`directory-${mismatch}`);
+  }
   try {
     const stat = await fsp.lstat(task.savePath);
     if (!stat.isFile() || stat.isSymbolicLink()) return failed('not-file');
