@@ -1,4 +1,4 @@
-// Hongguo Drama 7.7: desktop runtime; server entry is server/index.cjs.
+// Hongguo Drama 7.8: desktop runtime; server entry is server/index.cjs.
 /**
  * main.js - 红果短剧 6.2 下载器（独立版）主进程
  *
@@ -55,7 +55,7 @@ const { readFileIdentity, sameFileObject } = require('./src/native/file-identity
 const { localMediaEnv } = require('./src/native/child-env');
 const { safeErrorText, sanitizeLogValue, sanitizeIpcValue } = require('./src/native/error-text');
 const { createIpcBoundary } = require('./src/native/ipc-boundary');
-const { downloadTaskView } = require('./src/native/download-task-view');
+const { downloadTaskView, pathConflicts } = require('./src/native/download-task-view');
 const { createProxyConfig } = require('./src/native/proxy-config');
 const { createProxyManager } = require('./src/native/proxy-manager');
 const { createHistoryService } = require('./src/native/history-service');
@@ -397,11 +397,13 @@ function loadDownloadTasks() {
   for (const task of downloadTasks) {
     if (task.status !== 'completed' || !task.savePath) continue;
     try {
-      const current = readFileIdentity(task.savePath);
-      if (!task.fileIdentity && legacyFileMatches(task, task.savePath)) {
-        task.fileIdentity = current;
+      if (!task.fileIdentity) {
+        if (!legacyFileMatches(task, task.savePath)) continue;
+        task.fileIdentity = readFileIdentity(task.savePath);
         migrated = true;
-      } else if (task.fileIdentity && !task.fileIdentity.contentHash && sameFileObject(task.fileIdentity, current)) {
+      } else if (!task.fileIdentity.contentHash) {
+        const current = readFileIdentity(task.savePath);
+        if (!sameFileObject(task.fileIdentity, current)) continue;
         task.fileIdentity = { ...task.fileIdentity, contentHash: current.contentHash };
         migrated = true;
       }
@@ -4527,12 +4529,28 @@ ipcMain.handle('test-proxy', async (event, draft) => {
 });
 
 // ===== IPC：下载管理 =====
-ipcMain.handle('get-download-tasks', () => {
-  return downloadTaskView(downloadTasks, {
-    hasCompleteFile: hasCompleteTaskFile,
+async function currentDownloadTaskView(verifyFiles = false) {
+  const options = {
     xifanTitleConflict: info => episodeDisplayTitle(info.series_id, info.series_title, info.ep_title) !== info.ep_title,
-  });
-});
+  };
+  if (!verifyFiles) {
+    return downloadTaskView(downloadTasks, {
+      ...options,
+      // Path conflicts are cheap and safe to detect here; full file identity checks run in the explicit verification pass.
+      hasCompleteFile: (task, conflicts) => !conflicts.get(task.savePath)?.has(task),
+    });
+  }
+  const conflicts = pathConflicts(downloadTasks);
+  const checks = new Map();
+  for (const task of downloadTasks) {
+    if (task.status !== 'completed') continue;
+    await new Promise(resolve => setTimeout(resolve, 0));
+    checks.set(task, !conflicts.get(task.savePath)?.has(task) && hasCompleteTaskFile(task, conflicts));
+  }
+  return downloadTaskView(downloadTasks, { ...options, hasCompleteFile: task => checks.get(task) === true });
+}
+
+ipcMain.handle('get-download-tasks', (_event, options = {}) => currentDownloadTaskView(options?.verifyFiles !== false));
 
 
 // ===== 文件清理（删除已下载的本地文件）=====

@@ -24,25 +24,25 @@
 
 ## 下载与安装
 
-**当前正式版：7.7**（内部`7.7.0`，桌面构建`7.7.1`）。本轮恢复 `video_tab` 播放器签名取源，保留分集、画质、地址、加密和取消边界；统一发行双Mac、Windows x64与Linux x64 AppImage。
+**当前版本：7.8**（内部`7.8.0`，桌面构建`7.8.1`）。本轮修复大量下载任务位于 SMB／外置盘时，下载管理反复同步核验导致主进程失去响应；统一发行双Mac、Windows x64与Linux x64 AppImage。
 
-7.7已于2026-11-20 15:08:15（Asia/Shanghai）公开并设Latest；23份正式附件、远端SHA256与匿名下载入口均已核对，最终状态以[7.7记录](docs/release-7.7.md)为准。
+7.8已完成源码修复，正在按四平台同源流程构建、验收和汇总附件；实际发行状态以[7.8记录](docs/release-7.8.md)为准。
 
-| 平台 | 7.7正式附件 | 验收状态 |
+| 平台 | 7.8正式附件 | 验收状态 |
 |---|---|---|
-| Apple芯片Mac，macOS 13+ | [DMG](https://github.com/jackotom/hongguo-drama/releases/download/v7.7/Hongguo-7.7-mac-arm64.dmg) | 已签名、公证、装订；最终包两集静音播放通过 |
-| Intel Mac，macOS 13+ | [DMG](https://github.com/jackotom/hongguo-drama/releases/download/v7.7/Hongguo-7.7-mac-x64.dmg) | 已签名、公证、装订；Rosetta启动通过，实体Intel未验 |
-| Windows x64 | [安装版](https://github.com/jackotom/hongguo-drama/releases/download/v7.7/hongguo-downloader-7.7-win-x64-setup.exe) · [便携EXE](https://github.com/jackotom/hongguo-drama/releases/download/v7.7/hongguo-downloader-7.7-win-x64.exe) · [便携ZIP](https://github.com/jackotom/hongguo-drama/releases/download/v7.7/hongguo-downloader-7.7-win-x64.zip) | EXE未签名；真实下载、播放及安装升级在GitHub Windows虚拟机通过 |
-| Linux x64 | [AppImage](https://github.com/jackotom/hongguo-drama/releases/download/v7.7/hongguo-downloader-7.7-linux-x64.AppImage) | 赋予执行权限后运行；两集真实静音播放通过 |
+| Apple芯片Mac，macOS 13+ | [DMG](https://github.com/jackotom/hongguo-drama/releases/download/v7.8/Hongguo-7.8-mac-arm64.dmg) | 待本轮构建、签名及验收 |
+| Intel Mac，macOS 13+ | [DMG](https://github.com/jackotom/hongguo-drama/releases/download/v7.8/Hongguo-7.8-mac-x64.dmg) | 待本轮构建、签名及 Rosetta 启动 |
+| Windows x64 | [安装版](https://github.com/jackotom/hongguo-drama/releases/download/v7.8/hongguo-downloader-7.8-win-x64-setup.exe) · [便携EXE](https://github.com/jackotom/hongguo-drama/releases/download/v7.8/hongguo-downloader-7.8-win-x64.exe) · [便携ZIP](https://github.com/jackotom/hongguo-drama/releases/download/v7.8/hongguo-downloader-7.8-win-x64.zip) | EXE 未签名；待 Windows 虚拟机验收 |
+| Linux x64 | [AppImage](https://github.com/jackotom/hongguo-drama/releases/download/v7.8/hongguo-downloader-7.8-linux-x64.AppImage) | 待原生 Ubuntu 构建与真实素材验收 |
 
-[7.7正式发行页](https://github.com/jackotom/hongguo-drama/releases/tag/v7.7) · [SHA256](https://github.com/jackotom/hongguo-drama/releases/download/v7.7/SHA256SUMS.txt) · [精确源码](https://github.com/jackotom/hongguo-drama/releases/download/v7.7/hongguo-drama-7.7-source.zip)。实际状态见[7.7记录](docs/release-7.7.md)。上游部分网页片源仍可能404、只提供预览或超时，不保证所有内容永久可播。
+[7.8发行页](https://github.com/jackotom/hongguo-drama/releases/tag/v7.8) · [SHA256](https://github.com/jackotom/hongguo-drama/releases/download/v7.8/SHA256SUMS.txt) · [精确源码](https://github.com/jackotom/hongguo-drama/releases/download/v7.8/hongguo-drama-7.8-source.zip)。实际状态见[7.8记录](docs/release-7.8.md)。上游部分网页片源仍可能404、只提供预览或超时，不保证所有内容永久可播。
 
 **Android手机APK／Android TV版：** 请前往 [N3urda/hongguoTV](https://github.com/N3urda/hongguoTV) 下载。该项目独立维护；版本、兼容性与测试状态以该项目发布页为准，不计入本项目的四平台附件或验收。
 
 <details>
 <summary>7.6 历史下载与发行说明</summary>
 
-7.6历史发行包与验收回执见[7.6发行页](https://github.com/jackotom/hongguo-drama/releases/tag/v7.6)及[7.6记录](docs/release-7.6.md)；历史签名、公证和平台验收不替代7.7结果。
+7.7历史发行包与验收回执见[7.7发行页](https://github.com/jackotom/hongguo-drama/releases/tag/v7.7)及[7.7记录](docs/release-7.7.md)；历史签名、公证和平台验收不替代7.8结果。
 
 </details>
 
@@ -258,6 +258,12 @@ Mac和Windows安装版保留应用内更新入口；完整6.4→6.5自动更新�
 2. 在「发现短剧」浏览，或在「搜索与下载」输入剧名、红果分享链接或剧集 ID。
 3. 打开详情点「立即播放」，也可选择集数与清晰度加入下载队列。
 4. 下次从「我的剧库」或「观看记录」接着看；下载进度、失败重试和整剧合并在「下载管理」。
+
+## 7.8
+
+- 下载管理先用任务快照快速显示，再在后台串行核验文件；15 秒刷新不再叠加未完成的 SMB／外置盘扫描。
+- 启动时已有完整文件身份的任务不再逐个重新读取；文件身份、路径冲突、播放和删除前的安全检查保留。
+- 修复 #176 中近千条任务位于网络盘时主进程长时间失去响应的问题。
 
 ## 7.7（正式发布）
 

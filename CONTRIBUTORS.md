@@ -1,7 +1,7 @@
-<!-- 7.7 source and release target; historical credits retained. -->
+<!-- 7.8 source and release target; historical credits retained. -->
 # 贡献者与问题反馈致谢
 
-7.7 延续公开贡献记录；本轮播放授权修复参考 ch6vip/novel-sound 的公开实现，详细署名与历史致谢保留在下方。
+7.8 延续公开贡献记录；感谢 [@xiaowangbb](https://github.com/xiaowangbb) 在 [#176](https://github.com/jackotom/hongguo-drama/issues/176) 提供近千条任务、SMB 延迟和主进程 I/O 卡顿证据。详细署名与历史致谢保留在下方。
 
 ## 7.5 播放修复特别致谢（2026-11-16）
 

@@ -201,13 +201,22 @@ const runningMerge = () => ({ id: 'm', status: 'running', total: 2, done: 0, pro
     assert.equal(ui.button('合并整部剧'), undefined);
     ui.unmount();
   });
-  await test('one initial snapshot and no polling or focus trap while hidden', async () => {
-    let calls = 0;
-    const ui = mount({ getDownloadTasks: async () => { calls++; return [task(1)]; } });
-    await ui.flush(); assert.equal(calls, 1, 'initial effects must not request duplicate snapshots');
+  await test('initial fast snapshot and one deferred file verification stop while hidden', async () => {
+    const calls = [];
+    let finishVerify;
+    const ui = mount({ getDownloadTasks: async options => {
+      const verify = options?.verifyFiles === true;
+      calls.push(verify);
+      if (verify) return new Promise(resolve => { finishVerify = () => resolve([task(1)]); });
+      return [task(1)];
+    } });
+    await ui.flush(); assert.deepEqual(calls, [false], 'the list must render before disk verification');
+    ui.advance(1000); await ui.flush(); assert.deepEqual(calls, [false, true], 'file verification must run once after the fast snapshot');
+    ui.advance(15000); await ui.flush(); assert.deepEqual(calls, [false, true], 'periodic polling must not supersede an in-flight verification');
+    finishVerify(); await ui.flush();
     ui.find(n => n.props.title?.startsWith('删除任务')).props.onClick(); ui.render(); assert.equal(ui.dialogOpen(), true);
-    ui.setProps({ active: false }); const before = calls; ui.advance(20000); await ui.flush();
-    assert.equal(ui.intervals(), 0); assert.equal(calls, before); assert.equal(ui.dialogOpen(), false);
+    ui.setProps({ active: false }); const before = calls.length; ui.advance(20000); await ui.flush();
+    assert.equal(ui.intervals(), 0); assert.equal(calls.length, before); assert.equal(ui.dialogOpen(), false);
     const writes = ui.writes(); ui.emit('onDownloadProgress', { id: 't1', progress: 98 }); ui.advance(250); await ui.flush();
     assert.equal(ui.writes(), writes, 'hidden page must ignore high frequency task events'); ui.unmount();
   });

@@ -18,11 +18,16 @@ async function check({ sid = 'xifan:jiuzhou:253', seriesTitle = '天龙战神', 
     ipcMain: { handle: (name, fn) => { handlers[name] = fn; } }, seriesRegistry, downloadTasks,
     require: name => require(path.join(__dirname, '..', name)),
     downloadTaskView: require('../src/native/download-task-view').downloadTaskView,
+    pathConflicts: require('../src/native/download-task-view').pathConflicts,
     episodeDisplayTitle: require('../src/native/xifan').episodeDisplayTitle,
     fs: { existsSync: () => complete, statSync: () => ({ size: 200000 }) },
     collectSeriesEpisodeFiles: () => ({ dir: '/fixture', ordered: [] }),
-    hasCompleteTaskFile: () => complete, localPlayUrl: () => 'local-media://fixture', console,
+    hasCompleteTaskFile: () => complete, localPlayUrl: () => 'local-media://fixture', console, setTimeout,
   };
+  const viewStart = main.indexOf('async function currentDownloadTaskView');
+  const handlerStart = main.indexOf("ipcMain.handle('get-download-tasks'");
+  assert.ok(viewStart >= 0 && handlerStart > viewStart);
+  vm.runInNewContext(main.slice(viewStart, handlerStart), context);
   for (const name of ['get-series-episodes', 'get-download-tasks']) {
     const start = main.indexOf(`ipcMain.handle('${name}'`);
     assert.ok(start >= 0);
@@ -35,7 +40,7 @@ async function check({ sid = 'xifan:jiuzhou:253', seriesTitle = '天龙战神', 
   assert.equal(result.data.episodes[0].vid, episode.vid);
   assert.equal(result.data.episodes[0].savePath, downloadTasks[0].savePath);
   assert.equal(result.data.episodes[0].status, complete ? 'completed' : 'missing');
-  const [task] = handlers['get-download-tasks']();
+  const [task] = await handlers['get-download-tasks']();
   assert.equal(task.title, expected === title ? oldTaskTitle : `《${seriesTitle}》第001集`, '旧下载任务只改变显示标题');
   assert.equal(task.filename, downloadTasks[0].filename);
   assert.equal(task.savePath, downloadTasks[0].savePath);

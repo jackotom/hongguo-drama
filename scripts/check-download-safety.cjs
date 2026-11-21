@@ -63,6 +63,17 @@ async function crashedTemporary(overrides = {}) {
   return { h:restored, temporary, original:h };
 }
 (async () => {
+  await check('startup trusts established file identity without re-reading every completed download', async () => {
+    const h = load(), one = task('one', h.dir);
+    file(one.savePath);
+    const identity = req('./src/native/file-identity').readFileIdentity(one.savePath);
+    h.context.fixtureTask = { ...one, fileIdentity: identity };
+    h.context.startupReads = 0;
+    h.context.readFileIdentity = file => { h.context.startupReads++; return req('./src/native/file-identity').readFileIdentity(file); };
+    h.run('store.getTasks = () => [fixtureTask]; loadDownloadTasks();');
+    assert.equal(h.run('downloadTasks[0].fileIdentity.contentHash'), identity.contentHash);
+    assert.equal(h.run('startupReads'), 0);
+  });
   await check('issue150 removes missing or conflicting records without touching unknown neighboring files', async () => {
     for (const channel of ['delete-task','delete-tasks']) {
       const h = load(); const one = task('one',h.dir), two = task('two',h.dir);

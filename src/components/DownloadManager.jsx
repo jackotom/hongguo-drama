@@ -110,10 +110,10 @@ function DownloadManager({ onNavigate, active = true }) {
     };
   }, [active]);
 
-  const refresh = useCallback(async () => {
+  const refresh = useCallback(async (verifyFiles = false) => {
     const request = ++requests.current.tasks;
     try {
-      const list = await window.electronAPI.getDownloadTasks();
+      const list = await window.electronAPI.getDownloadTasks({ verifyFiles });
       if (!activeRef.current || request !== requests.current.tasks) return;
       if (!Array.isArray(list)) throw new Error('下载任务读取失败，请重试');
       for (const task of list) if (task.status === 'completed' && task.hongguoInfo?.series_id) downloadedSeries.current.add(String(task.hongguoInfo.series_id));
@@ -176,6 +176,12 @@ function DownloadManager({ onNavigate, active = true }) {
   useEffect(() => {
     if (!active) return;
     refresh();
+    let verifying = false;
+    const verifyTimer = setTimeout(async () => {
+      verifying = true;
+      try { await refresh(true); }
+      finally { verifying = false; }
+    }, 1000);
     loadQueue();
     loadSeriesList();
     loadMergeTasks();
@@ -248,14 +254,20 @@ function DownloadManager({ onNavigate, active = true }) {
         showToast('合并失败：' + (data.error || '未知错误'), 'error');
       }),
     ];
-    const timer = setInterval(() => {
-      loadQueue();
-      refresh();
-      loadMergeTasks();
+    let polling = false;
+    const timer = setInterval(async () => {
+      if (polling || verifying) return;
+      polling = true;
+      try {
+        await Promise.all([loadQueue(), refresh(), loadMergeTasks()]);
+      } finally {
+        polling = false;
+      }
     }, 15000);
     return () => {
       cleanups.forEach(cleanup => cleanup());
       clearInterval(timer);
+      clearTimeout(verifyTimer);
       clearTimeout(batchTimer);
       for (const key of Object.keys(requests.current)) requests.current[key]++;
     };
@@ -690,7 +702,7 @@ function DownloadManager({ onNavigate, active = true }) {
         <div className="dm-hint">{t("已选中 ")}<b>{t(retryableSelectedCount)}</b>{t(" 个失败项，点")}<b>{t("「重试选中」")}</b>{t(" 即会重新下载（无需重新解析）。")}</div>
       )}
 
-      {loadError && <div className="alert alert-error" role="alert">{t(loadError)}<button className="btn btn-outline btn-sm" onClick={refresh}>{t("重新加载")}</button></div>}
+      {loadError && <div className="alert alert-error" role="alert">{t(loadError)}<button className="btn btn-outline btn-sm" onClick={() => refresh(true)}>{t("重新加载")}</button></div>}
       {seriesOptions.length > 1 && (
         <div className="dm-series-filter">
           <label htmlFor="dm-series-select">{t("按剧集查看")}</label>

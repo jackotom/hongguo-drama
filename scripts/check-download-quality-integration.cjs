@@ -663,12 +663,14 @@ const checks = [
       assert.match(h.saved()[0].error,/工具/);
     }
   }],
-  ['lost files and interrupted or stopped tasks never retain a download notice', async () => {
+  ['fast task snapshots defer disk probes while explicit verification and load recovery fail closed', async () => {
     const h = fixture({width:720,height:1280});
     await h.handlers['hongguo-download-batch']({},payload('1080p'));
     await h.run('executeHongguoDownload(downloadTasks[0])');
     fs.unlinkSync(h.saved()[0].savePath);
-    const rows=await h.handlers['get-download-tasks']({});
+    const quick=await h.handlers['get-download-tasks']({}, {verifyFiles:false});
+    assert.equal(quick[0].status,'completed');
+    const rows=await h.handlers['get-download-tasks']({}, {verifyFiles:true});
     assert.equal(rows[0].status,'failed'); assert.equal(rows[0].qualityNotice,'');
     h.run(`store.getTasks = () => [{id:'interrupted',status:'downloading',qualityNotice:'正在下载更低质量片源'}, {id:'stopped',status:'stopped',qualityNotice:'正在下载更低质量片源'}]; loadDownloadTasks();`);
     assert.equal(h.run('downloadTasks[0].qualityNotice'),'');
