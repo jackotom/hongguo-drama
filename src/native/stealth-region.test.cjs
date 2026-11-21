@@ -17,6 +17,7 @@ function harness(t) {
   const context = { ...regionHelpers, store, ipcMain: { handle: (name, fn) => { handlers[name] = fn; } },
     require: createRequire(path.join(root, 'main.js')), path, app: { getPath: () => directory }, IS_PREVIEW: false,
     normalizeProxySettings: settings => ({ ...settings }), normalizeDownloadQuality: value => value, validateProxyDraft() {},
+    invalidateSeriesProgress() {},
     applyProxyWithTimeout: async () => {}, sendToRenderer() {}, updateDownloadGeneration: 0, appUpdateInstaller: null, proxyStartupFallback: false, MAX_CONCURRENT_DOWNLOADS: 3 };
   for (const [start, end] of [['function getDefaultSettings()', '// 启动时记下'], ['function getCurrentSettings()', '// 净化文件夹'], ['const SETTINGS_KEYS =', '// ===== IPC：网络代理']]) vm.runInNewContext(source.slice(source.indexOf(start), source.indexOf(end, source.indexOf(start))), context);
   return { handlers, file, context, read: async () => JSON.parse(JSON.stringify(await handlers['get-settings']())) };
