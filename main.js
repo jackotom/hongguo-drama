@@ -2547,9 +2547,11 @@ async function validateDirectoryIdentityAsync(identity, file) {
     const stat = await fsp.lstat(identity.directory);
     const identityPath = await fsp.realpath(identity.directory);
     const parentPath = await fsp.realpath(path.dirname(file));
+    const samePath = (left, right) => process.platform === 'win32'
+      ? path.resolve(left).toLowerCase() === path.resolve(right).toLowerCase()
+      : path.resolve(left) === path.resolve(right);
     if (!stat.isDirectory() || stat.isSymbolicLink() || stat.dev !== identity.device
-      || !pathInside(identityPath, identity.directory) || !pathInside(identity.directory, identityPath)
-      || !pathInside(identityPath, parentPath) || !pathInside(parentPath, identityPath)) throw new Error();
+      || !samePath(identityPath, identity.directory) || !samePath(identityPath, parentPath)) throw new Error();
     if (Number.isSafeInteger(identity.ino) && identity.ino > 0
       && Number.isSafeInteger(stat.ino) && stat.ino > 0
       && stat.ino !== identity.ino) throw new Error();
