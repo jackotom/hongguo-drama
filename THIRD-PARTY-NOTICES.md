@@ -1,4 +1,4 @@
-<!-- 7.9 release target. -->
+<!-- 7.9 release. -->
 # 第三方组件许可说明
 
 适用源码版本：红果短剧 7.9；沿用 follow-redirects 1.16.3、固定 nv-codec-headers 12.1.14.0 与 AMD AMF v1.5.3 头文件；其余第三方组件保留各自的版本、作者与许可。实际发行状态见 `docs/release-7.9.md`。
