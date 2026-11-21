@@ -2587,37 +2587,48 @@ async function legacyFileMatchesAsync(task, file) {
 }
 
 async function completeTaskFileForList(task, conflicts) {
-  if (!task?.savePath || task.pathConflict || conflicts.get(task.savePath)?.has(task)) return null;
-  if (task.nasDestination && !await nasDestinationCurrentAsync(task.nasDestination, task.savePath)) return null;
+  const failed = reason => ({ error: reason });
+  if (!task?.savePath) return failed('missing-path');
+  if (task.pathConflict) return failed('path-conflict');
+  if (conflicts.get(task.savePath)?.has(task)) return failed('task-conflict');
+  if (task.nasDestination && !await nasDestinationCurrentAsync(task.nasDestination, task.savePath)) return failed('nas-identity');
   if (!task.nasDestination && task.directoryIdentity
-    && !await validateDirectoryIdentityAsync(task.directoryIdentity, task.savePath)) return null;
+    && !await validateDirectoryIdentityAsync(task.directoryIdentity, task.savePath)) return failed('directory-identity');
   try {
     const stat = await fsp.lstat(task.savePath);
-    if (!stat.isFile() || stat.isSymbolicLink() || stat.size <= 1024 * 100) return null;
+    if (!stat.isFile() || stat.isSymbolicLink()) return failed('not-file');
+    if (stat.size <= 1024 * 100) return failed('too-small');
     if (task.fileIdentity) {
       const current = await readFileIdentityAsync(task.savePath, { content: false });
-      if (!sameFileObject(task.fileIdentity, current)) return null;
+      if (!sameFileObject(task.fileIdentity, current)) return failed('file-identity');
       if (task.fileIdentity.contentHash
         && (current.mtimeNs !== task.fileIdentity.mtimeNs || current.ctimeNs !== task.fileIdentity.ctimeNs
           || current.birthtimeNs !== task.fileIdentity.birthtimeNs)) {
         const full = await readFileIdentityAsync(task.savePath);
-        if (!sameFileObject(task.fileIdentity, full)) return null;
+        if (!sameFileObject(task.fileIdentity, full)) return failed('content-identity');
       }
-    } else if (!await legacyFileMatchesAsync(task, task.savePath)) return null;
+    } else if (!await legacyFileMatchesAsync(task, task.savePath)) return failed('legacy-identity');
     return { size: stat.size, identity: task.fileIdentity?.contentHash ? task.fileIdentity : null };
-  } catch (_) { return null; }
+  } catch (_) { return failed('stat-error'); }
 }
 
 async function scanSeriesEpisodes(seriesId, seriesTitle, tasks, entry) {
   const conflicts = pathConflicts(downloadTasks);
-  const byIndex = new Map();
+  const byIndex = new Map(), failures = new Map();
   for (let offset = 0; offset < tasks.length; offset += 6) {
     const batch = tasks.slice(offset, offset + 6);
     const checked = await Promise.all(batch.map(task => completeTaskFileForList(task, conflicts)));
     batch.forEach((task, index) => {
       const complete = checked[index];
       const idx = Number(task.hongguoInfo?.vid_index) || 0;
-      if (!complete || !idx || !ownsEpisodeFiles(task.savePath, tasks)) return;
+      if (!complete || complete.error) {
+        if (idx && task.status === 'completed') failures.set(task.id, complete?.error || 'incomplete');
+        return;
+      }
+      if (!idx || !ownsEpisodeFiles(task.savePath, tasks)) {
+        if (idx && task.status === 'completed') failures.set(task.id, 'ownership');
+        return;
+      }
       const previous = byIndex.get(idx);
       if (!previous || (task.startTime || 0) > (previous.startTime || 0)) byIndex.set(idx, {
         vid_index: idx, startTime: task.startTime || 0, path: task.savePath,
@@ -2680,7 +2691,7 @@ async function scanSeriesEpisodes(seriesId, seriesTitle, tasks, entry) {
     });
   }
   return {
-    dir, dirIdentity, scanFailed, ordered: [...byIndex.values()].sort((a, b) => a.vid_index - b.vid_index),
+    dir, dirIdentity, scanFailed, failures, ordered: [...byIndex.values()].sort((a, b) => a.vid_index - b.vid_index),
   };
 }
 
@@ -2758,6 +2769,7 @@ async function seriesEpisodesData(seriesId, { withUrls = true } = {}) {
       actualQuality: task?.actualQuality || null,
       status, progress, fileSize, fileUrl, savePath,
       candidate,
+      localCheck: task?.status === 'completed' && !candidate ? scan.failures.get(task.id) || 'not-matched' : undefined,
     };
   }).sort((a, b) => a.vid_index - b.vid_index);
 

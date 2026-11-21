@@ -126,7 +126,7 @@ module.exports = async function checkDownloads({ evaluate, result, dataFile, med
   assert.equal(seriesEpisodes.success, true);
   for (const index of expected) {
     const episode = seriesEpisodes.data.episodes.find(item => item.vid_index === index);
-    assert.equal(episode?.status, 'completed', 'Completed App queue task must return a playable episode');
+    assert.equal(episode?.status, 'completed', 'Completed App queue task must return a playable episode: ' + JSON.stringify(episode));
     assert.match(episode.fileUrl, /^hongguo-local:\/\/f\/[0-9a-f-]{36}$/i, 'Completed App queue task must return an opaque media capability');
   }
   receipt.seriesEpisodes = seriesEpisodes.data.episodes
