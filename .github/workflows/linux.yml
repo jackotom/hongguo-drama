@@ -75,7 +75,7 @@ jobs:
         run: xvfb-run -a node scripts/check-linux-appimage.cjs
         env:
           HONGGUO_ACCEPTANCE_SERIES_ID: '7690112243203050521'
-          HONGGUO_ACCEPTANCE_EPISODES: '1,2'
+          HONGGUO_ACCEPTANCE_EPISODES: '1,3'
       - name: Archive frozen source and asset digests
         run: |
           version=$(node -p "require('./package.json').version.replace(/\.0$/, '')")
