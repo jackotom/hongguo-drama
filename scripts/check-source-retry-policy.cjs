@@ -17,6 +17,17 @@ for (const code of ['DEVICE_REGISTRATION_FAILED', 'HTTP_403', 'HTTP_429', 'BUSIN
   assert.equal(context.sourceFailureIsTransient(error), false, `${code}: an unrelated timeout must not retry App rejection`);
   assert.equal(context.isDeferrableSourceError(task, error), false, `${code}: must not schedule automatic download retries`);
 }
+const publicLimited = {
+  code: 'SOURCE_UNAVAILABLE',
+  sources: [
+    { source: 'web', code: 'PUBLIC_ACCESS_LIMITED' },
+    { source: 'app', code: 'EMPTY_RESPONSE' },
+    { source: 'api', code: 'EMPTY_RESPONSE' },
+  ],
+};
+assert.equal(context.sourceFailure('web', { code: 'PUBLIC_ACCESS_LIMITED' }).code, 'PUBLIC_ACCESS_LIMITED');
+assert.equal(context.isDeferrableSourceError(task, publicLimited), false,
+  'website-only episodes must not enter an automatic retry loop while the App endpoint is empty');
 for (const code of ['TIMEOUT', 'NETWORK_ERROR', 'HTTP_503', 'MISSING_MODEL']) {
   assert.equal(context.sourceFailureIsTransient(unavailable(code)), true, `${code}: other transient routes can still recover`);
 }

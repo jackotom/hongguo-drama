@@ -18,6 +18,11 @@ function appRoute(config) {
     assert.ok(['api5-normal-sinfonlineb.fqnovel.com', 'api5-normal-sinfonlinea.fqnovel.com'].includes(url.hostname));
     return 'model';
   }
+  if (url.pathname === '/reading/bookapi/video_tab/multi_video_model/v1/') {
+    assert.equal(config.method, 'GET');
+    assert.equal(url.hostname, 'api5-normal-sinfonlineb.fqnovel.com');
+    return 'videoTab';
+  }
   if (url.pathname === '/novel/player/multi_video_model/v1/') {
     assert.equal(config.method, 'POST');
     assert.equal(url.hostname, 'api5-normal-sinfonlineb.fqnovel.com');
@@ -40,12 +45,13 @@ function appFixture(videoList, model = {}) {
     calls.push(config);
     const route = appRoute(config);
     let data;
-    if (route === 'registration') data = { device_id: playbackDevice.device_id, install_id: playbackDevice.iid };
+    if (route === 'videoTab') data = '';
+    else if (route === 'registration') data = { device_id: playbackDevice.device_id, install_id: playbackDevice.iid };
     else if (route === 'model' || route === 'legacy') {
       for (const key of ['device_id', 'iid', 'cdid']) assert.equal(new URL(config.url).searchParams.get(key), playbackDevice[key]);
       data = { data: { '11': { video_model: { fallback_api: 'https://vod.snssdk.com/info' } } } };
     } else data = { video_info: { data: { ...model, video_list: videoList } } };
-    return { status: 200, headers: {}, data: JSON.stringify(data) };
+    return { status: 200, headers: {}, data: typeof data === 'string' ? data : JSON.stringify(data) };
   } });
   return { ...app, calls };
 }
@@ -58,7 +64,7 @@ function routeFixture(appError = false) {
     './app-source': { fetchAppPlayUrl: async (_vid, options) => {
       calls.push(options.allowLowerQuality ? options.quality + ':fallback' : options.quality);
       if (appError) throw new Error('没有符合所选清晰度的片源');
-      return { url: mediaUrl(`${options.quality}-${calls.length}`), quality: options.quality };
+      return { url: mediaUrl(`${options.quality || 'auto'}-${calls.length}`), quality: options.quality };
     } },
     './hema': { fetchPlayUrlSingle: async () => { calls.push('hema'); return { url: mediaUrl('hema') }; } },
     './xifan': { fetchPlayUrlSingle: async () => { calls.push('xifan'); return { url: mediaUrl('xifan') }; } },
@@ -158,13 +164,13 @@ const checks = [
     const auto = await f.fetchPlayUrlSingle('11', '1');
     const hd = await f.fetchPlayUrlSingle('11', '1', { quality: '1080p' });
     const sd = await f.fetchPlayUrlSingle('11', '1', { quality: '720p' });
-    assert.equal(auto.url, mediaUrl('web')); assert.equal(hd.quality, '1080p'); assert.equal(sd.quality, '720p');
+    assert.equal(auto.url, mediaUrl('auto-1')); assert.equal(hd.quality, '1080p'); assert.equal(sd.quality, '720p');
     assert.equal((await f.fetchPlayUrlSingle('11', '1', { quality: '1080p' })).url, hd.url);
     const fresh = await f.fetchPlayUrlSingle('11', '1', { quality: '1080p', force: true });
     assert.notEqual(fresh.url, hd.url);
     assert.equal((await f.fetchPlayUrlSingle('11', '1', { quality: 'auto' })).url, auto.url);
     assert.equal((await f.fetchPlayUrlSingle('11', '1', { quality: '720p' })).url, sd.url);
-    assert.deepEqual(f.calls, ['web', '1080p', '720p', '1080p']);
+    assert.deepEqual(f.calls, [undefined, '1080p', '720p', '1080p']);
   }],
   ['explicit App failure returns no URL and never silently falls back to web', async () => {
     const f = routeFixture(true);

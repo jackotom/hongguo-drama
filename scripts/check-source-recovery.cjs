@@ -18,6 +18,11 @@ function appRoute(config) {
     assert.ok(['api5-normal-sinfonlineb.fqnovel.com', 'api5-normal-sinfonlinea.fqnovel.com'].includes(url.hostname));
     return 'model';
   }
+  if (url.pathname === '/reading/bookapi/video_tab/multi_video_model/v1/') {
+    assert.equal(config.method, 'GET');
+    assert.equal(url.hostname, 'api5-normal-sinfonlineb.fqnovel.com');
+    return 'videoTab';
+  }
   if (url.pathname === '/novel/player/multi_video_model/v1/') {
     assert.equal(config.method, 'POST');
     assert.equal(url.hostname, 'api5-normal-sinfonlineb.fqnovel.com');
@@ -54,12 +59,13 @@ function appFixture(rows) {
     calls.push(config);
     const route = appRoute(config);
     let data;
-    if (route === 'registration') data = { device_id: playbackDevice.device_id, install_id: playbackDevice.iid };
+    if (route === 'videoTab') data = '';
+    else if (route === 'registration') data = { device_id: playbackDevice.device_id, install_id: playbackDevice.iid };
     else if (route === 'model' || route === 'legacy') {
       for (const key of ['device_id', 'iid', 'cdid']) assert.equal(new URL(config.url).searchParams.get(key), playbackDevice[key]);
       data = { data: { '11': { video_model: { fallback_api: 'https://vod.snssdk.com/info' } } } };
     } else data = { video_info: { data: { video_list: rows } } };
-    return { status: 200, headers: {}, data: JSON.stringify(data) };
+    return { status: 200, headers: {}, data: typeof data === 'string' ? data : JSON.stringify(data) };
   } });
   return { ...app, calls };
 }
@@ -145,7 +151,7 @@ const checks = [
       ['ENOTFOUND', 'NETWORK_ERROR'], ['ECONNRESET', 'NETWORK_ERROR'], ['ERR_NETWORK', 'NETWORK_ERROR'],
       ['secret-token-code', 'NETWORK_ERROR']]) {
       const app = load('app-source.js', { axios: async config => {
-        assert.ok(['model', 'legacy'].includes(appRoute(config)));
+        assert.ok(['videoTab', 'model', 'legacy'].includes(appRoute(config)));
         throw Object.assign(new Error('secret https://signed.invalid/?token=private'), { code, config: { secret: true } });
       } });
       await assert.rejects(app.fetchAppPlayUrl('11'), error => {
@@ -176,7 +182,8 @@ const checks = [
         const route = appRoute(config);
         stages.push(route);
         assert.notEqual(route, 'registration', 'registration is isolated from model failures');
-        const result = { status: 200, headers: {}, ...(route === 'model' || route === 'legacy' ? response : { data: second }) };
+        const result = { status: 200, headers: {},
+          ...(route === 'videoTab' ? { data: '' } : route === 'model' || route === 'legacy' ? response : { data: second }) };
         if (typeof result.data !== 'string') result.data = JSON.stringify(result.data);
         return result;
       } });
@@ -184,7 +191,8 @@ const checks = [
       const result = await f.fetchPlayUrlSingle('11', '1', { quality: '720p' });
       assert.equal(result.sources[0].code, expected);
       assert.doesNotMatch(JSON.stringify(result), /secret|127\.0\.0\.1|private/);
-      assert.deepEqual(stages, second === null ? ['model'] : ['model', 'metadata'], 'explicit failures must not start another model route');
+      assert.deepEqual(stages.filter(stage => stage !== 'videoTab'),
+        second === null ? ['model'] : ['model', 'metadata'], 'explicit failures must not start another model route');
     }
   }],
   ['Web keeps null compatibility but reports actual failures on first and final fallback', async () => {
@@ -230,7 +238,7 @@ const checks = [
       } },
     });
     assert.equal((await f.fetchPlayUrlSingle('11', '1')).source, 'app');
-    assert.deepEqual(webTimeouts, [4000, 4000], 'Web cannot consume the whole lookup deadline');
+    assert.deepEqual(webTimeouts, [], 'App-first lookup must not spend the Web timeout budget');
     assert.deepEqual(apiTimeouts, []);
     appAvailable = false; webTimeouts.length = 0;
     assert.equal((await f.fetchPlayUrlSingle('11', '1', { force: true })).code, 'SOURCE_UNAVAILABLE');
@@ -310,7 +318,7 @@ const checks = [
     });
     const result = await f.fetchPlayUrlSingle('11', '1');
     assert.equal(result.source, 'app', 'SEO duration describes the episode, not the public preview file');
-    assert.deepEqual(calls, ['web', 'app'], 'known preview must skip the redundant alternate page');
+    assert.deepEqual(calls, ['app'], 'known preview must not preempt the complete App episode');
     appAvailable = false; calls.length = 0;
     const unavailable = await f.fetchPlayUrlSingle('11', '1', { force: true });
     assert.equal(unavailable.code, 'SOURCE_UNAVAILABLE');
@@ -404,15 +412,16 @@ const checks = [
     const result = await f.fetchAppPlayUrl('11');
     assert.ok(Array.isArray(result.variants), 'media candidates must survive address lookup');
     assert.deepEqual(Array.from(result.variants, v => v.url), ['main', 'backup', 'extra', 'hevc', 'list'].map(media));
+    const metadataCall = f.calls.findLast(call => ['model', 'metadata', 'legacy'].includes(appRoute(call)));
     for (const candidate of result.variants) {
       assert.equal(candidate.source, 'app'); assert.equal(candidate.vid, '11');
-      assert.equal(candidate.userAgent, f.calls[1].headers['User-Agent']);
+      assert.equal(candidate.userAgent, metadataCall.headers['User-Agent']);
       assert.equal(candidate.referer, undefined, 'App media must not start with the rejected website Referer');
       assert.equal(candidate.variants, undefined);
     }
     assert.equal(result.variants[2].contentKey, key1); assert.equal(result.variants[3].contentKey, key2);
-    assert.equal(result.variants[4].contentKey, null); assert.equal(f.calls.length, 2, 'no media preflight');
-    assert.deepEqual(f.calls.map(appRoute), ['model', 'metadata']);
+    assert.equal(result.variants[4].contentKey, null);
+    assert.deepEqual(f.calls.map(appRoute).filter(route => route !== 'videoTab'), ['model', 'metadata'], 'no media preflight');
   }],
   ['Strict quality alternatives never include smaller or unknown-size streams', async () => {
     const f = appFixture({ low: { main_url: media('low'), codec_type: 'h264', width: 720, height: 1280 },
@@ -437,7 +446,7 @@ const checks = [
     const f = routeFixture(); f.state.web = false;
     const unavailable = await f.fetchPlayUrlSingle('11', '1');
     assert.equal(unavailable.code, 'SOURCE_UNAVAILABLE');
-    assert.deepEqual(Array.from(unavailable.sources, item => item.source), ['web', 'app', 'api']);
+    assert.deepEqual(Array.from(unavailable.sources, item => item.source), ['app', 'web', 'api']);
     assert.doesNotMatch(JSON.stringify(unavailable), /secret|signed\.invalid|private|前.*集|付费|会员/);
     assert.ok(unavailable.sources.every(item => item.code && item.message));
     f.state.app = true;

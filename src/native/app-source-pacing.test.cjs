@@ -5,7 +5,7 @@ const path = require('node:path');
 const vm = require('node:vm');
 const { deferred, turn } = require('./hongguo-cancellation-fixture.cjs');
 
-function fixture(reply, registrationError) {
+function fixture(reply, registrationError, sdkReply) {
     let now = 1800000000000;
     const calls = [], registrations = [], timers = [], module = { exports: {} };
     function later(fn, ms) { const timer = { fn, at: now + ms, cleared: false }; timers.push(timer); return timer; }
@@ -29,6 +29,9 @@ function fixture(reply, registrationError) {
             if (name === 'axios') return async config => {
                 calls.push({ ...config, at: now });
                 return reply ? reply(config, calls.length) : success(config);
+            };
+            if (name === './sdk-playback') return {
+                resolveSdkPlayback: sdkReply || (async () => null),
             };
             return require(name.startsWith('.') ? path.join(__dirname, name) : name);
         },
@@ -60,6 +63,35 @@ function success(config) {
     } };
     return { status: 200, headers: {}, data: JSON.stringify({ code: 0, data: { [vid]: entry, '12': entry } }) };
 }
+
+function sdkSuccess(name) {
+    return {
+        model: {
+            video_id: `sdk-${name}`, video_duration: 60,
+            video_list: { hd: { codec_type: 'h264', vwidth: 1080, vheight: 1920,
+                main_url: `https://qznovelvod.com/${name}.mp4`, encrypt_info: { encrypt: false } } },
+        },
+        userAgent: 'sdk-fixture',
+    };
+}
+
+test('SDK-first downloads resolve in parallel without consuming playback pacing', async () => {
+    const held = [deferred(), deferred()], vids = [];
+    const f = fixture(undefined, undefined, vid => {
+        vids.push(vid);
+        return held[vids.length - 1].promise;
+    });
+    const first = f.fetch('11', { preferSdk: true });
+    const second = f.fetch('12', { preferSdk: true });
+    await turn();
+    assert.deepEqual(vids, ['11', '12']);
+    assert.equal(f.calls.length, 0, 'SDK-first downloads must skip empty official routes');
+    assert.equal(f.registrations.length, 0, 'SDK-first downloads must not spend the anonymous App identity');
+    held[0].resolve(sdkSuccess('first'));
+    held[1].resolve(sdkSuccess('second'));
+    assert.equal((await first).url, 'https://qznovelvod.com/first.mp4');
+    assert.equal((await second).url, 'https://qznovelvod.com/second.mp4');
+});
 
 test('concurrent playback and prefetch register and request serially with a one-second gap', async () => {
     const held = deferred(), f = fixture((config, count) => count === 1 ? held.promise : success(config));
@@ -95,30 +127,30 @@ test('cancelling the source cooldown does not send a request or extend the next 
     assert.equal(f.calls[1].at - f.calls[0].at, 1000);
 });
 
-test('empty current routes use one identity and one bounded route probe', async () => {
+test('empty current routes rotate identity once and stop', async () => {
     const f = fixture(() => ({ status: 200, headers: {}, data: '' }));
     const result = f.fetch().then(value => ({ value }), error => ({ error }));
     await turn();
-    for (let round = 0; round < 6; round++) await f.advance(250);
+    for (let round = 0; round < 30; round++) await f.advance(250);
     const settled = await Promise.race([result, new Promise(resolve => setTimeout(() => resolve({ timeout: true }), 100))]);
     assert.equal(settled.timeout, undefined, JSON.stringify({ calls: f.calls.length, liveTimers: f.liveTimers().length }));
     assert.equal(settled.error.code, 'EMPTY_RESPONSE');
-    assert.equal(f.registrations.length, 1, 'all empty routes must reuse the same identity');
-    assert.equal(f.calls.length, 12, 'six routes are each bounded to an initial request and one 250ms re-probe');
-    assert.deepEqual(f.calls.map(config => new URL(config.url).pathname), [
-        '/novel/player/multi_video_model/player/v1',
-        '/novel/player/multi_video_model/player/v1',
-        '/novel/player/multi_video_model/player/v1',
-        '/novel/player/multi_video_model/player/v1',
-        '/novel/player/video_model/v1/',
-        '/novel/player/video_model/v1/',
-        '/novel/player/video_model/v1/',
-        '/novel/player/video_model/v1/',
+    assert.equal(f.registrations.length, 2, 'one empty-result identity rotation is bounded');
+    const round = [
         '/reading/bookapi/video_tab/multi_video_model/v1/',
         '/reading/bookapi/video_tab/multi_video_model/v1/',
+        '/novel/player/multi_video_model/player/v1',
+        '/novel/player/multi_video_model/player/v1',
+        '/novel/player/multi_video_model/player/v1',
+        '/novel/player/multi_video_model/player/v1',
+        '/novel/player/video_model/v1/',
+        '/novel/player/video_model/v1/',
+        '/novel/player/video_model/v1/',
+        '/novel/player/video_model/v1/',
         '/novel/player/multi_video_model/v1/',
         '/novel/player/multi_video_model/v1/',
-    ]);
+    ];
+    assert.deepEqual(f.calls.map(config => new URL(config.url).pathname), [...round, ...round]);
 });
 
 test('explicit HTTP refusal remains terminal for queued consumers and permits a later action', async () => {

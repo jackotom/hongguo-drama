@@ -1,4 +1,4 @@
-// Hongguo Drama 8.0: desktop runtime; server entry is server/index.cjs.
+// Hongguo Drama 8.1: desktop runtime; server entry is server/index.cjs.
 /**
  * main.js - 红果短剧 6.2 下载器（独立版）主进程
  *
@@ -683,8 +683,15 @@ function sourceFailureHasEmpty(error) {
   return Array.isArray(error?.sources) && error.sources.some(item => item.code === 'EMPTY_RESPONSE');
 }
 
+function sourceFailureIsPublicLimited(error) {
+  return error?.code === 'SOURCE_UNAVAILABLE'
+    && Array.isArray(error.sources)
+    && error.sources.some(item => item.code === 'PUBLIC_ACCESS_LIMITED');
+}
+
 function isDeferrableSourceError(task, error) {
   if (!/^\d{1,30}$/.test(String(task.hongguoInfo?.vid || ''))) return false;
+  if (sourceFailureIsPublicLimited(error)) return false;
   if (isTransientRegistrationFailure(error)) return true;
   if (error?.code === 'EMPTY_RESPONSE') return true;
   if (error?.code === 'SOURCE_UNAVAILABLE') {
@@ -903,6 +910,7 @@ async function executeHongguoDownload(task) {
   task.cancelSource = source;
   let tmpPath, writer, temporary, finalPath;
   const numeric = /^\d{1,30}$/.test(String(vid));
+  const preferSdk = numeric;
   try {
     delete task.published;
     task.status = 'downloading'; task.cancelled = false; task.progress = 0; delete task.retryAt;
@@ -1028,8 +1036,18 @@ async function executeHongguoDownload(task) {
       }
       reusedCache = await reuseCache();
     }
-    if (!reusedCache) await withMediaRecovery(vid, hongguoInfo?.series_id, { playInfo: checkedPlayInfo, quality, allowLowerQuality, force: true, cancelToken: source.token,
-      onSourceReady: numeric ? clearHongguoSourceBackoff : null }, async playInfo => {
+    if (!reusedCache && preferSdk) {
+      task.qualityNotice = '正在获取完整片源';
+      sendToRenderer('download-progress', { id, qualityNotice: task.qualityNotice });
+    }
+    if (!reusedCache) await withMediaRecovery(vid, hongguoInfo?.series_id, { playInfo: checkedPlayInfo, quality, allowLowerQuality, preferSdk, force: true, cancelToken: source.token,
+      onSourceReady: () => {
+        if (numeric) clearHongguoSourceBackoff();
+        if (preferSdk && task.qualityNotice === '正在获取完整片源') {
+          task.qualityNotice = '';
+          sendToRenderer('download-progress', { id, qualityNotice: '' });
+        }
+      } }, async playInfo => {
       source.token.throwIfRequested();
       const bytevc2Executable = playInfo.codec === 'bytevc2' ? requireBytevc2Executable() : null;
       notifyQuality(Math.min(Number(playInfo.width), Number(playInfo.height)));
@@ -1146,10 +1164,16 @@ async function executeHongguoDownload(task) {
       }
     } else {
       const retries = task.sourceRetries || 0;
-      task.status = 'failed'; task.error = error.code === 'EEXIST' ? '下载临时文件发生冲突或已变化，已有文件已保留，请重试' : error.message; task.endTime = Date.now();
+      const publicLimited = numeric && sourceFailureIsPublicLimited(error);
+      const accessible = Number(task.hongguoInfo?.web_accessible_episodes);
+      task.status = 'failed';
+      task.error = publicLimited
+        ? `本集不在官网公开片源范围${Number.isSafeInteger(accessible) && accessible > 0 ? `（公开源只提供前 ${accessible} 集）` : ''}；后续集需在官方 App 观看，本应用不绕过登录、付费或 DRM。`
+        : error.code === 'EEXIST' ? '下载临时文件发生冲突或已变化，已有文件已保留，请重试' : error.message;
+      task.endTime = Date.now();
       const rejection = numeric && isDownloadSourceRejection(error);
-      const rejectionRetry = rejection || isTransientRegistrationFailure(error)
-        || error.code === 'EMPTY_RESPONSE' || error.code === 'SOURCE_UNAVAILABLE' && sourceFailureHasEmpty(error);
+      const rejectionRetry = !publicLimited && (rejection || isTransientRegistrationFailure(error)
+        || error.code === 'EMPTY_RESPONSE' || error.code === 'SOURCE_UNAVAILABLE' && sourceFailureHasEmpty(error));
       const delays = rejectionRetry ? REJECTION_RETRY_DELAYS
         : error.code === 'SOURCE_UNAVAILABLE' || [404, 410].includes(error.mediaStatus)
           ? SOURCE_RETRY_DELAYS : TRANSFER_RETRY_DELAYS;
@@ -1157,12 +1181,16 @@ async function executeHongguoDownload(task) {
         holdHongguoLookups(REJECTION_RETRY_DELAYS[Math.min(sourceRejectionStreak, REJECTION_RETRY_DELAYS.length - 1)]);
         sourceRejectionStreak++;
       }
-      if (retries < delays.length && (rejection || isDeferrableSourceError(task, error))) {
+      if (!publicLimited && retries < delays.length && (rejection || isDeferrableSourceError(task, error))) {
         const delay = delays[retries];
         task.sourceRetries = retries + 1; task.retryAt = Date.now() + delay; task.sourceRetryLimit = delays.length;
         const wait = delay >= 120000 ? `${delay / 60000} 分钟` : `${delay / 1000} 秒`;
         task.error = `${error.message} 将在 ${wait}后自动重试（${retries + 1}/${delays.length}）。`;
         armSourceRetry(task);
+      } else if (publicLimited) {
+        delete task.sourceRetries;
+        delete task.sourceRetryLimit;
+        delete task.retryAt;
       }
       sendToRenderer('download-failed', { id, error: task.error, retryAt: task.retryAt || null,
         sourceRetries: task.sourceRetries || 0, sourceRetryLimit: task.sourceRetryLimit || 3, qualityNotice: '' });
@@ -3284,7 +3312,8 @@ async function withMediaRecovery(vid, seriesId, options, consume) {
         if (!info) {
           lookup = boundedSignal(controller.signal, 30000);
           info = await awaitMediaOperation(hongguo.fetchPlayUrlSingle(vid, seriesId,
-            { quality: options.quality, allowLowerQuality: options.allowLowerQuality, force: options.force || round > 0, signal: lookup.signal }), lookup.signal);
+            { quality: options.quality, allowLowerQuality: options.allowLowerQuality, preferSdk: options.preferSdk === true,
+              force: options.force || round > 0, signal: lookup.signal }), lookup.signal);
           throwIfAborted(lookup.signal);
         }
       } catch (error) {
@@ -4281,6 +4310,8 @@ ipcMain.handle('decode-capability', async () => ({
 async function enqueueEpisodes({ seriesId, seriesTitle, episodes, cover, quality, nasDestination }) {
   if (!Array.isArray(episodes) || episodes.length === 0) return 0;
   const settings = getCurrentSettings();
+  const publicEpisodeLimit = typeof seriesRegistry === 'undefined' ? null
+    : seriesRegistry.find(item => String(item.series_id) === String(seriesId))?.web_accessible_episodes ?? null;
   const downloadQuality = normalizeDownloadQuality(quality ?? settings.download_quality);
   if (/^(xifan|hema|reelshort|dramabox|custom):/.test(String(seriesId))) {
     const current = await hongguo.fetchEpisodeList(seriesId);
@@ -4366,6 +4397,10 @@ async function enqueueEpisodes({ seriesId, seriesTitle, episodes, cover, quality
     );
     if (dup) {
       changedTasks.push({ task: dup, previous: { ...dup } });
+      if (dup.hongguoInfo) {
+        dup.hongguoInfo.web_available = ep.web_available ?? null;
+        dup.hongguoInfo.web_accessible_episodes = publicEpisodeLimit;
+      }
       if (!nasDestination) dup.metadataWarning = metadataWarning;
       if (!nasDestination && !dup.nasDestination && !dup.directoryIdentity && typeof dup.savePath === 'string' && fs.existsSync(path.dirname(dup.savePath)))
         dup.directoryIdentity = readDirectoryIdentity(path.dirname(dup.savePath));
@@ -4427,6 +4462,8 @@ async function enqueueEpisodes({ seriesId, seriesTitle, episodes, cover, quality
         series_title: cleanSeriesTitle,
         vid_index: ep.vid_index,
         ep_title: ep.title,
+        web_available: ep.web_available ?? null,
+        web_accessible_episodes: publicEpisodeLimit,
       },
     };
 

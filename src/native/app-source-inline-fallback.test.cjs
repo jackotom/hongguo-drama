@@ -26,6 +26,9 @@ function fixture(inline, fallback, { status = 200, code = 0, stringModel = false
                 registerPlaybackDevice: async () => ({ device_id: '1000000000000001', iid: '1000000000000002', cdid: 'fixture' }),
             };
             if (name === 'axios') return async config => {
+                if (new URL(config.url).pathname === '/reading/bookapi/video_tab/multi_video_model/v1/') {
+                    return { status: 200, headers: {}, data: '' };
+                }
                 calls.push(config);
                 const isFallback = config.url === fallbackUrl;
                 return { status: isFallback ? status : 200, headers: {}, data: isFallback && empty ? '' : JSON.stringify(isFallback
@@ -189,6 +192,7 @@ for (const options of [{ status: 403 }, { status: 429 }, { code: 1 }, { empty: t
     test(`fallback failure is terminal without another model request: ${JSON.stringify(options)}`, async () => {
         const f = fixture(model(), model({ video_list: [row(1080, { encrypt: false })] }), options);
         await assert.rejects(f.fetch({ quality: 'auto' }));
-        assert.equal(f.calls.length, 2);
+        assert.equal(f.calls.length, options.empty ? 4 : 2,
+            options.empty ? 'one empty identity rotation remains bounded' : 'explicit fallback failures do not retry');
     });
 }

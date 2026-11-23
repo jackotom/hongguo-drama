@@ -285,7 +285,11 @@ async function fetchPublicFallbackPlayUrl(vid, signal) {
   if (response?.status !== 200 || !payload || typeof payload !== 'object'
       || Number(payload.base_resp?.StatusCode ?? payload.code ?? 0) !== 0) {
     const error = new Error('官网公开兜底接口未返回有效片源');
-    error.code = response?.status >= 400 ? `HTTP_${response.status}` : 'NO_PLAYABLE_SOURCE';
+    const upstreamCode = String(payload?.error || '').trim().slice(0, 80);
+    error.code = upstreamCode === 'public_fallback_unavailable'
+      ? 'PUBLIC_ACCESS_LIMITED'
+      : response?.status >= 400 ? `HTTP_${response.status}` : 'NO_PLAYABLE_SOURCE';
+    if (upstreamCode) error.upstreamCode = upstreamCode;
     throw error;
   }
   let media;
@@ -376,6 +380,10 @@ async function fetchPlayUrlFromWeb(vid, sid, onFailure, signal) {
     if (publicFallback) return publicFallback;
   } catch (error) {
     throwIfAborted(signal);
+    if (error.code === 'PUBLIC_ACCESS_LIMITED') {
+      onFailure?.(error);
+      return null;
+    }
     lastErr = error;
   }
   for (const url of candidates) {
@@ -740,10 +748,10 @@ async function fetchPlayUrlSingle(vid, sid, options = {}) {
     if (String(vid).startsWith('xifan:') || String(sid).startsWith('xifan:')) return require('./xifan').fetchPlayUrlSingle(vid, sid);
     const skipWeb = (failedWebMedia.get(String(vid)) || 0) > Date.now();
     const allowLowerQuality = options.allowLowerQuality === true && quality !== 'auto';
-    const cacheKey = `play:${sid || ''}:${vid}${quality === 'auto' ? '' : `:${quality}`}${skipWeb ? ':fallback' : ''}${allowLowerQuality ? ':lower-quality' : ''}`;
+    const cacheKey = `play:${sid || ''}:${vid}${quality === 'auto' ? '' : `:${quality}`}${skipWeb ? ':fallback' : ''}${allowLowerQuality ? ':lower-quality' : ''}${options.preferSdk ? ':sdk-first' : ''}`;
     const result = await cachedRequest(cacheKey, 30000, signal => quality === 'auto'
-      ? fetchPlayUrlFresh(vid, sid, skipWeb, signal)
-      : require('./app-source').fetchAppPlayUrl(String(vid), { quality, allowLowerQuality, signal }).catch(async error => {
+      ? fetchPlayUrlFresh(vid, sid, skipWeb, signal, options.preferSdk === true)
+      : require('./app-source').fetchAppPlayUrl(String(vid), { quality, allowLowerQuality, preferSdk: options.preferSdk === true, signal }).catch(async error => {
         throwIfAborted(signal);
         if (error.code === 'ERR_CANCELED') throw error;
         const sources = [sourceFailure('app', error)];
@@ -773,6 +781,10 @@ function sourceFailure(source, error) {
   const message = String(error?.message || '');
   const code = String(error?.code || '');
   if (code === 'ERR_CANCELED') return { source, code, message: '已取消 App 片源请求' };
+  if (code === 'PUBLIC_ACCESS_LIMITED' || code === 'public_fallback_unavailable'
+      || code === 'protected_playback_unavailable') {
+    return { source, code: 'PUBLIC_ACCESS_LIMITED', message: '官网公开片源不提供本集，需在官方 App 观看' };
+  }
   const networkDetails = { DNS: 'DNS 解析失败', CONNECTION: '连接失败', TLS: 'TLS 证书或握手失败' };
   const network = typeof error?.networkFailure === 'string' && Object.hasOwn(networkDetails, error.networkFailure)
     ? { networkFailure: error.networkFailure } : {};
@@ -811,21 +823,21 @@ function sourceFailure(source, error) {
 
 function unavailableSources(sources, quality = 'auto') {
   const names = { web: '网页', app: 'App', api: '旧接口' };
-  const error = new Error(`本集取源失败${quality === 'auto' ? '' : `（所选清晰度 ${quality}，未降级）`}：${sources.map(item => `${names[item.source]}：${item.message}`).join('；')}。请重试或在官方 App 确认可播情况。`);
+  const publicLimited = sources.some(item => item.code === 'PUBLIC_ACCESS_LIMITED');
+  const message = publicLimited
+    ? `官网公开片源不提供本集，当前 App 取源也未返回完整地址。请稍后重试；若该集只对官方 App 开放，请在官方 App 观看。`
+    : `本集取源失败${quality === 'auto' ? '' : `（所选清晰度 ${quality}，未降级）`}：${sources.map(item => `${names[item.source]}：${item.message}`).join('；')}。请重试或在官方 App 确认可播情况。`;
+  const error = new Error(message);
   error.code = 'SOURCE_UNAVAILABLE';
   error.sources = sources;
   return error;
 }
 
-async function fetchPlayUrlFresh(vid, sid, skipWeb = false, signal) {
+async function fetchPlayUrlFresh(vid, sid, skipWeb = false, signal, preferSdk = false) {
   throwIfAborted(signal);
   const sources = [];
-  const web = !skipWeb && await fetchPlayUrlFromWeb(vid, sid, error => sources.push(sourceFailure('web', error)), signal);
-  throwIfAborted(signal);
-  if (web && web.url) return web;
-
   try {
-    const result = await require('./app-source').fetchAppPlayUrl(String(vid), { signal });
+    const result = await require('./app-source').fetchAppPlayUrl(String(vid), { preferSdk, signal });
     throwIfAborted(signal);
     return result;
   } catch (error) {
@@ -833,6 +845,10 @@ async function fetchPlayUrlFresh(vid, sid, skipWeb = false, signal) {
     if (error.code === 'ERR_CANCELED') throw error;
     sources.push(sourceFailure('app', error));
   }
+
+  const web = !skipWeb && await fetchPlayUrlFromWeb(vid, sid, error => sources.push(sourceFailure('web', error)), signal);
+  throwIfAborted(signal);
+  if (web && web.url) return web;
 
   const body = {
     biz_param: MODEL_BIZ_PARAM,

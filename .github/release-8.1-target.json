@@ -1,0 +1,8 @@
+{
+  "version": "8.1.0",
+  "buildVersion": "8.1.1",
+  "publicVersion": "8.1",
+  "tag": "v8.1",
+  "platforms": ["mac-arm64", "mac-x64", "win-x64", "linux-x64"],
+  "status": "source-frozen"
+}

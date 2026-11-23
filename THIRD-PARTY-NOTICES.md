@@ -1,7 +1,7 @@
-<!-- 8.0 release. -->
+<!-- 8.1 release. -->
 # 第三方组件许可说明
 
-适用源码版本：红果短剧 8.0；沿用 follow-redirects 1.16.3、固定 nv-codec-headers 12.1.14.0 与 AMD AMF v1.5.3 头文件；其余第三方组件保留各自的版本、作者与许可。实际发行状态见 `docs/release-8.0.md`。
+适用源码版本：红果短剧 8.1；沿用 follow-redirects 1.16.3、固定 nv-codec-headers 12.1.14.0 与 AMD AMF v1.5.3 头文件；其余第三方组件保留各自的版本、作者与许可。实际发行状态见 `docs/release-8.1.md`。
 
 7.1采纳anupam-orbis在PR #140提供的实际依赖锁更新：follow-redirects从1.16.1升至1.16.3；本项目另补重定向安全回归。该依赖更新继续用于7.4，完整协作记录见 `CONTRIBUTORS.md`。
 
@@ -92,6 +92,13 @@ x264 是唯一非系统静态依赖（GPLv2-or-later），整体构建为 GPLv3-
 6.9 的播放签名 `playback-signature.js` 改编自 N3urda/hongguoTV `7444bb01aec7b0420740103e551c45f1f66101c9` 的 `Argus.kt`（GPL-3.0-only）；其原始归属为 ch6vip/fqapp 的 `rust/src/sign/{argus,simon,ladon,protobuf}.rs`。黄金向量来自同一固定提交的 `PlayerSignTest.kt`。仅播放模型使用真实551 Argus及Ladon，按最终query、实际正文与时间签名；搜索、目录、账号签名和匿名注册协议保留。未移植上游设备持久化、轮换、更大重试预算或权益修改逻辑。详细来源与改动见上述 NOTICE。
 
 7.5 的当前播放路径改用 `playback-v5.js`：来源为 N3urda/hongguoTV 固定提交 `18c37c2afd0567520135abcae312352542f09083` 的 `Signer.kt`、`AesV3.kt`、`V5Constants.kt`、`MobilePlayback.kt` 及两个合成签名向量文件，GPL-3.0-only。保留上游 drpys 归属。仅移植纯 JavaScript Android v5 Medusa／Helios 和请求结构；未引入官方 SDK、JNI、字节码解释器、远程签名服务或 PolyForm 实现。旧551签名仅保留在有界空响应恢复路径。来源、贡献线索和改动见 NOTICE。
+
+### macOS SDK v5 播放取源执行文件（开发候选）
+
+- 参考来源：[waligoraamodio288-rgb/hongguo-desktop-releases v1.0.137](https://github.com/waligoraamodio288-rgb/hongguo-desktop-releases/releases/tag/v1.0.137)，对应第三方源码归档固定 SHA256 为 `beebd9847e3214ca280cfe71320fb89eb2d5b4db18659803a3404ddac75dd5db`。
+- 构建脚本优先使用 `scripts/sdk-playback/vendor/phone_account` 中此前通过固定摘要校验的对应源码子集；远端同名归档当前摘要已变化，不会被自动接受。当前已验证 macOS arm64 与 x64，Windows/Linux 尚未构建执行文件。
+- 执行文件使用 Unicorn 2.1.4（GPL-2.0）、Unidbg（Apache-2.0）、Python、Requests（Apache-2.0）、PyCryptodome（BSD 及公有领域声明）和 PyInstaller（GPL-2.0-or-later with bootloader exception）；固定源码归档保留其原始来源、摘要与许可资料。
+- 该执行文件不读取账号 Cookie，只接受分集编号与匿名 SDK 缓存目录；媒体地址和解密密钥不在日志中输出。正式发行前必须补齐各平台对应源码、完整许可文本和重新构建验收。
 
 3.6 的 App 目录复用项目已有签名实现。目录参数、返回结构与官方图片对象的 JPEG 变体参考 [aston314/hongguo-tv 公开实现](https://github.com/aston314/hongguo-tv/tree/d6a75e3d8e014d50904e24813cb23cff9aa9044c)；不使用其中的固定设备或账号身份。目录接口可访问不代表剧集获准再分发，发行包不包含测试剧集媒体。
 

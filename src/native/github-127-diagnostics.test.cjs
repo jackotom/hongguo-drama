@@ -76,15 +76,22 @@ test('empty playback responses keep their classification through the public sour
     assert.match(result.error, /所选清晰度 1080p，未降级/);
     assert.match(result.error, /空响应.*原因尚未确认/);
     assert.doesNotMatch(JSON.stringify(result), /签名|鉴权|请检查网络|PRIVATE_SENTINEL/);
-    assert.equal(registrations, 1, 'empty routes reuse one anonymous identity');
-    assert.equal(models, 12, 'six routes each probe twice');
+    assert.equal(registrations, 2, 'empty routes rotate identity once');
+    assert.equal(models, 24, 'six routes each probe twice for two identities');
     assert.deepEqual(stages, [
         'registration',
+        'video-tab', 'video-tab',
         'primary', 'primary',
         'alternate', 'alternate',
         'model-a', 'model-a',
         'model-c', 'model-c',
+        'legacy', 'legacy',
+        'renewal',
         'video-tab', 'video-tab',
+        'primary', 'primary',
+        'alternate', 'alternate',
+        'model-a', 'model-a',
+        'model-c', 'model-c',
         'legacy', 'legacy',
     ]);
 });
@@ -285,11 +292,11 @@ test('registration and models retain separate 8s/12s budgets across route recove
     assert.equal(registrations, 1);
     assert.deepEqual(stages, [
         'registration',
+        'video-tab', 'video-tab',
         'primary', 'primary',
         'alternate', 'alternate',
         'model-a', 'model-a',
         'model-c', 'model-c',
-        'video-tab', 'video-tab',
         'legacy',
     ]);
 });

@@ -25,8 +25,11 @@ for (const [target, depth] of [['model', 2], ['fallback', 2], ['encryption-metad
             }
         });
         function transport(config) {
-            calls++;
             const url = new URL(config.url);
+            if (url.pathname === '/reading/bookapi/video_tab/multi_video_model/v1/') {
+                return Promise.resolve({ status: 200, headers: {}, data: '' });
+            }
+            calls++;
             let stage;
             if (url.pathname.includes('device_register')) stage = 'registration';
             else if (config.url === fallback) stage = 'metadata';

@@ -21,6 +21,7 @@ function load(axios, { realDevice = false, getPlaybackDevice, registerPlaybackDe
       if (name === './request-signal') return require('../src/native/request-signal');
       if (name === './playback-v5') return require('../src/native/playback-v5');
       if (name === './playback-signature') return require('../src/native/playback-signature');
+      if (name === './sdk-playback') return { resolveSdkPlayback: async () => null };
       if (name === './playback-device') return getPlaybackDevice || registerPlaybackDevice ? {
         getPlaybackDevice: getPlaybackDevice || (async () => ({ device_id: '1000000000000001', iid: '1000000000000002', cdid: 'fixture' })),
         registerPlaybackDevice: registerPlaybackDevice || (async () => ({ device_id: '1000000000000001', iid: '1000000000000002', cdid: 'fixture' })),
@@ -111,14 +112,17 @@ function row(definition, width, height, suffix) {
   const recovery = load(async config => {
     recoverCalls++;
     const url = new URL(config.url);
-    if (url.pathname === '/novel/player/multi_video_model/player/v1') return { status: 200, headers: {}, data: '' };
+    if (url.pathname === '/novel/player/multi_video_model/player/v1'
+        || url.pathname === '/reading/bookapi/video_tab/multi_video_model/v1/') {
+      return { status: 200, headers: {}, data: '' };
+    }
     return inlineResponse([plain]);
   }, { getPlaybackDevice: async () => {
     recoveryRegistrations++;
     return identities[0];
   } });
   assert.equal((await recovery.fetchAppPlayUrl(vid)).url, plain.main_url, 'empty current routes recover through the official single-episode model');
-  assert.equal(recoverCalls, 5);
+  assert.equal(recoverCalls, 7, 'video_tab probes, both current model hosts and the recovery model');
   assert.equal(recoveryRegistrations, 1, 'all routes reuse the same identity');
   for (const status of [200, 403, 404]) {
     let calls = 0, registrations = 0;
@@ -127,13 +131,13 @@ function row(definition, width, height, suffix) {
         device_id: String(100 + ++registrations), iid: String(200 + registrations), cdid: 'fixture',
       }) });
     await assert.rejects(unavailable.fetchAppPlayUrl(vid), error => status === 200 ? error.code === 'EMPTY_RESPONSE' : error.status === status);
-    assert.equal(calls, status === 200 ? 12 : 1, 'empty routes have one bounded probe; HTTP rejection must not retry');
-    assert.equal(registrations, 1);
+    assert.equal(calls, status === 200 ? 24 : 1, 'one empty identity rotation remains bounded; HTTP rejection must not retry');
+    assert.equal(registrations, status === 200 ? 2 : 1);
   }
   let cooldownCalls = 0;
   await assert.rejects(load(async () => { cooldownCalls++; return { status: 200, headers: {}, data: '' }; },
     { getPlaybackDevice: async () => identities[0] }).fetchAppPlayUrl(vid), error => error.code === 'EMPTY_RESPONSE');
-  assert.equal(cooldownCalls, 12, 'empty responses use one bounded six-route probe');
+  assert.equal(cooldownCalls, 24, 'empty responses use one bounded two-identity six-route probe');
   let clock = Date.now(), slowCalls = 0;
   const slowRegistration = load(async config => {
     slowCalls++;
@@ -145,11 +149,16 @@ function row(definition, width, height, suffix) {
   const routes = [];
   const alternate = load(async config => {
     routes.push([config.method, new URL(config.url).pathname]);
-    if (new URL(config.url).pathname === '/novel/player/multi_video_model/player/v1') return { status: 200, headers: {}, data: '' };
+    if (['/novel/player/multi_video_model/player/v1',
+      '/reading/bookapi/video_tab/multi_video_model/v1/'].includes(new URL(config.url).pathname)) {
+      return { status: 200, headers: {}, data: '' };
+    }
     return inlineResponse([plain]);
   }, { getPlaybackDevice: async () => identities[0] });
   assert.equal((await alternate.fetchAppPlayUrl(vid)).url, plain.main_url);
-  assert.deepEqual(routes, [['POST', '/novel/player/multi_video_model/player/v1'],
+  assert.deepEqual(routes, [['GET', '/reading/bookapi/video_tab/multi_video_model/v1/'],
+    ['GET', '/reading/bookapi/video_tab/multi_video_model/v1/'],
+    ['POST', '/novel/player/multi_video_model/player/v1'],
     ['POST', '/novel/player/multi_video_model/player/v1'],
     ['POST', '/novel/player/multi_video_model/player/v1'],
     ['POST', '/novel/player/multi_video_model/player/v1'],

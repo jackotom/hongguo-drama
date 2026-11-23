@@ -16,6 +16,10 @@ build/ffmpeg/*
 !build/ffmpeg/COPYING.*
 !build/ffmpeg/LICENSE.md
 !build/ffmpeg/LIBREMPEG-*
+build/sdk-playback/*
+!build/sdk-playback/README.txt
+build/hongguo-sdk-playback/
+/hongguo-sdk-playback.spec
 
 # 构建与打包输出
 release/

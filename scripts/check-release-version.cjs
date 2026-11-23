@@ -1,7 +1,7 @@
 const assert = require('node:assert/strict');
 const { availableRelease } = require('../src/native/app-update');
 
-const ordered = ['1.7', '1.8', '1.9', '1.71', '1.74', '1.75', '1.75.1', '1.76', '1.99', '1.100', '2.0', '2.9', '3.0', '3.1', '3.2', '3.3', '3.4', '3.5', '3.6', '3.7', '3.8', '3.9', '4.0', '4.1', '4.2', '4.3', '4.4', '4.5', '4.6', '4.7', '4.8', '4.9', '5.0', '5.1', '5.2', '5.3', '5.4', '5.5', '5.6', '5.7', '5.8', '5.9', '6.0', '6.1', '6.2', '6.3', '6.4', '6.5', '6.6', '6.7', '6.8', '6.9', '7.0', '7.1', '7.2', '7.3', '7.4', '7.5', '7.6', '7.7', '7.8', '7.9', '8.0'];
+const ordered = ['1.7', '1.8', '1.9', '1.71', '1.74', '1.75', '1.75.1', '1.76', '1.99', '1.100', '2.0', '2.9', '3.0', '3.1', '3.2', '3.3', '3.4', '3.5', '3.6', '3.7', '3.8', '3.9', '4.0', '4.1', '4.2', '4.3', '4.4', '4.5', '4.6', '4.7', '4.8', '4.9', '5.0', '5.1', '5.2', '5.3', '5.4', '5.5', '5.6', '5.7', '5.8', '5.9', '6.0', '6.1', '6.2', '6.3', '6.4', '6.5', '6.6', '6.7', '6.8', '6.9', '7.0', '7.1', '7.2', '7.3', '7.4', '7.5', '7.6', '7.7', '7.8', '7.9', '8.0', '8.1'];
 let checks = 0;
 for (let current = 0; current < ordered.length; current++) {
   for (let next = 0; next < ordered.length; next++) {
@@ -22,8 +22,8 @@ for (const flags of [{ prerelease: true }, { draft: true }]) {
 }
 const pkg = require('../package.json');
 const lock = require('../package-lock.json');
-assert.equal(pkg.version, '8.0.0', 'Current source release target must be 8.0.0');
-assert.equal(pkg.build.buildVersion, '8.0.1', 'Current desktop build target must be 8.0.1');
+assert.equal(pkg.version, '8.1.0', 'Current source release target must be 8.1.0');
+assert.equal(pkg.build.buildVersion, '8.1.1', 'Current desktop build target must be 8.1.1');
 assert.equal(lock.version, pkg.version, 'Lockfile version must match the release');
 assert.equal(lock.packages[''].version, pkg.version, 'Lockfile root package must match the release');
 assert.match(pkg.version, /^\d+\.\d+\.0$/, 'Release versions use two public components and an internal zero patch');
@@ -156,5 +156,7 @@ assert.equal(availableRelease({ tag_name: 'v7.9' }, '7.8.0').version, '7.9');
 for (const current of ['7.9', '7.9.0']) for (const tag of ['v7.9', '7.9', 'v7.9.0', '7.9.0']) assert.equal(availableRelease({ tag_name: tag }, current), null);
 assert.equal(availableRelease({ tag_name: 'v8.0' }, '7.9.0').version, '8.0');
 for (const current of ['8.0', '8.0.0']) for (const tag of ['v8.0', '8.0', 'v8.0.0', '8.0.0']) assert.equal(availableRelease({ tag_name: tag }, current), null);
+assert.equal(availableRelease({ tag_name: 'v8.1' }, '8.0.0').version, '8.1');
+for (const current of ['8.1', '8.1.0']) for (const tag of ['v8.1', '8.1', 'v8.1.0', '8.1.0']) assert.equal(availableRelease({ tag_name: tag }, current), null);
 
 console.log(`PASS ${checks} version pairs, equivalent versions, invalid versions and unpublished releases`);

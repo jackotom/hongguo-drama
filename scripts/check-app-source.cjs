@@ -72,7 +72,7 @@ function fixture({ wrongVid = false, fallback = 'https://vod.snssdk.com/info', m
     if (new URL(config.url).pathname === '/reading/bookapi/video_tab/multi_video_model/v1/') {
       assert.equal(config.method, 'GET');
       assert.equal(config.data, null);
-      return modelResponse;
+      return emptyCurrent ? { status: 200, headers: {}, data: '' } : modelResponse;
     }
     if (new URL(config.url).pathname === '/novel/player/video_model/v1/') {
       assert.equal(config.method, 'POST');
@@ -109,6 +109,7 @@ function fixture({ wrongVid = false, fallback = 'https://vod.snssdk.com/info', m
         const signed = require(path.join(nativeDir, 'playback-v5')).signPlaybackV5(input);
         signatures.push({ input, ...signed, v5: true }); return signed;
       } };
+      if (name === './sdk-playback') return { resolveSdkPlayback: async () => null };
       if (name === './playback-signature') return { signPlayer: input => {
         const headers = require(path.join(nativeDir, 'playback-signature')).signPlayer({ ...input, ...entropy });
         signatures.push({ input, headers }); return headers;
@@ -152,7 +153,8 @@ const checks = [
     await f.fetch('11');
     await f.fetch('11');
     await Promise.all([f.fetch('11'), f.fetch('11'), f.fetch('11')]);
-    const requests = f.calls.filter(call => new URL(call.url).pathname === '/novel/player/multi_video_model/player/v1');
+    const requests = f.calls.filter(call => ['/novel/player/multi_video_model/player/v1',
+      '/reading/bookapi/video_tab/multi_video_model/v1/'].includes(new URL(call.url).pathname));
     assert.equal(requests.length, 5, 'one model request per lookup; no retry loop');
     for (const field of ['iid', 'device_id']) {
       const ids = requests.map(call => new URL(call.url).searchParams.get(field));
@@ -166,9 +168,9 @@ const checks = [
     assert.equal(f.calls.length, 10, 'each lookup retains its two-stage flow');
     const emptyV5 = fixture({ emptyCurrent: true });
     await emptyV5.fetch('11');
-    assert.equal(emptyV5.calls.length, 10, 'empty v5 responses recover through both current model hosts, video_tab and verified metadata');
+    assert.equal(emptyV5.calls.length, 12, 'empty v5 responses recover through both current model hosts, video_tab and verified metadata');
     assert.deepEqual(emptyV5.calls.map(call => call.method || 'GET'),
-      ['POST', 'POST', 'POST', 'POST', 'POST', 'POST', 'POST', 'POST', 'GET', 'GET']);
+      ['GET', 'GET', 'POST', 'POST', 'POST', 'POST', 'POST', 'POST', 'POST', 'POST', 'POST', 'GET']);
   }],
   ['App H264 takes priority over higher-resolution HEVC', async () => {
     const result = await appRows({ hd: { main_url: mediaUrl('hevc'), codec_type: 'hevc', quality_desc: '1080P' },

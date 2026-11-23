@@ -96,3 +96,13 @@ test('existing playInfo keeps the original no-lookup path and cleans job listene
     assert.equal(await h.recover('11', '100', { ...opts(parent.signal), playInfo: info('11') }, async candidate => candidate.url), info('11').url);
     assert.equal(h.lookups.length, 0); assert.equal(getEventListeners(parent.signal, 'abort').length, 0);
 });
+
+test('SDK-first download preference reaches the provider lookup', async t => {
+    const h = desktop(t), parent = h.controller();
+    const result = outcome(h.recover('11', '100', { ...opts(parent.signal), preferSdk: true },
+        async candidate => candidate.url));
+    await turn();
+    assert.equal(h.lookups[0].preferSdk, true);
+    h.calls[0].resolve(info('11'));
+    assert.equal((await result).value, info('11').url);
+});

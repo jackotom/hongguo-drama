@@ -1,4 +1,4 @@
-<!-- 8.0 source and release target; historical credits retained. -->
+<!-- 8.1 source and release target; historical credits retained. -->
 # 贡献者与问题反馈致谢
 
 8.0 延续公开贡献记录；感谢 #179 的多位用户及时提供空响应、无法在线播放和下载失败现象，感谢 #178 提供弹幕表情代码的显示需求。详细署名与历史致谢保留在下方。

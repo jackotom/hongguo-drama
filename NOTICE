@@ -1,8 +1,8 @@
-# 8.0 release.
+# 8.1 release.
 NOTICE —— 来源与修改说明
 =========================
 
-当前正式版本：8.0；实际状态与验收边界见 docs/release-8.0.md。
+当前正式版本：8.1；实际状态与验收边界见 docs/release-8.1.md。
 
 本软件（红果短剧下载器 / hongguo-downloader）是基于他人开源项目的**修改版本**。
 依照 GNU General Public License v3.0 第 5(a) 条，特此声明如下。

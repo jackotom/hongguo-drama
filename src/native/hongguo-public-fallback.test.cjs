@@ -42,5 +42,15 @@ test('public fallback rejects expired, private, unsupported or failed responses'
 
   const rejected = fixture({ error: 'public_fallback_unavailable' }, 403);
   await assert.rejects(rejected.native.fetchPublicFallbackPlayUrl('11', AbortSignal.timeout(5000)),
-    { code: 'HTTP_403' });
+    { code: 'PUBLIC_ACCESS_LIMITED', upstreamCode: 'public_fallback_unavailable' });
+});
+
+test('a restricted public episode stops before the player-page fallback hides the reason', async () => {
+  const f = fixture({ error: 'public_fallback_unavailable' }, 403);
+  let failure;
+  const result = await f.native.fetchPlayUrlFromWeb('11', '22', value => { failure = value; },
+    AbortSignal.timeout(5000));
+  assert.equal(result, null);
+  assert.equal(failure.code, 'PUBLIC_ACCESS_LIMITED');
+  assert.equal(f.calls.length, 1);
 });

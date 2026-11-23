@@ -26,6 +26,7 @@ function fixture(tabResponse, { legacyResponse, v5Response = tabResponse, signal
             const get = async () => { if (!cached) registrations++; cached = true; return identity; };
             return { registerPlaybackDevice: get, getPlaybackDevice: get, resetPlaybackDevice() { resets++; cached = false; } };
         }
+        if (name === './sdk-playback') return { resolveSdkPlayback: async () => null };
         if (name === './playback-v5') return { signPlaybackV5: input => {
             const signed = require('./playback-v5').signPlaybackV5(input);
             signatures.push({ ...input, signed, v5: true });
@@ -67,27 +68,26 @@ function assertPlayerBinding(f, request, index) {
     assert.ok(Buffer.from(request.headers['x-ladon'], 'base64').length > 4);
 }
 
-test('production playback uses the v5 POST endpoint and exact nested 1004 episode', async () => {
+test('production playback uses signed video_tab first and the exact episode', async () => {
     const f = fixture(response({ code: 0, data: { '1004': { [vid]: { video_model: model() }, '999': {} } } }));
     assert.equal((await f.fetch()).url, media);
     const request = f.calls[0], url = new URL(request.url);
-    assert.equal(request.method, 'POST');
-    assert.equal(url.pathname, '/novel/player/multi_video_model/player/v1');
+    assert.equal(request.method, 'GET');
+    assert.equal(url.pathname, '/reading/bookapi/video_tab/multi_video_model/v1/');
     assert.equal(f.calls.length, 1); assert.equal(f.registrations(), 1);
-    const body = JSON.parse(require('node:zlib').gunzipSync(request.data));
-    assert.deepEqual(body.mixed_video_id_map['1004'], [vid]);
-    assert.equal(body.dr_scene, 'player');
-    assert.equal(body.biz_param.disable_video_relate_book, false);
-    assert.equal(url.searchParams.get('ts'), null);
+    assert.equal(request.data, null);
+    assert.equal(url.searchParams.get('video_id'), vid);
+    assert.equal(url.searchParams.get('video_id_type'), '0');
+    assert.equal(url.searchParams.get('device_level'), '1');
     assert.equal(url.searchParams.get('version_code'), '74332');
     assert.equal(url.searchParams.get('device_id'), identity.device_id);
     assert.equal(url.searchParams.get('iid'), identity.iid);
-    assert.equal(request.headers['Content-Encoding'], 'gzip');
-    assert.equal(request.headers['x-ss-stub'], require('node:crypto').createHash('md5').update(request.data).digest('hex').toUpperCase());
     assert.ok(Buffer.from(request.headers['x-medusa'], 'base64').length > 248);
     assert.ok(Buffer.from(request.headers['x-helios'], 'base64').length > 4);
-    for (const key of ['x-argus', 'x-ladon', 'Cookie', 'Authorization']) assert.equal(request.headers[key], undefined);
-    assert.deepEqual(Buffer.from(f.signatures[0].body), Buffer.from(request.data));
+    for (const key of ['x-ss-stub', 'x-ss-req-ticket', 'x-argus', 'x-ladon', 'Content-Type', 'Content-Encoding', 'Cookie', 'Authorization']) {
+        assert.equal(request.headers[key], undefined, key);
+    }
+    assert.equal(f.signatures[0].body, null);
     assert.equal(f.signatures[0].signed.url, request.url);
     assert.ok(request.timeout > 0 && request.timeout <= 12000);
     assert.ok(request.signal);
@@ -109,12 +109,16 @@ test('empty v5 model retains the bounded signed legacy fallback', async () => {
     assert.equal((await f.fetch()).url, media);
     assert.equal(f.calls.length, 11); assert.equal(f.registrations(), 1);
     for (let i = 0; i < 2; i++) {
+        assert.equal(f.calls[i].method, 'GET');
+        assert.equal(new URL(f.calls[i].url).pathname, '/reading/bookapi/video_tab/multi_video_model/v1/');
+    }
+    for (let i = 2; i < 4; i++) {
         assert.equal(f.calls[i].method, 'POST');
         assert.equal(new URL(f.calls[i].url).pathname, '/novel/player/multi_video_model/player/v1');
-        assert.deepEqual(Buffer.from(f.signatures[i].body), Buffer.from(f.calls[i].data));
+        assert.deepEqual(Buffer.from(f.signatures[1].body), Buffer.from(f.calls[i].data));
     }
-    assert.equal(f.calls.at(-2).method, 'GET');
-    assert.equal(new URL(f.calls.at(-2).url).pathname, '/reading/bookapi/video_tab/multi_video_model/v1/');
+    assert.equal(f.calls.at(-2).method, 'POST');
+    assert.equal(new URL(f.calls.at(-2).url).pathname, '/novel/player/video_model/v1/');
     const legacy = f.calls.at(-1);
     assert.equal(new URL(legacy.url).pathname, '/novel/player/multi_video_model/v1/');
     assert.equal(legacy.headers.Connection, 'close');
@@ -134,8 +138,8 @@ for (const [name, result, code] of [
     test(`v5 ${name} stops within the existing request budget`, async () => {
         const f = fixture(result);
         await assert.rejects(f.fetch(), error => code ? error.code === code : error.status === 403);
-        assert.equal(f.calls.length, code === 'EMPTY_RESPONSE' ? 12 : 1);
-        assert.equal(f.registrations(), 1);
+        assert.equal(f.calls.length, code === 'EMPTY_RESPONSE' ? 24 : 1);
+        assert.equal(f.registrations(), code === 'EMPTY_RESPONSE' ? 2 : 1);
     });
 }
 
@@ -202,7 +206,7 @@ for (const status of [403, 429]) {
         const f = fixture(config => ({ status: new URL(config.url).hostname.includes('sinfonlineb') ? 200 : status,
             headers: {}, data: '' }));
         await assert.rejects(f.fetch(), { status });
-        assert.equal(f.calls.length, 3);
+        assert.equal(f.calls.length, 5);
         assert.equal(f.registrations(), 1);
     });
 }
@@ -213,7 +217,7 @@ test('cancelling on the alternate host stops without legacy', async () => {
         return { status: 200, headers: {}, data: '' };
     }, { signal: controller.signal });
     await assert.rejects(f.fetch(), { code: 'ERR_CANCELED' });
-    assert.equal(f.calls.length, 3);
+    assert.equal(f.calls.length, 5);
     assert.equal(f.registrations(), 1);
 });
 

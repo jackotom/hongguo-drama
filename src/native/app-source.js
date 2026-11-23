@@ -10,6 +10,7 @@ const crypto = require('node:crypto');
 const { gzipSync } = require('node:zlib');
 const { setTimeout: delay } = require('node:timers/promises');
 const playbackDevice = require('./playback-device');
+const sdkPlayback = require('./sdk-playback');
 const { signPlayer } = require('./playback-signature');
 const { signPlaybackV5 } = require('./playback-v5');
 const { abortError, throwIfAborted, boundedSignal, networkFailure } = require('./request-signal');
@@ -440,6 +441,10 @@ async function fetchAppPlayUrl(vid, options = {}) {
     normalizeDownloadQuality(options.quality); // Validate before registration or network I/O.
     vid = String(vid || '');
     if (!/^\d{1,30}$/.test(vid)) throw new Error('分集编号无效');
+    if (options.preferSdk) {
+        const preferred = await resolveSdkAppPlayUrl(vid, options);
+        if (preferred) return preferred;
+    }
     // Playback, prefetch and downloads share one paced turn, including registration.
     const previousRejection = playbackRejection;
     const pending = playbackQueue.then(async () => {
@@ -451,17 +456,20 @@ async function fetchAppPlayUrl(vid, options = {}) {
             catch (error) { throwIfAborted(options.signal); throw error; }
         }
         throwIfAborted(options.signal);
+        let identityRotated = false;
         try {
-            let identityRetried = false;
             for (;;) {
                 try { return await fetchAppPlayUrlFresh(vid, options); }
                 catch (error) {
                     throwIfAborted(options.signal);
-                    if (identityRetried || error.code !== 'BUSINESS_REJECTED' || Number(error.businessCode) !== 110001) throw error;
+                    const empty = error.code === 'EMPTY_RESPONSE';
+                    const rejected = error.code === 'BUSINESS_REJECTED' && Number(error.businessCode) === 110001;
+                    if (identityRotated || (!empty && !rejected)) throw error;
+                    if (empty && Date.now() - playbackIdentityResetAt < 30000) throw error;
                     playbackDevice.resetPlaybackDevice?.();
                     playbackIdentityResetAt = Date.now();
                     playbackEmptyRounds = 0;
-                    identityRetried = true;
+                    identityRotated = true;
                 }
             }
         }
@@ -515,10 +523,10 @@ async function fetchAppPlayUrlFresh(vid, options) {
     const { signal } = request;
     try {
         const routes = [
+            () => videoTabRequest(identity, vid),
             () => playbackRequest(payload, identity, vid),
             () => playbackRequest(payload, identity, vid, true),
             ...MODEL_APIS.map(base => () => playbackModelRequest(identity, vid, base)),
-            () => videoTabRequest(identity, vid),
             () => {
                 const legacy = playbackRequest(payload, identity, '');
                 legacy.headers.Connection = 'close';
@@ -561,9 +569,13 @@ async function fetchAppPlayUrlFresh(vid, options) {
             }
             break;
         }
-        if (!response) throw lastError || Object.assign(new Error('App 接口返回空响应（HTTP 200），原因尚未确认'), {
-            code: 'EMPTY_RESPONSE', status: 200, emptyResponse: true,
-        });
+        if (!response) {
+            const preferred = await resolveSdkAppPlayUrl(vid, options);
+            if (preferred) return preferred;
+            throw lastError || Object.assign(new Error('App 接口返回空响应（HTTP 200），原因尚未确认'), {
+                code: 'EMPTY_RESPONSE', status: 200, emptyResponse: true,
+            });
+        }
         playbackEmptyRounds = 0;
         const businessCode = Number(response.Code || response.code || 0);
         if (businessCode !== 0) throw Object.assign(new Error('App 接口暂未提供本集播放信息'), {
@@ -607,6 +619,16 @@ async function fetchAppPlayUrlFresh(vid, options) {
     } finally {
         request.dispose();
     }
+}
+
+async function resolveSdkAppPlayUrl(vid, options) {
+    const sdkResult = await sdkPlayback.resolveSdkPlayback(vid, { signal: options.signal });
+    throwIfAborted(options.signal);
+    if (!sdkResult) return null;
+    const parsed = parseAppPlayModel(sdkResult.model, vid, options, false);
+    parsed.userAgent = sdkResult.userAgent;
+    for (const variant of parsed.variants || []) variant.userAgent = sdkResult.userAgent;
+    return parsed;
 }
 
 function parseAppPlayModel(info, vid, options, inline, requireEncryptionMetadata = inline, minimumPixels = 0) {

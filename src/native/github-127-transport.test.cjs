@@ -46,7 +46,7 @@ for (const target of ['registration', 'model', 'alternate', 'model-a', 'model-c'
                 enter();
                 return;
             }
-            const routeOrder = { model: 0, alternate: 1, 'model-a': 2, 'model-c': 3, 'video-tab': 4 };
+            const routeOrder = { 'video-tab': 0, model: 1, alternate: 2, 'model-a': 3, 'model-c': 4 };
             const targetRoute = routeOrder[target];
             const emptyModel = targetRoute !== undefined && routeOrder[stage] !== undefined
                 && targetRoute > routeOrder[stage];
@@ -95,14 +95,14 @@ for (const target of ['registration', 'model', 'alternate', 'model-a', 'model-c'
             assert.equal(stages.at(-1), target, 'cancellation must not trigger another registration or route');
             const expectedStages = {
                 registration: ['registration'],
-                model: ['registration', 'model'],
-                alternate: ['registration', 'model', 'model', 'alternate'],
-                'model-a': ['registration', 'model', 'model', 'alternate', 'alternate', 'model-a'],
-                'model-c': ['registration', 'model', 'model', 'alternate', 'alternate', 'model-a', 'model-a', 'model-c'],
-                'video-tab': ['registration', 'model', 'model', 'alternate', 'alternate', 'model-a', 'model-a',
-                    'model-c', 'model-c', 'video-tab'],
-                fallback: ['registration', 'model', target],
-                'encryption-metadata': ['registration', 'model', target],
+                model: ['registration', 'video-tab', 'video-tab', 'model'],
+                alternate: ['registration', 'video-tab', 'video-tab', 'model', 'model', 'alternate'],
+                'model-a': ['registration', 'video-tab', 'video-tab', 'model', 'model', 'alternate', 'alternate', 'model-a'],
+                'model-c': ['registration', 'video-tab', 'video-tab', 'model', 'model', 'alternate', 'alternate',
+                    'model-a', 'model-a', 'model-c'],
+                'video-tab': ['registration', 'video-tab'],
+                fallback: ['registration', 'video-tab', target],
+                'encryption-metadata': ['registration', 'video-tab', target],
             }[target];
             assert.deepEqual(stages, expectedStages, 'each cancellation target must be reached through its actual route');
         } finally {
