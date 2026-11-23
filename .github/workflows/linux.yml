@@ -73,6 +73,9 @@ jobs:
       - run: cp "$RUNNER_TEMP/linux-media/ffmpeg/artifacts/"*source.tar.gz "$RUNNER_TEMP/linux-media/librempeg/artifacts/"*source.tar.gz dist/
       - if: ${{ !inputs.build_only }}
         run: xvfb-run -a node scripts/check-linux-appimage.cjs
+        env:
+          HONGGUO_ACCEPTANCE_SERIES_ID: '7690112243203050521'
+          HONGGUO_ACCEPTANCE_EPISODES: '1,2'
       - name: Archive frozen source and asset digests
         run: |
           version=$(node -p "require('./package.json').version.replace(/\.0$/, '')")

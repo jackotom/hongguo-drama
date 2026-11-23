@@ -81,7 +81,11 @@ function safeDownloadFailure(value) {
     result.realPlayback = await cdp.evaluate(`(async()=>{
       window.__hongguoRealDownloadFailure=null;
       const api=window.electronAPI;
-      const catalog=await api.browseList({source:'hongguo',category:'hot-real-drama'});
+      const fixedSeries=${JSON.stringify(process.env.HONGGUO_ACCEPTANCE_SERIES_ID || '')};
+      const fixedEpisodes=${JSON.stringify(process.env.HONGGUO_ACCEPTANCE_EPISODES || '')}
+        .split(',').map(Number).filter(Number.isInteger);
+      const catalog=fixedSeries?{success:true,results:[{series_id:fixedSeries,series_title:'Release acceptance'}]}
+        :await api.browseList({source:'hongguo',category:'hot-real-drama'});
       if(!catalog.success||!catalog.results?.length)throw Error('Real Hongguo catalog unavailable');
       localStorage.setItem('hongguo:online-quality','compat');
       localStorage.setItem('hongguo:software-decode','true');
@@ -93,7 +97,9 @@ function safeDownloadFailure(value) {
         const unlocked=resolved.data.episodes.filter(ep=>!ep.locked);
         if(unlocked.length<2)continue;
         const start=Math.floor(Math.random()*unlocked.length);
-        const episodes=[...unlocked.slice(start),...unlocked.slice(0,start)].slice(0,10);
+        const episodes=fixedEpisodes.length
+          ? fixedEpisodes.map(index=>unlocked.find(episode=>Number(episode.vid_index)===index)).filter(Boolean)
+          : [...unlocked.slice(start),...unlocked.slice(0,start)].slice(0,10);
         const states=[];
         for(const episode of episodes){
           if(states.length===2)break;
