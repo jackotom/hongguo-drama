@@ -1,7 +1,7 @@
-<!-- 7.9 release. -->
+<!-- 8.0 release. -->
 # 第三方组件许可说明
 
-适用源码版本：红果短剧 7.9；沿用 follow-redirects 1.16.3、固定 nv-codec-headers 12.1.14.0 与 AMD AMF v1.5.3 头文件；其余第三方组件保留各自的版本、作者与许可。实际发行状态见 `docs/release-7.9.md`。
+适用源码版本：红果短剧 8.0；沿用 follow-redirects 1.16.3、固定 nv-codec-headers 12.1.14.0 与 AMD AMF v1.5.3 头文件；其余第三方组件保留各自的版本、作者与许可。实际发行状态见 `docs/release-8.0.md`。
 
 7.1采纳anupam-orbis在PR #140提供的实际依赖锁更新：follow-redirects从1.16.1升至1.16.3；本项目另补重定向安全回归。该依赖更新继续用于7.4，完整协作记录见 `CONTRIBUTORS.md`。
 

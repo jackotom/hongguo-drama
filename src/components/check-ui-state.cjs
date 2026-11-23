@@ -680,6 +680,7 @@ async function mount(file, api, props = {}, storage = null) {
     first.resolve({ success: true, url: 'hongguo-stream://old', streamId: 'old' }); await ui.flush();
     assert.equal(ui.find(n => n.type === 'video')?.props.src, 'hongguo-stream://new');
     assert.ok(requested.every(p => p.requestId), 'each prepare must be cancellable');
+    assert.ok(requested.every(p => p.allowLowerQuality === true), 'automatic online quality may accept a lower complete source');
     const prepared = requested.length;
     ui.find(n => n.type === 'video').props.onError({ currentTarget: { error: { code: 2 } } });
     ui.render();

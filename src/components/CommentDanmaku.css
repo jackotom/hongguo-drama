@@ -1,5 +1,5 @@
 .comment-danmaku { position: absolute; inset: 0; z-index: 3; pointer-events: none; overflow: hidden; }
-.comment-danmaku-item { position: absolute; top: 0; left: 0; white-space: nowrap; line-height: 1.25; font-weight: 600; color: #fff; text-shadow: 0 1px 3px #000, 1px 0 2px #000, -1px 0 2px #000; will-change: transform; }
+.comment-danmaku-item { position: absolute; top: 0; left: 0; white-space: nowrap; line-height: 1.25; font-family: "PingFang SC", "Microsoft YaHei", "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif; font-weight: 600; color: #fff; text-shadow: 0 1px 3px #000, 1px 0 2px #000, -1px 0 2px #000; will-change: transform; }
 .comment-danmaku-static .comment-danmaku-item { max-width: calc(100% - 24px); overflow: hidden; text-overflow: ellipsis; will-change: auto; }
 .player-controls-danmaku { display: flex; align-items: center; gap: 2px; }
 .player-controls .danmaku-icon-button { flex: none; }

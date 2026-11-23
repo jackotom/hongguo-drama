@@ -99,13 +99,13 @@ async function registerPlaybackDevice(requestJson, { signal } = {}) {
     }
 }
 
-function getPlaybackDevice(requestJson) {
+function getPlaybackDevice(requestJson, { signal } = {}) {
     if (retryAfter && Date.now() >= retryAfter) {
         registration = undefined;
         retryAfter = 0;
     }
     // Share failures briefly to avoid concurrent retries, then allow recovery without restarting.
-    registration ||= Promise.resolve().then(() => registerPlaybackDevice(requestJson)).catch(error => {
+    registration ||= Promise.resolve().then(() => registerPlaybackDevice(requestJson, { signal })).catch(error => {
         if (error.code === 'ERR_CANCELED') registration = undefined;
         else retryAfter = Date.now() + 10000;
         throw error;
@@ -113,4 +113,12 @@ function getPlaybackDevice(requestJson) {
     return registration;
 }
 
-module.exports = { getPlaybackDevice, registerPlaybackDevice };
+function resetPlaybackDevice() {
+    registration = undefined;
+    retryAfter = 0;
+    registrationRetryAfter = 0;
+    lastRegistrationFailure = undefined;
+    lastNetworkFailure = undefined;
+}
+
+module.exports = { getPlaybackDevice, registerPlaybackDevice, resetPlaybackDevice };

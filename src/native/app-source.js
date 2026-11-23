@@ -9,7 +9,7 @@
 const crypto = require('node:crypto');
 const { gzipSync } = require('node:zlib');
 const { setTimeout: delay } = require('node:timers/promises');
-const { registerPlaybackDevice } = require('./playback-device');
+const playbackDevice = require('./playback-device');
 const { signPlayer } = require('./playback-signature');
 const { signPlaybackV5 } = require('./playback-v5');
 const { abortError, throwIfAborted, boundedSignal, networkFailure } = require('./request-signal');
@@ -21,9 +21,15 @@ const PROCESS_STARTED = Date.now();
 let playbackQueue = Promise.resolve();
 let playbackReadyAt = 0;
 let playbackRejection = null;
+let playbackEmptyRounds = 0;
+let playbackIdentityResetAt = 0;
 const VIDEO_API = 'https://api5-normal-sinfonlineb.fqnovel.com/novel/player/multi_video_model/v1/';
 const VIDEO_TAB_API = 'https://api5-normal-sinfonlineb.fqnovel.com/reading/bookapi/video_tab/multi_video_model/v1/';
 const PLAYER_API = 'https://api5-normal-sinfonlineb.fqnovel.com/novel/player/multi_video_model/player/v1';
+const MODEL_APIS = [
+    'https://api5-normal-sinfonlinea.fqnovel.com/novel/player/video_model/v1/',
+    'https://api5-normal-sinfonlinec.fqnovel.com/novel/player/video_model/v1/',
+];
 const SEARCH_API = 'https://api5-normal-sinfonlinea.fqnovel.com/reading/bookapi/search/tab/v';
 const VIDEO_UA = 'com.phoenix.read/71332 (Linux; U; Android 16; zh_CN; 25053RT47C; Build/BP2A.250605.031.A3; Cronet/TTNetVersion:04657795 2026-01-23 QuicVersion:c67e9834 2025-09-08)';
 const SEARCH_UA = 'com.phoenix.read/72232 (Linux; U; Android 16; zh_CN; 25053RT47C; Build/BP2A.250605.031.A3)';
@@ -177,6 +183,27 @@ function playbackRequest(payload, identity, videoId = '', alternate = false) {
     Object.assign(headers, { 'Content-Type': 'application/json; charset=UTF-8',
         'Content-Encoding': 'gzip', 'x-ss-stub': signature['x-ss-stub'] });
     return { url, body, headers, method: 'POST' };
+}
+
+function playbackModelRequest(identity, videoId, base) {
+    const payload = JSON.stringify({
+        biz_param: { detail_page_version: 0, device_level: 3, disable_digg_stat: false, from_video_id: '',
+            need_all_video_definition: true, need_mp4_align: false, source: 9, use_os_player: false,
+            use_server_dns: false, video_platform: 3 },
+        content_type: 1004,
+        video_id: String(videoId),
+    });
+    const body = gzipSync(Buffer.from(payload));
+    const signed = signPlaybackV5({
+        base,
+        values: { aid: '8662', app_name: 'novelread', version_code: '74332', version_name: '7.4.3.32',
+            channel: 'vivo_8662_64', device_platform: 'android', device_type: 'PGT-AN10', os_version: '12',
+            update_version_code: '74332', iid: identity.iid, cdid: identity.cdid, device_id: identity.device_id },
+        body, now: Date.now(),
+    });
+    return { ...signed, body, method: 'POST', headers: { ...signed.headers,
+        'User-Agent': 'com.phoenix.read/73932 (Linux; U; Android 12; zh_CN_#Hans; PGT-AN10; Build/V417IR;tt-ok/3.12.13.20)',
+        Accept: 'application/json', 'Content-Type': 'application/json; charset=utf-8', 'Content-Encoding': 'gzip' } };
 }
 
 function videoTabRequest(identity, videoId) {
@@ -425,20 +452,32 @@ async function fetchAppPlayUrl(vid, options = {}) {
         }
         throwIfAborted(options.signal);
         try {
-            let lastError;
-            for (let round = 0; round < 3; round++) {
+            let identityRetried = false;
+            for (;;) {
                 try { return await fetchAppPlayUrlFresh(vid, options); }
                 catch (error) {
                     throwIfAborted(options.signal);
-                    lastError = error;
-                    const anonymousEmpty = ['EMPTY_RESPONSE', 'ETIMEDOUT', 'ECONNABORTED'].includes(error.code)
-                        || error.code === 'BUSINESS_REJECTED' && Number(error.businessCode) === 110001;
-                    if (!anonymousEmpty || round === 2) throw error;
+                    if (identityRetried || error.code !== 'BUSINESS_REJECTED' || Number(error.businessCode) !== 110001) throw error;
+                    playbackDevice.resetPlaybackDevice?.();
+                    playbackIdentityResetAt = Date.now();
+                    playbackEmptyRounds = 0;
+                    identityRetried = true;
                 }
             }
-            throw lastError;
         }
         catch (error) {
+            const retryIdentity = ['EMPTY_RESPONSE', 'ETIMEDOUT', 'ECONNABORTED'].includes(error.code)
+                || error.code === 'BUSINESS_REJECTED' && Number(error.businessCode) === 110001;
+            if (retryIdentity) {
+                playbackEmptyRounds++;
+                const now = Date.now();
+                if (error.code === 'BUSINESS_REJECTED' && Number(error.businessCode) === 110001
+                    || playbackEmptyRounds >= 2 && now - playbackIdentityResetAt >= 30000) {
+                    playbackDevice.resetPlaybackDevice?.();
+                    playbackIdentityResetAt = now;
+                    playbackEmptyRounds = 0;
+                }
+            }
             // An explicit refusal also stops work queued before it was received.
             if ([403, 429].includes(error.status) || error.code === 'BUSINESS_REJECTED' && Number(error.businessCode) !== 110001
                 || (error.code === 'DEVICE_REGISTRATION_FAILED'
@@ -465,56 +504,67 @@ async function fetchAppPlayUrlFresh(vid, options) {
         mixed_video_id_map: { '1004': [vid] },
         dr_scene: 'player',
     });
-    // Playback identities can be single-use; search/account retain their shared device.
-    let identity = await registerPlaybackDevice(requestJson, { signal: options.signal });
+    // Reusing one identity avoids turning a transient upstream refusal into an
+    // identity-registration storm. Rotation is paced by fetchAppPlayUrl.
+    const getIdentity = playbackDevice.getPlaybackDevice || playbackDevice.registerPlaybackDevice;
+    const identity = await getIdentity(requestJson, { signal: options.signal });
     throwIfAborted(options.signal);
     // Registration has its own 8s budget; it must not consume the model request budget.
     const deadline = Date.now() + 12000;
     const request = boundedSignal(options.signal, 12000);
     const { signal } = request;
     try {
-        let response;
-        for (let attempt = 0; attempt < 2; attempt++) {
+        const routes = [
+            () => playbackRequest(payload, identity, vid),
+            () => playbackRequest(payload, identity, vid, true),
+            ...MODEL_APIS.map(base => () => playbackModelRequest(identity, vid, base)),
+            () => videoTabRequest(identity, vid),
+            () => {
+                const legacy = playbackRequest(payload, identity, '');
+                legacy.headers.Connection = 'close';
+                return legacy;
+            },
+        ];
+        let response, lastError;
+        for (const createRoute of routes) {
             throwIfAborted(signal);
-            const signed = playbackRequest(payload, identity, attempt ? '' : vid);
-            if (attempt) signed.headers.Connection = 'close';
-            try {
+            const route = createRoute();
+            for (let attempt = 0; attempt < 2; attempt++) {
                 try {
-                    response = await requestJson(signed.url, { method: signed.method, headers: signed.headers, data: signed.body }, deadline, signal);
+                    response = await requestJson(route.url, { method: route.method, headers: route.headers, data: route.body }, deadline, signal);
+                    lastError = undefined;
+                    break;
                 } catch (error) {
                     throwIfAborted(signal);
-                    if (attempt || error.code !== 'EMPTY_RESPONSE' || deadline - Date.now() < 1000) throw error;
-                    const alternate = playbackRequest(payload, identity, vid, true);
-                    try {
-                        response = await requestJson(alternate.url, { method: alternate.method, headers: alternate.headers, data: alternate.body }, deadline, signal);
-                    } catch (alternateError) {
-                        throwIfAborted(signal);
-                        if (alternateError.code !== 'EMPTY_RESPONSE' || deadline - Date.now() < 1000) throw alternateError;
-                        const tab = videoTabRequest(identity, vid);
-                        response = await requestJson(tab.url, { method: tab.method, headers: tab.headers, data: tab.body }, deadline, signal);
-                    }
+                    lastError = error;
+                    if (error.code !== 'EMPTY_RESPONSE') throw error;
+                    if (attempt || deadline - Date.now() < 1000) break;
+                    try { await delay(250, undefined, { signal }); }
+                    catch (waitError) { throwIfAborted(signal); throw waitError; }
                 }
-                throwIfAborted(signal);
-                break;
-            } catch (error) {
-                throwIfAborted(signal);
-                if (error.code === 'ERR_CANCELED') throw error;
-                if (attempt || error.code !== 'EMPTY_RESPONSE' || deadline - Date.now() < 1000) throw error;
-                if (deadline - Date.now() >= 8000) {
-                    try { identity = await registerPlaybackDevice(requestJson, { signal }); }
-                    catch (registrationError) {
-                        throwIfAborted(signal);
-                        if (registrationError.code === 'ERR_CANCELED') throw registrationError;
-                        if (registrationError.code === 'DEVICE_REGISTRATION_FAILED'
-                            && ['BUSINESS_REJECTED', 'HTTP_403', 'HTTP_429'].includes(registrationError.registrationFailure)) throw registrationError;
-                    }
-                }
-                throwIfAborted(signal);
-                if (deadline - Date.now() < 1500) throw error;
-                try { await delay(1000, undefined, { signal }); }
-                catch (waitError) { throwIfAborted(signal); throw waitError; }
             }
+            if (!response) continue;
+            const businessCode = Number(response.Code || response.code || 0);
+            if (businessCode !== 0) {
+                lastError = Object.assign(new Error('App 接口暂未提供本集播放信息'), {
+                    code: 'BUSINESS_REJECTED', businessCode,
+                });
+                throw lastError;
+            }
+            const entries = response.data?.['1004'] ?? response.data?.video_model_data ?? response.data;
+            const entry = entries?.[vid];
+            const candidate = typeof entry?.video_model === 'string' ? jsonBody(entry.video_model) : entry?.video_model;
+            if (!candidate || typeof candidate !== 'object' || Array.isArray(candidate)) {
+                throw Object.assign(new Error('App 接口未返回所选分集，已停止取址'), {
+                    code: entry?.video_model ? 'INVALID_RESPONSE' : 'MISSING_MODEL',
+                });
+            }
+            break;
         }
+        if (!response) throw lastError || Object.assign(new Error('App 接口返回空响应（HTTP 200），原因尚未确认'), {
+            code: 'EMPTY_RESPONSE', status: 200, emptyResponse: true,
+        });
+        playbackEmptyRounds = 0;
         const businessCode = Number(response.Code || response.code || 0);
         if (businessCode !== 0) throw Object.assign(new Error('App 接口暂未提供本集播放信息'), {
             code: 'BUSINESS_REJECTED', businessCode,

@@ -6,7 +6,7 @@ import {
   DEFAULT_DANMAKU_SOURCE, normalizeDanmakuSource, createOfficialFeed, appendOfficialPage,
   advanceTimedDanmaku, lowerBoundTime, resolveDanmakuStatus,
 } from '../danmakuOfficial.mjs';
-import { DEFAULT_DANMAKU_SETTINGS } from '../danmakuModel.mjs';
+import { DEFAULT_DANMAKU_SETTINGS, danmakuDisplayText, danmakuText } from '../danmakuModel.mjs';
 import * as sharedModel from '../danmakuModel.mjs';
 
 const SERIES = '7503745441910017049';
@@ -15,6 +15,14 @@ const VID = '7503780574541122622';
 const makeFeed = () => createOfficialFeed(SERIES, VID);
 const at = (time, text) => ({ time, text, color: '#FFFFFF', mode: 'scroll' });
 const options = (settings = DEFAULT_DANMAKU_SETTINGS, extra = {}) => ({ width: 800, height: 600, settings, reducedMotion: false, ...extra });
+
+test('弹幕表情代码显示为图片表情，未知代码保持原文', () => {
+  assert.equal(danmakuDisplayText('[爱慕][爱慕][爱慕]'), '😍😍😍');
+  assert.equal(danmakuDisplayText('连看七季[没看够]'), '连看七季🥺');
+  assert.equal(danmakuDisplayText('吃撑了[饱了]'), '吃撑了😋');
+  assert.equal(danmakuDisplayText('[未知表情] 好看'), '[未知表情] 好看');
+  assert.equal(danmakuText('[笑哭]', 2), '😂 × 2');
+});
 
 test('时间轴相同内容只聚合首条起五秒内，重取不累计，远处重复仍按原时间出现', () => {
   const feed = makeFeed();

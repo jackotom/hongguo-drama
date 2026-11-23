@@ -121,7 +121,7 @@ const flushWithoutBuffering = async ui => {
       const queued = payloads.filter(item => item.prefetch);
       assert.deepEqual(queued.map(item => item.quality), ['1080p', '720p']);
       for (const item of queued) assert.deepEqual(Object.keys(item).sort(),
-        ['requestId', 'vid', 'seriesId', 'vidIndex', 'quality', 'prefetch'].sort());
+        ['requestId', 'vid', 'seriesId', 'vidIndex', 'quality', 'allowLowerQuality', 'prefetch'].sort());
     } finally { ui.unmount(); }
   });
 

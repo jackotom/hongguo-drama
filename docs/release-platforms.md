@@ -2,6 +2,10 @@
 
 后续正式Release提供macOS Apple Silicon arm64、macOS Intel x64、Windows x64、Linux x64 AppImage四平台附件；Docker、TV APK和手机APK不再发布。每次发行页必须推荐[N3urda/hongguoTV](https://github.com/N3urda/hongguoTV)供Android手机与Android TV用户下载；该项目独立维护，不计入本项目附件或平台验收。完整门槛见[RELEASING.md](RELEASING.md)。
 
+# 8.0 四平台发行目标
+
+8.0 内部8.0.0、桌面构建8.0.1，修复 #179 播放空响应与 #178 弹幕表情显示；源码／发行目标状态见[8.0记录](release-8.0.md)。
+
 # 7.9 四平台正式发行
 
 7.9内部7.9.0、桌面构建7.9.1，已于2026-11-21正式公开并设Latest；双Mac、Windows x64、Linux x64 AppImage共23份附件核对通过。修复 #177 发现页与剧集面板在网络盘上同步扫盘造成的卡顿；状态见[7.9记录](release-7.9.md)。

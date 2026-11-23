@@ -19,6 +19,35 @@ const BUILTIN_BLOCKED_WORDS = ['习近平', '習近平', '共产党', '共產黨
 const comparable = text => text.normalize('NFKC').toLowerCase().replace(/[\s\u200b-\u200f\u202a-\u202e\u2060-\u2069\ufeff]/g, '');
 const cleanText = text => text.replace(/[\u0000-\u001f\u007f\u202a-\u202e\u2066-\u2069]/g, ' ').replace(/\s+/g, ' ').trim();
 
+// The official client sends its picture reactions as bracket tokens. Chromium
+// renders these Unicode mappings through the platform colour-emoji font, so
+// the overlay keeps the official meaning without shipping third-party art.
+const DANMAKU_EMOJI = Object.freeze({
+  大笑: '😄', 捂脸: '🤦', 爱慕: '😍', 赞: '👍', 点赞: '👍', 笑哭: '😂', 笑: '😄',
+  狗头: '🐶', doge: '🐶', 666: '🙌', 灵光一闪: '💡', 灵机一动: '💡', 滑稽: '🤪',
+  看: '👀', 盯: '👀', what: '😲', 星星眼: '🤩', 打脸: '🤕', 思考: '🤔',
+  疑问: '❓', 什么: '❓', 憨笑: '😁', 呲牙: '😁', 奸笑: '😏', 坏笑: '😏',
+  酷拽: '😎', 酷: '😎', 得意: '😌', 偷笑: '🤭', 捂嘴笑: '🤭', 小鼓掌: '👏',
+  鼓掌: '👏', 比心: '🫰', 爱心: '❤️', 心: '❤️', 送心: '💗', 生气: '😠',
+  怒: '😠', 发怒: '😡', 咒骂: '🤬', 流泪: '😢', 哭: '😭', 泣不成声: '😭',
+  泪奔: '😭', 大哭: '😭', 快哭了: '🥹', 晕: '😵', 困: '😪', 睡: '😴',
+  衰: '😩', 绝望: '😩', 擦汗: '😓', 汗: '😓', 抠鼻: '😤', 抓狂: '😫',
+  震惊: '😱', 惊讶: '😮', ok: '👌', 耶: '✌️', 胜利: '✌️', 微笑: '🙂',
+  害羞: '😊', 抱抱: '🤗', 拥抱: '🤗', 抱拳: '🙏', 拜托: '🙏', 握手: '🤝',
+  白眼: '🙄', 翻白眼: '🙄', 鲜花: '🌹', 玫瑰: '🌹', 花: '🌸', 送花: '🌹',
+  加油: '💪', 强: '💪', 厉害: '👍', 无语: '😑', 叹气: '😮‍💨', 吃瓜: '🍉',
+  柠檬: '🍋', 尴尬: '😅', 暗中观察: '🕵️', 心碎: '💔', 伤心: '💔', 礼物: '🎁', 饱了: '😋',
+  可爱: '🥰', 可怜: '🥺', 委屈: '🥺', 没看够: '🥺', 爽: '😆', 开心: '😄',
+  亲亲: '😘', 飞吻: '😘', 色: '😍', 舔屏: '🤤', 吐血: '🤮', 再见: '👋',
+  拜拜: '👋', 鄙视: '😒', 难过: '😞', 撇嘴: '😕', 调皮: '😜', 做鬼脸: '😜',
+  吐舌: '😛', 皱眉: '😣', 恐惧: '😨', 惊呆: '😮', 探究: '🧐', 机智: '🤓',
+  顶帖: '🔝', 破涕为笑: '😂',
+});
+
+export function danmakuDisplayText(value) {
+  return String(value ?? '').replace(/\[([^\[\]\r\n]{1,16})\]/g, (token, code) => DANMAKU_EMOJI[code.toLowerCase()] ?? token);
+}
+
 export function commentIsBlocked(content, settings) {
   const words = (settings.blockedWords || '').split(/[\n,，;；]+/).map(comparable).filter(Boolean);
   if (settings.sensitiveFilter) words.push(...BUILTIN_BLOCKED_WORDS);
@@ -49,8 +78,9 @@ export function groupDanmaku(items) {
 }
 
 export function danmakuText(content, count = 1) {
-  const chars = Array.from(content);
-  const text = chars.length > 80 ? `${chars.slice(0, 79).join('')}…` : content;
+  const display = danmakuDisplayText(content);
+  const chars = Array.from(display);
+  const text = chars.length > 80 ? `${chars.slice(0, 79).join('')}…` : display;
   return count > 1 ? `${text} × ${count}` : text;
 }
 

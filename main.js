@@ -1,4 +1,4 @@
-// Hongguo Drama 7.9: desktop runtime; server entry is server/index.cjs.
+// Hongguo Drama 8.0: desktop runtime; server entry is server/index.cjs.
 /**
  * main.js - 红果短剧 6.2 下载器（独立版）主进程
  *
@@ -3662,7 +3662,7 @@ async function prepareHlsEntry(playInfo,entry,signal,onProgress) {
 }
 
 ipcMain.handle('prepare-online-play', async (event, payload) => {
-  const { vid, seriesId, vidIndex, requestId, prefetch = false, force = false } = payload || {};
+  const { vid, seriesId, vidIndex, requestId, prefetch = false, force = false, allowLowerQuality = false } = payload || {};
   if (!vid) return { success: false, error: '缺少 vid' };
   let quality;
   try { quality = playbackQuality(payload.quality, vid); } catch (error) { return { success: false, error: error.message }; }
@@ -3688,7 +3688,7 @@ ipcMain.handle('prepare-online-play', async (event, payload) => {
               sendToRenderer('online-play-progress',{vid:sourceVid,seriesId,vidIndex,requestId:active.requestId, ...job.progress});
             }
           };
-          const prepared = await withMediaRecovery(sourceVid,seriesId,{playInfo:checkedPlayInfo,quality,force,signal:controller.signal},async playInfo => {
+          const prepared = await withMediaRecovery(sourceVid,seriesId,{playInfo:checkedPlayInfo,quality,allowLowerQuality,force,signal:controller.signal},async playInfo => {
             const entry = {quality,codec:playInfo.codec === 'bytevc2' ? 'h264' : playInfo.codec || '',size:0,lastUsed:Date.now(),seriesId:String(seriesId||''),vidIndex:Number(vidIndex)||0};
             if (playInfo.format === 'hls') await prepareHlsEntry(playInfo,entry,controller.signal,received => progress(received,0));
             else if (!prefetch && !playInfo.spadeA && !playInfo.contentKey && playInfo.codec !== 'bytevc2') return {...entry,playInfo};

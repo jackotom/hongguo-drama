@@ -17,6 +17,7 @@ const VIDEO_REFERER = "https://novelquickapp.com/";
 const SITE_ORIGIN = "https://hongguoduanju.com";
 const WEB_UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36";
 const WEB_REFERER = SITE_ORIGIN + "/";
+const PUBLIC_FALLBACK_PLAY_URL = SITE_ORIGIN + "/api/video/protected/fallback-play-info";
 
 const COMMON_QUERY = {
   ...Object.fromEntries([
@@ -252,6 +253,63 @@ async function fetchSiteHtml(url, timeout = 30000, signal, { trustedOfficialDns 
 }
 
 /**
+ * 官网网页播放器使用的公开兜底接口。
+ *
+ * 2026-11-23 App 播放模型全链路返回 200/0 字节时，官网仍能通过该接口
+ * 获取当前公开分集的完整 360p MP4。它不是 SEO 页里的 10 秒预览。
+ */
+async function fetchPublicFallbackPlayUrl(vid, signal) {
+  throwIfAborted(signal);
+  if (!/^\d{1,30}$/.test(String(vid))) return null;
+  const guarded = webMediaRequestOptions(PUBLIC_FALLBACK_PLAY_URL, { trustedOfficialDns: true });
+  const response = await axios({
+    ...guarded,
+    url: PUBLIC_FALLBACK_PLAY_URL,
+    method: 'POST',
+    headers: {
+      'User-Agent': WEB_UA,
+      Accept: 'application/json',
+      'Content-Type': 'application/json',
+      Referer: WEB_REFERER,
+    },
+    data: { item_id: String(vid) },
+    timeout: 6000,
+    maxRedirects: 0,
+    responseType: 'json',
+    maxContentLength: 64 * 1024,
+    validateStatus: () => true,
+    signal,
+  });
+  throwIfAborted(signal);
+  const payload = response?.data;
+  if (response?.status !== 200 || !payload || typeof payload !== 'object'
+      || Number(payload.base_resp?.StatusCode ?? payload.code ?? 0) !== 0) {
+    const error = new Error('官网公开兜底接口未返回有效片源');
+    error.code = response?.status >= 400 ? `HTTP_${response.status}` : 'NO_PLAYABLE_SOURCE';
+    throw error;
+  }
+  let media;
+  try { media = new URL(normalizeVideoUrl(payload.main_url)); } catch (_) { return null; }
+  if (media.protocol !== 'https:' || media.username || media.password || !isPublicMediaUrl(media.href)
+      || !/(^|\.)(?:qznovelvod|fqnovelvod|douyinvod)\.com$/i.test(media.hostname)) return null;
+  const expires = Number(payload.url_expire);
+  if (Number.isFinite(expires) && expires > 0 && expires * 1000 <= Date.now() + 5000) return null;
+  return {
+    url: media.href,
+    spadeA: null,
+    contentKey: null,
+    codec: 'h264',
+    source: 'web',
+    vid: String(vid),
+    quality: '360p',
+    width: 360,
+    height: 640,
+    userAgent: WEB_UA,
+    referer: WEB_REFERER,
+  };
+}
+
+/**
  * 从官网 player 页内嵌 JSON 取完整分集列表
  * vid_list 按下标即集数顺序（下标 i → 第 i+1 集）
  */
@@ -313,6 +371,13 @@ async function fetchPlayUrlFromWeb(vid, sid, onFailure, signal) {
   candidates.push(`${SITE_ORIGIN}/player/_/${encodeURIComponent(vid)}`);
 
   let lastErr = null;
+  try {
+    const publicFallback = await fetchPublicFallbackPlayUrl(vid, signal);
+    if (publicFallback) return publicFallback;
+  } catch (error) {
+    throwIfAborted(signal);
+    lastErr = error;
+  }
   for (const url of candidates) {
     throwIfAborted(signal);
     try {
@@ -678,10 +743,18 @@ async function fetchPlayUrlSingle(vid, sid, options = {}) {
     const cacheKey = `play:${sid || ''}:${vid}${quality === 'auto' ? '' : `:${quality}`}${skipWeb ? ':fallback' : ''}${allowLowerQuality ? ':lower-quality' : ''}`;
     const result = await cachedRequest(cacheKey, 30000, signal => quality === 'auto'
       ? fetchPlayUrlFresh(vid, sid, skipWeb, signal)
-      : require('./app-source').fetchAppPlayUrl(String(vid), { quality, allowLowerQuality, signal }).catch(error => {
+      : require('./app-source').fetchAppPlayUrl(String(vid), { quality, allowLowerQuality, signal }).catch(async error => {
         throwIfAborted(signal);
         if (error.code === 'ERR_CANCELED') throw error;
-        throw unavailableSources([sourceFailure('app', error)], allowLowerQuality ? 'auto' : quality);
+        const sources = [sourceFailure('app', error)];
+        if (allowLowerQuality && !skipWeb) {
+          let webError;
+          const web = await fetchPlayUrlFromWeb(vid, sid, failure => { webError = failure; }, signal);
+          throwIfAborted(signal);
+          if (web?.url) return web;
+          if (webError) sources.push(sourceFailure('web', webError));
+        }
+        throw unavailableSources(sources, allowLowerQuality ? 'auto' : quality);
       }), options);
     throwIfAborted(options.signal);
     // Last-resort web recovery must not replace App priority during the penalty window.
@@ -1205,6 +1278,7 @@ module.exports = {
   resolveSeriesId,
   fetchEpisodeList,
   fetchEpisodeListFromWeb,
+  fetchPublicFallbackPlayUrl,
   fetchPlayUrlSingle,
   fetchPlayUrlFromWeb,
   deriveKey,

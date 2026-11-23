@@ -76,12 +76,13 @@ for (const [target, depth] of [['model', 2], ['fallback', 2], ['encryption-metad
         assert.equal(calls, canceledCalls, 'no request may start after handoff cancellation');
         const expectedStages = target === 'registration' ? ['registration'] : target === 'model'
             ? ['registration', 'primary'] : target === 'alternate'
-                ? ['registration', 'primary', 'alternate'] : ['registration', 'primary', 'metadata'];
+                ? ['registration', 'primary', 'primary', 'alternate'] : ['registration', 'primary', 'metadata'];
         assert.deepEqual(stages, expectedStages, 'cancellation must occur at the intended response handoff');
         assert.equal(calls, expectedStages.length);
         const beforeRecovery = calls;
         assert.equal((await api.fetchAppPlayUrl('11')).source, 'app', 'same module still accepts an independent no-signal lookup');
-        assert.equal(calls, beforeRecovery + 2, 'recovery has one registration and one model request');
-        assert.deepEqual(stages.slice(beforeRecovery), ['registration', 'primary']);
+        const recoveryStages = target === 'registration' ? ['registration', 'primary'] : ['primary'];
+        assert.equal(calls, beforeRecovery + recoveryStages.length, 'recovery reuses a completed identity');
+        assert.deepEqual(stages.slice(beforeRecovery), recoveryStages);
     });
 }

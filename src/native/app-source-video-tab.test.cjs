@@ -17,15 +17,15 @@ const model = () => ({ video_id: 'synthetic-video', video_duration: 60, video_li
 const response = data => ({ status: 200, headers: {}, data: JSON.stringify(data) });
 const nested = value => ({ code: 0, data: { video_model_data: { [vid]: { video_model: value } } } });
 
-function fixture(tabResponse, { legacyResponse, signal } = {}) {
+function fixture(tabResponse, { legacyResponse, v5Response = tabResponse, signal } = {}) {
     const calls = [], signatures = [];
-    let registrations = 0;
+    let registrations = 0, resets = 0, cached = false;
     const module = { exports: {} };
     const context = { module, Buffer, URL, AbortSignal, setTimeout, clearTimeout, require(name) {
-        if (name === './playback-device') return { registerPlaybackDevice: async () => {
-            registrations++;
-            return identity;
-        } };
+        if (name === './playback-device') {
+            const get = async () => { if (!cached) registrations++; cached = true; return identity; };
+            return { registerPlaybackDevice: get, getPlaybackDevice: get, resetPlaybackDevice() { resets++; cached = false; } };
+        }
         if (name === './playback-v5') return { signPlaybackV5: input => {
             const signed = require('./playback-v5').signPlaybackV5(input);
             signatures.push({ ...input, signed, v5: true });
@@ -37,13 +37,17 @@ function fixture(tabResponse, { legacyResponse, signal } = {}) {
         } };
         if (name === 'axios') return async config => {
             calls.push(config);
-            if (new URL(config.url).pathname === '/novel/player/multi_video_model/v1/') return legacyResponse || { status: 200, headers: {}, data: '' };
+            const path = new URL(config.url).pathname;
+            if (path === '/novel/player/multi_video_model/v1/') return legacyResponse || { status: 200, headers: {}, data: '' };
+            if (path === '/novel/player/multi_video_model/player/v1') {
+                return typeof v5Response === 'function' ? v5Response(config) : v5Response;
+            }
             return typeof tabResponse === 'function' ? tabResponse(config) : tabResponse;
         };
         return require(name.startsWith('.') ? path.join(__dirname, name) : name);
     } };
     vm.runInNewContext(fs.readFileSync(require.resolve('./app-source'), 'utf8'), context);
-    return { context, calls, signatures, registrations: () => registrations,
+    return { context, calls, signatures, registrations: () => registrations, resets: () => resets,
         fetch: options => module.exports.fetchAppPlayUrl(vid, { quality: '1080p', signal, ...options }) };
 }
 
@@ -51,7 +55,7 @@ function assertPlayerBinding(f, request, index) {
     const input = f.signatures[index], url = new URL(request.url);
     assert.ok(input, 'model must use the real PlayerSigner family');
     assert.equal(input.query, url.search.slice(1));
-    assert.equal(input.body, request.data, 'sign the actual sent Buffer, not the JSON before gzip');
+    assert.deepEqual(Buffer.from(input.body), Buffer.from(request.data), 'sign the actual sent Buffer, not the JSON before gzip');
     assert.equal(input.ts, Number(request.headers['x-khronos']));
     const expected = signPlayer({ ...input, ...signerEntropy });
     for (const name of ['x-ss-req-ticket', 'x-khronos', 'x-argus', 'x-ladon', 'x-ss-stub']) assert.equal(request.headers[name], expected[name], name);
@@ -83,7 +87,7 @@ test('production playback uses the v5 POST endpoint and exact nested 1004 episod
     assert.ok(Buffer.from(request.headers['x-medusa'], 'base64').length > 248);
     assert.ok(Buffer.from(request.headers['x-helios'], 'base64').length > 4);
     for (const key of ['x-argus', 'x-ladon', 'Cookie', 'Authorization']) assert.equal(request.headers[key], undefined);
-    assert.equal(f.signatures[0].body, request.data);
+    assert.deepEqual(Buffer.from(f.signatures[0].body), Buffer.from(request.data));
     assert.equal(f.signatures[0].signed.url, request.url);
     assert.ok(request.timeout > 0 && request.timeout <= 12000);
     assert.ok(request.signal);
@@ -103,19 +107,20 @@ for (const wrap of [value => ({ code: 0, data: { [vid]: { video_model: value } }
 test('empty v5 model retains the bounded signed legacy fallback', async () => {
     const f = fixture({ status: 200, headers: {}, data: '' }, { legacyResponse: response(nested(model())) });
     assert.equal((await f.fetch()).url, media);
-    assert.equal(f.calls.length, 4); assert.equal(f.registrations(), 2);
+    assert.equal(f.calls.length, 11); assert.equal(f.registrations(), 1);
     for (let i = 0; i < 2; i++) {
         assert.equal(f.calls[i].method, 'POST');
         assert.equal(new URL(f.calls[i].url).pathname, '/novel/player/multi_video_model/player/v1');
-        assert.equal(f.signatures[i].body, f.calls[i].data);
-        assert.equal(f.signatures[i].signed.url, f.calls[i].url);
+        assert.deepEqual(Buffer.from(f.signatures[i].body), Buffer.from(f.calls[i].data));
     }
-    assert.equal(f.calls[2].method, 'GET');
-    assert.equal(new URL(f.calls[2].url).pathname, '/reading/bookapi/video_tab/multi_video_model/v1/');
-    const legacy = f.calls[3];
+    assert.equal(f.calls.at(-2).method, 'GET');
+    assert.equal(new URL(f.calls.at(-2).url).pathname, '/reading/bookapi/video_tab/multi_video_model/v1/');
+    const legacy = f.calls.at(-1);
     assert.equal(new URL(legacy.url).pathname, '/novel/player/multi_video_model/v1/');
     assert.equal(legacy.headers.Connection, 'close');
-    assertPlayerBinding(f, legacy, 3);
+    const legacySignatureIndex = f.signatures.findLastIndex(item => !item.v5);
+    assert.ok(legacySignatureIndex >= 0);
+    assertPlayerBinding(f, legacy, legacySignatureIndex);
 });
 
 for (const [name, result, code] of [
@@ -130,7 +135,7 @@ for (const [name, result, code] of [
         const f = fixture(result);
         await assert.rejects(f.fetch(), error => code ? error.code === code : error.status === 403);
         assert.equal(f.calls.length, code === 'EMPTY_RESPONSE' ? 12 : 1);
-        assert.equal(f.registrations(), code === 'EMPTY_RESPONSE' ? 6 : 1);
+        assert.equal(f.registrations(), 1);
     });
 }
 
@@ -139,16 +144,16 @@ test('an empty current response retains the successful legacy recovery', async (
         legacyResponse: response({ code: 0, data: { [vid]: { video_model: model() } } }),
     });
     assert.equal((await f.fetch()).url, media);
-    assert.equal(f.calls.length, 4);
-    assert.equal(f.registrations(), 2);
+    assert.equal(f.calls.length, 11);
+    assert.equal(f.registrations(), 1);
 });
 
 for (const legacyResponse of [response({ code: 1 }), { status: 429, headers: {}, data: '' }]) {
     test(`explicit legacy rejection remains terminal (${legacyResponse.status})`, async () => {
         const f = fixture({ status: 200, headers: {}, data: '' }, { legacyResponse });
         await assert.rejects(f.fetch());
-        assert.equal(f.calls.length, 4);
-        assert.equal(f.registrations(), 2);
+        assert.equal(f.calls.length, 11);
+        assert.equal(f.registrations(), 1);
     });
 }
 
@@ -174,18 +179,22 @@ for (const [changes, code] of [[{ main_url: 'https://127.0.0.1/private' }, 'SECU
     });
 }
 
-// A real empty response on the primary host recovered with the same identity on the alternate.
-test('empty primary host recovers on the alternate official host without legacy or registration', async () => {
+// An empty primary host recovers with the same identity through another current route.
+test('empty primary host recovers on another official route without registration churn', async () => {
+    const empty = { status: 200, headers: {}, data: '' };
     const f = fixture(config => new URL(config.url).hostname === 'api5-normal-sinfonlineb.fqnovel.com'
-        ? { status: 200, headers: {}, data: '' } : response(nested(model())));
+        ? empty : response(nested(model())), { v5Response: empty });
     assert.equal((await f.fetch()).url, media);
-    assert.equal(f.calls.length, 2);
+    assert.ok(f.calls.length >= 2);
     assert.equal(f.registrations(), 1);
-    assert.equal(new URL(f.calls[1].url).hostname, 'api5-normal-sinfonlinea.fqnovel.com');
-    assert.equal(f.calls[1].method, 'POST');
-    assert.equal(f.signatures[1].signed.url, f.calls[1].url);
-    assert.equal(f.signatures[1].body, f.calls[1].data);
-    assert.ok(f.calls[1].timeout <= f.calls[0].timeout);
+    assert.equal(new URL(f.calls.at(-1).url).hostname, 'api5-normal-sinfonlinea.fqnovel.com');
+    assert.equal(new URL(f.calls.at(-1).url).pathname, '/novel/player/video_model/v1/');
+    assert.equal(f.calls.at(-1).method, 'POST');
+    const modelBody = JSON.parse(require('node:zlib').gunzipSync(f.calls.at(-1).data));
+    assert.equal(modelBody.content_type, 1004);
+    assert.equal(modelBody.video_id, vid);
+    assert.equal(modelBody.biz_param.video_platform, 3);
+    assert.ok(f.calls.at(-1).timeout <= f.calls[0].timeout);
 });
 
 for (const status of [403, 429]) {
@@ -193,7 +202,7 @@ for (const status of [403, 429]) {
         const f = fixture(config => ({ status: new URL(config.url).hostname.includes('sinfonlineb') ? 200 : status,
             headers: {}, data: '' }));
         await assert.rejects(f.fetch(), { status });
-        assert.equal(f.calls.length, 2);
+        assert.equal(f.calls.length, 3);
         assert.equal(f.registrations(), 1);
     });
 }
@@ -204,7 +213,7 @@ test('cancelling on the alternate host stops without legacy', async () => {
         return { status: 200, headers: {}, data: '' };
     }, { signal: controller.signal });
     await assert.rejects(f.fetch(), { code: 'ERR_CANCELED' });
-    assert.equal(f.calls.length, 2);
+    assert.equal(f.calls.length, 3);
     assert.equal(f.registrations(), 1);
 });
 

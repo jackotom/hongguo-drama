@@ -107,33 +107,33 @@ function row(definition, width, height, suffix) {
     data: { [id]: { video_model: { video_list: rows, fallback_api: 'https://vod.snssdk.com/must-not-fetch' } } } }) });
   const plain = { ...row('1080p', 1080, 1920, 'inline'), encrypt_info: { encrypt: false } };
   const identities = [{ device_id: '11', iid: '12', cdid: 'fixture' }, { device_id: '21', iid: '22', cdid: 'fixture' }];
-  let recoverCalls = 0, renewals = 0, recoveryRegistrations = 0;
+  let recoverCalls = 0, recoveryRegistrations = 0;
   const recovery = load(async config => {
     recoverCalls++;
-    if (new URL(config.url).searchParams.get('device_id') === '11') return { status: 200, headers: {}, data: '' };
+    const url = new URL(config.url);
+    if (url.pathname === '/novel/player/multi_video_model/player/v1') return { status: 200, headers: {}, data: '' };
     return inlineResponse([plain]);
-  }, { registerPlaybackDevice: async () => {
+  }, { getPlaybackDevice: async () => {
     recoveryRegistrations++;
-    if (recoveryRegistrations > 1) renewals++;
-    return identities[recoveryRegistrations - 1];
+    return identities[0];
   } });
-  assert.equal((await recovery.fetchAppPlayUrl(vid)).url, plain.main_url, 'empty model response renews the device and recovers');
-  assert.equal(recoverCalls, 4);
-  assert.equal(renewals, 1);
+  assert.equal((await recovery.fetchAppPlayUrl(vid)).url, plain.main_url, 'empty current routes recover through the official single-episode model');
+  assert.equal(recoverCalls, 5);
+  assert.equal(recoveryRegistrations, 1, 'all routes reuse the same identity');
   for (const status of [200, 403, 404]) {
     let calls = 0, registrations = 0;
     const unavailable = load(async () => { calls++; return { status, headers: {}, data: '' }; },
-      { registerPlaybackDevice: async () => ({
+      { getPlaybackDevice: async () => ({
         device_id: String(100 + ++registrations), iid: String(200 + registrations), cdid: 'fixture',
       }) });
     await assert.rejects(unavailable.fetchAppPlayUrl(vid), error => status === 200 ? error.code === 'EMPTY_RESPONSE' : error.status === status);
-    assert.equal(calls, status === 200 ? 12 : 1, 'three bounded anonymous rounds; HTTP rejection must not retry');
-    assert.equal(registrations, status === 200 ? 6 : 1);
+    assert.equal(calls, status === 200 ? 12 : 1, 'empty routes have one bounded probe; HTTP rejection must not retry');
+    assert.equal(registrations, 1);
   }
   let cooldownCalls = 0;
   await assert.rejects(load(async () => { cooldownCalls++; return { status: 200, headers: {}, data: '' }; },
     { getPlaybackDevice: async () => identities[0] }).fetchAppPlayUrl(vid), error => error.code === 'EMPTY_RESPONSE');
-  assert.equal(cooldownCalls, 12, 'empty responses permit three bounded anonymous rounds');
+  assert.equal(cooldownCalls, 12, 'empty responses use one bounded six-route probe');
   let clock = Date.now(), slowCalls = 0;
   const slowRegistration = load(async config => {
     slowCalls++;
@@ -150,7 +150,10 @@ function row(definition, width, height, suffix) {
   }, { getPlaybackDevice: async () => identities[0] });
   assert.equal((await alternate.fetchAppPlayUrl(vid)).url, plain.main_url);
   assert.deepEqual(routes, [['POST', '/novel/player/multi_video_model/player/v1'],
-    ['POST', '/novel/player/multi_video_model/player/v1'], ['GET', '/reading/bookapi/video_tab/multi_video_model/v1/']]);
+    ['POST', '/novel/player/multi_video_model/player/v1'],
+    ['POST', '/novel/player/multi_video_model/player/v1'],
+    ['POST', '/novel/player/multi_video_model/player/v1'],
+    ['POST', '/novel/player/video_model/v1/']]);
   let inlineCalls = 0;
   const direct = load(async config => {
     inlineCalls++;
@@ -165,14 +168,14 @@ function row(definition, width, height, suffix) {
   assert.equal(inlineCalls, 1, 'inline model must not fetch the obsolete fallback endpoint');
   assert.equal((await direct.fetchAppPlayUrl(vid, { quality: '1080p' })).width, 1080);
 
-  let registrations = 0;
+  let registrations = 1;
   const oneUseDevice = load(async config => inlineResponse([plain]), {
-    getPlaybackDevice: async () => assert.fail('playback model must not reuse the cached device'),
-    registerPlaybackDevice: async () => ({ device_id: String(++registrations), iid: '2', cdid: 'fixture' }),
+    getPlaybackDevice: async () => identities[0],
+    registerPlaybackDevice: async () => assert.fail('playback must not replace a valid cached device'),
   });
   await oneUseDevice.fetchAppPlayUrl(vid);
   await oneUseDevice.fetchAppPlayUrl(vid);
-  assert.equal(registrations, 2, 'each model request registers a device because the upstream may allow one request per identity');
+  assert.equal(registrations, 1, 'playback requests reuse the same device identity');
 
   // Encode a synthetic Spade key, so the real decoder is exercised without captured credentials.
   const keyHex = '0123456789abcdef0123456789abcdef';
@@ -211,7 +214,7 @@ function row(definition, width, height, suffix) {
     return inlineResponse([plain]);
   }, { realDevice: true });
   const simultaneous = await Promise.all([registered.fetchAppPlayUrl(vid), registered.fetchAppPlayUrl(vid)]);
-  assert.equal(registrations, 2, 'each model request uses a separately registered device');
+  assert.equal(registrations, 1, 'concurrent playback uses one shared device identity');
   assert.equal(modelCalls, 2);
   assert.ok(simultaneous.every(result => result.url === plain.main_url));
   assert.doesNotMatch(JSON.stringify(simultaneous), /synthetic-unused-token/);

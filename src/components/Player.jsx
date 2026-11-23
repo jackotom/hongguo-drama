@@ -1059,7 +1059,7 @@ function Player({ target, onNavigate, onSeriesSelected, onFloatingChange, active
           try {
             res = await window.electronAPI.prepareOnlinePlay({
               requestId: request.requestId, vid: ep.vid, seriesId: activeSeriesId, vidIndex,
-              quality: qualities[index], force,
+              quality: qualities[index], allowLowerQuality: stateRef.current.onlineQuality === 'auto', force,
             });
           } catch (error) { res = { success: false, error: error?.message || String(error), code: error?.code }; }
           if (onlineRequestRef.current !== request) break;
@@ -1269,7 +1269,8 @@ function Player({ target, onNavigate, onSeriesSelected, onFloatingChange, active
           try {
             result = await window.electronAPI.prepareOnlinePlay({
               requestId: request.requestId, vid: request.vid, seriesId: request.seriesId,
-              vidIndex: request.vidIndex, quality: qualities[index], prefetch: onlineRequestRef.current !== request,
+              vidIndex: request.vidIndex, quality: qualities[index], allowLowerQuality: onlineQuality === 'auto',
+              prefetch: onlineRequestRef.current !== request,
             });
           } catch (error) { result = { success: false, error: error?.message || String(error), code: error?.code }; }
           if (rejectsPlaybackSource(result) && (prefetchRef.current.includes(request) || onlineRequestRef.current === request)) {

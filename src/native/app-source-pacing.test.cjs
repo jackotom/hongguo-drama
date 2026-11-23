@@ -34,7 +34,20 @@ function fixture(reply, registrationError) {
         },
     });
     return { calls, registrations, fetch: (vid = '11', options) => module.exports.fetchAppPlayUrl(vid, options),
-        async advance(ms) { now += ms; for (const timer of timers) if (!timer.cleared && timer.at <= now) { timer.cleared = true; timer.fn(); } await turn(); },
+        async advance(ms) {
+            now += ms;
+            for (let idle = 0, rounds = 0; rounds < 50; rounds++) {
+                await turn();
+                const timer = timers.find(item => !item.cleared && item.at <= now);
+                if (!timer) {
+                    if (++idle > 1) break;
+                    continue;
+                }
+                idle = 0;
+                timer.cleared = true;
+                timer.fn();
+            }
+        },
         liveTimers: () => timers.filter(timer => !timer.cleared),
     };
 }
@@ -82,103 +95,54 @@ test('cancelling the source cooldown does not send a request or extend the next 
     assert.equal(f.calls[1].at - f.calls[0].at, 1000);
 });
 
-test('empty current responses wait one second before the single existing legacy attempt', async () => {
-    const f = fixture((config, count) => count <= 3 ? { status: 200, headers: {}, data: '' } : success(config));
-    const result = f.fetch(); await turn();
-    assert.equal(f.calls.length, 3, 'V5 primary, alternate and the current-episode tab stay in one bounded probe');
-    await f.advance(999); assert.equal(f.calls.length, 3, '300ms recovery still bursts the API');
-    await f.advance(1); await result;
-    assert.equal(f.calls.length, 4); assert.equal(f.calls[3].method, 'POST');
+test('empty current routes use one identity and one bounded route probe', async () => {
+    const f = fixture(() => ({ status: 200, headers: {}, data: '' }));
+    const result = f.fetch().then(value => ({ value }), error => ({ error }));
+    await turn();
+    for (let round = 0; round < 6; round++) await f.advance(250);
+    const settled = await Promise.race([result, new Promise(resolve => setTimeout(() => resolve({ timeout: true }), 100))]);
+    assert.equal(settled.timeout, undefined, JSON.stringify({ calls: f.calls.length, liveTimers: f.liveTimers().length }));
+    assert.equal(settled.error.code, 'EMPTY_RESPONSE');
+    assert.equal(f.registrations.length, 1, 'all empty routes must reuse the same identity');
+    assert.equal(f.calls.length, 12, 'six routes are each bounded to an initial request and one 250ms re-probe');
+    assert.deepEqual(f.calls.map(config => new URL(config.url).pathname), [
+        '/novel/player/multi_video_model/player/v1',
+        '/novel/player/multi_video_model/player/v1',
+        '/novel/player/multi_video_model/player/v1',
+        '/novel/player/multi_video_model/player/v1',
+        '/novel/player/video_model/v1/',
+        '/novel/player/video_model/v1/',
+        '/novel/player/video_model/v1/',
+        '/novel/player/video_model/v1/',
+        '/reading/bookapi/video_tab/multi_video_model/v1/',
+        '/reading/bookapi/video_tab/multi_video_model/v1/',
+        '/novel/player/multi_video_model/v1/',
+        '/novel/player/multi_video_model/v1/',
+    ]);
 });
 
-for (const registrationFailure of ['HTTP_403', 'HTTP_429', 'BUSINESS_REJECTED']) {
-    test(`a renewal ${registrationFailure} stops legacy recovery and already queued requests`, async () => {
-        const refusal = Object.assign(new Error('registration refused'), { code: 'DEVICE_REGISTRATION_FAILED', registrationFailure });
-        const f = fixture((config, count) => count <= 3 ? { status: 200, headers: {}, data: '' } : success(config),
-            attempt => attempt === 2 ? refusal : undefined);
-        const first = f.fetch().then(value => ({ value }), error => ({ error }));
-        const queued = f.fetch('12').then(value => ({ value }), error => ({ error }));
-        await turn(); await f.advance(1000);
-        assert.equal((await first).error, refusal, 'renewal refusal must reach the source queue unchanged');
-        assert.equal((await queued).error, refusal);
-        assert.equal(f.registrations.length, 2, 'queued work must not register after the refusal');
-        assert.equal(f.calls.length, 3, 'legacy recovery must not send the previous identity after a refusal');
-    });
-}
-
-for (const registrationFailure of ['TIMEOUT', 'NETWORK_ERROR', 'HTTP_500']) {
-    test(`a renewal ${registrationFailure} retains the bounded legacy recovery`, async () => {
-        const failure = Object.assign(new Error('registration unavailable'), { code: 'DEVICE_REGISTRATION_FAILED', registrationFailure });
-        const f = fixture((config, count) => count <= 3 ? { status: 200, headers: {}, data: '' } : success(config),
-            attempt => attempt === 2 ? failure : undefined);
-        const result = f.fetch(); await turn(); await f.advance(1000);
-        assert.equal((await result).url, 'https://qznovelvod.com/fixture.mp4');
-        assert.equal(f.registrations.length, 2); assert.equal(f.calls.length, 4);
-        assert.equal(f.calls[3].method, 'POST');
-        assert.equal(new URL(f.calls[3].url).searchParams.get('device_id'), new URL(f.calls[0].url).searchParams.get('device_id'));
-    });
-}
-
-test('cancelling renewal skips legacy recovery and leaves a later request available', async () => {
-    const controller = new AbortController();
-    const f = fixture((config, count) => count <= 3 ? { status: 200, headers: {}, data: '' } : success(config), attempt => {
-        if (attempt === 2) {
-            controller.abort();
-            return Object.assign(new Error('cancelled'), { code: 'ERR_CANCELED' });
-        }
-    });
-    await assert.rejects(f.fetch('11', { signal: controller.signal }), { code: 'ERR_CANCELED' });
-    assert.equal(f.calls.length, 3); assert.equal(f.registrations.length, 2);
-    const later = f.fetch(); await turn(); await f.advance(1000);
-    assert.equal((await later).url, 'https://qznovelvod.com/fixture.mp4');
-    assert.equal(f.calls.length, 4); assert.equal(f.registrations.length, 3);
-});
-
-test('explicit rejection remains terminal and releases the queue for an independent later action', async () => {
+test('explicit HTTP refusal remains terminal for queued consumers and permits a later action', async () => {
     const f = fixture((config, count) => count === 1 ? { status: 429, headers: {}, data: '' } : success(config));
-    await assert.rejects(f.fetch(), { status: 429 });
+    const first = assert.rejects(f.fetch(), { status: 429 });
+    const queued = assert.rejects(f.fetch('12'), { status: 429 });
+    await first; await queued;
     assert.equal(f.calls.length, 1); assert.equal(f.registrations.length, 1);
     const next = f.fetch(); await turn(); await f.advance(1000); await next;
     assert.equal(f.calls.length, 2);
 });
 
-for (const status of [403, 429]) {
-    test(`HTTP ${status} also stops callers already waiting for the same source turn`, async () => {
-        const held = deferred(), f = fixture((config, count) => count === 1 ? held.promise : success(config));
-        const first = assert.rejects(f.fetch(), { status });
-        const queued = assert.rejects(f.fetch(), { status });
-        await turn(); held.resolve({ status, headers: {}, data: '' }); await first; await turn();
-        await f.advance(1000); await queued;
-        assert.equal(f.calls.length, 1); assert.equal(f.registrations.length, 1);
-        assert.equal((await f.fetch()).url, 'https://qznovelvod.com/fixture.mp4', 'a new explicit action may retry');
-    });
-}
-
-test('an explicit registration refusal stops queued registrations without poisoning a later retry', async () => {
-    const error = Object.assign(new Error('registration refused'), { code: 'DEVICE_REGISTRATION_FAILED', registrationFailure: 'BUSINESS_REJECTED' });
-    const f = fixture(undefined, error);
-    const first = assert.rejects(f.fetch(), { code: error.code }), queued = assert.rejects(f.fetch(), { code: error.code });
-    await first; await queued;
-    assert.equal(f.registrations.length, 1); assert.equal(f.calls.length, 0);
-    await f.advance(1000); await f.fetch();
-    assert.equal(f.registrations.length, 2); assert.equal(f.calls.length, 1);
+test('timeout is surfaced without rotating the shared identity or probing later routes', async () => {
+    const f = fixture(() => { throw Object.assign(new Error('timeout'), { code: 'ETIMEDOUT' }); });
+    await assert.rejects(f.fetch(), { code: 'ETIMEDOUT' });
+    assert.equal(f.calls.length, 1);
+    assert.equal(f.registrations.length, 1);
 });
 
-for (const route of ['model', 'fallback']) {
-    test(`a ${route} business refusal stops already queued requests without a status field`, async () => {
-        const requests = route === 'model' ? 1 : 2;
-        const f = fixture((config, count) => {
-            if (route === 'fallback' && count === 1) return { status: 200, headers: {}, data: JSON.stringify({
-                code: 0, data: { '11': { video_model: { fallback_api: 'https://fqnovel.com/fallback' } } },
-            }) };
-            if (count === requests) return { status: 200, headers: {}, data: '{"code":100103}' };
-            return success(config);
-        });
-        const first = assert.rejects(f.fetch(), error => error.code === 'BUSINESS_REJECTED' && error.status === undefined);
-        const queued = f.fetch().then(value => ({ value }), error => ({ error }));
-        await first; await turn(); await f.advance(1000);
-        assert.equal((await queued).error?.code, 'BUSINESS_REJECTED', 'queued work must retain the refusal');
-        assert.equal(f.calls.length, requests); assert.equal(f.registrations.length, 1);
-        assert.equal((await f.fetch()).url, 'https://qznovelvod.com/fixture.mp4', 'a later explicit retry remains available');
-    });
-}
+test('110001 rotates the identity once before retrying a single route', async () => {
+    const f = fixture((config, count) => count === 1
+        ? { status: 200, headers: {}, data: '{"code":110001}' }
+        : success(config));
+    assert.equal((await f.fetch()).url, 'https://qznovelvod.com/fixture.mp4');
+    assert.equal(f.registrations.length, 2);
+    assert.equal(f.calls.length, 2);
+});

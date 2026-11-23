@@ -16,13 +16,15 @@ const answer = data => ({ status: 200, headers: {}, data: JSON.stringify(data) }
 
 function fixture(tabAnswer, v5Answer = '') {
   const calls = [], registrations = [];
+  let resets = 0, cached = false;
   const module = { exports: {} };
   vm.runInNewContext(fs.readFileSync(require.resolve('./app-source'), 'utf8'), {
     module, Buffer, URL, AbortSignal, setTimeout, clearTimeout,
     require(name) {
       if (name === './playback-device') return {
-        async registerPlaybackDevice() { registrations.push(identity); return identity; },
-        async getPlaybackDevice() { registrations.push(identity); return identity; },
+        async registerPlaybackDevice() { if (!cached) registrations.push(identity); cached = true; return identity; },
+        async getPlaybackDevice() { if (!cached) registrations.push(identity); cached = true; return identity; },
+        resetPlaybackDevice() { resets++; cached = false; },
       };
       if (name === 'axios') return async config => {
         calls.push(config);
@@ -34,6 +36,7 @@ function fixture(tabAnswer, v5Answer = '') {
         if (url.pathname === '/reading/bookapi/video_tab/multi_video_model/v1/') {
           return typeof tabAnswer === 'function' ? tabAnswer(config, calls.length) : tabAnswer;
         }
+        if (url.pathname === '/novel/player/video_model/v1/') return { status: 200, headers: {}, data: '' };
         if (url.pathname === '/novel/player/multi_video_model/v1/') return { status: 200, headers: {}, data: '' };
         throw new Error(`unexpected request ${url.pathname}`);
       };
@@ -41,7 +44,7 @@ function fixture(tabAnswer, v5Answer = '') {
     },
   }, { filename: require.resolve('./app-source') });
   return { calls, fetch: options => module.exports.fetchAppPlayUrl(vid, { quality: '1080p', ...options }),
-    registrations: () => registrations.length };
+    registrations: () => registrations.length, resets: () => resets };
 }
 
 test('empty V5 responses recover through the current episode video_tab with the same identity', async () => {
@@ -61,11 +64,13 @@ test('empty current routes keep the failure bounded and never accept the preview
   const f = fixture({ status: 200, headers: {}, data: '' });
   await assert.rejects(f.fetch(), { code: 'EMPTY_RESPONSE' });
   assert.equal(f.calls.length, 12);
-  assert.equal(new URL(f.calls[2].url).pathname, '/reading/bookapi/video_tab/multi_video_model/v1/');
-  assert.equal(new URL(f.calls[3].url).pathname, '/novel/player/multi_video_model/v1/');
+  assert.equal(f.registrations(), 1);
+  assert.ok(f.calls.some(call => new URL(call.url).pathname === '/novel/player/video_model/v1/'));
+  assert.ok(f.calls.some(call => new URL(call.url).pathname === '/reading/bookapi/video_tab/multi_video_model/v1/'));
+  assert.equal(new URL(f.calls.at(-1).url).pathname, '/novel/player/multi_video_model/v1/');
 });
 
-test('an empty anonymous round retries with a fresh identity before failing', async () => {
+test('an empty route is reprobed with the same identity instead of registering again', async () => {
   let tabAttempts = 0;
   const f = fixture(() => {
     tabAttempts++;
@@ -74,8 +79,9 @@ test('an empty anonymous round retries with a fresh identity before failing', as
       : answer({ code: 0, data: { video_model_data: { [vid]: { video_model: model } } } });
   });
   assert.equal((await f.fetch()).url, media);
-  assert.equal(f.registrations(), 3);
-  assert.ok(f.calls.length > 4);
+  assert.equal(f.registrations(), 1);
+  assert.equal(f.resets(), 0);
+  assert.equal(f.calls.length, 10);
 });
 
 test('business code 110001 rotates the anonymous identity and retries', async () => {
@@ -89,16 +95,13 @@ test('business code 110001 rotates the anonymous identity and retries', async ()
   assert.equal((await f.fetch()).url, media);
   assert.equal(f.registrations(), 2);
   assert.equal(f.calls.length, 2);
+  assert.equal(f.resets(), 1);
 });
 
-test('a timed out anonymous round retries with a fresh identity', async () => {
-  let v5Attempts = 0;
-  const f = fixture('', () => {
-    v5Attempts++;
-    if (v5Attempts === 1) throw Object.assign(new Error('timeout'), { code: 'ETIMEDOUT' });
-    return answer({ code: 0, data: { '1004': { [vid]: { video_model: model } } } });
-  });
-  assert.equal((await f.fetch()).url, media);
-  assert.equal(f.registrations(), 2);
-  assert.equal(f.calls.length, 2);
+test('a timeout is surfaced without immediately rotating the anonymous identity', async () => {
+  const f = fixture('', () => { throw Object.assign(new Error('timeout'), { code: 'ETIMEDOUT' }); });
+  await assert.rejects(f.fetch(), { code: 'ETIMEDOUT' });
+  assert.equal(f.registrations(), 1);
+  assert.equal(f.resets(), 0);
+  assert.equal(f.calls.length, 1);
 });
