@@ -158,10 +158,11 @@ function safeDownloadFailure(value) {
           return {seriesId:drama.series_id,title:drama.series_title,completeDownloads:true,downloadedFromOfficialSource:true,states};
         }
       }
-      throw Error('No two playable real episodes in six dramas: '+lastFailure);
+      throw Error('No two playable real episodes in '+dramas.length+' drama(s): '+lastFailure);
     })()`, 420000);
     assert.equal(result.realPlayback.states.length, 2);
-    result.checks.push('Fresh random Hongguo episodes 1 and 2: real source preparation and ten seconds muted playback each');
+    result.checks.push('Real Hongguo episodes ' + result.realPlayback.states.map(item => item.episode).join(' and ')
+      + ': complete source preparation and ten seconds muted playback each');
     result.passed = true;
     console.log('PASS actual Linux AppImage: media tools, launch, software assets and two real muted episodes');
   } catch (error) {
