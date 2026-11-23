@@ -67,6 +67,10 @@ async function keyHandoff(key, code, expectedSource) {
   await evaluate(`(() => {
     const video = document.querySelector('video');
     const originalSource = video.currentSrc;
+    if (typeof window.__verificationNextFrame !== 'function') window.__verificationNextFrame = () => new Promise(resolve => {
+      const timer = setTimeout(() => { cancelAnimationFrame(frame); resolve(false); }, 100);
+      const frame = requestAnimationFrame(() => { clearTimeout(timer); resolve(true); });
+    });
     window.__keyHandoff = { key: ${JSON.stringify(key)}, trusted: false, ended: false, sourceChanged: false, nextPlaying: false, frames: 0, visibleFrames: 0, fullscreenLost: false };
     const result = window.__keyHandoff;
     const keydown = event => { if (event.key === result.key) result.trusted = event.isTrusted; };
@@ -447,6 +451,10 @@ async function realFootage(mediaDir, ffmpeg, ffprobe, dataFile) {
   const automaticHandoff = await evaluate(`(async () => {
     const video = document.querySelector('video');
     const originalSource = video.currentSrc;
+    if (typeof window.__verificationNextFrame !== 'function') window.__verificationNextFrame = () => new Promise(resolve => {
+      const timer = setTimeout(() => { cancelAnimationFrame(frame); resolve(false); }, 100);
+      const frame = requestAnimationFrame(() => { clearTimeout(timer); resolve(true); });
+    });
     const result = { ended: false, sourceChanged: false, nextPlaying: false, frames: 0, visibleFrames: 0, fullscreenLost: false };
     const ended = () => { result.ended = true; };
     video.addEventListener('ended', ended, { once: true });
