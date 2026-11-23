@@ -1,6 +1,6 @@
 # 8.1 四平台发行目标
 
-状态：源码与发行目标。公开版本 `8.1`，内部版本 `8.1.0`，桌面构建 `8.1.1`。
+状态：已于 2026-11-23 21:33:46（Asia/Shanghai）正式公开并设 Latest。公开版本 `8.1`，内部版本 `8.1.0`，桌面构建 `8.1.1`，冻结源码 `bc02370ff519adf7a94a20688c5538ac303f4ec7`，标签 `v8.1`，Release ID `455441801`。
 
 发行范围：macOS Apple Silicon arm64、macOS Intel x64、Windows x64、Linux x64 AppImage。Docker、TV APK与手机APK不在本轮附件或验收范围。
 
@@ -17,10 +17,14 @@
 
 ## 已完成的定向验证
 
-- 取源、节奏、身份、SDK 并发和桌面恢复共 46 项测试通过。
+- 全量 `npm test` 通过：582 项单元测试与 118 项平台检查全绿。
 - SDK 首次缓存并发实测：复用两份已校验素材、无设备文件的隔离缓存运行四个分集，4.62 秒全部成功，只生成一份权限 `0600` 的设备文件。
 - macOS arm64 SDK 执行文件已验证 1080P HEVC 模型；Intel x64 SDK 执行文件在 Rosetta 下验证可运行并返回完整模型。
-- 当前目录包 `codesign --verify --deep --strict` 通过。
+- 双 Mac 最终 App 与 DMG 本轮重新 Developer ID 签名、Apple 公证 Accepted、装订、Gatekeeper 验证和更新 ZIP 恢复校验通过。
+- arm64 最终签名包真实下载《嫌疑人的秘密2藏金生死线》第 1、2 集，均为 1080P；静音播放到 10.077 秒并暂停，画面为 1080×1920。
+- x64 最终签名包经 Rosetta 启动并显示 8.1.0。
+- Linux 源码 CI `45176314415` 成功：AppImage 启动、三份媒体工具和 CPU/HEVC Wasm 加载，真实第 1、3 集静音播放通过。
+- Windows 验收 `45181606439` 成功：真实队列、暂停／恢复、逆序重试、两集静音播放、切集、新装、同版重装及真实 1.80 升级资料保留通过；EXE 未签名。
 
 ## 平台边界
 
@@ -33,3 +37,18 @@
 - 双 Mac App／DMG 本轮重新 Developer ID 签名、Apple 公证并装订；最终更新 ZIP 从签名后 App 重新生成。
 - Windows／Linux 使用冻结源码在平台 CI 构建；Windows EXE 未签名，GitHub Windows 虚拟机验收不等同实体电脑。
 - 四平台包、更新清单、精确源码、对应媒体源码和总体 SHA256 齐备并完成远端回读后一次公开并设 Latest。
+
+## 公证回执
+
+- arm64 更新 ZIP：`afeed138-6d6f-4129-84ac-e2962e68fd76`
+- x64 更新 ZIP：`e0526c71-7601-4fd5-ace9-cd548fefcd58`
+- arm64 DMG：`b041abeb-5587-461e-ad70-86979f389688`
+- x64 DMG：`2ba1f015-6275-4585-9aeb-c842fffacf65`
+
+## 正式回执
+
+- 23 份正式附件全部为 `uploaded`，本地与 GitHub 远端名称、大小和 SHA256 逐项一致；总 1,785,141,733 字节。
+- `SHA256SUMS.txt` 自身 SHA256 为 `65c00a9bd262a5d58fe0fd3793993040a10cdf3d97e827e35f1b0eedbed66ca3`。
+- `latest-mac.yml`、`latest.yml`、总校验文件和精确源码均以无认证请求完整下载并与本地摘要一致。
+- 四个主要程序附件匿名 Range 请求均返回 HTTP 206；`/releases/latest` 已跳转 `v8.1`。
+- 应用代码冻结于 `b20413b2d46a3d0e5d51e22694cb121477ce1d5d`；最终标签 `bc02370ff519adf7a94a20688c5538ac303f4ec7` 仅额外修改 Windows 验收脚本，不改变随包应用代码。

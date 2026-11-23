@@ -28,6 +28,8 @@
 
 8.1 已完成 macOS arm64／x64 SDK 执行文件、有限并行和首次缓存锁：真实批量取源从约23秒降到约2～3秒，随后继续完成媒体下载。双 Mac 原生支持该 SDK 路径；Windows x64 和 Linux x64 保留完整回退，但本轮不提供对应架构的 SDK 执行文件。
 
+8.1 已于2026-11-23 21:33:46（Asia/Shanghai）公开并设 Latest；双 Mac、Windows x64 与 Linux x64 AppImage 共23份正式附件，远端大小／SHA256和 Latest 入口均已核对。实际状态见[8.1记录](docs/release-8.1.md)。
+
 | 平台 | 8.1正式附件 | 验收状态 |
 |---|---|---|
 | Apple芯片Mac，macOS 13+ | [DMG](https://github.com/jackotom/hongguo-drama/releases/download/v8.1/Hongguo-8.1-mac-arm64.dmg) | SDK后续集完整片源、下载提速和静音播放验收 |
