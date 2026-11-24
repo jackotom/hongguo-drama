@@ -26,6 +26,11 @@ if [ "$TARGET_ARCH" != "$(uname -m)" ]; then
     printf '%s\n' "Build $ARCH on a matching host architecture." >&2
     exit 1
 fi
+PYTHON_ARCH="$("$PYTHON" -c 'import platform; print(platform.machine())')"
+if [ "$PYTHON_ARCH" != "$TARGET_ARCH" ]; then
+    printf '%s\n' "Python architecture $PYTHON_ARCH does not match target $TARGET_ARCH." >&2
+    exit 1
+fi
 
 command -v "$PYTHON" >/dev/null
 mkdir -p "$STAGE/source" "$STAGE/build-$ARCH" "$WORK/darwin-$ARCH"
@@ -52,9 +57,8 @@ else
 fi
 cp "$ROOT/scripts/sdk-playback/resolve_cli.py" "$BUILD_ROOT/resolve_cli.py"
 
-if [ ! -x "$STAGE/venv-$ARCH/bin/python" ]; then
-    "$PYTHON" -m venv "$STAGE/venv-$ARCH"
-fi
+rm -rf "$STAGE/venv-$ARCH"
+"$PYTHON" -m venv "$STAGE/venv-$ARCH"
 "$STAGE/venv-$ARCH/bin/pip" install --quiet \
     pyinstaller==6.22.3 unicorn==2.1.4 requests==2.34.2 pycryptodome==4.6.0
 
