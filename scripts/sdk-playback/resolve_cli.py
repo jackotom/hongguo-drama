@@ -162,7 +162,10 @@ def resolve(video, cache, content_type):
     sdk_core = SdkDigestCore(assets.image)
 
     def core(payload, selector, seconds):
-        return sdk_core.digest(payload, selector, seconds)[0][:16]
+        stage(f"digest-{selector}-start")
+        digest = sdk_core.digest(payload, selector, seconds)[0][:16]
+        stage(f"digest-{selector}-done")
+        return digest
 
     stage("bootstrap-prepare")
     prepared = prepare_bootstrap(
