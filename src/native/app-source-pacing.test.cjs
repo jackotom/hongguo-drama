@@ -93,8 +93,8 @@ test('Parallel SDK-first downloads resolve without consuming playback pacing', a
     assert.equal(f.registrations.length, 0, 'SDK-first downloads must not spend the anonymous App identity');
     held[0].resolve(sdkSuccess('first'));
     held[1].resolve(sdkSuccess('second'));
-    assert.equal((await first).url, 'https://qznovelvod.com/first.mp4');
-    assert.equal((await second).url, 'https://qznovelvod.com/second.mp4');
+    assert.deepEqual([(await first).url, (await first).sourceProvider], ['https://qznovelvod.com/first.mp4', 'sdk']);
+    assert.deepEqual([(await second).url, (await second).sourceProvider], ['https://qznovelvod.com/second.mp4', 'sdk']);
 });
 
 test('Online SDK-first playback waits for a FIFO slot and one-second pacing', async () => {
@@ -140,6 +140,7 @@ test('SDK recovers when a non-empty App response refuses playback', async () => 
     const result = await f.fetch('11');
     assert.equal(result.url, 'https://qznovelvod.com/recovered.mp4');
     assert.equal(result.source, 'app');
+    assert.equal(result.sourceProvider, 'sdk');
     assert.equal(f.calls.length, 1);
 });
 
@@ -151,6 +152,7 @@ test('SDK unavailable under preferSdk still falls back to the official route', a
     const result = await f.fetch('11', { preferSdk: true });
     assert.equal(result.url, 'https://qznovelvod.com/fixture.mp4');
     assert.equal(result.source, 'app');
+    assert.equal(result.sourceProvider, 'official');
     assert.equal(f.calls.length, 1);
     assert.equal(f.registrations.length, 1);
 });

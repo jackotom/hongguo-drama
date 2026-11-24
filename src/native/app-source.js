@@ -715,7 +715,7 @@ async function resolveSdkAppPlayUrl(vid, options, onFailure) {
     throwIfAborted(options.signal);
     if (!sdkResult) return null;
     try {
-        const parsed = parseAppPlayModel(sdkResult.model, vid, options, false);
+        const parsed = parseAppPlayModel(sdkResult.model, vid, { ...options, sourceProvider: 'sdk' }, false);
         parsed.userAgent = sdkResult.userAgent;
         for (const variant of parsed.variants || []) variant.userAgent = sdkResult.userAgent;
         return parsed;
@@ -791,7 +791,8 @@ function parseAppPlayModel(info, vid, options, inline, requireEncryptionMetadata
                     const identity = `${url}:${contentKey || ''}`;
                     if (seen.has(identity)) continue;
                     seen.add(identity);
-                    variants.push({ url, contentKey, codec: selected.codec === 'bytevc1' ? 'hevc' : selected.codec, source: 'app', vid,
+                    variants.push({ url, contentKey, codec: selected.codec === 'bytevc1' ? 'hevc' : selected.codec,
+                        source: 'app', sourceProvider: options.sourceProvider || 'official', vid,
                         userAgent: inline ? PLAYBACK_UA : VIDEO_UA, quality: allowLowerQuality ? (selected.width && selected.height ? `${Math.min(selected.width, selected.height)}p` : '') : requestedQuality === 'auto' ? selected.quality : requestedQuality,
                         ...(requestedQuality === 'auto' ? {} : { width: selected.width, height: selected.height }) });
                     if (selected.codec === 'bytevc2') Object.assign(variants[variants.length - 1], {

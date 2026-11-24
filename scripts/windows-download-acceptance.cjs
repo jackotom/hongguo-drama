@@ -132,6 +132,9 @@ module.exports = async function checkDownloads({ evaluate, result, dataFile, med
   receipt.seriesEpisodes = seriesEpisodes.data.episodes
     .filter(episode => expected.includes(episode.vid_index))
     .map(episode => ({ index: episode.vid_index, status: episode.status, fileUrl: episode.fileUrl }));
+  receipt.sourceProviders = tasks.map(task => ({ index: task.hongguoInfo.vid_index, provider: task.sourceProvider || '' }));
+  assert.deepEqual(receipt.sourceProviders.map(item => item.provider).sort(), ['sdk', 'sdk'],
+    'Fresh Windows acceptance downloads must both use the packaged SDK instead of the official fallback: ' + JSON.stringify(receipt.sourceProviders));
   const files = [];
   for (const episode of episodes) {
     const task = tasks.find(task => task.hongguoInfo.vid === episode.vid);
@@ -205,7 +208,7 @@ module.exports = async function checkDownloads({ evaluate, result, dataFile, med
     trial.settingRestored = true;
   }
   receipt.tested = true;
-  result.checks.push('Final portable EXE native IPC: real two-episode queue, persistent pause/resume and reversed batch retry start/complete in episode order; completed tasks rebind to playable episode capabilities; exact temporary identities match disk, full media probes/decodes and cleans up');
+  result.checks.push('Final portable EXE native IPC: real two-episode queue used packaged SDK for both downloads; persistent pause/resume and reversed batch retry started/completed in episode order; completed tasks rebind to playable episode capabilities; exact temporary identities match disk, full media probes/decodes and cleans up');
   delete result.stage;
   return files;
 };

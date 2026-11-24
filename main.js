@@ -912,10 +912,11 @@ async function executeHongguoDownload(task) {
   task.cancelSource = source;
   let tmpPath, writer, temporary, finalPath;
   const numeric = /^\d{1,30}$/.test(String(vid));
+  const preferSdk = numeric;
   try {
     delete task.published;
     task.status = 'downloading'; task.cancelled = false; task.progress = 0; delete task.retryAt;
-    delete task.qualityNotice; delete task.actualQuality;
+    delete task.qualityNotice; delete task.actualQuality; delete task.sourceProvider;
     sendToRenderer('download-progress', { id, progress: 0, receivedBytes: 0, totalBytes: 0, qualityNotice: '', actualQuality: null });
     const settings = getCurrentSettings();
     // Old and retried tasks retain their original policy, independent of new defaults.
@@ -1037,20 +1038,22 @@ async function executeHongguoDownload(task) {
       }
       reusedCache = await reuseCache();
     }
-    if (!reusedCache && numeric) {
+    if (!reusedCache && preferSdk) {
       task.qualityNotice = '正在获取完整片源';
       sendToRenderer('download-progress', { id, qualityNotice: task.qualityNotice });
     }
     if (!reusedCache) await withMediaRecovery(vid, hongguoInfo?.series_id, { playInfo: checkedPlayInfo, quality, allowLowerQuality,
-      content_type: hongguoInfo?.content_type, sdkPriority: false, force: true, cancelToken: source.token,
+      content_type: hongguoInfo?.content_type, preferSdk, parallelSdk: preferSdk, sdkPriority: false,
+      force: true, cancelToken: source.token,
       onSourceReady: () => {
         if (numeric) clearHongguoSourceBackoff();
-        if (numeric && task.qualityNotice === '正在获取完整片源') {
+        if (preferSdk && task.qualityNotice === '正在获取完整片源') {
           task.qualityNotice = '';
           sendToRenderer('download-progress', { id, qualityNotice: '' });
         }
       } }, async playInfo => {
       source.token.throwIfRequested();
+      task.sourceProvider = playInfo.sourceProvider || playInfo.source || 'app';
       const bytevc2Executable = playInfo.codec === 'bytevc2' ? requireBytevc2Executable() : null;
       notifyQuality(Math.min(Number(playInfo.width), Number(playInfo.height)));
       task.progress = 0; task.receivedBytes = 0; task.totalBytes = 0;
