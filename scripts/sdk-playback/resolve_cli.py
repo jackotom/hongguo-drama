@@ -27,6 +27,15 @@ from phone_sdk_materials_v5 import decode_app_config, read_sdk_image
 from phone_sdk_session_v5 import send_prepared
 
 
+STAGE = "start"
+
+
+def stage(name):
+    global STAGE
+    STAGE = name
+    print(f"[sdk-playback] {name}", file=sys.stderr, flush=True)
+
+
 def load_device(cache):
     path = cache / "device.json"
     try:
@@ -139,11 +148,15 @@ def register(cache):
 
 
 def resolve(video, cache, content_type):
+    stage("cache-lock")
     # Parallel downloads may start with an empty cache; initialize its shared
     # device and SDK assets once before independent playback sessions begin.
     with cache_lock(cache):
+        stage("registration")
         context = register(cache)
+        stage("assets")
         assets = load_assets(cache, allow_download=True)
+    stage("materials")
     materials = decode_app_config(assets.configuration)
     image = read_sdk_image(assets.image)
     sdk_core = SdkDigestCore(assets.image)
@@ -151,6 +164,7 @@ def resolve(video, cache, content_type):
     def core(payload, selector, seconds):
         return sdk_core.digest(payload, selector, seconds)[0][:16]
 
+    stage("bootstrap-prepare")
     prepared = prepare_bootstrap(
         context,
         int(time.time() * 1000),
@@ -158,6 +172,7 @@ def resolve(video, cache, content_type):
         image=image,
         core=core,
     )
+    stage("bootstrap-send")
     result = exchange_response(
         send_prepared(prepared),
         common=materials.exchange_key,
@@ -165,6 +180,7 @@ def resolve(video, cache, content_type):
     )
     ladon = prepared.next_ladon
     if result.status == 202:
+        stage("bootstrap-continue")
         prepared = prepare_bootstrap(
             context,
             int(time.time() * 1000),
@@ -183,6 +199,7 @@ def resolve(video, cache, content_type):
     if result.status != 200:
         raise RuntimeError(f"SDK session status {result.status}")
 
+    stage("playback-prepare")
     playback = prepare_playback_v5(
         context,
         video,
@@ -194,6 +211,7 @@ def resolve(video, cache, content_type):
         image=image,
         core=core,
     )
+    stage("playback-send")
     payload = json.loads(send_prepared(playback))
     data = payload.get("data", {})
     entries = data.get(content_type, data)
@@ -222,6 +240,7 @@ def main():
     except Exception as error:
         print(json.dumps({
             "ok": False,
+            "stage": STAGE,
             "error": f"{type(error).__name__}: {str(error)[:240]}",
         }, separators=(",", ":")))
         return 1
