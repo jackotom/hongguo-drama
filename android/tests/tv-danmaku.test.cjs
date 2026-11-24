@@ -225,10 +225,11 @@ test('后台取消弹幕且前台不复播；pagehide移除自己监听、观察
   } finally { h.dispose(); }
 });
 
-test('TV入口连真实消费者、仅TV映射fs/path；私有身份损坏不覆盖，缺失只创建白名单文件', async () => {
+test('TV入口连真实消费者、Android隔离Node与SDK模块；私有身份损坏不覆盖，缺失只创建白名单文件', async () => {
   const source=fs.readFileSync(path.join(root,'bundle.cjs'),'utf8');
   assert.match(source,/import '\.\/web\/tv\.js'.*connectTvDanmaku\(\)/);
-  assert.match(source,/tv \? \{'node:fs':path\.join\(root,'mobile\/fs\.cjs'\), 'node:path':path\.join\(root,'mobile\/path\.cjs'\)\}/);
+  for(const alias of ['node:fs','node:path','node:child_process','electron'])
+    assert.match(source,new RegExp(`'${alias}':path\\.join\\(root,'mobile/`));
   for(const broken of [false,true]) {
     const h=await fixture();
     try {
