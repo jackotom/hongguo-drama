@@ -8,6 +8,7 @@ const root = path.resolve(__dirname, '..');
 const skip = new Set([
   'check-windows-release.cjs',
   'check-windows-installer.cjs',
+  'check-windows-sdk-playback.cjs',
   'check-hls-media.cjs',
   'check-download-media-validity.cjs',
   'check-ffmpeg-mac.cjs',
