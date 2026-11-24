@@ -134,7 +134,7 @@ test('content type 1001 is sent and parsed through the 1001 model bucket', async
     assert.match(payload, /"mixed_video_id_map":\{"1001":\["11"\]\}/);
 });
 
-test('SDK recovers when a non-empty App response refuses playback', async () => {
+test('V8 official route is attempted before SDK fallback for downloads', async () => {
     const f = fixture(() => ({ status: 200, headers: {}, data: '{"code":12345}' }), undefined,
         async () => sdkSuccess('recovered'));
     const result = await f.fetch('11');
@@ -142,6 +142,7 @@ test('SDK recovers when a non-empty App response refuses playback', async () => 
     assert.equal(result.source, 'app');
     assert.equal(result.sourceProvider, 'sdk');
     assert.equal(f.calls.length, 1);
+    assert.deepEqual(f.sdkCalls.map(call => call.vid), ['11']);
 });
 
 test('SDK unavailable under preferSdk still falls back to the official route', async () => {

@@ -912,7 +912,7 @@ async function executeHongguoDownload(task) {
   task.cancelSource = source;
   let tmpPath, writer, temporary, finalPath;
   const numeric = /^\d{1,30}$/.test(String(vid));
-  const preferSdk = numeric;
+  const preferV8 = numeric;
   try {
     delete task.published;
     task.status = 'downloading'; task.cancelled = false; task.progress = 0; delete task.retryAt;
@@ -1038,22 +1038,22 @@ async function executeHongguoDownload(task) {
       }
       reusedCache = await reuseCache();
     }
-    if (!reusedCache && preferSdk) {
+    if (!reusedCache && preferV8) {
       task.qualityNotice = '正在获取完整片源';
       sendToRenderer('download-progress', { id, qualityNotice: task.qualityNotice });
     }
     const contentType = String(hongguoInfo?.content_type || '1004');
-    const sdkBatchVids = !reusedCache && preferSdk ? [String(vid), ...downloadQueue
+    const sdkBatchVids = !reusedCache ? [String(vid), ...downloadQueue
       .filter(queued => queued && queued.status === 'pending' && queued.type === 'hongguo'
         && String(queued.hongguoInfo?.content_type || '1004') === contentType
         && /^\d{1,30}$/.test(String(queued.hongguoInfo?.vid || '')) && String(queued.hongguoInfo.vid) !== String(vid))
       .map(queued => String(queued.hongguoInfo.vid))].slice(0, 8) : undefined;
     if (!reusedCache) await withMediaRecovery(vid, hongguoInfo?.series_id, { playInfo: checkedPlayInfo, quality, allowLowerQuality,
-      content_type: hongguoInfo?.content_type, preferSdk, parallelSdk: preferSdk, sdkPriority: false,
+      content_type: hongguoInfo?.content_type, preferSdk: false, parallelSdk: false, sdkPriority: false,
       sdkBatchVids, force: true, cancelToken: source.token,
       onSourceReady: () => {
         if (numeric) clearHongguoSourceBackoff();
-        if (preferSdk && task.qualityNotice === '正在获取完整片源') {
+        if (task.qualityNotice === '正在获取完整片源') {
           task.qualityNotice = '';
           sendToRenderer('download-progress', { id, qualityNotice: '' });
         }
