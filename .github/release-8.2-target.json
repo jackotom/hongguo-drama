@@ -1,0 +1,8 @@
+{
+  "version": "8.2.0",
+  "buildVersion": "8.2.1",
+  "publicVersion": "8.2",
+  "tag": "v8.2",
+  "platforms": ["mac-arm64", "mac-x64", "win-x64", "linux-x64"],
+  "status": "source-target"
+}

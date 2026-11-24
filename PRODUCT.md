@@ -1,4 +1,4 @@
-<!-- 8.1 source and release target; TV and phone remain independent. -->
+<!-- 8.2 source and release target; TV and phone remain independent. -->
 
 8.0 已于2026-11-23 18:34:11（Asia/Shanghai）正式公开并设Latest，内部8.0.0、桌面构建8.0.1。本轮修复 #179 中 App 播放模型全链路返回空响应时的在线播放与下载恢复，改用官网播放器完整公开兜底片源，并补齐 #178 的弹幕表情显示；23份附件、远端SHA256与Latest入口已核对。实际状态见[8.0记录](docs/release-8.0.md)。
 

@@ -31,14 +31,24 @@ function electronApp() {
     }
 }
 
-function executablePath(app) {
-    if (process.platform !== 'darwin' || !['arm64', 'x64'].includes(process.arch)) return null;
+function executablePath(app, platform = process.platform, arch = process.arch) {
+    let targetDir = null;
+    let binaryName = null;
+    if (platform === 'darwin' && ['arm64', 'x64'].includes(arch)) {
+        targetDir = `darwin-${arch}`;
+        binaryName = 'hongguo-sdk-playback';
+    } else if (platform === 'win32' && arch === 'x64') {
+        targetDir = 'win32-x64';
+        binaryName = 'hongguo-sdk-playback.exe';
+    } else {
+        return null;
+    }
     if (app.isPackaged) {
         return path.join(process.resourcesPath, 'app.asar.unpacked', 'build', 'sdk-playback',
-            `darwin-${process.arch}`, 'hongguo-sdk-playback');
+            targetDir, binaryName);
     }
     return path.join(__dirname, '..', '..', 'build', 'sdk-playback',
-        `darwin-${process.arch}`, 'hongguo-sdk-playback');
+        targetDir, binaryName);
 }
 
 function runHelper(executable, args, signal, timeoutMs) {
@@ -181,4 +191,4 @@ async function resolveSdkPlayback(vid, options = {}) {
     }
 }
 
-module.exports = { resolveSdkPlayback };
+module.exports = { resolveSdkPlayback, executablePath };

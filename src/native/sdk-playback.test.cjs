@@ -1,6 +1,7 @@
 const assert = require('node:assert/strict');
 const { EventEmitter } = require('node:events');
 const Module = require('node:module');
+const path = require('node:path');
 const { test, after } = require('node:test');
 
 const originalLoad = Module._load;
@@ -34,7 +35,8 @@ Module._load = function load(request, parent, isMain) {
     return originalLoad.apply(this, arguments);
 };
 
-const { resolveSdkPlayback } = require('./sdk-playback');
+const { resolveSdkPlayback, executablePath } = require('./sdk-playback');
+const sdkSupportedHost = process.platform === 'darwin' || (process.platform === 'win32' && process.arch === 'x64');
 
 after(() => { Module._load = originalLoad; });
 
@@ -43,7 +45,19 @@ function finish(child) {
     child.emit('close', 0);
 }
 
-test('SDK helpers are capped at three concurrent processes', { skip: process.platform !== 'darwin' }, async () => {
+test('executablePath resolves macOS arm64/x64 and Windows x64 binaries and rejects unsupported targets', () => {
+    const devApp = { isPackaged: false };
+    const macArm = executablePath(devApp, 'darwin', 'arm64');
+    const macX64 = executablePath(devApp, 'darwin', 'x64');
+    const winX64 = executablePath(devApp, 'win32', 'x64');
+    assert.ok(macArm && macArm.endsWith(path.join('build', 'sdk-playback', 'darwin-arm64', 'hongguo-sdk-playback')));
+    assert.ok(macX64 && macX64.endsWith(path.join('build', 'sdk-playback', 'darwin-x64', 'hongguo-sdk-playback')));
+    assert.ok(winX64 && winX64.endsWith(path.join('build', 'sdk-playback', 'win32-x64', 'hongguo-sdk-playback.exe')));
+    assert.equal(executablePath(devApp, 'win32', 'arm64'), null);
+    assert.equal(executablePath(devApp, 'linux', 'x64'), null);
+});
+
+test('SDK helpers are capped at three concurrent processes', { skip: !sdkSupportedHost }, async () => {
     const pending = ['11', '12', '13', '14'].map(vid => resolveSdkPlayback(vid));
     await new Promise(resolve => setImmediate(resolve));
     assert.equal(children.length, 3);
@@ -62,7 +76,7 @@ test('SDK helpers are capped at three concurrent processes', { skip: process.pla
     assert.match(errors[0].message, /fixture failure/);
 });
 
-test('SDK timeout kills the helper and reports SDK_TIMEOUT', { skip: process.platform !== 'darwin' }, async () => {
+test('SDK timeout kills the helper and reports SDK_TIMEOUT', { skip: !sdkSupportedHost }, async () => {
     const errors = [];
     const pending = resolveSdkPlayback('16', { timeoutMs: 5, onError: error => errors.push(error) });
     await new Promise(resolve => setImmediate(resolve));
@@ -71,7 +85,7 @@ test('SDK timeout kills the helper and reports SDK_TIMEOUT', { skip: process.pla
     assert.equal(errors[0].code, 'SDK_TIMEOUT');
 });
 
-test('SDK cancellation kills the helper without reporting a failure', { skip: process.platform !== 'darwin' }, async () => {
+test('SDK cancellation kills the helper without reporting a failure', { skip: !sdkSupportedHost }, async () => {
     const controller = new AbortController(), errors = [];
     const pending = resolveSdkPlayback('17', { contentType: '1001', signal: controller.signal, onError: error => errors.push(error) });
     await new Promise(resolve => setImmediate(resolve));
@@ -82,7 +96,7 @@ test('SDK cancellation kills the helper without reporting a failure', { skip: pr
     assert.deepEqual(errors, []);
 });
 
-test('SDK spawn failure reports SDK_SPAWN_FAILED', { skip: process.platform !== 'darwin' }, async () => {
+test('SDK spawn failure reports SDK_SPAWN_FAILED', { skip: !sdkSupportedHost }, async () => {
     const errors = [];
     const pending = resolveSdkPlayback('18', { onError: error => errors.push(error) });
     await new Promise(resolve => setImmediate(resolve));
@@ -91,7 +105,7 @@ test('SDK spawn failure reports SDK_SPAWN_FAILED', { skip: process.platform !== 
     assert.equal(errors[0].code, 'SDK_SPAWN_FAILED');
 });
 
-test('SDK invalid output reports SDK_INVALID_RESPONSE', { skip: process.platform !== 'darwin' }, async () => {
+test('SDK invalid output reports SDK_INVALID_RESPONSE', { skip: !sdkSupportedHost }, async () => {
     const errors = [];
     const pending = resolveSdkPlayback('19', { onError: error => errors.push(error) });
     await new Promise(resolve => setImmediate(resolve));
@@ -101,7 +115,7 @@ test('SDK invalid output reports SDK_INVALID_RESPONSE', { skip: process.platform
     assert.equal(errors[0].code, 'SDK_INVALID_RESPONSE');
 });
 
-test('priority playback starts before queued SDK downloads', { skip: process.platform !== 'darwin' }, async () => {
+test('priority playback starts before queued SDK downloads', { skip: !sdkSupportedHost }, async () => {
     const start = children.length;
     const active = ['20', '21', '22'].map(vid => resolveSdkPlayback(vid));
     await new Promise(resolve => setImmediate(resolve));

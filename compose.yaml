@@ -1,4 +1,4 @@
-# Hongguo Drama 8.1 release source; Docker is not an 8.1 Release attachment.
+# Hongguo Drama 8.2 release target source; Docker is not an 8.2 Release attachment.
 services:
   hongguo:
     image: hongguo-drama:8.0

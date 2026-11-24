@@ -1,5 +1,11 @@
 # 红果短剧项目规则
 
+## 8.2 Windows SDK 接入与创作者合集发行目标（源码／发行目标）
+
+- 本轮从公开 8.1 增加 0.1 至 8.2，内部 8.2.0、桌面构建 8.2.1，目标标签 `v8.2`；当前尚未公开，最新公开正式版仍为 8.1。
+- 接入 Windows x64 SDK v5 播放取源（`resolve_cli.py` Windows `msvcrt` 文件锁兼容、`sdk-playback.js` `win32-x64/hongguo-sdk-playback.exe` 路径解析、`scripts/build-sdk-playback-win.ps1` 与 `.github/workflows/windows.yml` 打包验收）。
+- 纳入创作者合集播放恢复、当前 App V5 `preload/v1` 官方兜底与 Android 构建 SDK 隔离；待完成推送后的全平台 CI、双 Mac 重新签名／公证／装订与远端摘要核对后再统一公开。详见 `docs/release-8.2.md`。
+
 ## 8.1 播放取源与下载提速发行（2026-11-23）
 
 - 本轮从公开 8.0 按“逢 9 进 1”升级为 8.1，内部 8.1.0、桌面构建 8.1.1。

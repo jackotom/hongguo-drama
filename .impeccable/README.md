@@ -1,9 +1,9 @@
-<!-- 8.1 desktop release; this directory keeps its existing scope. -->
+<!-- 8.2 desktop release target; this directory keeps its existing scope. -->
 <!-- 6.7 unified release. -->
 # 红果短剧 6.3 设计资料
 
 `design.json` 保存现有配色、字体、间距和布局约定，`surfaces/` 保存页面设计记录。
-本目录不定义应用版本；8.1 的运行版本由根目录 `package.json` 提供。功能与验收边界见 [8.1 说明](../docs/release-8.1.md)。
+本目录不定义应用版本；8.2 的运行版本由根目录 `package.json` 提供。功能与验收边界见 [8.2 说明](../docs/release-8.2.md)。
 
 沿用现有布局：大屏片单铺满可用空间；默认100%缩放，海报大小与用户手动界面缩放独立。
 

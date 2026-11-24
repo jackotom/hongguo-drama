@@ -5,7 +5,6 @@ from the pinned reference source archive.
 """
 
 import argparse
-import fcntl
 import json
 import os
 import sys
@@ -54,7 +53,8 @@ def save_device(cache, context):
         stream.write(data)
         stream.flush()
         os.fsync(stream.fileno())
-    os.chmod(temporary, 0o600)
+    if os.name != "nt":
+        os.chmod(temporary, 0o600)
     os.replace(temporary, path)
 
 
@@ -69,12 +69,36 @@ def cache_lock(cache):
     path = cache / "init.lock"
     if path.is_symlink():
         raise RuntimeError("invalid cache lock path")
-    with path.open("a+") as stream:
-        fcntl.flock(stream.fileno(), fcntl.LOCK_EX)
-        try:
-            yield
-        finally:
-            fcntl.flock(stream.fileno(), fcntl.LOCK_UN)
+    with path.open("a+b") as stream:
+        if os.name == "nt":
+            import msvcrt
+
+            if os.fstat(stream.fileno()).st_size == 0:
+                stream.write(b"0")
+                stream.flush()
+            deadline = time.monotonic() + 30.0
+            while True:
+                stream.seek(0)
+                try:
+                    msvcrt.locking(stream.fileno(), msvcrt.LK_NBLCK, 1)
+                    break
+                except OSError:
+                    if time.monotonic() >= deadline:
+                        raise RuntimeError("SDK cache lock timed out") from None
+                    time.sleep(0.05)
+            try:
+                yield
+            finally:
+                stream.seek(0)
+                msvcrt.locking(stream.fileno(), msvcrt.LK_UNLCK, 1)
+        else:
+            import fcntl
+
+            fcntl.flock(stream.fileno(), fcntl.LOCK_EX)
+            try:
+                yield
+            finally:
+                fcntl.flock(stream.fileno(), fcntl.LOCK_UN)
 
 
 def register(cache):
