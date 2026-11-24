@@ -23,7 +23,6 @@ jobs:
             ffmpeg -version | head -1
             exit 0
           fi
-          sudo apt-get update -qq
           sudo apt-get install -y -qq ffmpeg
       # Node fixtures mock Electron; real packaged launches run in the platform workflows.
       - run: npm test
