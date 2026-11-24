@@ -203,15 +203,17 @@ export default function AccountManagement({ active = true }) {
           <span className="account-avatar"><User size={24} /></span>
           <div><strong>{account.nickname}</strong><p>{t("已登录红果账号")}</p></div>
         </div>
-        <div className="account-summary">
-          <span>{t("APP 观看记录")}</span>
-          <strong>{t(historyLoading && !rows.length ? '读取中' : `${rows.length} 部`)}</strong>
-          <small>{t("最近 50 部；不会批量导入本机记录")}</small>
-        </div>
-        <div className="account-summary">
-          <span>{t("官方收藏夹")}</span>
-          <strong>{t(favoritesLoading && !favorites.length ? '读取中' : `${favorites.length} 部`)}</strong>
-          <small>{t("红果 App「我的 → 收藏」里的云端书架")}</small>
+        <div className="account-summaries">
+          <div className="account-summary">
+            <span>{t("APP 观看记录")}</span>
+            <strong>{t(historyLoading && !rows.length ? '读取中' : `${rows.length} 部`)}</strong>
+            <small>{t("最近 50 部；不会批量导入本机记录")}</small>
+          </div>
+          <div className="account-summary">
+            <span>{t("官方收藏夹")}</span>
+            <strong>{t(favoritesLoading && !favorites.length ? '读取中' : `${favorites.length} 部`)}</strong>
+            <small>{t("红果 App「我的 → 收藏」里的云端书架")}</small>
+          </div>
         </div>
         <div className="account-page-actions">
           <button className="btn btn-outline" type="button" disabled={busy || historyLoading} onClick={async () => {
@@ -224,47 +226,54 @@ export default function AccountManagement({ active = true }) {
           }}><RefreshCw size={15} />{t("刷新收藏")}</button>
           <button className="btn btn-outline" type="button" disabled={busy} onClick={logout}>{t("退出账号")}</button>
         </div>
-        <div className="account-history-heading">
-          <h3>{t("观看记录")}</h3>
-          <label>{t("搜索")}<input className="input-field" type="search" value={query} onChange={event => setQuery(event.target.value)} placeholder={t("输入剧名")} /></label>
+        <div className="account-columns">
+          <section className="account-column" aria-label={t("观看记录")}>
+            <div className="account-history-heading">
+              <h3>{t("观看记录")}</h3>
+              <label>{t("搜索")}<input className="input-field" type="search" value={query} onChange={event => setQuery(event.target.value)} placeholder={t("输入剧名")} /></label>
+            </div>
+            {t(historyLoading && !rows.length ? <div className="account-history-empty" role="status">{t("正在读取 APP 观看记录…")}</div>
+              : !rows.length ? <div className="account-history-empty">{t("APP 还没有观看记录。")}</div>
+              : !visibleRows.length ? <div className="account-history-empty">{t("没有匹配的 APP 记录。")}</div>
+              : <ul className="account-history-list">{visibleRows.map(row => <li key={row.series_id}>
+                <button type="button" disabled={busy} onClick={() => open(row)} aria-label={t(`继续观看 ${row.series_title} 第${row.vid_index}集`)}>
+                  <span className="account-history-cover">
+                    {row.cover && <img src={row.cover} alt="" loading="lazy" onError={event => event.currentTarget.remove()} />}
+                    <Play size={18} />
+                  </span>
+                  <span className="account-history-copy">
+                    <strong>{row.series_title}</strong>
+                    <small>{t("看到第 ")}{t(row.vid_index || '?')}{t(" 集")}{t(row.total ? ` / 共 ${row.total} 集` : '')} · {t(Math.floor(row.currentTime || 0))}:{t(String(Math.floor((row.currentTime || 0) % 60)).padStart(2, '0'))}</small>
+                    <small>{t(row.updatedAt ? new Date(row.updatedAt).toLocaleString(getLanguage(), { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '时间未知')}</small>
+                  </span>
+                  <span className="account-history-action"><Play size={14} />{t("继续观看")}</span>
+                </button>
+              </li>)}</ul>)}
+          </section>
+          <section className="account-column" aria-label={t("官方收藏夹")}>
+            <div className="account-history-heading">
+              <h3>{t("官方收藏夹")}</h3>
+              <label>{t("搜索")}<input className="input-field" type="search" value={favoriteQuery} onChange={event => setFavoriteQuery(event.target.value)} placeholder={t("输入剧名")} /></label>
+            </div>
+            {t(favoritesLoading && !favorites.length ? <div className="account-history-empty" role="status">{t("正在读取官方收藏…")}</div>
+              : !favorites.length ? <div className="account-history-empty">{t("红果账号的收藏夹是空的。")}</div>
+              : !visibleFavorites.length ? <div className="account-history-empty">{t("没有匹配的收藏。")}</div>
+              : <ul className="account-history-list">{visibleFavorites.map(row => <li key={row.series_id}>
+                <button type="button" disabled={busy} onClick={() => openFavorite(row)} aria-label={t(`打开收藏的 ${row.series_title}`)}>
+                  <span className="account-history-cover">
+                    {row.cover && <img src={row.cover} alt="" loading="lazy" onError={event => event.currentTarget.remove()} />}
+                    <Play size={18} />
+                  </span>
+                  <span className="account-history-copy">
+                    <strong>{row.series_title}</strong>
+                    <small>{row.total ? t(`共 ${row.total} 集`) : t('集数未知')}{row.intro ? ` · ${row.intro}` : ''}</small>
+                    <small>{t(row.collectedAt ? new Date(row.collectedAt).toLocaleString(getLanguage(), { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '收藏时间未知')}</small>
+                  </span>
+                  <span className="account-history-action"><Play size={14} />{t("打开")}</span>
+                </button>
+              </li>)}</ul>)}
+          </section>
         </div>
-        {t(historyLoading && !rows.length ? <div className="account-history-empty" role="status">{t("正在读取 APP 观看记录…")}</div>
-          : !rows.length ? <div className="account-history-empty">{t("APP 还没有观看记录。")}</div>
-          : !visibleRows.length ? <div className="account-history-empty">{t("没有匹配的 APP 记录。")}</div>
-          : <ul className="account-history-list">{visibleRows.map(row => <li key={row.series_id}>
-            <button type="button" disabled={busy} onClick={() => open(row)} aria-label={t(`继续观看 ${row.series_title} 第${row.vid_index}集`)}>
-              <span className="account-history-cover">
-                {row.cover && <img src={row.cover} alt="" loading="lazy" onError={event => event.currentTarget.remove()} />}
-                <Play size={18} />
-              </span>
-              <span className="account-history-copy">
-                <strong>{row.series_title}</strong>
-                <small>{t("看到第 ")}{t(row.vid_index || '?')}{t(" 集")}{t(row.total ? ` / 共 ${row.total} 集` : '')} · {t(Math.floor(row.currentTime || 0))}:{t(String(Math.floor((row.currentTime || 0) % 60)).padStart(2, '0'))}</small>
-                <small>{t(row.updatedAt ? new Date(row.updatedAt).toLocaleString(getLanguage(), { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '时间未知')}</small>
-              </span>
-              <span className="account-history-action"><Play size={14} />{t("继续观看")}</span>
-            </button>
-          </li>)}</ul>)}
-        <div className="account-history-heading">
-          <h3>{t("官方收藏夹")}</h3>
-          <label>{t("搜索")}<input className="input-field" type="search" value={favoriteQuery} onChange={event => setFavoriteQuery(event.target.value)} placeholder={t("输入剧名")} /></label>
-        </div>
-        {t(favoritesLoading && !favorites.length ? <div className="account-history-empty" role="status">{t("正在读取官方收藏…")}</div>
-          : !favorites.length ? <div className="account-history-empty">{t("红果账号的收藏夹是空的。")}</div>
-          : !visibleFavorites.length ? <div className="account-history-empty">{t("没有匹配的收藏。")}</div>
-          : <ul className="account-history-list">{visibleFavorites.map(row => <li key={row.series_id}>
-            <button type="button" disabled={busy} onClick={() => openFavorite(row)} aria-label={t(`打开收藏的 ${row.series_title}`)}>
-              <span className="account-history-cover">
-                {row.cover && <img src={row.cover} alt="" loading="lazy" onError={event => event.currentTarget.remove()} />}
-                <Play size={18} />
-              </span>
-              <span className="account-history-copy">
-                <strong>{row.series_title}</strong>
-                <small>{row.total ? t(`共 ${row.total} 集`) : t('集数未知')}{row.intro ? ` · ${row.intro}` : ''}</small>
-                <small>{t(row.collectedAt ? new Date(row.collectedAt).toLocaleString(getLanguage(), { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '收藏时间未知')}</small>
-              </span>              <span className="account-history-action"><Play size={14} />{t("打开")}</span>
-            </button>
-          </li>)}</ul>)}
       </> : <>
         <div className="account-login-copy">
           <h3>{t("扫码登录")}</h3>

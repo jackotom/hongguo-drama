@@ -1,4 +1,4 @@
-.account-page { max-width: 840px; margin: 0 auto; }
+.account-page { max-width: 1080px; margin: 0 auto; }
 .account-page-header { display: flex; align-items: center; gap: 10px; margin-bottom: 30px; }
 .account-page-header h2 { margin: 0 0 6px; font-size: 22px; }
 .account-page-header p { margin: 0; color: var(--text-secondary); }
@@ -8,6 +8,9 @@
 .account-identity strong { display: block; font-size: 17px; }
 .account-identity p, .account-login-copy p, .account-page-status, .account-summary small { margin: 6px 0 0; color: var(--text-secondary); line-height: 1.6; }
 .account-summary { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; margin-top: 24px; padding-top: 20px; border-top: 1px solid var(--border); }
+/* 观看记录与收藏夹的计数并排显示，顶部不再堆叠。 */
+.account-summaries { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 28px; }
+.account-summaries .account-summary { min-width: 0; }
 .account-summary span { color: var(--text-secondary); }
 .account-summary strong { font-size: 18px; }
 .account-summary small { flex-basis: 100%; }
@@ -18,10 +21,27 @@
 .account-qr img { width: 232px; height: 232px; object-fit: contain; padding: 10px; border-radius: 8px; background: #fff; }
 .account-qr span { color: var(--text-secondary); font-size: 13px; }
 .account-page-status { margin-top: 16px; }
-.account-history-heading { display: flex; align-items: center; justify-content: space-between; gap: 18px; margin-top: 26px; padding-top: 22px; border-top: 1px solid var(--border); }
+.account-history-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 26px; padding-top: 22px; border-top: 1px solid var(--border); }
 .account-history-heading h3 { margin: 0; font-size: 16px; }
 .account-history-heading label { display: flex; align-items: center; gap: 8px; color: var(--text-secondary); font-size: 13px; }
 .account-history-heading .input-field { width: min(38vw, 240px); }
+/* 观看记录与官方收藏夹并排：各自成列、各自滚动，避免收藏被几十条观看记录顶到很下面。
+   minmax(0, 1fr) 两列等宽，内容再长也不会把某一列撑宽。 */
+.account-columns { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 28px; align-items: start; }
+.account-column { min-width: 0; }
+.account-column .account-history-heading { border-top: 0; padding-top: 0; gap: 10px; }
+.account-column .account-history-heading h3 { flex-shrink: 0; }
+.account-column .account-history-heading label { flex: 1 1 auto; min-width: 0; }
+/* 窄列里「搜索」两个字会被挤成竖排，这里改为不换行并让输入框自适应剩余宽度。 */
+.account-column .account-history-heading label { white-space: nowrap; }
+.account-column .account-history-heading .input-field { flex: 1 1 auto; width: auto; min-width: 0; }
+/* 列表内的长剧名不得撑宽所在列。 */
+.account-column .account-history-copy { min-width: 0; }
+.account-column .account-history-copy strong, .account-column .account-history-copy small { overflow-wrap: anywhere; }
+.account-column .account-history-list { max-height: 62vh; overflow-y: auto; overscroll-behavior: contain; }
+.account-column .account-history-cover { width: 44px; height: 60px; }
+.account-column .account-history-list button { gap: 10px; padding: 10px 6px; }
+.account-column .account-history-action { display: none; }
 .account-history-list { list-style: none; padding: 0; margin: 14px 0 0; }
 .account-history-list li { border-top: 1px solid var(--border); }
 .account-history-list li:first-child { border-top: 0; }
@@ -35,6 +55,14 @@
 .account-history-copy small { color: var(--text-secondary); }
 .account-history-action { display: inline-flex; align-items: center; gap: 5px; color: var(--accent); font-size: 13px; white-space: nowrap; }
 .account-history-empty { padding: 36px 12px; color: var(--text-secondary); text-align: center; }
+@media (max-width: 860px) {
+  /* 窗口不够宽时回到单列，避免两列都被压到读不清。 */
+  .account-columns, .account-summaries { grid-template-columns: minmax(0, 1fr); gap: 0; }
+  .account-column + .account-column .account-history-heading { margin-top: 26px; padding-top: 22px; border-top: 1px solid var(--border); }
+  .account-column .account-history-list { max-height: none; overflow-y: visible; }
+  .account-column .account-history-action { display: inline-flex; }
+  .account-summaries .account-summary + .account-summary { margin-top: 0; }
+}
 @media (max-width: 640px) {
   .account-card { padding: 20px; }
   .account-page-actions .btn { flex: 1 1 160px; justify-content: center; }
