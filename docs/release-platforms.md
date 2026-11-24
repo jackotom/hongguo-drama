@@ -2,11 +2,11 @@
 
 后续正式Release提供macOS Apple Silicon arm64、macOS Intel x64、Windows x64、Linux x64 AppImage四平台附件；Docker、TV APK和手机APK不再发布。每次发行页必须推荐[N3urda/hongguoTV](https://github.com/N3urda/hongguoTV)供Android手机与Android TV用户下载；该项目独立维护，不计入本项目附件或平台验收。完整门槛见[RELEASING.md](RELEASING.md)。
 
-# 8.2 四平台源码／发行目标
+# 8.2 四平台正式发行
 
-8.2为当前源码／发行目标，内部8.2.0、桌面构建8.2.1，目标标签`v8.2`，尚未正式公开；最新公开正式版仍为8.1。本轮新增Windows x64 SDK v5 播放取源构建接入、创作者合集播放恢复、当前 App V5 `preload/v1` 官方兜底与 Android 构建 SDK 隔离；待完成双 Mac 重新签名／公证与 Windows／Linux CI 验收，详见[8.2记录](release-8.2.md)。
+8.2内部8.2.0、桌面构建8.2.1，已于2026-11-24正式公开并设Latest；双Mac、Windows x64、Linux x64 AppImage共23份附件核对通过。本轮新增Windows x64 SDK v5播放取源、无CFG helper、创作者合集播放恢复、当前 App V5 `preload/v1` 官方兜底与 Android 构建 SDK 隔离。状态见[8.2记录](release-8.2.md)。
 
-# 8.1 四平台正式发行
+# 8.1 上一四平台正式发行
 
 8.1内部8.1.0、桌面构建8.1.1，已于2026-11-23正式公开并设Latest；双Mac、Windows x64、Linux x64 AppImage共23份附件核对通过。恢复后续分集SDK 1080P取源与下载提速；状态见[8.1记录](release-8.1.md)。
 
@@ -32,7 +32,7 @@
 
 # 7.4 五平台发行目标（历史）
 
-7.4为当前源码／发行目标，内部7.4.0、桌面构建7.4.1。修复下载临时文件身份误判与匿名注册超时后的批量失败，增加按剧筛选和 Windows AMD AMF 硬件编码。双Mac、Windows x64、Linux x64 AppImage、Docker amd64须同源齐备并通过必要验收后一次公开；实际状态见[7.4记录](release-7.4.md)。
+7.4内部7.4.0、桌面构建7.4.1，已于2026-11-15公开。修复下载临时文件身份误判与匿名注册超时后的批量失败，增加按剧筛选和 Windows AMD AMF 硬件编码；实际状态见[7.4记录](release-7.4.md)。
 
 # 7.3 五平台正式发行（历史）
 

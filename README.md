@@ -24,22 +24,20 @@
 
 ## 下载与安装
 
-**当前源码／发行目标：8.2**（内部`8.2.0`，桌面构建`8.2.1`，目标标签`v8.2`，尚未正式公开；详见[8.2记录](docs/release-8.2.md)）。本轮新增 Windows x64 SDK v5 播放取源构建接入、创作者合集播放恢复、当前 App V5 `preload/v1` 官方兜底与 Android 构建 SDK 隔离。
+**当前正式版：8.2**（内部`8.2.0`，桌面构建`8.2.1`）。本轮接入 Windows x64 SDK v5 播放取源，修复 Unicorn 与 Windows CFG 冲突；同时加入创作者合集播放恢复、当前 App V5 `preload/v1` 官方兜底与 Android 构建 SDK 隔离。
 
-**最新公开正式版：8.1**（内部`8.1.0`，桌面构建`8.1.1`）。本轮恢复后续分集的完整 1080P 取源，并把下载取源改为 SDK 优先、有限并行，减少批量下载前长时间停在 0% 的问题。
+8.2 的 Windows 最终包在两集真实下载中均记录 `sourceProvider=sdk`，下载队列、静音播放、切集、新装、同版重装和 1.80 升级通过。Windows helper 使用无 CFG 的 PyInstaller bootloader，避免 Unicorn `longjmp` 触发 `0xC0000409` 崩溃。
 
-8.1 已完成 macOS arm64／x64 SDK 执行文件、有限并行和首次缓存锁：真实批量取源从约23秒降到约2～3秒，随后继续完成媒体下载。双 Mac 原生支持该 SDK 路径；Windows x64 和 Linux x64 保留完整回退，但本轮不提供对应架构的 SDK 执行文件。
+8.2 已于2026-11-24 14:05:26（Asia/Shanghai）公开并设 Latest；双 Mac、Windows x64 与 Linux x64 AppImage 共23份正式附件，远端大小／SHA256和全部匿名入口均已核对。实际状态见[8.2记录](docs/release-8.2.md)。
 
-8.1 已于2026-11-23 21:33:46（Asia/Shanghai）公开并设 Latest；双 Mac、Windows x64 与 Linux x64 AppImage 共23份正式附件，远端大小／SHA256和 Latest 入口均已核对。实际状态见[8.1记录](docs/release-8.1.md)。
-
-| 平台 | 8.1正式附件 | 验收状态 |
+| 平台 | 8.2正式附件 | 验收状态 |
 |---|---|---|
-| Apple芯片Mac，macOS 13+ | [DMG](https://github.com/jackotom/hongguo-drama/releases/download/v8.1/Hongguo-8.1-mac-arm64.dmg) | SDK后续集完整片源、下载提速和静音播放验收 |
-| Intel Mac，macOS 13+ | [DMG](https://github.com/jackotom/hongguo-drama/releases/download/v8.1/Hongguo-8.1-mac-x64.dmg) | x64 SDK执行文件已构建；Rosetta验收，实体Intel未验 |
-| Windows x64 | [安装版](https://github.com/jackotom/hongguo-drama/releases/download/v8.1/hongguo-downloader-8.1-win-x64-setup.exe) · [便携EXE](https://github.com/jackotom/hongguo-drama/releases/download/v8.1/hongguo-downloader-8.1-win-x64.exe) · [便携ZIP](https://github.com/jackotom/hongguo-drama/releases/download/v8.1/hongguo-downloader-8.1-win-x64.zip) | EXE未签名；保留回退，未提供SDK执行文件 |
-| Linux x64 | [AppImage](https://github.com/jackotom/hongguo-drama/releases/download/v8.1/hongguo-downloader-8.1-linux-x64.AppImage) | 保留回退，未提供SDK执行文件；继续做启动与媒体检查 |
+| Apple芯片Mac，macOS 13+ | [DMG](https://github.com/jackotom/hongguo-drama/releases/download/v8.2/Hongguo-8.2-mac-arm64.dmg) | SDK真实两集、静音播放和公证装订通过 |
+| Intel Mac，macOS 13+ | [DMG](https://github.com/jackotom/hongguo-drama/releases/download/v8.2/Hongguo-8.2-mac-x64.dmg) | x64 SDK执行文件；Rosetta启动通过，实体Intel未验 |
+| Windows x64 | [安装版](https://github.com/jackotom/hongguo-drama/releases/download/v8.2/hongguo-downloader-8.2-win-x64-setup.exe) · [便携EXE](https://github.com/jackotom/hongguo-drama/releases/download/v8.2/hongguo-downloader-8.2-win-x64.exe) · [便携ZIP](https://github.com/jackotom/hongguo-drama/releases/download/v8.2/hongguo-downloader-8.2-win-x64.zip) | SDK真实两集、队列、播放和安装升级通过；EXE未签名 |
+| Linux x64 | [AppImage](https://github.com/jackotom/hongguo-drama/releases/download/v8.2/hongguo-downloader-8.2-linux-x64.AppImage) | 保留回退；启动和两集真实静音播放通过 |
 
-[8.1发行页](https://github.com/jackotom/hongguo-drama/releases/tag/v8.1) · [SHA256](https://github.com/jackotom/hongguo-drama/releases/download/v8.1/SHA256SUMS.txt) · [精确源码](https://github.com/jackotom/hongguo-drama/releases/download/v8.1/hongguo-drama-8.1-source.zip)。上游部分网页片源仍可能404、仅预览、空响应或CDN超时，不保证所有内容永久可播。
+[8.2发行页](https://github.com/jackotom/hongguo-drama/releases/tag/v8.2) · [SHA256](https://github.com/jackotom/hongguo-drama/releases/download/v8.2/SHA256SUMS.txt) · [精确源码](https://github.com/jackotom/hongguo-drama/releases/download/v8.2/hongguo-drama-8.2-source.zip)。上游部分网页片源仍可能404、仅预览、空响应或CDN超时，不保证所有内容永久可播。
 
 **Android手机APK／Android TV版：** 请前往 [N3urda/hongguoTV](https://github.com/N3urda/hongguoTV) 下载。该项目独立维护；版本、兼容性与测试状态以该项目发布页为准，不计入本项目的四平台附件或验收。
 
@@ -277,12 +275,13 @@ Mac和Windows安装版保留应用内更新入口；完整6.4→6.5自动更新�
 3. 打开详情点「立即播放」，也可选择集数与清晰度加入下载队列。
 4. 下次从「我的剧库」或「观看记录」接着看；下载进度、失败重试和整剧合并在「下载管理」。
 
-## 8.2（源码／发行目标）
+## 8.2（正式发布）
 
-- 新增 Windows x64 SDK v5 播放取源接入（`win32-x64/hongguo-sdk-playback.exe` 构建脚本、Windows 文件锁兼容与 GitHub Actions 构建验收链路），与 macOS 共用 3 进程并发上限与前台播放优先。
+- 新增 Windows x64 SDK v5 播放取源接入（`win32-x64/hongguo-sdk-playback.exe`、Windows 文件锁兼容、PE x64 打包与真实取源验收），与 macOS 共用 3 进程并发上限与前台播放优先。
+- Windows helper 使用无 CFG 的 PyInstaller bootloader，避免 Unicorn `longjmp` 被 Windows Control Flow Guard 拒绝后以 `0xC0000409` 崩溃。
 - 支持创作者合集详情与分集播放恢复；SDK 失败后的官方兜底优先请求当前 App V5 `preload/v1`，失败时保留原有有界链路与官网公开兜底。
 - Android／TV 构建隔离桌面原生 SDK 模块，避免浏览器打包引入 Node 内置模块。
-- 当前尚未执行 8.2 双 Mac 重新签名／公证及 Windows／Linux CI 正式验收，详见[8.2记录](docs/release-8.2.md)。
+- Windows 最终真实两集均由 SDK 下载；完整队列、静音播放、安装升级、双 Mac 公证与 Linux 播放均已通过，详见[8.2记录](docs/release-8.2.md)。
 
 ## 8.1（正式发布）
 
@@ -1017,7 +1016,7 @@ https://github.com/user-attachments/assets/b95f4f60-b57c-495f-a30e-62ac2b0bda11
 
 ## 版本与验证范围
 
-7.5为当前源码／发行目标，内部7.5.0、候选构建7.5.2。本轮明确只发行Mac双架构与Windows，TV和手机独立。实际签名、平台验收、附件摘要和限制以[7.5记录](docs/release-7.5.md)为准。
+7.5内部7.5.0、候选构建7.5.2，已按当时授权发行Mac双架构与Windows；TV和手机独立。实际签名、平台验收、附件摘要和限制以[7.5记录](docs/release-7.5.md)为准。
 
 7.2 TV开发补充包已于2026-11-13 16:08:18（Asia/Shanghai）追加公开，版本7.2／code70200，沿用公开6.6 TV签名证书；TV源码冻结`2aa068f496f78114389d94c41b83dde877b174ce`。新增APK、精确TV源码和独立SHA256清单三份附件，现共28份正式附件；原25份桌面／Docker附件与原v7.2标签不变。构建、签名连续性、Manifest／包内容、定向源码检查及三附件匿名完整下载摘要核对通过。**TV实机未测试，请用户自行测试；安装、启动、实际遥控、播放和覆盖升级均未验证。** 手机保持独立，本机正式应用未替换。详见[TV补充回执](docs/release-7.2-tv.md)。以下首发五平台记录保持。
 

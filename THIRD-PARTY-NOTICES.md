@@ -1,7 +1,7 @@
-<!-- 8.2 release target. -->
+<!-- 8.2 official release. -->
 # 第三方组件许可说明
 
-适用源码版本：红果短剧 8.2（源码／发行目标）；沿用 follow-redirects 1.16.3、固定 nv-codec-headers 12.1.14.0 与 AMD AMF v1.5.3 头文件；其余第三方组件保留各自的版本、作者与许可。实际发行状态见 `docs/release-8.2.md`。
+适用源码版本：红果短剧 8.2（正式发行）；沿用 follow-redirects 1.16.3、固定 nv-codec-headers 12.1.14.0 与 AMD AMF v1.5.3 头文件；其余第三方组件保留各自的版本、作者与许可。实际发行状态见 `docs/release-8.2.md`。
 
 7.1采纳anupam-orbis在PR #140提供的实际依赖锁更新：follow-redirects从1.16.1升至1.16.3；本项目另补重定向安全回归。该依赖更新继续用于7.4，完整协作记录见 `CONTRIBUTORS.md`。
 
@@ -97,7 +97,7 @@ x264 是唯一非系统静态依赖（GPLv2-or-later），整体构建为 GPLv3-
 ### macOS 与 Windows x64 SDK v5 播放取源执行文件
 
 - 参考来源：[waligoraamodio288-rgb/hongguo-desktop-releases v1.0.137](https://github.com/waligoraamodio288-rgb/hongguo-desktop-releases/releases/tag/v1.0.137)，对应第三方源码归档固定 SHA256 为 `beebd9847e3214ca280cfe71320fb89eb2d5b4db18659803a3404ddac75dd5db`。
-- 构建脚本（`scripts/build-sdk-playback-mac.sh` 与 `scripts/build-sdk-playback-win.ps1`）优先使用 `scripts/sdk-playback/vendor/phone_account` 中此前通过固定摘要校验的对应源码子集；远端同名归档当前摘要已变化，不会被自动接受。8.1 已验证 macOS arm64 与 x64；8.2 源码目标新增 Windows x64 构建接入（待 Windows CI 构建与真实验收），Linux 尚未构建执行文件。
+- 构建脚本（`scripts/build-sdk-playback-mac.sh` 与 `scripts/build-sdk-playback-win.ps1`）优先使用 `scripts/sdk-playback/vendor/phone_account` 中此前通过固定摘要校验的对应源码子集；远端同名归档当前摘要已变化，不会被自动接受。8.2 已验证 macOS arm64、macOS x64、Windows x64 与 Linux x64 AppImage；Windows SDK helper 使用无 CFG 的 PyInstaller bootloader，Linux 继续使用官方接口和公开片源回退。
 - 执行文件使用 Unicorn 2.1.4（GPL-2.0）、Unidbg（Apache-2.0）、Python、Requests（Apache-2.0）、PyCryptodome（BSD 及公有领域声明）和 PyInstaller（GPL-2.0-or-later with bootloader exception）；固定源码归档保留其原始来源、摘要与许可资料。
 - 该执行文件不读取账号 Cookie，只接受分集编号与匿名 SDK 缓存目录；媒体地址和解密密钥不在日志中输出。正式发行前必须补齐各平台对应源码、完整许可文本和重新构建验收。
 
