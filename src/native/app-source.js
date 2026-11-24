@@ -331,7 +331,9 @@ function signedMetadataRequest(apiPath, values = {}, payload = null) {
 
 // Account reads use the registered device identity plus the website login cookie.
 function signedAccountRequest(apiPath, values = {}, identity) {
-    if (!['/reading/user/info/v1/', '/reading/bookapi/read_history/list/v1/', '/reading/bookapi/read_progress/list/v1/', '/reading/bookapi/multi-detail/v1/'].includes(apiPath)) {
+    if (!['/reading/user/info/v1/', '/reading/bookapi/read_history/list/v1/', '/reading/bookapi/read_progress/list/v1/',
+        '/reading/bookapi/multi-detail/v1/', '/reading/bookapi/bookshelf/video/info/v1/',
+        '/reading/bookapi/bookshelf/video/list/v/'].includes(apiPath)) {
         throw new Error('不支持的账号接口');
     }
     if (![identity?.device_id, identity?.iid].every(value => typeof value === 'string' && /^\d{1,30}$/.test(value) && /[1-9]/.test(value))

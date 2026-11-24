@@ -61,8 +61,57 @@ function responseData(payload) {
   return payload.data;
 }
 
-function parseQr(payload) {
+/**
+ * 解析官方「我的 → 收藏」返回的剧集书架。
+ *
+ * 接口 `/reading/bookapi/bookshelf/video/info/v1/` 返回 `data.video_shelf_info` 数组，
+ * 每项里真正的剧集信息放在 `video_data` 里，外层另带收藏时间、简介与标签。
+ * 字段名在不同版本间有出入，这里按「外层优先、内层兜底」的顺序逐个尝试。
+ */
+function parseFavorites(payload) {
   const data = responseData(payload);
+  // 空书架时官方给的是 null；有条目时是数组。两者含义不同，不能混为一谈。
+  if (!Object.prototype.hasOwnProperty.call(data, 'video_shelf_info')) {
+    throw new Error('官方收藏数据格式已变化');
+  }
+  const rows = data.video_shelf_info == null ? [] : data.video_shelf_info;
+  if (!Array.isArray(rows)) throw new Error('官方收藏数据格式已变化');
+  const pick = (source, keys) => {
+    for (const key of keys) {
+      const value = source?.[key];
+      if (typeof value === 'string' && value.trim()) return value.trim();
+      if (typeof value === 'number' && Number.isFinite(value)) return String(value);
+    }
+    return '';
+  };
+  const parsed = rows.map(row => {
+    const video = row?.video_data && typeof row.video_data === 'object' ? row.video_data : row;
+    const seriesId = pick(video, ['series_id']) || pick(row, ['series_id', 'book_id']);
+    const title = pick(row, ['series_title']) || pick(video, ['title']) || pick(row, ['book_name']);
+    if (!/^\d{1,30}$/.test(seriesId) || !title) return null;
+    const cover = cleanCover(pick(row, ['series_cover_url']) || pick(video, ['cover', 'cover_url', 'thumb_url']) || pick(row, ['thumb_url']));
+    const rawCount = Number(video?.episode_cnt ?? video?.episode_count ?? row?.episode_cnt ?? 0);
+    const intro = cleanText(pick(row, ['series_intro']) || pick(video, ['video_desc']) || pick(row, ['abstract']));
+    const stamp = Number(row?.collect_time ?? 0);
+    return {
+      series_id: seriesId,
+      series_title: title,
+      cover,
+      intro,
+      total: Number.isFinite(rawCount) && rawCount > 0 ? Math.floor(rawCount) : 0,
+      // collect_time 有秒和毫秒两种口径：10 位以内是秒，更长的是毫秒，统一成毫秒。
+      collectedAt: stamp > 0 && stamp < 10_000_000_000 ? stamp * 1000 : stamp,
+      account: true,
+    };
+  }).filter(Boolean)
+    .sort((a, b) => b.collectedAt - a.collectedAt)
+    .filter((row, index, list) => list.findIndex(item => item.series_id === row.series_id) === index);
+  // 有条目却一条都解析不出来，多半是官方改了字段，需要如实报错而不是显示空列表。
+  if (rows.length > 0 && parsed.length === 0) throw new Error('官方收藏条目格式已变化');
+  return parsed;
+}
+
+function parseQr(payload) {  const data = responseData(payload);
   const token = String(data.token || '').trim();
   const source = String(data.qrcode || '').trim();
   if (!token || !source) throw new Error('红果登录二维码格式已变化');
@@ -426,6 +475,14 @@ function createAccountService({
       return publicAccount({ results: history.map(row => ({ ...row })) });
     },
 
+    /** 官方「我的 → 收藏」里的剧集书架（云端，不是本机收藏）。 */
+    async favorites() {
+      const current = credentials;
+      if (!current || !profile) return { success: true, signedIn: false, account: null, results: [] };
+      const rows = parseFavorites(await accountJson(current, '/reading/bookapi/bookshelf/video/info/v1/'));
+      return publicAccount({ results: rows.map(row => ({ ...row })) });
+    },
+
     row(seriesId) {
       return history.find(row => row.series_id === String(seriesId)) || null;
     },
@@ -433,5 +490,5 @@ function createAccountService({
 }
 
 module.exports = {
-  createAccountService, secureSessionStore, parseQr, parsePassportProfile, parseHistory, safeMessage,
+  createAccountService, secureSessionStore, parseQr, parsePassportProfile, parseHistory, parseFavorites, safeMessage,
 };
