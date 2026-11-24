@@ -1054,6 +1054,7 @@ async function executeHongguoDownload(task) {
       } }, async playInfo => {
       source.token.throwIfRequested();
       task.sourceProvider = playInfo.sourceProvider || playInfo.source || 'app';
+      if (playInfo.sdkFailure) task.sdkFailure = playInfo.sdkFailure;
       const bytevc2Executable = playInfo.codec === 'bytevc2' ? requireBytevc2Executable() : null;
       notifyQuality(Math.min(Number(playInfo.width), Number(playInfo.height)));
       task.progress = 0; task.receivedBytes = 0; task.totalBytes = 0;
@@ -5589,18 +5590,26 @@ ipcMain.handle('set-interface-language', (_event, language) => {
   return { success: true };
 });
 
-ipcMain.handle('get-app-info', async () => ({
-  version: APP_VERSION,
-  brand: APP_TITLE,
-  appName: APP_TITLE,
-  platform: process.platform,
-  preview: IS_PREVIEW,
-  dataDir: app.getPath('userData'),
-  systemLocale: (await import('./src/native/ui-language.mjs')).systemLocale(
-    process.env, app.getPreferredSystemLanguages?.()[0] || app.getLocale(), process.platform),
-  configMode: portableConfig.mode,
-  configNote: portableConfig.reason || '',
-}));
+ipcMain.handle('get-app-info', async () => {
+  let sdkPlaybackAvailable = false;
+  try {
+    const executable = require('./src/native/sdk-playback').executablePath(app);
+    sdkPlaybackAvailable = !!executable && fs.statSync(executable).isFile();
+  } catch {}
+  return {
+    version: APP_VERSION,
+    brand: APP_TITLE,
+    appName: APP_TITLE,
+    platform: process.platform,
+    preview: IS_PREVIEW,
+    dataDir: app.getPath('userData'),
+    systemLocale: (await import('./src/native/ui-language.mjs')).systemLocale(
+      process.env, app.getPreferredSystemLanguages?.()[0] || app.getLocale(), process.platform),
+    configMode: portableConfig.mode,
+    configNote: portableConfig.reason || '',
+    sdkPlaybackAvailable,
+  };
+});
 
 // 打开外部链接（保留给需要时调用）
 ipcMain.handle('open-external-url', async (event, url) => {

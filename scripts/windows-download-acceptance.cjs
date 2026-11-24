@@ -52,6 +52,7 @@ module.exports = async function checkDownloads({ evaluate, result, dataFile, med
   const receipt = result.appDownloadQueue = { tested: false, seriesId: series.series_id, episodes: expected, maxConcurrent: 1, phases: [], temporaryIdentities: [], media: [] };
   const appInfo = await api('window.electronAPI.getAppInfo()');
   assert.equal(appInfo.configMode, 'portable');
+  assert.equal(appInfo.sdkPlaybackAvailable, true, 'Portable application must expose the packaged Windows SDK helper');
   assert.equal(path.resolve(appInfo.dataDir).toLowerCase(), path.resolve(path.dirname(dataFile)).toLowerCase());
   const staleTasks = await api('window.electronAPI.getDownloadTasks()');
   await api('window.electronAPI.pauseAll()');
@@ -132,7 +133,8 @@ module.exports = async function checkDownloads({ evaluate, result, dataFile, med
   receipt.seriesEpisodes = seriesEpisodes.data.episodes
     .filter(episode => expected.includes(episode.vid_index))
     .map(episode => ({ index: episode.vid_index, status: episode.status, fileUrl: episode.fileUrl }));
-  receipt.sourceProviders = tasks.map(task => ({ index: task.hongguoInfo.vid_index, provider: task.sourceProvider || '' }));
+  receipt.sourceProviders = tasks.map(task => ({ index: task.hongguoInfo.vid_index,
+    provider: task.sourceProvider || '', sdkFailure: task.sdkFailure || null }));
   assert.deepEqual(receipt.sourceProviders.map(item => item.provider).sort(), ['sdk', 'sdk'],
     'Fresh Windows acceptance downloads must both use the packaged SDK instead of the official fallback: ' + JSON.stringify(receipt.sourceProviders));
   const files = [];

@@ -499,7 +499,11 @@ async function fetchAppPlayUrl(vid, options = {}) {
                 if (preferred) return preferred;
             }
             for (;;) {
-                try { return await fetchAppPlayUrlFresh(vid, options); }
+                try {
+                    const result = await fetchAppPlayUrlFresh(vid, options);
+                    if (sdkFailure) result.sdkFailure = sdkFailure;
+                    return result;
+                }
                 catch (error) {
                     throwIfAborted(options.signal);
                     const empty = error.code === 'EMPTY_RESPONSE';

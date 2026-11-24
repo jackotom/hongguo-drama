@@ -153,6 +153,7 @@ test('SDK unavailable under preferSdk still falls back to the official route', a
     assert.equal(result.url, 'https://qznovelvod.com/fixture.mp4');
     assert.equal(result.source, 'app');
     assert.equal(result.sourceProvider, 'official');
+    assert.equal(result.sdkFailure.code, 'SDK_UNAVAILABLE');
     assert.equal(f.calls.length, 1);
     assert.equal(f.registrations.length, 1);
 });

@@ -126,6 +126,10 @@ jobs:
         run: npm ci --no-audit --no-fund
       - if: ${{ inputs.build_only }}
         run: npm ci --no-audit --no-fund --ignore-scripts
+      - name: Verify Windows SDK helper resolves a real episode
+        if: ${{ !inputs.build_only }}
+        shell: pwsh
+        run: node scripts/check-windows-sdk-playback.cjs build/sdk-playback/win32-x64/hongguo-sdk-playback.exe
       - run: node scripts/prepare-electron.cjs
         env:
           GH_TOKEN: ${{ github.token }}
