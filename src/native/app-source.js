@@ -585,7 +585,10 @@ async function fetchAppPlayUrlFresh(vid, options) {
         ];
         const preferred = candidates.find(route => route.id === preferredPlaybackRoute);
         const routes = preferred ? [preferred, ...candidates.filter(route => route !== preferred)] : candidates;
-        let response, lastError;
+        let response, lastError, successfulRoute = '';
+        const rememberPreferredRoute = () => Promise.resolve().then(() => {
+            if (!signal.aborted && successfulRoute) preferredPlaybackRoute = successfulRoute;
+        });
         for (const routeCandidate of routes) {
             throwIfAborted(signal);
             const route = routeCandidate.create();
@@ -619,7 +622,7 @@ async function fetchAppPlayUrlFresh(vid, options) {
                     code: entry?.video_model ? 'INVALID_RESPONSE' : 'MISSING_MODEL',
                 });
             }
-            preferredPlaybackRoute = routeCandidate.id;
+            successfulRoute = routeCandidate.id;
             break;
         }
         if (!response) {
@@ -656,14 +659,18 @@ async function fetchAppPlayUrlFresh(vid, options) {
         if (!inline) {
             const info = await readFallback();
             throwIfAborted(signal);
-            return parseAppPlayModel(info, vid, options, false);
+            const parsed = parseAppPlayModel(info, vid, options, false);
+            rememberPreferredRoute();
+            return parsed;
         }
         try {
-            return parseAppPlayModel(model, vid, options, true);
+            const parsed = parseAppPlayModel(model, vid, options, true);
+            rememberPreferredRoute();
+            return parsed;
         } catch (error) {
             const duration = Number(model.video_duration);
             const codecFallback = ['NO_COMPATIBLE_SOURCE', 'QUALITY_UNAVAILABLE'].includes(error.code);
-            if ((!error.incompleteEncryptionMetadata && !codecFallback)
+            if ((error.incompleteEncryptionMetadata ? !error.minimumPixels : !codecFallback)
                 || typeof model.video_id !== 'string' || !model.video_id.trim()
                 || !Number.isFinite(duration) || duration <= 0 || !model.fallback_api) throw error;
             const validateFallback = info => {
@@ -677,14 +684,18 @@ async function fetchAppPlayUrlFresh(vid, options) {
             if (error.incompleteEncryptionMetadata) {
                 const info = validateFallback(await readFallback());
                 throwIfAborted(signal);
-                return parseAppPlayModel(info, vid, options, false, true, error.minimumPixels);
+                const parsed = parseAppPlayModel(info, vid, options, false, true, error.minimumPixels);
+                rememberPreferredRoute();
+                return parsed;
             }
             let lastError = error;
             for (const attempt of [{ codec: '1' }, { codec: '0', forceCodec: 'h264' }]) {
                 try {
                     const info = validateFallback(await readFallback(attempt));
                     throwIfAborted(signal);
-                    return parseAppPlayModel(info, vid, options, false);
+                    const parsed = parseAppPlayModel(info, vid, options, false);
+                    rememberPreferredRoute();
+                    return parsed;
                 } catch (fallbackError) {
                     lastError = fallbackError;
                 }

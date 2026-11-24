@@ -29,6 +29,9 @@ for (const [target, depth] of [['model', 2], ['fallback', 2], ['encryption-metad
             if (url.pathname === '/reading/bookapi/video_tab/multi_video_model/v1/') {
                 return Promise.resolve({ status: 200, headers: {}, data: '' });
             }
+            if (url.pathname === '/novel/player/multi_video_model/preload/v1') {
+                return Promise.resolve({ status: 200, headers: {}, data: '' });
+            }
             calls++;
             let stage;
             if (url.pathname.includes('device_register')) stage = 'registration';

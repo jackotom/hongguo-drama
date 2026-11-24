@@ -60,7 +60,11 @@ test('empty playback responses keep their classification through the public sour
     let registrations = 0, models = 0;
     const stages = [];
     const native = loadNative({ axios: async config => {
-        if (new URL(config.url).pathname.includes('device_register')) {
+        const pathname = new URL(config.url).pathname;
+        if (pathname === '/novel/player/multi_video_model/preload/v1') {
+            return { status: 200, headers: {}, data: '' };
+        }
+        if (pathname.includes('device_register')) {
             registrations++;
             stages.push(registrations === 1 ? 'registration' : 'renewal');
             return response({ device_id: String(100 + registrations), install_id: '456' });
@@ -273,7 +277,11 @@ test('registration and models retain separate 8s/12s budgets across route recove
     let now = Date.now(), registrations = 0;
     const stages = [];
     const api = app(async config => {
-        if (new URL(config.url).pathname.includes('device_register')) {
+        const pathname = new URL(config.url).pathname;
+        if (pathname === '/novel/player/multi_video_model/preload/v1') {
+            return { status: 200, headers: {}, data: '' };
+        }
+        if (pathname.includes('device_register')) {
             registrations++;
             stages.push(registrations === 1 ? 'registration' : 'renewal');
             assert.ok(config.timeout > 0 && config.timeout <= 8000);

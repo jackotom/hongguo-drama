@@ -63,6 +63,9 @@ for (const target of ['registration', 'model', 'alternate', 'model-a', 'model-c'
         const api = load(config => {
             const url = new URL(config.url);
             let stage;
+            if (url.pathname === '/novel/player/multi_video_model/preload/v1') {
+                return Promise.resolve({ status: 200, headers: {}, data: '' });
+            }
             if (url.pathname.includes('device_register')) stage = ++registrations === 1 ? 'registration' : 'registration';
             else if (config.url === metadata) stage = target;
             else if (url.pathname === '/reading/bookapi/video_tab/multi_video_model/v1/') {
