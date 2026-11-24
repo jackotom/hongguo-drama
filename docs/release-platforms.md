@@ -2,9 +2,9 @@
 
 后续正式Release提供macOS Apple Silicon arm64、macOS Intel x64、Windows x64、Linux x64 AppImage四平台附件；Docker、TV APK和手机APK不再发布。每次发行页必须推荐[N3urda/hongguoTV](https://github.com/N3urda/hongguoTV)供Android手机与Android TV用户下载；该项目独立维护，不计入本项目附件或平台验收。完整门槛见[RELEASING.md](RELEASING.md)。
 
-# 8.2 四平台正式发行
+# 8.2 四平台修复候选（Draft）
 
-8.2内部8.2.0、桌面构建8.2.1，已于2026-11-24正式公开并设Latest；双Mac、Windows x64、Linux x64 AppImage共23份附件核对通过。本轮新增Windows x64 SDK v5播放取源、无CFG helper、创作者合集播放恢复、当前 App V5 `preload/v1` 官方兜底与 Android 构建 SDK 隔离。状态见[8.2记录](release-8.2.md)。
+8.2 首个公开包因 macOS 普通启动崩溃已撤回为 Draft，Latest 为 8.1。当前内部 8.2.0、桌面构建 8.2.1，改为 V8/当前 App 官方取源优先、失败后再走 SDK，并合入 SDK 会话复用、批量取源和 macOS entitlements 修复。最终四平台验收与公证未完成，状态见[8.2记录](release-8.2.md)。
 
 # 8.1 上一四平台正式发行
 

@@ -4,13 +4,14 @@
 
 - 以后任何更新在上传 GitHub 前，必须先用最终包按用户正常入口实测“能打开发并正常使用”；不能只用构建成功、签名、公证、特殊参数启动或局部窗口检查代替。
 - macOS 必须从最终 DMG／App 普通双击或 LaunchServices 启动，不得依赖 `--js-flags`、`--user-data-dir` 等测试专用参数；Windows 必须有真实下载与播放，Linux 必须有最终 AppImage 启动与播放。
-- 2026-11-24 的 8.2 首个公开 Mac 包因 Electron 44.9.1 在当前 macOS 的 V8 CodeRange 初始化崩溃，普通启动即 `EXC_BREAKPOINT`。该 Release 已撤回为 Draft，Latest 恢复 8.1；修复包未通过上述硬门禁前不得重新上传或公开。
+- 2026-11-24 的 8.2 首个公开 Mac 包因 Electron 44.9.1 在当前 macOS 的 V8 CodeRange 初始化崩溃，普通启动即 `EXC_BREAKPOINT`。该 Release 已撤回为 Draft，Latest 恢复 8.1；最终包必须同时给 Electron 主程序、Renderer/GPU Helper 和 SDK helper 配置 JIT 所需 entitlements，再普通启动验证。
 
-## 8.2 Windows SDK 接入（2026-11-24，公开包已撤回）
+## 8.2 V8 优先与 SDK 兜底（2026-11-24，Draft 修复中）
 
-- 从公开 8.1 增加 0.1 至 8.2，内部 8.2.0、桌面构建 8.2.1，冻结源码 `2303f85b589417eee16e260ff341429656729617`，标签 `v8.2`、原 Release ID `456354972`；首次公开后因 Mac 普通启动失败已撤回为 Draft，23 份附件保留用于替换。
-- 接入 Windows x64 SDK v5 播放取源；Windows helper 使用无 CFG 的 PyInstaller bootloader，避免 Unicorn `longjmp` 与 Windows Control Flow Guard 冲突。
-- Windows 两集真实下载均为 `sourceProvider=sdk`，下载队列、静音播放、安装升级通过；Linux、Test 通过。Mac 首次只验证了带 `--jitless` 的测试启动，漏掉普通启动，已被用户实测否决。
+- 从公开 8.1 增加 0.1 至 8.2，内部 8.2.0、桌面构建 8.2.1，代码冻结 `1d1bcb6bda2fbf1829a5e55b29e19d90c42f72b5`；原 Release ID `456354972` 已撤回为 Draft，23 份旧附件只保留作候选，不得直接重新公开。
+- 用户明确下载与播放顺序为“先 V8/当前 App 官方取源，失败后再走 SDK”，SDK 再失败才进入网页或旧接口。不得把 SDK 改回默认首选。
+- 合入 PR #189 的 SDK `--serve` 会话复用与 #190 的批量多分集取源；批量仅用于同一内容类型的数字分集，保留 8 集上限、2 分钟缓存、旧 helper 单集回退、部分/全部取消和前台播放优先级。
+- Electron 升级到 44.11.5；macOS 主程序、所有 Helper、SDK helper 均使用 hardened runtime entitlements，普通 LaunchServices 启动和打包应用真实 V8 两集静音播放已通过。Windows 新包、Linux、公证与附件核验仍须在最终代码上重做。
 
 ## 8.1 播放取源与下载提速发行（2026-11-23）
 

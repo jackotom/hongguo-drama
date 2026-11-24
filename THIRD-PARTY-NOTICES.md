@@ -1,7 +1,7 @@
-<!-- 8.2 official release. -->
+<!-- 8.2 release candidate; not currently public. -->
 # 第三方组件许可说明
 
-适用源码版本：红果短剧 8.2（正式发行）；沿用 follow-redirects 1.16.3、固定 nv-codec-headers 12.1.14.0 与 AMD AMF v1.5.3 头文件；其余第三方组件保留各自的版本、作者与许可。实际发行状态见 `docs/release-8.2.md`。
+适用源码版本：红果短剧 8.2（Draft 修复候选）；沿用 follow-redirects 1.16.3、固定 nv-codec-headers 12.1.14.0 与 AMD AMF v1.5.3 头文件；其余第三方组件保留各自的版本、作者与许可。实际发行状态见 `docs/release-8.2.md`。
 
 7.1采纳anupam-orbis在PR #140提供的实际依赖锁更新：follow-redirects从1.16.1升至1.16.3；本项目另补重定向安全回归。该依赖更新继续用于7.4，完整协作记录见 `CONTRIBUTORS.md`。
 
@@ -92,7 +92,7 @@ x264 是唯一非系统静态依赖（GPLv2-or-later），整体构建为 GPLv3-
 6.9 的播放签名 `playback-signature.js` 改编自 N3urda/hongguoTV `7444bb01aec7b0420740103e551c45f1f66101c9` 的 `Argus.kt`（GPL-3.0-only）；其原始归属为 ch6vip/fqapp 的 `rust/src/sign/{argus,simon,ladon,protobuf}.rs`。黄金向量来自同一固定提交的 `PlayerSignTest.kt`。仅播放模型使用真实551 Argus及Ladon，按最终query、实际正文与时间签名；搜索、目录、账号签名和匿名注册协议保留。未移植上游设备持久化、轮换、更大重试预算或权益修改逻辑。详细来源与改动见上述 NOTICE。
 
 7.5 的当前播放路径改用 `playback-v5.js`：来源为 N3urda/hongguoTV 固定提交 `18c37c2afd0567520135abcae312352542f09083` 的 `Signer.kt`、`AesV3.kt`、`V5Constants.kt`、`MobilePlayback.kt` 及两个合成签名向量文件，GPL-3.0-only。保留上游 drpys 归属。仅移植纯 JavaScript Android v5 Medusa／Helios 和请求结构；未引入官方 SDK、JNI、字节码解释器、远程签名服务或 PolyForm 实现。旧551签名仅保留在有界空响应恢复路径。来源、贡献线索和改动见 NOTICE。
-8.2 候选补充 N3urda/hongguoTV 固定提交 `ef328f3a3dc28479d90608a507996136672cf946` 的当前官方 App V5 `preload/v1` 请求形态（GPL-3.0-only），仅用于 SDK 失败后的有界官方兜底，并复用项目现有纯 JavaScript V5 签名与媒体校验。
+8.2 候选补充 N3urda/hongguoTV 固定提交 `ef328f3a3dc28479d90608a507996136672cf946` 的当前官方 App V5 `preload/v1` 请求形态（GPL-3.0-only）。默认先使用该 V8/当前 App 官方链路，失败后才进入 SDK，并复用项目现有纯 JavaScript V5 签名与媒体校验。
 
 ### macOS 与 Windows x64 SDK v5 播放取源执行文件
 
