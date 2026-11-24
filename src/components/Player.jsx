@@ -1036,7 +1036,7 @@ function Player({ target, onNavigate, onSeriesSelected, onFloatingChange, active
       resetPlayback(autoplay, force === false);
       setCompatMap(prev => { const next = { ...prev }; delete next[vidIndex]; return next; });
       const request = prefetched || { requestId: crypto.randomUUID(), vid: ep.vid,
-        qualityIndex, playbackQuality: qualities[qualityIndex] };
+        contentType: ep.content_type || '', qualityIndex, playbackQuality: qualities[qualityIndex] };
       onlineRequestRef.current = request;
       pendingSeekRef.current = seekTo;
       setCurrentIndex(vidIndex);
@@ -1059,6 +1059,7 @@ function Player({ target, onNavigate, onSeriesSelected, onFloatingChange, active
           try {
             res = await window.electronAPI.prepareOnlinePlay({
               requestId: request.requestId, vid: ep.vid, seriesId: activeSeriesId, vidIndex,
+              contentType: request.contentType || ep.content_type || '',
               quality: qualities[index], allowLowerQuality: stateRef.current.onlineQuality === 'auto', force,
             });
           } catch (error) { res = { success: false, error: error?.message || String(error), code: error?.code }; }
@@ -1257,7 +1258,7 @@ function Player({ target, onNavigate, onSeriesSelected, onFloatingChange, active
       const failedAt = prefetchFailureRef.current.get(key);
       if (failedAt && Date.now() - failedAt < PREFETCH_RETRY_MS) continue;
       const request = { requestId: crypto.randomUUID(), vid: episode.vid, seriesId: activeSeriesId,
-        vidIndex: episode.vid_index, quality: onlineQuality, ready: false };
+        vidIndex: episode.vid_index, contentType: episode.content_type || '', quality: onlineQuality, ready: false };
       prefetchRef.current = [...prefetchRef.current, request];
       request.promise = (async () => {
         const qualities = playbackQualities(onlineQuality, activeSeriesId);
@@ -1269,7 +1270,8 @@ function Player({ target, onNavigate, onSeriesSelected, onFloatingChange, active
           try {
             result = await window.electronAPI.prepareOnlinePlay({
               requestId: request.requestId, vid: request.vid, seriesId: request.seriesId,
-              vidIndex: request.vidIndex, quality: qualities[index], allowLowerQuality: onlineQuality === 'auto',
+              vidIndex: request.vidIndex, contentType: request.contentType || '',
+              quality: qualities[index], allowLowerQuality: onlineQuality === 'auto',
               prefetch: onlineRequestRef.current !== request,
             });
           } catch (error) { result = { success: false, error: error?.message || String(error), code: error?.code }; }

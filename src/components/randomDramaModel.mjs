@@ -58,7 +58,7 @@ export function pickRandomDrama(items, previous, random = Math.random) {
 
 export async function playRecommendedDrama(api, item, { signal, resume = true } = {}) {
   signal?.throwIfAborted();
-  const result = await waitForRequest(api.searchResolve(item.series_id), { signal, message: '分集加载超时，请重试本剧' });
+  const result = await waitForRequest(api.searchResolve(item.series_id, { contentType: item.content_type }), { signal, message: '分集加载超时，请重试本剧' });
   signal?.throwIfAborted();
   if (!result?.success) throw new Error(result?.error || '暂时无法加载这部剧');
   if (String(result.data?.series_id) !== String(item.series_id)) throw new Error('来源返回的剧集不匹配，请重试');

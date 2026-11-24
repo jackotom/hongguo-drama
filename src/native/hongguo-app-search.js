@@ -45,21 +45,35 @@ function parseSearchPayload(payload, { page = 1 } = {}) {
   const tab = tabs.find(item => Number(item?.tab_type) === SEARCH_TAB);
   if (!tab) throw appError('App 搜索暂未返回短剧结果', 'APP_TAB_MISSING');
   const seen = new Set(), results = [];
+  const playableSeries = item => {
+    const contentType = item?.content_type == null ? 1004 : Number(item.content_type);
+    if (![1003, 1004].includes(contentType)) return false;
+    if (contentType === 1003) {
+      const albumId = String(item?.album_info?.album_id_str || item?.album_info?.album_id || '');
+      return /^\d{1,30}$/.test(albumId) && albumId === String(item?.series_id || '')
+        && Number(item.album_info?.episode_cnt) > 0;
+    }
+    if (!/^\d{1,30}$/.test(String(item?.series_id || ''))) return false;
+    const count = item.episode_cnt ?? item.episode_count;
+    return count == null || Number(count) > 0;
+  };
   for (const cell of Array.isArray(tab.data) ? tab.data : []) {
-    const video = (Array.isArray(cell?.video_data) ? cell.video_data : [])
-      .find(item => /^\d{1,30}$/.test(String(item?.series_id || '')));
+    const video = (Array.isArray(cell?.video_data) ? cell.video_data : []).find(playableSeries);
     // Header/ad/search-suggestion cells have no video_data; their book_id is not a drama.
     if (!video) continue;
-    const seriesId = String(video.series_id);
-    const title = cleanTitle(cell?.search_high_light?.title?.text || video.title || cell?.cell_name || '');
+    const contentType = String(video.content_type ?? 1004);
+    const album = contentType === '1003' ? video.album_info || {} : {};
+    const seriesId = String(contentType === '1003' ? album.album_id_str || album.album_id : video.series_id);
+    const title = cleanTitle(cell?.search_high_light?.title?.text || album.title || video.title || cell?.cell_name || '');
     if (!title || seen.has(seriesId)) continue;
     seen.add(seriesId);
     results.push({
       series_id: seriesId,
       series_title: title,
-      cover: appCover(video?.cover),
-      episode_count: Number(video?.episode_cnt ?? video?.episode_count ?? 0) || 0,
-      description: cleanTitle(video?.series_intro || video?.video_desc || cell?.series_intro || ''),
+      cover: appCover(album.cover || video?.cover),
+      episode_count: Number(album.episode_cnt ?? video?.episode_cnt ?? video?.episode_count ?? 0) || 0,
+      description: cleanTitle(album.intro || video?.series_intro || video?.video_desc || cell?.series_intro || ''),
+      content_type: contentType,
       source: 'hongguo',
       url: `https://hongguoduanju.com/detail?series_id=${seriesId}`,
     });

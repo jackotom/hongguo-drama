@@ -1007,7 +1007,7 @@
   "看完自动删除": "Delete after watching",
   "看完一集后删除该集已下载的视频、在线播放缓存和转码缓存。下载文件会永久删除；需要时可重新下载。保存后生效。": "After watching, delete the episode’s downloaded video, online playback cache and conversion cache. Downloaded files are permanently deleted; download again if needed. Applies after saving.",
   "优先使用红果 App 搜索": "Prefer Hongguo app search",
-  "失败或空结果自动回退官网；关闭此项时，官网不可用仍会尝试 App 备用搜索。": "Falls back to the website on failure or empty results. When disabled, app search is still attempted if the website is unavailable.",
+  "失败或空结果自动回退官网；关闭此项时，官网无匹配或不可用仍会尝试 App 备用搜索。": "Falls back to the website on failure or empty results. When disabled, app search is still attempted if the website has no match or is unavailable.",
   "弹幕按钮设置": "Comment overlay buttons",
   "显示弹幕按钮": "Show comment buttons",
   "保存后生效。关闭时隐藏弹幕及弹幕设置按钮，并停用弹幕；再次开启会恢复原有弹幕偏好。": "Applies after saving. Disabling hides the overlay and settings buttons and turns comments off; re-enabling restores your preferences.",

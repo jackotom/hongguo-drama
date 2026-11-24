@@ -114,7 +114,7 @@ def register(cache):
     return context
 
 
-def resolve(video, cache):
+def resolve(video, cache, content_type):
     # Parallel downloads may start with an empty cache; initialize its shared
     # device and SDK assets once before independent playback sessions begin.
     with cache_lock(cache):
@@ -163,6 +163,7 @@ def resolve(video, cache):
         context,
         video,
         int(time.time() * 1000),
+        content_type=content_type,
         token=result.token,
         previous_ladon=ladon,
         materials=materials,
@@ -171,7 +172,7 @@ def resolve(video, cache):
     )
     payload = json.loads(send_prepared(playback))
     data = payload.get("data", {})
-    entries = data.get("1004", data)
+    entries = data.get(content_type, data)
     model = entries.get(video, {}).get("video_model")
     if isinstance(model, str):
         model = json.loads(model)
@@ -184,9 +185,10 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--video", required=True)
     parser.add_argument("--cache", required=True, type=Path)
+    parser.add_argument("--content-type", default="1004", choices=("1001", "1004"))
     args = parser.parse_args()
     try:
-        model, user_agent = resolve(args.video, args.cache)
+        model, user_agent = resolve(args.video, args.cache, args.content_type)
         print(json.dumps({
             "ok": True,
             "model": model,

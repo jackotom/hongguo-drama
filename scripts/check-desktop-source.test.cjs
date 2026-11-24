@@ -97,12 +97,25 @@ test('existing playInfo keeps the original no-lookup path and cleans job listene
     assert.equal(h.lookups.length, 0); assert.equal(getEventListeners(parent.signal, 'abort').length, 0);
 });
 
-test('SDK-first download preference reaches the provider lookup', async t => {
+test('parallel SDK-first download preference reaches the provider lookup', async t => {
     const h = desktop(t), parent = h.controller();
-    const result = outcome(h.recover('11', '100', { ...opts(parent.signal), preferSdk: true },
+    const result = outcome(h.recover('11', '100', { ...opts(parent.signal), preferSdk: true, parallelSdk: true },
         async candidate => candidate.url));
     await turn();
     assert.equal(h.lookups[0].preferSdk, true);
+    assert.equal(h.lookups[0].parallelSdk, true);
     h.calls[0].resolve(info('11'));
     assert.equal((await result).value, info('11').url);
+});
+
+test('Hongguo online playback prefers SDK before official playback routes', async t => {
+    const h = desktop(t);
+    const pending = h.handlers['prepare-online-play']({}, {
+        vid: '11', seriesId: '100', vidIndex: 1, requestId: 'sdk-online', quality: 'auto',
+    });
+    await turn();
+    assert.equal(h.lookups[0].preferSdk, true);
+    assert.equal(h.lookups[0].parallelSdk, false);
+    h.calls[0].resolve(info('11'));
+    assert.equal((await pending).success, true);
 });

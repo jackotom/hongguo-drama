@@ -538,12 +538,14 @@ function upsertSeriesRegistry(data) {
     series_title: data.series_title || '未命名短剧',
     cover: data.cover || '',
     total: data.episodes.length,
+    content_type: data.content_type || '',
     web_accessible_episodes: data.web_accessible_episodes ?? null,
     episodes: data.episodes.map((e) => ({
       vid: String(e.vid),
       vid_index: e.vid_index || 0,
       title: e.title || '',
       cover: e.cover || '',
+      content_type: e.content_type || data.content_type || '',
       web_available: e.web_available ?? null,
       locked: e.locked === true,
     })),
@@ -1040,7 +1042,8 @@ async function executeHongguoDownload(task) {
       task.qualityNotice = '正在获取完整片源';
       sendToRenderer('download-progress', { id, qualityNotice: task.qualityNotice });
     }
-    if (!reusedCache) await withMediaRecovery(vid, hongguoInfo?.series_id, { playInfo: checkedPlayInfo, quality, allowLowerQuality, preferSdk, force: true, cancelToken: source.token,
+    if (!reusedCache) await withMediaRecovery(vid, hongguoInfo?.series_id, { playInfo: checkedPlayInfo, quality, allowLowerQuality,
+      content_type: hongguoInfo?.content_type, preferSdk, parallelSdk: preferSdk, force: true, cancelToken: source.token,
       onSourceReady: () => {
         if (numeric) clearHongguoSourceBackoff();
         if (preferSdk && task.qualityNotice === '正在获取完整片源') {
@@ -1756,6 +1759,28 @@ async function searchAtSourcePage(keyword, options = {}) {
         }
       }
     }
+    let appSupplement = 0;
+    if (!appEnabled && options?.appSearch !== false && options?.fuzzy !== false
+      && !hasTitleMatch(results) && Date.now() >= appSearchCooldownUntil) {
+      try {
+        const appDeadline = Math.min(deadline || Date.now() + 8000, Date.now() + 8000);
+        const app = await require('./src/native/hongguo-app-search').searchApp(keyword, { page: 1, deadline: appDeadline });
+        appSearchCooldownUntil = 0;
+        const merged = new Map(results.map(item => [String(item.series_id), item]));
+        for (const item of app.results) {
+          if (!hasTitleMatch([item])) continue;
+          const id = String(item.series_id);
+          if (!merged.has(id)) merged.set(id, { ...item, app_search: true });
+          appSupplement++;
+        }
+        results = [...merged.values()];
+        if (!appSupplement) appFallbackError = 'App 搜索没有标题匹配';
+      } catch (error) {
+        appSearchCooldownUntil = Date.now() + APP_SEARCH_COOLDOWN_MS;
+        appFallbackError = error?.message || 'App 搜索不可用';
+        console.warn('[Search] 官网无标题匹配后的 App 补充搜索失败:', appFallbackError);
+      }
+    }
     // 官网没有标题匹配（常见于当天刚上线、搜索索引未同步），用 App 上新列表补搜。
     // 短剧名还要排除“老剧名包含新剧名”的遮蔽，例如搜「接班」只返回《接班人的考题》。
     // Any non-exact result can be an older title that merely contains the query.
@@ -1780,6 +1805,7 @@ async function searchAtSourcePage(keyword, options = {}) {
       hasMore: response.hasMore,
       relaxed: attempted.length > 0,
       relaxedQuery,
+      appSupplement,
       newRelease: newRelease.results.length,
       newReleaseChecked: newRelease.checked,
       newReleasePartial: newRelease.partial === true,
@@ -1889,10 +1915,10 @@ ipcMain.handle('find-series-sequels', async (_event, seriesId, options = {}) => 
 });
 
 // 搜索选中某部剧后，拉取完整分集并登记档案
-ipcMain.handle('search-resolve', async (event, seriesId) => {
+ipcMain.handle('search-resolve', async (event, seriesId, options = {}) => {
   try {
     if (!seriesId) return { success: false, error: '缺少 series_id' };
-    const data = await hongguo.fetchEpisodeList(String(seriesId));
+    const data = await hongguo.fetchEpisodeList(String(seriesId), options);
     upsertSeriesRegistry(data);
     return { success: true, data };
   } catch (error) {
@@ -2789,6 +2815,7 @@ async function seriesEpisodesData(seriesId, { withUrls = true } = {}) {
     }
     return {
       vid: episode.vid, vid_index: idx,
+      content_type: episode.content_type || entry?.content_type || '',
       title: seriesId.startsWith('xifan:')
         ? require('./src/native/xifan').episodeDisplayTitle(seriesId, seriesTitle, episode.title || '') : episode.title || '',
       web_available: episode.web_available ?? null,
@@ -3313,6 +3340,7 @@ async function withMediaRecovery(vid, seriesId, options, consume) {
           lookup = boundedSignal(controller.signal, 30000);
           info = await awaitMediaOperation(hongguo.fetchPlayUrlSingle(vid, seriesId,
             { quality: options.quality, allowLowerQuality: options.allowLowerQuality, preferSdk: options.preferSdk === true,
+              parallelSdk: options.parallelSdk === true, content_type: options.content_type,
               force: options.force || round > 0, signal: lookup.signal }), lookup.signal);
           throwIfAborted(lookup.signal);
         }
@@ -3691,7 +3719,7 @@ async function prepareHlsEntry(playInfo,entry,signal,onProgress) {
 }
 
 ipcMain.handle('prepare-online-play', async (event, payload) => {
-  const { vid, seriesId, vidIndex, requestId, prefetch = false, force = false, allowLowerQuality = false } = payload || {};
+  const { vid, seriesId, vidIndex, requestId, prefetch = false, force = false, allowLowerQuality = false, contentType = '' } = payload || {};
   if (!vid) return { success: false, error: '缺少 vid' };
   let quality;
   try { quality = playbackQuality(payload.quality, vid); } catch (error) { return { success: false, error: error.message }; }
@@ -3717,7 +3745,8 @@ ipcMain.handle('prepare-online-play', async (event, payload) => {
               sendToRenderer('online-play-progress',{vid:sourceVid,seriesId,vidIndex,requestId:active.requestId, ...job.progress});
             }
           };
-          const prepared = await withMediaRecovery(sourceVid,seriesId,{playInfo:checkedPlayInfo,quality,allowLowerQuality,force,signal:controller.signal},async playInfo => {
+          const prepared = await withMediaRecovery(sourceVid,seriesId,{playInfo:checkedPlayInfo,quality,allowLowerQuality,
+            content_type:contentType,preferSdk:/^\d{1,30}$/.test(sourceVid),force,signal:controller.signal},async playInfo => {
             const entry = {quality,codec:playInfo.codec === 'bytevc2' ? 'h264' : playInfo.codec || '',size:0,lastUsed:Date.now(),seriesId:String(seriesId||''),vidIndex:Number(vidIndex)||0};
             if (playInfo.format === 'hls') await prepareHlsEntry(playInfo,entry,controller.signal,received => progress(received,0));
             else if (!prefetch && !playInfo.spadeA && !playInfo.contentKey && playInfo.codec !== 'bytevc2') return {...entry,playInfo};
@@ -4398,6 +4427,7 @@ async function enqueueEpisodes({ seriesId, seriesTitle, episodes, cover, quality
     if (dup) {
       changedTasks.push({ task: dup, previous: { ...dup } });
       if (dup.hongguoInfo) {
+        dup.hongguoInfo.content_type = ep.content_type || '';
         dup.hongguoInfo.web_available = ep.web_available ?? null;
         dup.hongguoInfo.web_accessible_episodes = publicEpisodeLimit;
       }
@@ -4462,6 +4492,7 @@ async function enqueueEpisodes({ seriesId, seriesTitle, episodes, cover, quality
         series_title: cleanSeriesTitle,
         vid_index: ep.vid_index,
         ep_title: ep.title,
+        content_type: ep.content_type || '',
         web_available: ep.web_available ?? null,
         web_accessible_episodes: publicEpisodeLimit,
       },

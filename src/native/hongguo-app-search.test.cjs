@@ -70,6 +70,20 @@ test('HEIC covers become a placeholder instead of a broken image', () => {
   assert.equal(result.results[0].cover, '');
 });
 
+test('creator collections map their album identity and episode count', () => {
+  const result = parseSearchPayload({ ...payload, search_tabs: [{ ...payload.search_tabs[0], data: [
+    { search_high_light: { title: { text: '创作者合集' } },
+      video_data: [{ series_id: '7676321126145854488', title: '创作者合集', content_type: 1003, episode_cnt: 0, duration: 0,
+        album_info: { album_id_str: '7676321126145854488', title: '创作者合集', episode_cnt: 20 } }] },
+    { search_high_light: { title: { text: '正常短剧' } },
+      video_data: [{ series_id: '7670427740574600216', title: '正常短剧', content_type: 1004, episode_cnt: 71 }] },
+  ] }] });
+  assert.deepEqual(result.results.map(item => [item.series_title, item.series_id, item.content_type, item.episode_count]), [
+    ['创作者合集', '7676321126145854488', '1003', 20],
+    ['正常短剧', '7670427740574600216', '1004', 71],
+  ]);
+});
+
 test('the signed request uses branch-0 search headers and carries the keyword', async () => {
   let captured;
   const result = await searchApp('测试短剧', { request: async (signed, deadline) => {

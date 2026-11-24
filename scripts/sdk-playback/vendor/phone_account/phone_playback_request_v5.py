@@ -13,7 +13,7 @@ HOST = 'api5-normal-sinfonlineb.fqnovel.com'
 PATH = '/novel/player/multi_video_model/player/v1'
 
 
-def prepare_playback_v5(context, video, milliseconds, *, token, previous_ladon, materials, image, core):
+def prepare_playback_v5(context, video, milliseconds, *, content_type='1004', token, previous_ladon, materials, image, core):
     if not isinstance(context, dict) or not isinstance(context.get('params'), dict):
         raise ValueError('invalid-playback-context')
     cookies = context.get('cookies', {})
@@ -23,6 +23,8 @@ def prepare_playback_v5(context, video, milliseconds, *, token, previous_ladon, 
         raise ValueError('invalid-video-identity')
     if type(milliseconds) is not int or not 0 <= milliseconds // 1000 <= 0xffffffff:
         raise ValueError('invalid-playback-time')
+    if content_type not in ('1001', '1004'):
+        raise ValueError('invalid-playback-content-type')
     params = dict(context['params'])
     if params.get('aid') != '8662':
         raise ValueError('invalid-playback-application')
@@ -43,7 +45,7 @@ def prepare_playback_v5(context, video, milliseconds, *, token, previous_ladon, 
     query = urlencode([(name, params[name]) for name in names if params.get(name)], quote_via=quote, safe='*').encode('ascii')
     # Existing app's media contract, preserving the one selected episode and
     # all model definitions. Final compressed bytes are signed exactly once.
-    payload = {'dr_scene': 'player', 'mixed_video_id_map': {'1004': [video]}, 'biz_param': {
+    payload = {'dr_scene': 'player', 'mixed_video_id_map': {content_type: [video]}, 'biz_param': {
         'detail_page_version': 0, 'device_level': 4, 'disable_digg_stat': False,
         'need_all_video_definition': True, 'need_mp4_align': False, 'use_os_player': False,
         'use_server_dns': False, 'video_platform': 1024}}

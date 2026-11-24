@@ -548,8 +548,22 @@ async function fetchEpisodeList(seriesId, options = {}) {
   if (String(seriesId).startsWith('custom:')) return require('./custom-source').fetchEpisodeList(seriesId);
   if (String(seriesId).startsWith('hema:')) return require('./hema').fetchEpisodeList(seriesId);
   if (String(seriesId).startsWith('xifan:')) return require('./xifan').fetchEpisodeList(seriesId);
+  if (String(options.content_type || options.contentType || '') === '1003') {
+    return require('./hongguo-creator-album').fetchCreatorAlbum(seriesId, { deadline: Date.now() + 15000 });
+  }
   return cachedRequest(`episodes:${seriesId}`, 60000,
-    () => fetchEpisodeListFresh(seriesId, { deadline: Number(options.deadline) || 0 }),
+    async () => {
+      try {
+        return await fetchEpisodeListFresh(seriesId, { deadline: Number(options.deadline) || 0 });
+      } catch (error) {
+        if (!/^\d{1,30}$/.test(String(seriesId))) throw error;
+        try {
+          return await require('./hongguo-creator-album').fetchCreatorAlbum(seriesId, { deadline: Date.now() + 5000 });
+        } catch {
+          throw error;
+        }
+      }
+    },
     { force: options.force === true });
 }
 
@@ -748,10 +762,12 @@ async function fetchPlayUrlSingle(vid, sid, options = {}) {
     if (String(vid).startsWith('xifan:') || String(sid).startsWith('xifan:')) return require('./xifan').fetchPlayUrlSingle(vid, sid);
     const skipWeb = (failedWebMedia.get(String(vid)) || 0) > Date.now();
     const allowLowerQuality = options.allowLowerQuality === true && quality !== 'auto';
-    const cacheKey = `play:${sid || ''}:${vid}${quality === 'auto' ? '' : `:${quality}`}${skipWeb ? ':fallback' : ''}${allowLowerQuality ? ':lower-quality' : ''}${options.preferSdk ? ':sdk-first' : ''}`;
+    const contentType = ['1001', '1004'].includes(String(options.content_type || options.contentType)) ? String(options.content_type || options.contentType) : '1004';
+    const cacheKey = `play:${sid || ''}:${vid}${quality === 'auto' ? '' : `:${quality}`}${contentType === '1004' ? '' : `:type-${contentType}`}${skipWeb ? ':fallback' : ''}${allowLowerQuality ? ':lower-quality' : ''}${options.preferSdk ? ':sdk-first' : ''}${options.parallelSdk ? ':parallel-sdk' : ''}`;
     const result = await cachedRequest(cacheKey, 30000, signal => quality === 'auto'
-      ? fetchPlayUrlFresh(vid, sid, skipWeb, signal, options.preferSdk === true)
-      : require('./app-source').fetchAppPlayUrl(String(vid), { quality, allowLowerQuality, preferSdk: options.preferSdk === true, signal }).catch(async error => {
+      ? fetchPlayUrlFresh(vid, sid, skipWeb, signal, options.preferSdk === true, options.parallelSdk === true, contentType)
+      : require('./app-source').fetchAppPlayUrl(String(vid), { quality, allowLowerQuality, preferSdk: options.preferSdk === true,
+        parallelSdk: options.parallelSdk === true, contentType, signal }).catch(async error => {
         throwIfAborted(signal);
         if (error.code === 'ERR_CANCELED') throw error;
         const sources = [sourceFailure('app', error)];
@@ -778,6 +794,12 @@ async function fetchPlayUrlSingle(vid, sid, options = {}) {
 }
 
 function sourceFailure(source, error) {
+  const failure = classifySourceFailure(source, error);
+  if (!error?.sdkFailure || failure.code === 'ERR_CANCELED') return failure;
+  return { ...failure, sdkFailure: true, message: `${failure.message}；${error.sdkFailure.message}` };
+}
+
+function classifySourceFailure(source, error) {
   const message = String(error?.message || '');
   const code = String(error?.code || '');
   if (code === 'ERR_CANCELED') return { source, code, message: '已取消 App 片源请求' };
@@ -824,8 +846,11 @@ function sourceFailure(source, error) {
 function unavailableSources(sources, quality = 'auto') {
   const names = { web: '网页', app: 'App', api: '旧接口' };
   const publicLimited = sources.some(item => item.code === 'PUBLIC_ACCESS_LIMITED');
-  const message = publicLimited
-    ? `官网公开片源不提供本集，当前 App 取源也未返回完整地址。请稍后重试；若该集只对官方 App 开放，请在官方 App 观看。`
+  const sdkFailure = sources.find(item => item.sdkFailure);
+  const message = sdkFailure
+    ? `本集取源失败：${sdkFailure.message}${publicLimited ? '；官网公开片源也不提供本集' : ''}。请稍后重试或在官方 App 确认可播情况。`
+    : publicLimited
+      ? `官网公开片源不提供本集，当前 App 取源也未返回完整地址。请稍后重试；若该集只对官方 App 开放，请在官方 App 观看。`
     : `本集取源失败${quality === 'auto' ? '' : `（所选清晰度 ${quality}，未降级）`}：${sources.map(item => `${names[item.source]}：${item.message}`).join('；')}。请重试或在官方 App 确认可播情况。`;
   const error = new Error(message);
   error.code = 'SOURCE_UNAVAILABLE';
@@ -833,11 +858,11 @@ function unavailableSources(sources, quality = 'auto') {
   return error;
 }
 
-async function fetchPlayUrlFresh(vid, sid, skipWeb = false, signal, preferSdk = false) {
+async function fetchPlayUrlFresh(vid, sid, skipWeb = false, signal, preferSdk = false, parallelSdk = false, contentType = '1004') {
   throwIfAborted(signal);
   const sources = [];
   try {
-    const result = await require('./app-source').fetchAppPlayUrl(String(vid), { preferSdk, signal });
+    const result = await require('./app-source').fetchAppPlayUrl(String(vid), { preferSdk, parallelSdk, contentType, signal });
     throwIfAborted(signal);
     return result;
   } catch (error) {

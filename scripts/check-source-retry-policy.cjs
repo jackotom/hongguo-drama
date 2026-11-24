@@ -26,6 +26,35 @@ const publicLimited = {
   ],
 };
 assert.equal(context.sourceFailure('web', { code: 'PUBLIC_ACCESS_LIMITED' }).code, 'PUBLIC_ACCESS_LIMITED');
+const sdkFailure = { code: 'SDK_TIMEOUT', message: 'SDK 取源超时' };
+const registrationTimeout = context.sourceFailure('app', {
+  code: 'DEVICE_REGISTRATION_FAILED', registrationFailure: 'TIMEOUT', sdkFailure,
+});
+assert.equal(registrationTimeout.code, 'TIMEOUT');
+assert.equal(registrationTimeout.registrationFailure, 'TIMEOUT');
+assert.equal(registrationTimeout.sdkFailure, true);
+assert.match(registrationTimeout.message, /请求超时/);
+assert.match(registrationTimeout.message, /SDK 取源超时/);
+assert.equal(context.isDeferrableSourceError(task, {
+  code: 'SOURCE_UNAVAILABLE', sources: [registrationTimeout],
+}), true);
+const unavailable503 = context.sourceFailure('app', { status: 503, sdkFailure });
+assert.equal(unavailable503.code, 'HTTP_503');
+assert.equal(unavailable503.sdkFailure, true);
+assert.match(unavailable503.message, /HTTP 503/);
+assert.match(unavailable503.message, /SDK 取源超时/);
+assert.equal(context.isDeferrableSourceError(task, {
+  code: 'SOURCE_UNAVAILABLE', sources: [unavailable503],
+}), true);
+for (const status of [403, 429]) {
+  const rejection = context.sourceFailure('app', { status, sdkFailure });
+  const error = { code: 'SOURCE_UNAVAILABLE', sources: [rejection] };
+  assert.equal(rejection.code, `HTTP_${status}`);
+  assert.equal(rejection.sdkFailure, true);
+  assert.match(rejection.message, new RegExp(`HTTP ${status}`));
+  assert.equal(context.isDownloadSourceRejection(error), true);
+  assert.equal(context.sourceFailureIsTransient(error), false);
+}
 assert.equal(context.isDeferrableSourceError(task, publicLimited), false,
   'website-only episodes must not enter an automatic retry loop while the App endpoint is empty');
 for (const code of ['TIMEOUT', 'NETWORK_ERROR', 'HTTP_503', 'MISSING_MODEL']) {

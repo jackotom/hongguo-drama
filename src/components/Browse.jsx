@@ -428,7 +428,7 @@ function Browse({ onNavigate, active = true }) {
     setRangeInput('');
     setRangeError('');
     try {
-      const res = await window.electronAPI.searchResolve(item.series_id);
+      const res = await window.electronAPI.searchResolve(item.series_id, { contentType: item.content_type });
       if (request !== detailRequest.current) return;
       if (!res || !res.success) {
         showToast((res && res.error) || '拉取分集失败', 'error');

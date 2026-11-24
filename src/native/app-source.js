@@ -186,12 +186,12 @@ function playbackRequest(payload, identity, videoId = '', alternate = false) {
     return { url, body, headers, method: 'POST' };
 }
 
-function playbackModelRequest(identity, videoId, base) {
+function playbackModelRequest(identity, videoId, base, contentType = '1004') {
     const payload = JSON.stringify({
         biz_param: { detail_page_version: 0, device_level: 3, disable_digg_stat: false, from_video_id: '',
             need_all_video_definition: true, need_mp4_align: false, source: 9, use_os_player: false,
             use_server_dns: false, video_platform: 3 },
-        content_type: 1004,
+        content_type: Number(contentType),
         video_id: String(videoId),
     });
     const body = gzipSync(Buffer.from(payload));
@@ -273,15 +273,18 @@ function signedSearchRequest({ keyword, page = 1, cursor = null, identity } = {}
 const metadataDevice = { ...DEVICE, version_code: '73532', version_name: '7.3.5.32', manifest_version_code: '73532',
     update_version_code: '73532', pv_player: '73532', iid: localId(), device_id: localId() };
 function signedMetadataRequest(apiPath, values = {}, payload = null) {
-    if (!['/reading/distribution/category/landpage/v/', '/reading/bookapi/bookmall/cell/change/v'].includes(apiPath)) {
+    if (!['/reading/distribution/category/landpage/v/', '/reading/bookapi/bookmall/cell/change/v',
+        '/novel/player/album_detail/v1/'].includes(apiPath)) {
         throw new Error('不支持的 App 目录接口');
     }
+    const device = apiPath === '/novel/player/album_detail/v1/'
+        ? { ...metadataDevice, iid: localId(), device_id: localId() } : metadataDevice;
     const body = payload === null ? null : Buffer.from(JSON.stringify(payload));
     const khronos = Math.floor(Date.now() / 1000), ticketBase = Date.now();
     let query, url, requestTicket;
     for (let n = 0; n < 128; n += 1) {
         requestTicket = ticketBase + n;
-        query = pythonUrlEncode({ ...values, ...metadataDevice, ts: String(khronos), _rticket: String(requestTicket) });
+        query = pythonUrlEncode({ ...values, ...device, ts: String(khronos), _rticket: String(requestTicket) });
         url = `https://api5-normal-sinfonlineb.fqnovel.com${apiPath}?${query}`;
         if (branchOf(url, body, khronos) === 0) break;
         if (n === 127) throw new Error('无法生成 App 目录请求签名');
@@ -292,7 +295,7 @@ function signedMetadataRequest(apiPath, values = {}, payload = null) {
         'x-ss-req-ticket': String(requestTicket), 'x-khronos': String(khronos),
         'x-gorgon': xGorgon(query, body, khronos, Math.floor(Math.random() * 65536)),
         'x-ladon': be32(khronos).toString('base64'), 'x-argus': le32(khronos).toString('base64'),
-        'x-helios': helios(khronos), 'x-medusa': buildMedusa(url, body, khronos, metadataDevice), 'x-tt-dt': '',
+        'x-helios': helios(khronos), 'x-medusa': buildMedusa(url, body, khronos, device), 'x-tt-dt': '',
     };
     if (body) { headers['Content-Type'] = 'application/json; charset=utf-8'; headers['x-ss-stub'] = md5(body); }
     return { url, headers, body };
@@ -441,8 +444,12 @@ async function fetchAppPlayUrl(vid, options = {}) {
     normalizeDownloadQuality(options.quality); // Validate before registration or network I/O.
     vid = String(vid || '');
     if (!/^\d{1,30}$/.test(vid)) throw new Error('分集编号无效');
-    if (options.preferSdk) {
-        const preferred = await resolveSdkAppPlayUrl(vid, options);
+    options = { ...options, contentType: ['1001', '1004'].includes(String(options.contentType)) ? String(options.contentType) : '1004' };
+    let sdkFailure = null;
+    const trySdk = async () => resolveSdkAppPlayUrl(vid, options, error => { sdkFailure = error; });
+    const parallelSdk = options.preferSdk && options.parallelSdk === true;
+    if (parallelSdk) {
+        const preferred = await trySdk();
         if (preferred) return preferred;
     }
     // Playback, prefetch and downloads share one paced turn, including registration.
@@ -458,6 +465,11 @@ async function fetchAppPlayUrl(vid, options = {}) {
         throwIfAborted(options.signal);
         let identityRotated = false;
         try {
+            // Downloads may run SDK-first in parallel; online playback takes a paced queue slot first.
+            if (options.preferSdk && !parallelSdk) {
+                const preferred = await trySdk();
+                if (preferred) return preferred;
+            }
             for (;;) {
                 try { return await fetchAppPlayUrlFresh(vid, options); }
                 catch (error) {
@@ -474,6 +486,7 @@ async function fetchAppPlayUrl(vid, options = {}) {
             }
         }
         catch (error) {
+            throwIfAborted(options.signal);
             const retryIdentity = ['EMPTY_RESPONSE', 'ETIMEDOUT', 'ECONNABORTED'].includes(error.code)
                 || error.code === 'BUSINESS_REJECTED' && Number(error.businessCode) === 110001;
             if (retryIdentity) {
@@ -486,6 +499,11 @@ async function fetchAppPlayUrl(vid, options = {}) {
                     playbackEmptyRounds = 0;
                 }
             }
+            if (!options.preferSdk) {
+                const preferred = await trySdk();
+                if (preferred) return preferred;
+            }
+            if (sdkFailure) error.sdkFailure = sdkFailure;
             // An explicit refusal also stops work queued before it was received.
             if ([403, 429].includes(error.status) || error.code === 'BUSINESS_REJECTED' && Number(error.businessCode) !== 110001
                 || (error.code === 'DEVICE_REGISTRATION_FAILED'
@@ -507,9 +525,10 @@ async function fetchAppPlayUrl(vid, options = {}) {
 }
 
 async function fetchAppPlayUrlFresh(vid, options) {
+    const contentType = options.contentType || '1004';
     const payload = JSON.stringify({
         biz_param: { detail_page_version: 0, device_level: 1, disable_digg_stat: false, disable_video_relate_book: false, need_all_video_definition: true, need_mp4_align: false, use_os_player: false, use_server_dns: false, video_platform: 1024 },
-        mixed_video_id_map: { '1004': [vid] },
+        mixed_video_id_map: { [contentType]: [vid] },
         dr_scene: 'player',
     });
     // Reusing one identity avoids turning a transient upstream refusal into an
@@ -526,7 +545,7 @@ async function fetchAppPlayUrlFresh(vid, options) {
             () => videoTabRequest(identity, vid),
             () => playbackRequest(payload, identity, vid),
             () => playbackRequest(payload, identity, vid, true),
-            ...MODEL_APIS.map(base => () => playbackModelRequest(identity, vid, base)),
+            ...MODEL_APIS.map(base => () => playbackModelRequest(identity, vid, base, contentType)),
             () => {
                 const legacy = playbackRequest(payload, identity, '');
                 legacy.headers.Connection = 'close';
@@ -559,7 +578,7 @@ async function fetchAppPlayUrlFresh(vid, options) {
                 });
                 throw lastError;
             }
-            const entries = response.data?.['1004'] ?? response.data?.video_model_data ?? response.data;
+            const entries = response.data?.[contentType] ?? response.data?.video_model_data ?? response.data;
             const entry = entries?.[vid];
             const candidate = typeof entry?.video_model === 'string' ? jsonBody(entry.video_model) : entry?.video_model;
             if (!candidate || typeof candidate !== 'object' || Array.isArray(candidate)) {
@@ -570,8 +589,6 @@ async function fetchAppPlayUrlFresh(vid, options) {
             break;
         }
         if (!response) {
-            const preferred = await resolveSdkAppPlayUrl(vid, options);
-            if (preferred) return preferred;
             throw lastError || Object.assign(new Error('App 接口返回空响应（HTTP 200），原因尚未确认'), {
                 code: 'EMPTY_RESPONSE', status: 200, emptyResponse: true,
             });
@@ -581,7 +598,7 @@ async function fetchAppPlayUrlFresh(vid, options) {
         if (businessCode !== 0) throw Object.assign(new Error('App 接口暂未提供本集播放信息'), {
             code: 'BUSINESS_REJECTED', businessCode,
         });
-        const entries = response.data?.['1004'] ?? response.data?.video_model_data ?? response.data;
+        const entries = response.data?.[contentType] ?? response.data?.video_model_data ?? response.data;
         const entry = entries?.[vid];
         const model = typeof entry?.video_model === 'string' ? jsonBody(entry.video_model) : entry?.video_model;
         if (!model || typeof model !== 'object' || Array.isArray(model)) throw Object.assign(new Error('App 接口未返回所选分集，已停止取址'), { code: entry?.video_model ? 'INVALID_RESPONSE' : 'MISSING_MODEL' });
@@ -621,14 +638,21 @@ async function fetchAppPlayUrlFresh(vid, options) {
     }
 }
 
-async function resolveSdkAppPlayUrl(vid, options) {
-    const sdkResult = await sdkPlayback.resolveSdkPlayback(vid, { signal: options.signal });
+async function resolveSdkAppPlayUrl(vid, options, onFailure) {
+    const sdkResult = await sdkPlayback.resolveSdkPlayback(vid, {
+        signal: options.signal, contentType: options.contentType, onError: onFailure,
+    });
     throwIfAborted(options.signal);
     if (!sdkResult) return null;
-    const parsed = parseAppPlayModel(sdkResult.model, vid, options, false);
-    parsed.userAgent = sdkResult.userAgent;
-    for (const variant of parsed.variants || []) variant.userAgent = sdkResult.userAgent;
-    return parsed;
+    try {
+        const parsed = parseAppPlayModel(sdkResult.model, vid, options, false);
+        parsed.userAgent = sdkResult.userAgent;
+        for (const variant of parsed.variants || []) variant.userAgent = sdkResult.userAgent;
+        return parsed;
+    } catch (error) {
+        onFailure?.({ code: error.code || 'SDK_INVALID_RESPONSE', message: error.message });
+        return null;
+    }
 }
 
 function parseAppPlayModel(info, vid, options, inline, requireEncryptionMetadata = inline, minimumPixels = 0) {

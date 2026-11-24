@@ -237,12 +237,16 @@ const checks = [
     assert.equal(typeof app.signedMetadataRequest, 'function');
     const category = app.signedMetadataRequest('/reading/distribution/category/landpage/v/', {}, { limit: 15 });
     const rank = app.signedMetadataRequest('/reading/bookapi/bookmall/cell/change/v', { offset: '0' });
+    const album = app.signedMetadataRequest('/novel/player/album_detail/v1/', {}, { album_id: '7676321126145854488' });
     const a = new URL(category.url), b = new URL(rank.url);
     assert.equal(a.origin, 'https://api5-normal-sinfonlineb.fqnovel.com');
     for (const key of ['iid', 'device_id']) { assert.match(a.searchParams.get(key), /^\d+$/); assert.equal(a.searchParams.get(key), b.searchParams.get(key)); }
     assert.equal(a.searchParams.get('version_code'), '73532'); assert.equal(a.searchParams.get('version_name'), '7.3.5.32');
     assert.equal(category.headers['Accept-Encoding'], 'identity'); assert.ok(category.headers['x-ss-stub']);
     assert.equal(rank.body, null); assert.ok(rank.headers['x-medusa']); assert.ok(rank.headers['x-gorgon']);
+    assert.equal(new URL(album.url).origin, a.origin); assert.ok(album.headers['x-ss-stub']);
+    assert.notEqual(new URL(album.url).searchParams.get('device_id'), a.searchParams.get('device_id'),
+      'album directory uses a fresh one-shot metadata identity');
     assert.throws(() => app.signedMetadataRequest('/unrelated', {}));
   }],
 ];

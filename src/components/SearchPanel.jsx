@@ -232,7 +232,7 @@ function SearchPanel({ onSelectSeries, onViewSeries, onSwitchToInput, active = t
     setPickingId(item.series_id);
     setError('');
     try {
-      const res = await window.electronAPI.searchResolve(item.series_id);
+      const res = await window.electronAPI.searchResolve(item.series_id, { contentType: item.content_type });
       if (request !== requestVersion.current) return;
       if (res && res.success && res.data) {
         await (viewDetails ? onViewSeries : onSelectSeries)({

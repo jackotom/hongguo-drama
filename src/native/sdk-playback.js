@@ -11,6 +11,16 @@ const MAX_CONCURRENT_HELPERS = 3;
 let activeHelpers = 0;
 const helperWaiters = [];
 
+function sdkError(message, code = 'SDK_PLAYBACK_FAILED') {
+    const error = new Error(message);
+    error.code = code;
+    return error;
+}
+
+function safeDetail(value) {
+    return String(value || '').replace(/https?:\/\/\S+/gi, '[url]').replace(/\s+/g, ' ').trim().slice(0, 200);
+}
+
 function electronApp() {
     try {
         const electron = require('electron');
@@ -47,41 +57,47 @@ function runHelper(executable, args, signal, timeoutMs) {
             signal?.removeEventListener('abort', cancel);
             resolve(value);
         };
+        const fail = (message, code) => finish({ error: sdkError(message, code) });
         const cancel = () => {
             if (!child.killed) child.kill();
-            finish(null);
+            fail('SDK 取源已取消', 'ERR_CANCELED');
         };
         const timer = setTimeout(() => {
             if (!child.killed) child.kill();
-            finish(null);
+            fail('SDK 取源超时', 'SDK_TIMEOUT');
         }, timeoutMs);
         signal?.addEventListener('abort', cancel, { once: true });
         if (signal?.aborted) cancel();
         child.stdout.on('data', chunk => {
             stdout += chunk.toString('utf8');
-            if (stdout.length > MAX_OUTPUT) cancel();
+            if (stdout.length > MAX_OUTPUT) {
+                if (!child.killed) child.kill();
+                fail('SDK 返回数据过长', 'SDK_INVALID_RESPONSE');
+            }
         });
         child.stderr.on('data', chunk => {
             stderr = (stderr + chunk.toString('utf8')).slice(-4096);
         });
-        child.on('error', () => finish(null));
+        child.on('error', () => fail('SDK 执行文件启动失败', 'SDK_SPAWN_FAILED'));
         child.on('close', code => {
             if (settled) return;
             if (code !== 0) {
-                if (stderr) console.warn('[SDK playback] helper failed:', stderr.replace(/\s+/g, ' ').slice(0, 240));
-                finish(null);
+                let detail = '';
+                try { detail = safeDetail(JSON.parse(stdout)?.error); } catch {}
+                if (!detail) detail = safeDetail(stderr);
+                fail(`SDK 取源失败${detail ? `：${detail}` : `（退出码 ${code}）`}`, 'SDK_HELPER_FAILED');
                 return;
             }
             try {
                 const payload = JSON.parse(stdout);
                 if (payload?.ok !== true || !payload.model || typeof payload.model !== 'object' ||
                     Array.isArray(payload.model) || typeof payload.userAgent !== 'string' || !payload.userAgent.trim()) {
-                    finish(null);
+                    fail('SDK 返回数据无效', 'SDK_INVALID_RESPONSE');
                     return;
                 }
-                finish({ model: payload.model, userAgent: payload.userAgent.slice(0, 512) });
+                finish({ result: { model: payload.model, userAgent: payload.userAgent.slice(0, 512) } });
             } catch {
-                finish(null);
+                fail('SDK 返回数据无法解析', 'SDK_INVALID_RESPONSE');
             }
         });
     });
@@ -117,23 +133,48 @@ function releaseHelper() {
 }
 
 async function resolveSdkPlayback(vid, options = {}) {
+    const report = error => {
+        if (error?.code !== 'ERR_CANCELED') options.onError?.({ code: error.code, message: error.message });
+    };
     const app = electronApp();
-    if (!app || !/^\d{1,30}$/.test(String(vid))) return null;
+    if (!/^\d{1,30}$/.test(String(vid))) {
+        report(sdkError('分集编号无效', 'SDK_INVALID_VIDEO'));
+        return null;
+    }
+    if (!app) {
+        report(sdkError('SDK 运行环境不可用', 'SDK_UNAVAILABLE'));
+        return null;
+    }
     const executable = executablePath(app);
-    if (!executable) return null;
+    if (!executable) {
+        report(sdkError('当前平台未启用后续集 SDK', 'SDK_UNAVAILABLE'));
+        return null;
+    }
     try {
-        if (!fs.statSync(executable).isFile()) return null;
+        if (!fs.statSync(executable).isFile()) {
+            report(sdkError('SDK 执行文件不存在', 'SDK_UNAVAILABLE'));
+            return null;
+        }
         const cachePath = path.join(app.getPath('userData'), 'sdk-playback');
         fs.mkdirSync(cachePath, { recursive: true });
         const cacheDir = fs.realpathSync(cachePath);
         await acquireHelper(options.signal);
         try {
-            return await runHelper(executable, ['--video', String(vid), '--cache', cacheDir],
+            const args = ['--video', String(vid), '--cache', cacheDir];
+            if (String(options.contentType || '1004') !== '1004') args.push('--content-type', String(options.contentType));
+            const outcome = await runHelper(executable, args,
                 options.signal, Number(options.timeoutMs) || DEFAULT_TIMEOUT);
+            if (outcome.error) {
+                report(outcome.error);
+                return null;
+            }
+            return outcome.result;
         } finally {
             releaseHelper();
         }
-    } catch {
+    } catch (error) {
+        report(error?.name === 'AbortError' ? sdkError('SDK 取源已取消', 'ERR_CANCELED')
+            : sdkError(`SDK 初始化失败：${safeDetail(error?.message) || '未知错误'}`, 'SDK_INIT_FAILED'));
         return null;
     }
 }
