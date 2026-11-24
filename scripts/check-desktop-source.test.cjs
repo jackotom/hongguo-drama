@@ -108,16 +108,17 @@ test('parallel SDK-first download preference reaches the provider lookup', async
     assert.equal((await result).value, info('11').url);
 });
 
-test('desktop downloads use parallel SDK-first lookup with the episode content type', async t => {
+test('desktop downloads use V8-first lookup and pass SDK batch fallback metadata', async t => {
     const h = desktop(t);
     const task = h.add('11', '11');
     task.hongguoInfo.content_type = '1001';
     h.state.load = async (vid, options) => { h.lookups.push(options); return info(vid); };
     await h.run('executeHongguoDownload(downloadTasks[0])');
     assert.equal(task.status, 'completed', task.error);
-    assert.equal(h.lookups[0].preferSdk, true);
-    assert.equal(h.lookups[0].parallelSdk, true);
+    assert.equal(h.lookups[0].preferSdk, false);
+    assert.equal(h.lookups[0].parallelSdk, false);
     assert.equal(h.lookups[0].sdkPriority, false);
+    assert.equal(h.lookups[0].sdkBatchVids[0], '11');
     assert.equal(h.lookups[0].content_type, '1001');
 });
 

@@ -265,7 +265,7 @@ function awaitBatchEntry(entry, key, signal) {
         if (released) return;
         released = true;
         entry.waiters--;
-        if (entry.waiters <= 0 && !entry.settled) entry.controller.abort();
+        if (entry.waiters <= 0) entry.controller.abort();
     };
     return new Promise(resolve => {
         let done = false;
@@ -287,7 +287,7 @@ function awaitBatchEntry(entry, key, signal) {
         entry.promise.then(
             result => {
                 releaseWaiter();
-                if (result?.unsupportedBatch) finish(result);
+                if (result?.unsupportedBatch || result?.failure) finish(result);
                 else finish(result instanceof Map ? (result.get(key) || null) : null);
             },
             () => {
@@ -317,7 +317,7 @@ function startBatch(vids, contentType, env, timeoutMs, priority = false) {
                     stdout => parseBatchPayload(stdout, vids),
                 );
                 if (outcome.unsupportedBatch) return outcome;
-                if (outcome.error) return null;
+                if (outcome.error) return { failure: outcome.error };
                 storeCachedModels(outcome.result, contentType);
                 return outcome.result;
             } finally {
@@ -444,8 +444,16 @@ function createSdkPlaybackSession(options = {}) {
                     const raw = JSON.parse(line);
                     const entry = pending.get(raw?.id);
                     if (!entry) continue;
+                    if (raw?.ok !== true) {
+                        const error = sdkError(`SDK 会话取源失败：${safeDetail(raw?.error) || '未知错误'}`, 'SDK_HELPER_FAILED');
+                        pending.delete(raw.id);
+                        entry.onError?.(error);
+                        entry.finish(null);
+                        continue;
+                    }
+                    const parsed = parseSinglePayload(line).result;
                     pending.delete(raw.id);
-                    entry.finish(parseSinglePayload(line).result);
+                    entry.finish(parsed);
                 } catch (error) {
                     resetWorker(error?.code || 'SDK_INVALID_RESPONSE');
                     break;
@@ -550,6 +558,11 @@ async function resolveSdkPlayback(vid, options = {}) {
             const inflight = pendingBatches.get(cacheKeyValue);
             if (inflight) {
                 const shared = await awaitBatchEntry(inflight, key, options.signal);
+                if (options.signal?.aborted) return null;
+                if (shared?.failure) {
+                    reportFailure(options, shared.failure);
+                    return null;
+                }
                 if (shared && !shared.unsupportedBatch) return shared;
             }
             if (Array.isArray(options.batchVids) && options.batchVids.length > 1) {
@@ -559,6 +572,11 @@ async function resolveSdkPlayback(vid, options = {}) {
                 if (candidates.length > 1) {
                     const entry = startBatch(candidates, contentType, env, timeoutMs, options.priority === true);
                     const batchResult = await awaitBatchEntry(entry, key, options.signal);
+                    if (options.signal?.aborted) return null;
+                    if (batchResult?.failure) {
+                        reportFailure(options, batchResult.failure);
+                        return null;
+                    }
                     if (batchResult && !batchResult.unsupportedBatch) return batchResult;
                 }
             }

@@ -135,8 +135,8 @@ module.exports = async function checkDownloads({ evaluate, result, dataFile, med
     .map(episode => ({ index: episode.vid_index, status: episode.status, fileUrl: episode.fileUrl }));
   receipt.sourceProviders = tasks.map(task => ({ index: task.hongguoInfo.vid_index,
     provider: task.sourceProvider || '', sdkFailure: task.sdkFailure || null }));
-  assert.deepEqual(receipt.sourceProviders.map(item => item.provider).sort(), ['sdk', 'sdk'],
-    'Fresh Windows acceptance downloads must both use the packaged SDK instead of the official fallback: ' + JSON.stringify(receipt.sourceProviders));
+  assert.equal(receipt.sourceProviders.every(item => ['official', 'sdk'].includes(item.provider)), true,
+    'Fresh Windows acceptance downloads must record the actual V8/official or SDK provider: ' + JSON.stringify(receipt.sourceProviders));
   const files = [];
   for (const episode of episodes) {
     const task = tasks.find(task => task.hongguoInfo.vid === episode.vid);

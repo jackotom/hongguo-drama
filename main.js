@@ -916,7 +916,7 @@ async function executeHongguoDownload(task) {
   try {
     delete task.published;
     task.status = 'downloading'; task.cancelled = false; task.progress = 0; delete task.retryAt;
-    delete task.qualityNotice; delete task.actualQuality; delete task.sourceProvider;
+    delete task.qualityNotice; delete task.actualQuality; delete task.sourceProvider; delete task.sdkFailure;
     sendToRenderer('download-progress', { id, progress: 0, receivedBytes: 0, totalBytes: 0, qualityNotice: '', actualQuality: null });
     const settings = getCurrentSettings();
     // Old and retried tasks retain their original policy, independent of new defaults.

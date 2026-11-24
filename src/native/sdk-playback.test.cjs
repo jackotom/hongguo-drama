@@ -216,6 +216,27 @@ test('resolveSdkPlaybackBatch filters requested models and content type', async 
     assert.deepEqual(models.get('40000001'), { model: { a: 1 }, userAgent: 'batch-ua' });
 });
 
+test('batch failure is reported without rerunning the same episode as a single request', async () => {
+    resetFixtures();
+    const errors = [];
+    const pending = resolveSdkPlayback('31000001', {
+        batchVids: ['31000001', '31000002'],
+        onError: error => errors.push(error),
+    });
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(children.length, 1);
+    children[0].stdout.emit('data', Buffer.from(JSON.stringify({
+        ok: false,
+        stage: 'playback-send',
+        error: 'RuntimeError: fixture batch failure',
+    })));
+    children[0].emit('close', 1);
+    assert.equal(await pending, null);
+    assert.equal(children.length, 1);
+    assert.equal(errors[0].code, 'SDK_HELPER_FAILED');
+    assert.match(errors[0].message, /fixture batch failure/);
+});
+
 test('createSdkPlaybackSession reuses one --serve process across requests', async () => {
     resetFixtures();
     const session = createSdkPlaybackSession({ cacheDir: '/tmp/serve-cache' });
@@ -247,6 +268,41 @@ test('createSdkPlaybackSession reuses one --serve process across requests', asyn
             userAgent: 'ua-2',
         }) + '\n'));
         assert.deepEqual(await second, { model: { ep: 2 }, userAgent: 'ua-2' });
+    } finally {
+        session.close();
+    }
+});
+
+test('createSdkPlaybackSession reports a failed response immediately and keeps the worker reusable', async () => {
+    resetFixtures();
+    const errors = [];
+    const session = createSdkPlaybackSession({ cacheDir: '/tmp/serve-cache' });
+    try {
+        const failed = session.resolve('51000001', { onError: error => errors.push(error) });
+        await new Promise(resolve => setImmediate(resolve));
+        await new Promise(resolve => setImmediate(resolve));
+        const failedRequest = JSON.parse(children[0].stdin.writes[0]);
+        children[0].stdout.emit('data', Buffer.from(JSON.stringify({
+            id: failedRequest.id,
+            ok: false,
+            stage: 'playback-send',
+            error: 'RuntimeError: fixture session failure',
+        }) + '\n'));
+        assert.equal(await failed, null);
+        assert.equal(errors[0].code, 'SDK_HELPER_FAILED');
+        assert.match(errors[0].message, /fixture session failure/);
+        assert.equal(children[0].killed, false);
+
+        const recovered = session.resolve('51000002');
+        await new Promise(resolve => setImmediate(resolve));
+        const recoveredRequest = JSON.parse(children[0].stdin.writes[1]);
+        children[0].stdout.emit('data', Buffer.from(JSON.stringify({
+            id: recoveredRequest.id,
+            ok: true,
+            model: { recovered: true },
+            userAgent: 'ua-recovered',
+        }) + '\n'));
+        assert.deepEqual(await recovered, { model: { recovered: true }, userAgent: 'ua-recovered' });
     } finally {
         session.close();
     }
