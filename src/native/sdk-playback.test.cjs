@@ -6,6 +6,8 @@ const { after, test } = require('node:test');
 
 const originalLoad = Module._load;
 const originalVersions = process.versions;
+const originalPlatform = Object.getOwnPropertyDescriptor(process, 'platform');
+const originalArch = Object.getOwnPropertyDescriptor(process, 'arch');
 const children = [];
 const spawnedCalls = [];
 
@@ -13,6 +15,8 @@ Object.defineProperty(process, 'versions', {
     value: { ...originalVersions, electron: '44.11.5' },
     configurable: true,
 });
+Object.defineProperty(process, 'platform', { value: 'win32', configurable: true });
+Object.defineProperty(process, 'arch', { value: 'x64', configurable: true });
 
 Module._load = function load(request, parent, isMain) {
     if (request === 'electron') {
@@ -64,6 +68,8 @@ after(() => {
         value: originalVersions,
         configurable: true,
     });
+    Object.defineProperty(process, 'platform', originalPlatform);
+    Object.defineProperty(process, 'arch', originalArch);
 });
 
 function resetFixtures() {
