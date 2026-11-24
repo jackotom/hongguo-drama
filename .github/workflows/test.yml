@@ -3,6 +3,7 @@ name: Test
 on:
   push:
   pull_request:
+  workflow_dispatch:
 permissions:
   contents: read
 jobs:
@@ -17,7 +18,13 @@ jobs:
           cache: npm
       - run: npm ci --no-audit --no-fund
       - name: Install real-media test tools
-        run: sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg
+        run: |
+          if command -v ffmpeg >/dev/null && command -v ffprobe >/dev/null; then
+            ffmpeg -version | head -1
+            exit 0
+          fi
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq ffmpeg
       # Node fixtures mock Electron; real packaged launches run in the platform workflows.
       - run: npm test
         env:
