@@ -4,7 +4,8 @@
   "publicVersion": "8.2",
   "tag": "v8.2",
   "platforms": ["mac-arm64", "mac-x64", "win-x64", "linux-x64"],
-  "status": "draft-rebuild",
+  "status": "published",
   "releaseId": 456354972,
-  "sourceSha": "4ef6b05"
+  "sourceSha": "ea5a852f65acdc4c5b11265ca13b03d115096dc7",
+  "publishedAt": "2026-11-24T07:56:30Z"
 }
