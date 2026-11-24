@@ -912,7 +912,6 @@ async function executeHongguoDownload(task) {
   task.cancelSource = source;
   let tmpPath, writer, temporary, finalPath;
   const numeric = /^\d{1,30}$/.test(String(vid));
-  const preferSdk = numeric;
   try {
     delete task.published;
     task.status = 'downloading'; task.cancelled = false; task.progress = 0; delete task.retryAt;
@@ -1038,15 +1037,15 @@ async function executeHongguoDownload(task) {
       }
       reusedCache = await reuseCache();
     }
-    if (!reusedCache && preferSdk) {
+    if (!reusedCache && numeric) {
       task.qualityNotice = '正在获取完整片源';
       sendToRenderer('download-progress', { id, qualityNotice: task.qualityNotice });
     }
     if (!reusedCache) await withMediaRecovery(vid, hongguoInfo?.series_id, { playInfo: checkedPlayInfo, quality, allowLowerQuality,
-      content_type: hongguoInfo?.content_type, preferSdk, parallelSdk: preferSdk, force: true, cancelToken: source.token,
+      content_type: hongguoInfo?.content_type, sdkPriority: false, force: true, cancelToken: source.token,
       onSourceReady: () => {
         if (numeric) clearHongguoSourceBackoff();
-        if (preferSdk && task.qualityNotice === '正在获取完整片源') {
+        if (numeric && task.qualityNotice === '正在获取完整片源') {
           task.qualityNotice = '';
           sendToRenderer('download-progress', { id, qualityNotice: '' });
         }
@@ -1762,8 +1761,10 @@ async function searchAtSourcePage(keyword, options = {}) {
     let appSupplement = 0;
     if (!appEnabled && options?.appSearch !== false && options?.fuzzy !== false
       && !hasTitleMatch(results) && Date.now() >= appSearchCooldownUntil) {
-      try {
-        const appDeadline = Math.min(deadline || Date.now() + 8000, Date.now() + 8000);
+      const appDeadline = Math.min(deadline || Date.now() + 8000, Date.now() + 8000);
+      if (appDeadline - Date.now() < 1000) {
+        appFallbackError = '搜索时间预算已用完';
+      } else try {
         const app = await require('./src/native/hongguo-app-search').searchApp(keyword, { page: 1, deadline: appDeadline });
         appSearchCooldownUntil = 0;
         const merged = new Map(results.map(item => [String(item.series_id), item]));
@@ -3340,7 +3341,7 @@ async function withMediaRecovery(vid, seriesId, options, consume) {
           lookup = boundedSignal(controller.signal, 30000);
           info = await awaitMediaOperation(hongguo.fetchPlayUrlSingle(vid, seriesId,
             { quality: options.quality, allowLowerQuality: options.allowLowerQuality, preferSdk: options.preferSdk === true,
-              parallelSdk: options.parallelSdk === true, content_type: options.content_type,
+              parallelSdk: options.parallelSdk === true, sdkPriority: options.sdkPriority === true, content_type: options.content_type,
               force: options.force || round > 0, signal: lookup.signal }), lookup.signal);
           throwIfAborted(lookup.signal);
         }
@@ -3746,7 +3747,7 @@ ipcMain.handle('prepare-online-play', async (event, payload) => {
             }
           };
           const prepared = await withMediaRecovery(sourceVid,seriesId,{playInfo:checkedPlayInfo,quality,allowLowerQuality,
-            content_type:contentType,preferSdk:/^\d{1,30}$/.test(sourceVid),force,signal:controller.signal},async playInfo => {
+            content_type:contentType,sdkPriority:true,force,signal:controller.signal},async playInfo => {
             const entry = {quality,codec:playInfo.codec === 'bytevc2' ? 'h264' : playInfo.codec || '',size:0,lastUsed:Date.now(),seriesId:String(seriesId||''),vidIndex:Number(vidIndex)||0};
             if (playInfo.format === 'hls') await prepareHlsEntry(playInfo,entry,controller.signal,received => progress(received,0));
             else if (!prefetch && !playInfo.spadeA && !playInfo.contentKey && playInfo.codec !== 'bytevc2') return {...entry,playInfo};

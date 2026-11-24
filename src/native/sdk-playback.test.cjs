@@ -100,3 +100,22 @@ test('SDK invalid output reports SDK_INVALID_RESPONSE', { skip: process.platform
     assert.equal(await pending, null);
     assert.equal(errors[0].code, 'SDK_INVALID_RESPONSE');
 });
+
+test('priority playback starts before queued SDK downloads', { skip: process.platform !== 'darwin' }, async () => {
+    const start = children.length;
+    const active = ['20', '21', '22'].map(vid => resolveSdkPlayback(vid));
+    await new Promise(resolve => setImmediate(resolve));
+    const download = resolveSdkPlayback('23');
+    const playback = resolveSdkPlayback('24', { priority: true });
+    await new Promise(resolve => setImmediate(resolve));
+    finish(children[start]);
+    await new Promise(resolve => setImmediate(resolve));
+    assert.deepEqual(children[start + 3].args.slice(0, 2), ['--video', '24']);
+    finish(children[start + 1]);
+    await new Promise(resolve => setImmediate(resolve));
+    assert.deepEqual(children[start + 4].args.slice(0, 2), ['--video', '23']);
+    finish(children[start + 2]);
+    finish(children[start + 3]);
+    finish(children[start + 4]);
+    await Promise.all([...active, download, playback]);
+});

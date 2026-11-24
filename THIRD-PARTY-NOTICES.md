@@ -92,6 +92,7 @@ x264 是唯一非系统静态依赖（GPLv2-or-later），整体构建为 GPLv3-
 6.9 的播放签名 `playback-signature.js` 改编自 N3urda/hongguoTV `7444bb01aec7b0420740103e551c45f1f66101c9` 的 `Argus.kt`（GPL-3.0-only）；其原始归属为 ch6vip/fqapp 的 `rust/src/sign/{argus,simon,ladon,protobuf}.rs`。黄金向量来自同一固定提交的 `PlayerSignTest.kt`。仅播放模型使用真实551 Argus及Ladon，按最终query、实际正文与时间签名；搜索、目录、账号签名和匿名注册协议保留。未移植上游设备持久化、轮换、更大重试预算或权益修改逻辑。详细来源与改动见上述 NOTICE。
 
 7.5 的当前播放路径改用 `playback-v5.js`：来源为 N3urda/hongguoTV 固定提交 `18c37c2afd0567520135abcae312352542f09083` 的 `Signer.kt`、`AesV3.kt`、`V5Constants.kt`、`MobilePlayback.kt` 及两个合成签名向量文件，GPL-3.0-only。保留上游 drpys 归属。仅移植纯 JavaScript Android v5 Medusa／Helios 和请求结构；未引入官方 SDK、JNI、字节码解释器、远程签名服务或 PolyForm 实现。旧551签名仅保留在有界空响应恢复路径。来源、贡献线索和改动见 NOTICE。
+8.2 候选补充 N3urda/hongguoTV 固定提交 `ef328f3a3dc28479d90608a507996136672cf946` 的当前官方 App V5 `preload/v1` 请求形态（GPL-3.0-only），仅用于 SDK 失败后的有界官方兜底，并复用项目现有纯 JavaScript V5 签名与媒体校验。
 
 ### macOS SDK v5 播放取源执行文件（开发候选）
 

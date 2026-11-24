@@ -53,9 +53,7 @@ function parseSearchPayload(payload, { page = 1 } = {}) {
       return /^\d{1,30}$/.test(albumId) && albumId === String(item?.series_id || '')
         && Number(item.album_info?.episode_cnt) > 0;
     }
-    if (!/^\d{1,30}$/.test(String(item?.series_id || ''))) return false;
-    const count = item.episode_cnt ?? item.episode_count;
-    return count == null || Number(count) > 0;
+    return /^\d{1,30}$/.test(String(item?.series_id || ''));
   };
   for (const cell of Array.isArray(tab.data) ? tab.data : []) {
     const video = (Array.isArray(cell?.video_data) ? cell.video_data : []).find(playableSeries);

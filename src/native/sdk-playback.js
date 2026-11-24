@@ -10,6 +10,7 @@ const DEFAULT_TIMEOUT = 45000;
 const MAX_CONCURRENT_HELPERS = 3;
 let activeHelpers = 0;
 const helperWaiters = [];
+const priorityHelperWaiters = [];
 
 function sdkError(message, code = 'SDK_PLAYBACK_FAILED') {
     const error = new Error(message);
@@ -103,27 +104,28 @@ function runHelper(executable, args, signal, timeoutMs) {
     });
 }
 
-function acquireHelper(signal) {
+function acquireHelper(signal, priority = false) {
     if (signal?.aborted) return Promise.reject(Object.assign(new Error('cancelled'), { name: 'AbortError' }));
     if (activeHelpers < MAX_CONCURRENT_HELPERS) {
         activeHelpers++;
         return Promise.resolve();
     }
     return new Promise((resolve, reject) => {
-        const waiter = { resolve, reject, signal };
+        const queue = priority ? priorityHelperWaiters : helperWaiters;
+        const waiter = { resolve, reject, signal, queue };
         waiter.abort = () => {
-            const index = helperWaiters.indexOf(waiter);
-            if (index >= 0) helperWaiters.splice(index, 1);
+            const index = queue.indexOf(waiter);
+            if (index >= 0) queue.splice(index, 1);
             reject(Object.assign(new Error('cancelled'), { name: 'AbortError' }));
         };
         signal?.addEventListener('abort', waiter.abort, { once: true });
-        helperWaiters.push(waiter);
+        queue.push(waiter);
         if (signal?.aborted) waiter.abort();
     });
 }
 
 function releaseHelper() {
-    const waiter = helperWaiters.shift();
+    const waiter = priorityHelperWaiters.shift() || helperWaiters.shift();
     if (!waiter) {
         activeHelpers--;
         return;
@@ -158,7 +160,7 @@ async function resolveSdkPlayback(vid, options = {}) {
         const cachePath = path.join(app.getPath('userData'), 'sdk-playback');
         fs.mkdirSync(cachePath, { recursive: true });
         const cacheDir = fs.realpathSync(cachePath);
-        await acquireHelper(options.signal);
+        await acquireHelper(options.signal, options.priority === true);
         try {
             const args = ['--video', String(vid), '--cache', cacheDir];
             if (String(options.contentType || '1004') !== '1004') args.push('--content-type', String(options.contentType));

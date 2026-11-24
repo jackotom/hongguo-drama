@@ -24,9 +24,11 @@ let playbackReadyAt = 0;
 let playbackRejection = null;
 let playbackEmptyRounds = 0;
 let playbackIdentityResetAt = 0;
+let preferredPlaybackRoute = '';
 const VIDEO_API = 'https://api5-normal-sinfonlineb.fqnovel.com/novel/player/multi_video_model/v1/';
 const VIDEO_TAB_API = 'https://api5-normal-sinfonlineb.fqnovel.com/reading/bookapi/video_tab/multi_video_model/v1/';
 const PLAYER_API = 'https://api5-normal-sinfonlineb.fqnovel.com/novel/player/multi_video_model/player/v1';
+const PRELOAD_API = 'https://reading.snssdk.com/novel/player/multi_video_model/preload/v1';
 const MODEL_APIS = [
     'https://api5-normal-sinfonlinea.fqnovel.com/novel/player/video_model/v1/',
     'https://api5-normal-sinfonlinec.fqnovel.com/novel/player/video_model/v1/',
@@ -205,6 +207,32 @@ function playbackModelRequest(identity, videoId, base, contentType = '1004') {
     return { ...signed, body, method: 'POST', headers: { ...signed.headers,
         'User-Agent': 'com.phoenix.read/73932 (Linux; U; Android 12; zh_CN_#Hans; PGT-AN10; Build/V417IR;tt-ok/3.12.13.20)',
         Accept: 'application/json', 'Content-Type': 'application/json; charset=utf-8', 'Content-Encoding': 'gzip' } };
+}
+
+function preloadRequest(identity, videoId, contentType = '1004') {
+    // Current-app profile from N3urda/hongguoTV ef328f3a: V5 preload + device_level=2.
+    const payload = JSON.stringify({
+        biz_param: { detail_page_version: 0, device_level: 2, disable_digg_stat: false,
+            disable_video_relate_book: false, need_all_video_definition: true, need_mp4_align: false,
+            use_os_player: false, use_server_dns: false, video_platform: 1024 },
+        mixed_video_id_map: { [contentType]: [String(videoId)] },
+        dr_scene: 'preload',
+    });
+    const body = gzipSync(Buffer.from(payload));
+    const signed = signPlaybackV5({
+        base: PRELOAD_API,
+        values: {
+            aid: '8662', app_name: 'novelread', version_code: '74532', version_name: '7.4.5.32',
+            update_version_code: '74532', manifest_version_code: '74532', os: 'android', ssmix: 'a',
+            channel: 'update_64', device_platform: 'android', device_type: '25053RT47C',
+            device_brand: 'Redmi', os_version: '16', os_api: '36', ac: 'wifi', language: 'zh',
+            host_abi: 'arm64-v8a', iid: identity.iid, cdid: identity.cdid, device_id: identity.device_id,
+        },
+        body, now: Date.now(), field21: 312,
+    });
+    return { ...signed, body, method: 'POST', headers: { ...signed.headers,
+        'User-Agent': 'okhttp/4.12.0', Accept: 'application/json',
+        'Content-Type': 'application/json; charset=utf-8', 'Content-Encoding': 'gzip' } };
 }
 
 function videoTabRequest(identity, videoId) {
@@ -541,21 +569,26 @@ async function fetchAppPlayUrlFresh(vid, options) {
     const request = boundedSignal(options.signal, 12000);
     const { signal } = request;
     try {
-        const routes = [
-            () => videoTabRequest(identity, vid),
-            () => playbackRequest(payload, identity, vid),
-            () => playbackRequest(payload, identity, vid, true),
-            ...MODEL_APIS.map(base => () => playbackModelRequest(identity, vid, base, contentType)),
-            () => {
+        const candidates = [
+            { id: 'preload_current', create: () => preloadRequest(identity, vid, contentType) },
+            { id: 'video_tab', create: () => videoTabRequest(identity, vid) },
+            { id: 'player_b', create: () => playbackRequest(payload, identity, vid) },
+            { id: 'player_a', create: () => playbackRequest(payload, identity, vid, true) },
+            ...MODEL_APIS.map((base, index) => ({
+                id: `model_${index}`, create: () => playbackModelRequest(identity, vid, base, contentType),
+            })),
+            { id: 'legacy', create: () => {
                 const legacy = playbackRequest(payload, identity, '');
                 legacy.headers.Connection = 'close';
                 return legacy;
-            },
+            } },
         ];
+        const preferred = candidates.find(route => route.id === preferredPlaybackRoute);
+        const routes = preferred ? [preferred, ...candidates.filter(route => route !== preferred)] : candidates;
         let response, lastError;
-        for (const createRoute of routes) {
+        for (const routeCandidate of routes) {
             throwIfAborted(signal);
-            const route = createRoute();
+            const route = routeCandidate.create();
             for (let attempt = 0; attempt < 2; attempt++) {
                 try {
                     response = await requestJson(route.url, { method: route.method, headers: route.headers, data: route.body }, deadline, signal);
@@ -586,6 +619,7 @@ async function fetchAppPlayUrlFresh(vid, options) {
                     code: entry?.video_model ? 'INVALID_RESPONSE' : 'MISSING_MODEL',
                 });
             }
+            preferredPlaybackRoute = routeCandidate.id;
             break;
         }
         if (!response) {
@@ -603,9 +637,15 @@ async function fetchAppPlayUrlFresh(vid, options) {
         const model = typeof entry?.video_model === 'string' ? jsonBody(entry.video_model) : entry?.video_model;
         if (!model || typeof model !== 'object' || Array.isArray(model)) throw Object.assign(new Error('App 接口未返回所选分集，已停止取址'), { code: entry?.video_model ? 'INVALID_RESPONSE' : 'MISSING_MODEL' });
         const inline = model.video_list && typeof model.video_list === 'object' && Object.keys(model.video_list).length > 0;
-        const readFallback = async () => {
-            const fallback = parseFallback(model.fallback_api);
+        const readFallback = async ({ codec = '', forceCodec = '' } = {}) => {
+            let fallback = parseFallback(model.fallback_api);
             if (!fallback) throw Object.assign(new Error('App 接口未返回本集片源地址'), { code: 'MISSING_MODEL' });
+            if (codec) {
+                const target = new URL(fallback);
+                target.searchParams.set('codec_type', codec);
+                if (forceCodec) target.searchParams.set('force_codec', forceCodec);
+                fallback = target.href;
+            }
             const outer = await requestJson(fallback, { headers: { 'User-Agent': VIDEO_UA } }, deadline, signal);
             throwIfAborted(signal);
             if ([outer, outer.video_info].some(value => Number(value?.Code || value?.code || 0) !== 0)) {
@@ -622,16 +662,34 @@ async function fetchAppPlayUrlFresh(vid, options) {
             return parseAppPlayModel(model, vid, options, true);
         } catch (error) {
             const duration = Number(model.video_duration);
-            if (!error.incompleteEncryptionMetadata || typeof model.video_id !== 'string' || !model.video_id.trim() || !Number.isFinite(duration) || duration <= 0
-                || !error.minimumPixels || !model.fallback_api) throw error;
-            const info = await readFallback();
-            throwIfAborted(signal);
-            const fallbackDuration = Number(info?.video_duration);
-            if (info?.video_id !== model.video_id || !Number.isFinite(fallbackDuration) || fallbackDuration <= 0
-                || Math.abs(fallbackDuration - duration) > 0.5) {
-                throw Object.assign(new Error('备用片源编号或完整时长无法确认，已停止取址'), { code: 'INVALID_RESPONSE' });
+            const codecFallback = ['NO_COMPATIBLE_SOURCE', 'QUALITY_UNAVAILABLE'].includes(error.code);
+            if ((!error.incompleteEncryptionMetadata && !codecFallback)
+                || typeof model.video_id !== 'string' || !model.video_id.trim()
+                || !Number.isFinite(duration) || duration <= 0 || !model.fallback_api) throw error;
+            const validateFallback = info => {
+                const fallbackDuration = Number(info?.video_duration);
+                if (info?.video_id !== model.video_id || !Number.isFinite(fallbackDuration) || fallbackDuration <= 0
+                    || Math.abs(fallbackDuration - duration) > 0.5) {
+                    throw Object.assign(new Error('备用片源编号或完整时长无法确认，已停止取址'), { code: 'INVALID_RESPONSE' });
+                }
+                return info;
+            };
+            if (error.incompleteEncryptionMetadata) {
+                const info = validateFallback(await readFallback());
+                throwIfAborted(signal);
+                return parseAppPlayModel(info, vid, options, false, true, error.minimumPixels);
             }
-            return parseAppPlayModel(info, vid, options, false, true, error.minimumPixels);
+            let lastError = error;
+            for (const attempt of [{ codec: '1' }, { codec: '0', forceCodec: 'h264' }]) {
+                try {
+                    const info = validateFallback(await readFallback(attempt));
+                    throwIfAborted(signal);
+                    return parseAppPlayModel(info, vid, options, false);
+                } catch (fallbackError) {
+                    lastError = fallbackError;
+                }
+            }
+            throw lastError;
         }
     } finally {
         request.dispose();
@@ -641,6 +699,7 @@ async function fetchAppPlayUrlFresh(vid, options) {
 async function resolveSdkAppPlayUrl(vid, options, onFailure) {
     const sdkResult = await sdkPlayback.resolveSdkPlayback(vid, {
         signal: options.signal, contentType: options.contentType, onError: onFailure,
+        priority: options.sdkPriority === true,
     });
     throwIfAborted(options.signal);
     if (!sdkResult) return null;
@@ -709,7 +768,8 @@ function parseAppPlayModel(info, vid, options, inline, requireEncryptionMetadata
                 throw Object.assign(new Error('本集片源缺少有效解密信息'), { code: 'INVALID_RESPONSE' });
             }
             const key = spade ? deriveContentKey(spade) : null;
-            for (const candidate of [selected.item.main_url, selected.item.backup_url, ...(Array.isArray(selected.item.backup_url_list) ? selected.item.backup_url_list : [])]) {
+            for (const candidate of [selected.item.main_url, selected.item.backup_url, selected.item.backup_url_1,
+                ...(Array.isArray(selected.item.backup_url_list) ? selected.item.backup_url_list : [])]) {
                 if (typeof candidate !== 'string' || !candidate) continue;
                 try {
                     const media = info.key_seed

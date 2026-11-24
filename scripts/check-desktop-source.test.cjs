@@ -108,14 +108,16 @@ test('parallel SDK-first download preference reaches the provider lookup', async
     assert.equal((await result).value, info('11').url);
 });
 
-test('Hongguo online playback prefers SDK before official playback routes', async t => {
+test('Hongguo online playback uses official sources first with SDK fallback priority', async t => {
     const h = desktop(t);
     const pending = h.handlers['prepare-online-play']({}, {
-        vid: '11', seriesId: '100', vidIndex: 1, requestId: 'sdk-online', quality: 'auto',
+        vid: '11', seriesId: '100', vidIndex: 1, requestId: 'official-online', quality: 'auto', contentType: '1001',
     });
     await turn();
-    assert.equal(h.lookups[0].preferSdk, true);
+    assert.equal(h.lookups[0].preferSdk, false);
     assert.equal(h.lookups[0].parallelSdk, false);
+    assert.equal(h.lookups[0].sdkPriority, true);
+    assert.equal(h.lookups[0].content_type, '1001');
     h.calls[0].resolve(info('11'));
     assert.equal((await pending).success, true);
 });

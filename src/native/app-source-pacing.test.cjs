@@ -213,6 +213,8 @@ test('empty current routes rotate identity once and stop', async () => {
     assert.equal(settled.error.code, 'EMPTY_RESPONSE');
     assert.equal(f.registrations.length, 2, 'one empty-result identity rotation is bounded');
     const round = [
+        '/novel/player/multi_video_model/preload/v1',
+        '/novel/player/multi_video_model/preload/v1',
         '/reading/bookapi/video_tab/multi_video_model/v1/',
         '/reading/bookapi/video_tab/multi_video_model/v1/',
         '/novel/player/multi_video_model/player/v1',

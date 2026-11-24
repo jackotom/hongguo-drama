@@ -138,6 +138,27 @@ function failure(message, kind, fallback) {
   assert.equal(result.meta.appSupplement, 1);
   harness.cleanup();
 
+  const budgetAppCalls = [];
+  harness = load(async () => ({
+    results: [{ series_id: '7777777', series_title: '同题材无关剧' }], total: 1, page: 1, totalPages: 1, hasMore: false,
+  }), async (keyword, options = {}) => {
+    if (options.deadline <= Date.now()) throw Object.assign(new Error('App 搜索超时'), { code: 'APP_TIMEOUT' });
+    budgetAppCalls.push(keyword);
+    return {
+      results: [{ series_id: '8888888', series_title: '预算恢复后命中的剧', cover: '', episode_count: 0 }],
+      hasMore: false,
+    };
+  });
+  await harness.context.searchAtSourcePage('预算恢复后命中的剧', {
+    source: 'hongguo', page: 1, fuzzy: true, deadline: Date.now() - 1,
+  });
+  assert.deepEqual(budgetAppCalls, [], 'an expired budget must not start or cool down App search');
+  await harness.context.searchAtSourcePage('预算恢复后命中的剧', {
+    source: 'hongguo', page: 1, fuzzy: true, deadline: Date.now() + 8000,
+  });
+  assert.deepEqual(budgetAppCalls, ['预算恢复后命中的剧'], 'a later search must still reach App fallback');
+  harness.cleanup();
+
   harness = load(async keyword => {
     if (keyword === '无结果，补搜失败') return { results: [], total: 0, page: 1, totalPages: 0, hasMore: false };
     throw new Error('HTTP 502');

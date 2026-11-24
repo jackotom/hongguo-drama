@@ -208,6 +208,14 @@ test('bodyless v5 uses the empty-body digest without body-describing headers', (
   assert.ok(message.get(13).equals(api.__test.hashF13(sm3(Buffer.from(query)), md5(Buffer.alloc(0)), ts)));
 });
 
+test('current-app preload can select wire field21 312 without changing the default profile', () => {
+  const api = load();
+  const current = messageFor(api, { field21: 312 });
+  assert.equal(sint(current.message, 21), 312);
+  const normal = messageFor(api);
+  assert.equal(sint(normal.message, 21), 377);
+});
+
 test('registered identity and profile enter both query and serialized Medusa, with no fallback identity', () => {
   const api = load();
   for (const identity of [VALUES, { ...VALUES, device_id: '3234567890123456789', iid: '4234567890123456789',

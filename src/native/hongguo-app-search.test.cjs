@@ -84,6 +84,17 @@ test('creator collections map their album identity and episode count', () => {
   ]);
 });
 
+test('short-drama results remain visible while episode count is not filled yet', () => {
+  const result = parseSearchPayload({ ...payload, search_tabs: [{ ...payload.search_tabs[0], data: [
+    { search_high_light: { title: { text: '刚上线的新剧' } },
+      video_data: [{ series_id: '7670427740574600217', title: '刚上线的新剧', content_type: 1004, episode_cnt: 0 }] },
+  ] }] });
+  assert.equal(result.results.length, 1);
+  assert.equal(result.results[0].series_id, '7670427740574600217');
+  assert.equal(result.results[0].content_type, '1004');
+  assert.equal(result.results[0].episode_count, 0);
+});
+
 test('the signed request uses branch-0 search headers and carries the keyword', async () => {
   let captured;
   const result = await searchApp('测试短剧', { request: async (signed, deadline) => {

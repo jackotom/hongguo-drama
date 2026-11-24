@@ -187,7 +187,7 @@ function xmxor(data, key) {
   return encoded;
 }
 
-function medusa(query, f13, ts, who) {
+function medusa(query, f13, ts, who, field21 = 377) {
   const flags = Buffer.alloc(8);
   const device = proto([[1,1,'sint'], [2,2,'sint'], [3,'8662'], [4,who.device_id],
     [5,PROCESS_NONCE], [6,'!noperm!'], [12,'Asia/Shanghai,8'], [13,'zh_CN'],
@@ -198,7 +198,7 @@ function medusa(query, f13, ts, who) {
     [6,'646637794'], [7,who.version_name], [8,'v04.10.03-ml-android'], [9,0x040a0300,'sint'],
     [10,flags], [12,ts,'sint'], [13,f13], [14,query.subarray(0,6)],
     [15,proto([[1,1,'sint'], [2,1,'sint'], [3,1,'sint'], [5,1,'sint']])],
-    [17,ts,'sint'], [20,'none'], [21,377,'sint'], [23,env],
+    [17,ts,'sint'], [20,'none'], [21,field21,'sint'], [23,env],
     [24,'{"cmr":16777216,"cmr2":16777216,"un_h":11,"vpn":0,"kd":0,"dyn":"","do":1,"tk":true}']]);
   const nonce = random32(), high = (nonce >>> 16) & 255;
   const hash = sm3(Buffer.concat([SIGN_KEY, le32(nonce), SIGN_KEY]));
@@ -270,7 +270,7 @@ function validatedValues(values) {
 
 function signPlaybackV5(input) {
   if (!plainObject(input)) throw new TypeError('V5 signing options are required');
-  const { base, values, body, now = Date.now() } = input;
+  const { base, values, body, now = Date.now(), field21 = 377 } = input;
   if (typeof base !== 'string' || base.length > 8192 || /[\s?#]/.test(base)) throw new TypeError('V5 base must be an HTTPS URL without query or fragment');
   let parsed;
   try { parsed = new URL(base); } catch { throw new TypeError('V5 base must be a valid HTTPS URL'); }
@@ -278,6 +278,7 @@ function signPlaybackV5(input) {
     throw new TypeError('V5 base must use HTTPS without credentials or a custom port');
   }
   if (!Number.isSafeInteger(now) || now < 0 || Math.floor(now / 1000) > 0x7fffffff) throw new RangeError('V5 now must be nonnegative integer milliseconds within signed timestamp range');
+  if (!Number.isInteger(field21) || field21 < 0 || field21 > 0xffff) throw new RangeError('V5 field21 must be an unsigned 16-bit integer');
   const who = validatedValues(values);
   if (body !== null && !Buffer.isBuffer(body)) throw new TypeError('V5 body must be the original gzip Buffer');
   const hasBody = body !== null;
@@ -294,7 +295,7 @@ function signPlaybackV5(input) {
     if (branch(queryHash, bodyHash, ts) !== 12) continue;
     const f13 = hashF13(queryHash, bodyHash, ts);
     return { url: `${parsed.href}?${query}`, headers: {
-      'x-khronos': String(ts), 'x-helios': helios(ts), 'x-medusa': medusa(queryHash, f13, ts, who),
+      'x-khronos': String(ts), 'x-helios': helios(ts), 'x-medusa': medusa(queryHash, f13, ts, who, field21),
       ...(hasBody ? { 'x-ss-stub': bodyHash.toString('hex').toUpperCase() } : {}),
     } };
   }
