@@ -43,7 +43,7 @@ sign_path() {
 find "$APP/Contents" -type f -print0 | while IFS= read -r -d '' file; do
     if file -b "$file" | grep -q 'Mach-O'; then
         case "$file" in
-            "$APP"/Contents/MacOS/*|*/Contents/MacOS/*)
+            "$APP"/Contents/MacOS/*|*/Contents/MacOS/*|*/hongguo-sdk-playback)
                 sign_path "$file" "$INHERIT_ENTITLEMENTS" || exit 1
                 ;;
             *)
