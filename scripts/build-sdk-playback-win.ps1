@@ -27,12 +27,25 @@ $VenvPython = Join-Path $VenvDir 'Scripts\python.exe'
 $VenvPip = Join-Path $VenvDir 'Scripts\pip.exe'
 $VenvPyInstaller = Join-Path $VenvDir 'Scripts\pyinstaller.exe'
 
-if (-not (Test-Path $VenvPython)) {
-    & $Python -m venv $VenvDir
-    if ($LASTEXITCODE) { throw 'Failed to create Python virtual environment' }
+if (Test-Path $VenvDir) { Remove-Item -Recurse -Force $VenvDir }
+& $Python -m venv $VenvDir
+if ($LASTEXITCODE) { throw 'Failed to create Python virtual environment' }
+
+$PreviousCompileBootloader = $env:PYINSTALLER_COMPILE_BOOTLOADER
+$PreviousBootloaderWafArgs = $env:PYINSTALLER_BOOTLOADER_WAF_ARGS
+try {
+    $env:PYINSTALLER_COMPILE_BOOTLOADER = '1'
+    $env:PYINSTALLER_BOOTLOADER_WAF_ARGS = '--no-cfg'
+    & $VenvPip install --quiet --no-cache-dir --no-binary=pyinstaller pyinstaller==6.22.3
+    if ($LASTEXITCODE) { throw 'Failed to build PyInstaller without CFG' }
+} finally {
+    if ($null -eq $PreviousCompileBootloader) { Remove-Item Env:\PYINSTALLER_COMPILE_BOOTLOADER -ErrorAction SilentlyContinue }
+    else { $env:PYINSTALLER_COMPILE_BOOTLOADER = $PreviousCompileBootloader }
+    if ($null -eq $PreviousBootloaderWafArgs) { Remove-Item Env:\PYINSTALLER_BOOTLOADER_WAF_ARGS -ErrorAction SilentlyContinue }
+    else { $env:PYINSTALLER_BOOTLOADER_WAF_ARGS = $PreviousBootloaderWafArgs }
 }
 
-& $VenvPip install --quiet pyinstaller==6.22.3 unicorn==2.1.4 requests==2.34.2 pycryptodome==4.6.0
+& $VenvPip install --quiet unicorn==2.1.4 requests==2.34.2 pycryptodome==4.6.0
 if ($LASTEXITCODE) { throw 'Failed to install SDK playback build dependencies' }
 
 Push-Location $BuildRoot

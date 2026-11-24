@@ -36,6 +36,23 @@ def stage(name):
     print(f"[sdk-playback] {name}", file=sys.stderr, flush=True)
 
 
+def windows_cfg_enabled():
+    if os.name != "nt":
+        return False
+    import ctypes
+    from ctypes import wintypes
+
+    class Policy(ctypes.Structure):
+        _fields_ = [("Flags", wintypes.DWORD)]
+
+    value = Policy()
+    if not ctypes.windll.kernel32.GetProcessMitigationPolicy(
+        ctypes.c_void_p(-1), 7, ctypes.byref(value), ctypes.sizeof(value)
+    ):
+        raise OSError("GetProcessMitigationPolicy failed")
+    return bool(value.Flags & 1)
+
+
 def load_device(cache):
     path = cache / "device.json"
     try:
@@ -233,6 +250,9 @@ def main():
     parser.add_argument("--content-type", default="1004", choices=("1001", "1004"))
     args = parser.parse_args()
     try:
+        stage("cfg-check")
+        if windows_cfg_enabled():
+            raise RuntimeError("Windows Control Flow Guard is enabled; rebuild the PyInstaller bootloader with --no-cfg")
         model, user_agent = resolve(args.video, args.cache, args.content_type)
         print(json.dumps({
             "ok": True,
