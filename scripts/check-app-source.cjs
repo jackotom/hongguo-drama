@@ -58,6 +58,18 @@ function fixture({ wrongVid = false, fallback = 'https://vod.snssdk.com/info', m
     assert.equal(config.responseType, 'text');
     const model = { video_model: JSON.stringify({ fallback_api: fallback }) };
     const modelResponse = { status: 200, headers: {}, data: JSON.stringify({ code: 0, data: { '999': model, ...(wrongVid ? {} : { '11': model }) } }) };
+    if (new URL(config.url).pathname === '/novel/player/multi_video_model/preload/v1') {
+      assert.equal(config.method, 'POST');
+      assert.equal(config.headers['Content-Encoding'], 'gzip');
+      assert.ok(config.headers['x-ss-stub']);
+      const payload = JSON.parse(zlib.gunzipSync(config.data));
+      assert.deepEqual(payload.mixed_video_id_map['1004'], ['11']);
+      assert.equal(payload.dr_scene, 'preload');
+      assert.equal(payload.biz_param.device_level, 2);
+      assertPlayerSignature(config);
+      if (redirect) return { status: 302, headers: { location: redirect }, data: '' };
+      return emptyCurrent ? { status: 200, headers: {}, data: '' } : modelResponse;
+    }
     if (new URL(config.url).pathname === '/novel/player/multi_video_model/player/v1') {
       assert.equal(config.method, 'POST');
       assert.equal(config.headers['Content-Encoding'], 'gzip');
@@ -153,7 +165,8 @@ const checks = [
     await f.fetch('11');
     await f.fetch('11');
     await Promise.all([f.fetch('11'), f.fetch('11'), f.fetch('11')]);
-    const requests = f.calls.filter(call => ['/novel/player/multi_video_model/player/v1',
+    const requests = f.calls.filter(call => ['/novel/player/multi_video_model/preload/v1',
+      '/novel/player/multi_video_model/player/v1',
       '/reading/bookapi/video_tab/multi_video_model/v1/'].includes(new URL(call.url).pathname));
     assert.equal(requests.length, 5, 'one model request per lookup; no retry loop');
     for (const field of ['iid', 'device_id']) {
@@ -168,9 +181,9 @@ const checks = [
     assert.equal(f.calls.length, 10, 'each lookup retains its two-stage flow');
     const emptyV5 = fixture({ emptyCurrent: true });
     await emptyV5.fetch('11');
-    assert.equal(emptyV5.calls.length, 12, 'empty v5 responses recover through both current model hosts, video_tab and verified metadata');
+    assert.equal(emptyV5.calls.length, 14, 'empty v5 responses recover through preload, both current model hosts, video_tab and verified metadata');
     assert.deepEqual(emptyV5.calls.map(call => call.method || 'GET'),
-      ['GET', 'GET', 'POST', 'POST', 'POST', 'POST', 'POST', 'POST', 'POST', 'POST', 'POST', 'GET']);
+      ['POST', 'POST', 'GET', 'GET', 'POST', 'POST', 'POST', 'POST', 'POST', 'POST', 'POST', 'POST', 'POST', 'GET']);
   }],
   ['App H264 takes priority over higher-resolution HEVC', async () => {
     const result = await appRows({ hd: { main_url: mediaUrl('hevc'), codec_type: 'hevc', quality_desc: '1080P' },
@@ -269,7 +282,7 @@ const checks = [
     }
     const { fetch, calls } = fixture({ redirect: 'https://127.0.0.1/private' });
     await assert.rejects(fetch('11'));
-    assert.equal(calls.length, 2);
+    assert.equal(calls.length, 1);
     await assert.rejects(fixture({ media: 'https://127.0.0.1/video' }).fetch('11'));
   }],
   ['invalid input and invalid key rejected', async () => {
