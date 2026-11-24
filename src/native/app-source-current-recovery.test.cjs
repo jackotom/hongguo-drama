@@ -30,7 +30,8 @@ function fixture(tabAnswer, v5Answer = '') {
       if (name === 'axios') return async config => {
         calls.push(config);
         const url = new URL(config.url);
-        if (url.pathname === '/novel/player/multi_video_model/player/v1') {
+        if (url.pathname === '/novel/player/multi_video_model/preload/v1'
+            || url.pathname === '/novel/player/multi_video_model/player/v1') {
           const answer = typeof v5Answer === 'function' ? v5Answer(config, calls.length) : v5Answer;
           return typeof answer === 'string' ? { status: 200, headers: {}, data: answer } : answer;
         }
@@ -65,7 +66,7 @@ test('empty V5 responses recover through the current episode video_tab with the 
 test('empty current routes keep the failure bounded and never accept the preview page', async () => {
   const f = fixture({ status: 200, headers: {}, data: '' });
   await assert.rejects(f.fetch(), { code: 'EMPTY_RESPONSE' });
-  assert.equal(f.calls.length, 24);
+  assert.equal(f.calls.length, 28);
   assert.equal(f.registrations(), 2);
   assert.ok(f.calls.some(call => new URL(call.url).pathname === '/novel/player/video_model/v1/'));
   assert.ok(f.calls.some(call => new URL(call.url).pathname === '/reading/bookapi/video_tab/multi_video_model/v1/'));
@@ -83,7 +84,7 @@ test('an empty route is reprobed with the same identity instead of registering a
   assert.equal((await f.fetch()).url, media);
   assert.equal(f.registrations(), 1);
   assert.equal(f.resets(), 0);
-  assert.equal(f.calls.length, 2);
+  assert.equal(f.calls.length, 4);
 });
 
 test('business code 110001 rotates the anonymous identity and retries', async () => {
@@ -96,7 +97,7 @@ test('business code 110001 rotates the anonymous identity and retries', async ()
   });
   assert.equal((await f.fetch()).url, media);
   assert.equal(f.registrations(), 2);
-  assert.equal(f.calls.length, 6);
+  assert.equal(f.calls.length, 2);
   assert.equal(f.resets(), 1);
 });
 
@@ -105,5 +106,5 @@ test('a timeout is surfaced without immediately rotating the anonymous identity'
   await assert.rejects(f.fetch(), { code: 'ETIMEDOUT' });
   assert.equal(f.registrations(), 1);
   assert.equal(f.resets(), 0);
-  assert.equal(f.calls.length, 3);
+  assert.equal(f.calls.length, 1);
 });

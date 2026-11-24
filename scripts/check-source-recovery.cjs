@@ -13,6 +13,11 @@ function appRoute(config) {
     assert.equal(url.hostname, 'log5-applog-lf.fqnovel.com');
     return 'registration';
   }
+  if (url.pathname === '/novel/player/multi_video_model/preload/v1') {
+    assert.equal(config.method, 'POST');
+    assert.equal(url.hostname, 'reading.snssdk.com');
+    return 'model';
+  }
   if (url.pathname === '/novel/player/multi_video_model/player/v1') {
     assert.equal(config.method, 'POST');
     assert.ok(['api5-normal-sinfonlineb.fqnovel.com', 'api5-normal-sinfonlinea.fqnovel.com'].includes(url.hostname));
