@@ -8,10 +8,10 @@
 
 ## 8.2 V8 优先与 SDK 兜底（2026-11-24，Draft 修复中）
 
-- 从公开 8.1 增加 0.1 至 8.2，内部 8.2.0、桌面构建 8.2.1，代码冻结 `1d1bcb6bda2fbf1829a5e55b29e19d90c42f72b5`；原 Release ID `456354972` 已撤回为 Draft，23 份旧附件只保留作候选，不得直接重新公开。
+- 从公开 8.1 增加 0.1 至 8.2，内部 8.2.0、桌面构建 8.2.1，代码冻结 `4ef6b05`；原 Release ID `456354972` 已撤回为 Draft，23 份旧附件只保留作候选，不得直接重新公开。
 - 用户明确下载与播放顺序为“先 V8/当前 App 官方取源，失败后再走 SDK”，SDK 再失败才进入网页或旧接口。不得把 SDK 改回默认首选。
 - 合入 PR #189 的 SDK `--serve` 会话复用与 #190 的批量多分集取源；批量仅用于同一内容类型的数字分集，保留 8 集上限、2 分钟缓存、旧 helper 单集回退、部分/全部取消和前台播放优先级。
-- Electron 升级到 44.11.5；macOS 主程序、所有 Helper、SDK helper 均使用 hardened runtime entitlements，普通 LaunchServices 启动和打包应用真实 V8 两集静音播放已通过。Windows 新包、Linux、公证与附件核验仍须在最终代码上重做。
+- Electron 升级到 44.11.5；macOS 主程序、所有 Helper、SDK helper 均使用 hardened runtime entitlements，普通 LaunchServices 启动和打包应用真实 V8 两集静音播放已通过。SDK `--serve` 失败必须立即回调；批量失败不得再起单集重复等待；V8/Windows 验收不得继续强制 `sourceProvider=sdk`。Windows 新包、Linux、公证与附件核验仍须在最终代码上重做。
 
 ## 8.1 播放取源与下载提速发行（2026-11-23）
 
