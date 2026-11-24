@@ -103,6 +103,9 @@ jobs:
         with:
           node-version: '22'
           cache: npm
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
       - if: ${{ !inputs.build_only }}
         run: npm ci --no-audit --no-fund
       - if: ${{ inputs.build_only }}
@@ -110,6 +113,16 @@ jobs:
       - run: node scripts/prepare-electron.cjs
         env:
           GH_TOKEN: ${{ github.token }}
+      - name: Build Windows SDK playback helper
+        shell: pwsh
+        run: pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/build-sdk-playback-win.ps1
+      - name: Verify Windows SDK playback helper
+        if: ${{ !inputs.build_only }}
+        shell: pwsh
+        run: |
+          if (-not (Test-Path build/sdk-playback/win32-x64/hongguo-sdk-playback.exe)) { throw 'Windows SDK playback helper missing' }
+          & build/sdk-playback/win32-x64/hongguo-sdk-playback.exe --help | Out-Null
+          if ($LASTEXITCODE) { throw 'Windows SDK playback helper failed --help check' }
       - uses: actions/download-artifact@v4
         with:
           name: windows-media
@@ -127,7 +140,7 @@ jobs:
       - name: Run playback source regression checks
         if: ${{ !inputs.build_only }}
         run: |
-          node --test src/native/playback-v5.test.cjs src/native/app-source-pacing.test.cjs src/native/app-source-video-tab.test.cjs src/native/app-source-inline-fallback.test.cjs src/native/github-127-diagnostics.test.cjs src/native/github-127-handoff.test.cjs src/native/github-127-transport.test.cjs src/native/hongguo-cancellation.test.cjs src/native/playback-device.test.cjs src/native/playback-signature.test.cjs
+          node --test src/native/playback-v5.test.cjs src/native/app-source-pacing.test.cjs src/native/app-source-video-tab.test.cjs src/native/app-source-inline-fallback.test.cjs src/native/github-127-diagnostics.test.cjs src/native/github-127-handoff.test.cjs src/native/github-127-transport.test.cjs src/native/hongguo-cancellation.test.cjs src/native/playback-device.test.cjs src/native/playback-signature.test.cjs src/native/sdk-playback.test.cjs
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
           node scripts/check-app-source.cjs
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
@@ -145,7 +158,7 @@ jobs:
             dist/*.exe
             dist/*.yml
             dist/*.blockmap
-          key: windows-update-v2-${{ github.sha }}-${{ hashFiles('package*.json', 'main.js', 'preload.js', 'index.html', 'vite.config.js', 'src/**', 'build/**', 'scripts/build-ffmpeg-source-win.sh', 'scripts/build-librempeg-source.sh', 'scripts/librempeg-videotoolbox-prototype.patch', 'scripts/prepare-nv-codec-headers.sh', 'scripts/prepare-amf-headers.sh', 'scripts/setup-software-player.cjs', 'scripts/software-player-assets.json') }}
+          key: windows-update-v2-${{ github.sha }}-${{ hashFiles('package*.json', 'main.js', 'preload.js', 'index.html', 'vite.config.js', 'src/**', 'build/**', 'scripts/build-ffmpeg-source-win.sh', 'scripts/build-librempeg-source.sh', 'scripts/librempeg-videotoolbox-prototype.patch', 'scripts/prepare-nv-codec-headers.sh', 'scripts/prepare-amf-headers.sh', 'scripts/setup-software-player.cjs', 'scripts/software-player-assets.json', 'scripts/build-sdk-playback-win.ps1', 'scripts/sdk-playback/**') }}
       - shell: pwsh
         if: ${{ inputs.build_only || steps.app-cache.outputs.cache-hit != 'true' }}
         run: |

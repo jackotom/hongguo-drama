@@ -21,6 +21,7 @@
     "build:mac:dir": "node scripts/setup-ffmpeg-mac.js arm64 x64 && npm run build:react && electron-builder --mac --arm64 --x64 --dir --publish never",
     "test": "node scripts/test.cjs",
     "setup:software": "node scripts/setup-software-player.cjs",
+    "setup:sdk:win": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-sdk-playback-win.ps1",
     "predev": "npm run setup:software",
     "prebuild:react": "npm run setup:software",
     "build:linux": "npm run build:react && node scripts/check-linux-media.cjs && electron-builder --linux AppImage --x64 --publish never"
@@ -59,13 +60,16 @@
       "main.js",
       "preload.js",
       "dist-react/**/*",
-      "build/sdk-playback/**/*",
+      "build/sdk-playback/darwin-*/hongguo-sdk-playback",
+      "build/sdk-playback/win32-x64/hongguo-sdk-playback.exe",
+      "build/sdk-playback/README.txt",
       "src/native/**/*",
       "src/store.js"
     ],
     "asar": true,
     "asarUnpack": [
-      "build/sdk-playback/**/*"
+      "build/sdk-playback/**/*",
+      "build/sdk-playback/win32-x64/**"
     ],
     "artifactName": "hongguo-downloader-8.1-${os}-${arch}.${ext}",
     "win": {
