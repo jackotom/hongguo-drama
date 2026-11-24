@@ -12,6 +12,10 @@
   - `scripts/sdk-playback/resolve_cli.py` 兼容 Windows（使用 `msvcrt.locking` 替代 POSIX `fcntl` 缓存文件锁，跳过 Windows 不支持的 `chmod 0600`）。
   - `src/native/sdk-playback.js` 支持 `win32-x64/hongguo-sdk-playback.exe` 路径解析，与 macOS 共用 3 进程并发上限、前台播放优先、超时与取消清理。
   - 新增 `scripts/build-sdk-playback-win.ps1`，并在 `.github/workflows/windows.yml` 中接入 Python 3.11、PyInstaller 打包、缓存与 `--help` 校验。
+- **SDK 执行文件打包与 macOS 签名工具**：
+  - 构建中间产物（虚拟环境、PyInstaller 工作目录、源码归档）改写入 `build/sdk-playback-work/`，`build/sdk-playback/` 只保留随包发布的执行文件；Windows CI 在打包后校验 `app.asar.unpacked` 中执行文件存在、可启动且不含中间目录。
+  - `scripts/build-sdk-playback-mac.sh` 修正 `x64` 目标与本机 `x86_64` 架构名的比较，Intel 主机或 Rosetta 下可按文档构建。
+  - 新增 `scripts/sign-mac-app.sh`：自底向上签名嵌套二进制与框架；只对 .app 使用 `codesign --deep` 会留下 ad-hoc 子项，公证会拒绝。
 - **创作者合集与当前 App V5 `preload/v1` 兜底**：
   - 支持创作者合集详情与分集播放恢复。
   - SDK 失败后的官方兜底优先请求当前 App V5 `preload/v1`，失败时保留原有有界链路与官网公开兜底。

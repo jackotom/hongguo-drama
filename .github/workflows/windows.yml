@@ -174,6 +174,17 @@ jobs:
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+      - name: Verify packaged Windows SDK playback helper
+        shell: pwsh
+        run: |
+          $base = 'dist/win-unpacked/resources/app.asar.unpacked/build/sdk-playback'
+          $exe = Join-Path $base 'win32-x64/hongguo-sdk-playback.exe'
+          if (-not (Test-Path $exe -PathType Leaf)) { throw "Packaged SDK helper missing: $exe" }
+          $stray = Get-ChildItem $base -Directory | Where-Object { $_.Name -like 'venv-*' -or $_.Name -like 'build-*' -or $_.Name -eq 'source' }
+          if ($stray) { throw "SDK build intermediates leaked into the package: $($stray.Name -join ', ')" }
+          $help = (& $exe --help 2>&1 | Out-String)
+          if ($LASTEXITCODE -or $help -notmatch '--video') { throw 'Packaged SDK playback helper failed to start' }
+          Write-Output 'PASS packaged Windows SDK playback helper present, clean and runnable'
       - uses: actions/cache/save@v4
         if: ${{ !inputs.build_only && steps.app-cache.outputs.cache-hit != 'true' }}
         with:

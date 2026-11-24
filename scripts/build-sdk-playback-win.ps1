@@ -3,9 +3,10 @@ $ErrorActionPreference = 'Stop'
 
 $Root = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 $Work = Join-Path $Root 'build\sdk-playback'
+$Stage = Join-Path $Root 'build\sdk-playback-work'
 $Vendor = Join-Path $Root 'scripts\sdk-playback\vendor\phone_account'
-$BuildRoot = Join-Path $Work 'build-win32-x64'
-$VenvDir = Join-Path $Work 'venv-win32-x64'
+$BuildRoot = Join-Path $Stage 'build-win32-x64'
+$VenvDir = Join-Path $Stage 'venv-win32-x64'
 $OutDir = Join-Path $Work 'win32-x64'
 
 if (-not (Test-Path $Vendor -PathType Container)) {
@@ -16,7 +17,7 @@ $Python = if ($env:PYTHON) { $env:PYTHON } else { 'python' }
 & $Python --version | Out-Null
 if ($LASTEXITCODE) { throw "Python not found: $Python" }
 
-New-Item -ItemType Directory -Force $Work, $BuildRoot, $OutDir | Out-Null
+New-Item -ItemType Directory -Force $Work, $Stage, $BuildRoot, $OutDir | Out-Null
 $TargetAccount = Join-Path $BuildRoot 'phone_account'
 if (Test-Path $TargetAccount) { Remove-Item -Recurse -Force $TargetAccount }
 Copy-Item -Recurse -Force $Vendor $TargetAccount

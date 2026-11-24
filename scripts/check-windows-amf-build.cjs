@@ -59,7 +59,7 @@ contract('Linux FFmpeg excludes AMF', !/amf/i.test(fflinux), 'linux ffmpeg unexp
 
 contract('Windows media cache key includes AMF prep', /windows-media-\$\{\{ hashFiles\('[^)]*prepare-amf-headers\.sh[^)]*'\) \}\}/.test(workflow), 'media cache key stale');
 contract('Windows librempeg cache key includes AMF prep', /windows-librempeg-\$\{\{ hashFiles\('[^)]*prepare-amf-headers\.sh[^)]*'\) \}\}/.test(workflow), 'librempeg cache key stale');
-contract('Windows app cache key includes NV and AMF prep', /windows-update-v2-[^\n]*prepare-nv-codec-headers\.sh[^\n]*prepare-amf-headers\.sh/.test(workflow), 'app cache key stale');
+contract('Windows app cache key includes NV and AMF prep', /windows-update-v\d+-[^\n]*prepare-nv-codec-headers\.sh[^\n]*prepare-amf-headers\.sh/.test(workflow), 'app cache key stale');
 contract('Windows cache miss never routes through rejected historical media reuse', !workflow.includes('reuse-release-media.py'), 'historical media reuse keeps build_only broken after build-script changes');
 contract('Windows build_only toolchain installs on a media cache miss',
   workflow.includes("name: Install Windows media build toolchain") &&

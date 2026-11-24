@@ -1,7 +1,9 @@
 macOS 与 Windows x64 SDK 播放取源执行文件
 
 该目录由 `scripts/build-sdk-playback-mac.sh`（macOS arm64 / x64）或
-`scripts/build-sdk-playback-win.ps1`（Windows x64）生成，不属于通用 npm 依赖。
+`scripts/build-sdk-playback-win.ps1`（Windows x64）生成，不属于通用 npm 依赖；构建中间目录
+（虚拟环境、PyInstaller 工作目录、源码归档）写入 `build/sdk-playback-work/`，本目录只保留
+随包发布的执行文件。
 8.1 已验证 macOS arm64 与 x64；8.2 源码目标补充 Windows x64 构建脚本与工作流
 （`win32-x64/hongguo-sdk-playback.exe`，待 Windows CI 构建与真实验收）。Linux 尚未构建执行文件，继续使用官方接口与公开片源回退。
 
