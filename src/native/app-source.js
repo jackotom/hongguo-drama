@@ -715,6 +715,8 @@ async function resolveSdkAppPlayUrl(vid, options, onFailure) {
     const sdkResult = await sdkPlayback.resolveSdkPlayback(vid, {
         signal: options.signal, contentType: options.contentType, onError: onFailure,
         priority: options.sdkPriority === true,
+        batchVids: options.sdkBatchVids,
+        fresh: options.sdkFresh === true,
     });
     throwIfAborted(options.signal);
     if (!sdkResult) return null;

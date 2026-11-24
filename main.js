@@ -1042,9 +1042,15 @@ async function executeHongguoDownload(task) {
       task.qualityNotice = '正在获取完整片源';
       sendToRenderer('download-progress', { id, qualityNotice: task.qualityNotice });
     }
+    const contentType = String(hongguoInfo?.content_type || '1004');
+    const sdkBatchVids = !reusedCache && preferSdk ? [String(vid), ...downloadQueue
+      .filter(queued => queued && queued.status === 'pending' && queued.type === 'hongguo'
+        && String(queued.hongguoInfo?.content_type || '1004') === contentType
+        && /^\d{1,30}$/.test(String(queued.hongguoInfo?.vid || '')) && String(queued.hongguoInfo.vid) !== String(vid))
+      .map(queued => String(queued.hongguoInfo.vid))].slice(0, 8) : undefined;
     if (!reusedCache) await withMediaRecovery(vid, hongguoInfo?.series_id, { playInfo: checkedPlayInfo, quality, allowLowerQuality,
       content_type: hongguoInfo?.content_type, preferSdk, parallelSdk: preferSdk, sdkPriority: false,
-      force: true, cancelToken: source.token,
+      sdkBatchVids, force: true, cancelToken: source.token,
       onSourceReady: () => {
         if (numeric) clearHongguoSourceBackoff();
         if (preferSdk && task.qualityNotice === '正在获取完整片源') {
@@ -3345,7 +3351,9 @@ async function withMediaRecovery(vid, seriesId, options, consume) {
           lookup = boundedSignal(controller.signal, 30000);
           info = await awaitMediaOperation(hongguo.fetchPlayUrlSingle(vid, seriesId,
             { quality: options.quality, allowLowerQuality: options.allowLowerQuality, preferSdk: options.preferSdk === true,
-              parallelSdk: options.parallelSdk === true, sdkPriority: options.sdkPriority === true, content_type: options.content_type,
+              parallelSdk: options.parallelSdk === true, sdkPriority: options.sdkPriority === true,
+              content_type: options.content_type,
+              sdkBatchVids: !round ? options.sdkBatchVids : undefined, sdkFresh: round > 0,
               force: options.force || round > 0, signal: lookup.signal }), lookup.signal);
           throwIfAborted(lookup.signal);
         }

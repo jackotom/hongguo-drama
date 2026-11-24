@@ -763,12 +763,15 @@ async function fetchPlayUrlSingle(vid, sid, options = {}) {
     const skipWeb = (failedWebMedia.get(String(vid)) || 0) > Date.now();
     const allowLowerQuality = options.allowLowerQuality === true && quality !== 'auto';
     const contentType = ['1001', '1004'].includes(String(options.content_type || options.contentType)) ? String(options.content_type || options.contentType) : '1004';
+    const sdkBatchVids = Array.isArray(options.sdkBatchVids) ? options.sdkBatchVids : undefined;
+    const sdkFresh = options.sdkFresh === true;
     const cacheKey = `play:${sid || ''}:${vid}${quality === 'auto' ? '' : `:${quality}`}${contentType === '1004' ? '' : `:type-${contentType}`}${skipWeb ? ':fallback' : ''}${allowLowerQuality ? ':lower-quality' : ''}${options.preferSdk ? ':sdk-first' : ''}${options.parallelSdk ? ':parallel-sdk' : ''}`;
     const result = await cachedRequest(cacheKey, 30000, signal => quality === 'auto'
       ? fetchPlayUrlFresh(vid, sid, skipWeb, signal, options.preferSdk === true, options.parallelSdk === true,
-        contentType, options.sdkPriority === true)
+        contentType, options.sdkPriority === true, sdkBatchVids, sdkFresh)
       : require('./app-source').fetchAppPlayUrl(String(vid), { quality, allowLowerQuality, preferSdk: options.preferSdk === true,
-        parallelSdk: options.parallelSdk === true, sdkPriority: options.sdkPriority === true, contentType, signal }).catch(async error => {
+        parallelSdk: options.parallelSdk === true, sdkPriority: options.sdkPriority === true,
+        contentType, sdkBatchVids, sdkFresh, signal }).catch(async error => {
         throwIfAborted(signal);
         if (error.code === 'ERR_CANCELED') throw error;
         const sources = [sourceFailure('app', error)];
@@ -860,12 +863,12 @@ function unavailableSources(sources, quality = 'auto') {
 }
 
 async function fetchPlayUrlFresh(vid, sid, skipWeb = false, signal, preferSdk = false, parallelSdk = false,
-  contentType = '1004', sdkPriority = false) {
+  contentType = '1004', sdkPriority = false, sdkBatchVids = undefined, sdkFresh = false) {
   throwIfAborted(signal);
   const sources = [];
   try {
     const result = await require('./app-source').fetchAppPlayUrl(String(vid), {
-      preferSdk, parallelSdk, sdkPriority, contentType, signal,
+      preferSdk, parallelSdk, sdkPriority, contentType, sdkBatchVids, sdkFresh, signal,
     });
     throwIfAborted(signal);
     return result;
