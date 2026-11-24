@@ -622,7 +622,11 @@ async function fetchAppPlayUrlFresh(vid, options) {
 }
 
 async function resolveSdkAppPlayUrl(vid, options) {
-    const sdkResult = await sdkPlayback.resolveSdkPlayback(vid, { signal: options.signal });
+    const sdkResult = await sdkPlayback.resolveSdkPlayback(vid, {
+        signal: options.signal,
+        batchVids: options.sdkBatchVids,
+        fresh: options.sdkFresh === true,
+    });
     throwIfAborted(options.signal);
     if (!sdkResult) return null;
     const parsed = parseAppPlayModel(sdkResult.model, vid, options, false);

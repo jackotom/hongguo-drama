@@ -748,10 +748,12 @@ async function fetchPlayUrlSingle(vid, sid, options = {}) {
     if (String(vid).startsWith('xifan:') || String(sid).startsWith('xifan:')) return require('./xifan').fetchPlayUrlSingle(vid, sid);
     const skipWeb = (failedWebMedia.get(String(vid)) || 0) > Date.now();
     const allowLowerQuality = options.allowLowerQuality === true && quality !== 'auto';
+    const sdkBatchVids = Array.isArray(options.sdkBatchVids) ? options.sdkBatchVids : undefined;
+    const sdkFresh = options.sdkFresh === true;
     const cacheKey = `play:${sid || ''}:${vid}${quality === 'auto' ? '' : `:${quality}`}${skipWeb ? ':fallback' : ''}${allowLowerQuality ? ':lower-quality' : ''}${options.preferSdk ? ':sdk-first' : ''}`;
     const result = await cachedRequest(cacheKey, 30000, signal => quality === 'auto'
-      ? fetchPlayUrlFresh(vid, sid, skipWeb, signal, options.preferSdk === true)
-      : require('./app-source').fetchAppPlayUrl(String(vid), { quality, allowLowerQuality, preferSdk: options.preferSdk === true, signal }).catch(async error => {
+      ? fetchPlayUrlFresh(vid, sid, skipWeb, signal, options.preferSdk === true, sdkBatchVids, sdkFresh)
+      : require('./app-source').fetchAppPlayUrl(String(vid), { quality, allowLowerQuality, preferSdk: options.preferSdk === true, sdkBatchVids, sdkFresh, signal }).catch(async error => {
         throwIfAborted(signal);
         if (error.code === 'ERR_CANCELED') throw error;
         const sources = [sourceFailure('app', error)];
@@ -833,11 +835,11 @@ function unavailableSources(sources, quality = 'auto') {
   return error;
 }
 
-async function fetchPlayUrlFresh(vid, sid, skipWeb = false, signal, preferSdk = false) {
+async function fetchPlayUrlFresh(vid, sid, skipWeb = false, signal, preferSdk = false, sdkBatchVids = undefined, sdkFresh = false) {
   throwIfAborted(signal);
   const sources = [];
   try {
-    const result = await require('./app-source').fetchAppPlayUrl(String(vid), { preferSdk, signal });
+    const result = await require('./app-source').fetchAppPlayUrl(String(vid), { preferSdk, sdkBatchVids, sdkFresh, signal });
     throwIfAborted(signal);
     return result;
   } catch (error) {
