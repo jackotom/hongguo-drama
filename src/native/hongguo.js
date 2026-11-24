@@ -848,7 +848,7 @@ function unavailableSources(sources, quality = 'auto') {
   const publicLimited = sources.some(item => item.code === 'PUBLIC_ACCESS_LIMITED');
   const sdkFailure = sources.find(item => item.sdkFailure);
   const message = sdkFailure
-    ? `本集取源失败：${sdkFailure.message}${publicLimited ? '；官网公开片源也不提供本集' : ''}。请稍后重试或在官方 App 确认可播情况。`
+    ? `本集取源失败${quality === 'auto' ? '' : `（所选清晰度 ${quality}，未降级）`}：${sdkFailure.message}${publicLimited ? '；官网公开片源也不提供本集' : ''}。请稍后重试或在官方 App 确认可播情况。`
     : publicLimited
       ? `官网公开片源不提供本集，当前 App 取源也未返回完整地址。请稍后重试；若该集只对官方 App 开放，请在官方 App 观看。`
     : `本集取源失败${quality === 'auto' ? '' : `（所选清晰度 ${quality}，未降级）`}：${sources.map(item => `${names[item.source]}：${item.message}`).join('；')}。请重试或在官方 App 确认可播情况。`;
