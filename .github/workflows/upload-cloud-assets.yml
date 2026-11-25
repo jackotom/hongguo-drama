@@ -82,11 +82,12 @@ jobs:
 
       - name: Write upload receipt
         env:
+          GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ inputs.release_tag }}
           SOURCE_SHA: ${{ inputs.source_sha }}
         run: |
           mkdir -p receipt
-          gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --json assets \
+          gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --json tagName,assets \
             --jq '{tag: .tagName, sourceSha: "'"$SOURCE_SHA"'", assets: [.assets[] | {name, size, state}]}' > receipt/cloud-upload.json
           cat receipt/cloud-upload.json
 
