@@ -3,7 +3,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { ChevronDown, RefreshCw, Shield } from './icons';
 import './SourcePackSettings.css';
 
-const DEFAULT_SOURCE_ORDER = ['app', 'sdk', 'web', 'openhongguo'];
+const DEFAULT_SOURCE_ORDER = ['openhongguo', 'sdk', 'app', 'web'];
 
 export default function SourcePackSettings() {
   useLanguage();

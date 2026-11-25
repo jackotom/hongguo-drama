@@ -99,8 +99,14 @@ function routeFixture() {
   });
   return { ...native, state };
 }
+async function withSourceOrder(value, run) {
+  const sourceOrder = require('../src/native/source-order');
+  const previous = sourceOrder.getSourceOrder();
+  sourceOrder.setSourceOrder(value);
+  try { return await run(); } finally { sourceOrder.setSourceOrder(previous); }
+}
 const checks = [
-  ['Missing explicit quality remains distinct from incompatible automatic sources without leaking raw messages', async () => {
+  ['Missing explicit quality remains distinct from incompatible automatic sources without leaking raw messages', () => withSourceOrder(['app', 'sdk', 'web', 'openhongguo'], async () => {
     for (const quality of ['720p', '1080p']) {
       const app = appFixture({ low: { main_url: media('low'), codec_type: 'h264', width: 360, height: 640 } });
       const f = load('hongguo.js', { './app-source': app });
@@ -124,8 +130,8 @@ const checks = [
       assert.equal(result.sources[0].code, code);
       assert.doesNotMatch(JSON.stringify(result), /secret|signed\.invalid|private/);
     }
-  }],
-  ['Registration failures retain safe details and remain retryable only for transient causes', async () => {
+  })],
+  ['Registration failures retain safe details and remain retryable only for transient causes', () => withSourceOrder(['app', 'sdk', 'web', 'openhongguo'], async () => {
     for (const [failure, expected, detail] of [
       [{ code: 'ECONNRESET' }, 'NETWORK_ERROR', '连接失败'],
       [{ code: 'ETIMEDOUT' }, 'TIMEOUT', '请求超时'],
@@ -164,8 +170,8 @@ const checks = [
       assert.equal(result.sources[0].message, '匿名播放设备注册失败；本机冷却 10 秒后可手动重试，上游何时恢复暂无法确认');
       assert.doesNotMatch(JSON.stringify(result), /secret|function|\[object/);
     }
-  }],
-  ['App network failures retain only safe codes and aggregate into distinct reasons', async () => {
+  })],
+  ['App network failures retain only safe codes and aggregate into distinct reasons', () => withSourceOrder(['app', 'sdk', 'web', 'openhongguo'], async () => {
     for (const [code, expected] of [['ECONNABORTED', 'TIMEOUT'], ['ETIMEDOUT', 'TIMEOUT'],
       ['ENOTFOUND', 'NETWORK_ERROR'], ['ECONNRESET', 'NETWORK_ERROR'], ['ERR_NETWORK', 'NETWORK_ERROR'],
       ['secret-token-code', 'NETWORK_ERROR']]) {
@@ -183,8 +189,8 @@ const checks = [
       assert.equal(result.sources[0].code, expected);
       assert.doesNotMatch(JSON.stringify(result), /secret|signed\.invalid|private/);
     }
-  }],
-  ['App distinguishes HTTP, business refusal, absent model, parsing and unsafe media', async () => {
+  })],
+  ['App distinguishes HTTP, business refusal, absent model, parsing and unsafe media', () => withSourceOrder(['app', 'sdk', 'web', 'openhongguo'], async () => {
     const first = { data: { '11': { video_model: { fallback_api: 'https://vod.snssdk.com/info' } } } };
     const cases = [
       [{ status: 403 }, null, 'HTTP_403'],
@@ -213,7 +219,7 @@ const checks = [
       assert.deepEqual(stages.filter(stage => stage !== 'videoTab'),
         second === null ? ['model'] : ['model', 'metadata'], 'explicit failures must not start another model route');
     }
-  }],
+  })],
   ['Web keeps null compatibility but reports actual failures on first and final fallback', async () => {
     for (const [failure, expected] of [
       [Object.assign(new Error('secret URL'), { response: { status: 404 } }), 'HTTP_404'],
@@ -320,7 +326,7 @@ const checks = [
     });
     assert.equal(apiCalls, 1, 'empty 200 responses must stop without retrying');
   }],
-  ['Protected website SEO preview never replaces the complete App episode', async () => {
+  ['Protected website SEO preview never replaces the complete App episode', () => withSourceOrder(['app', 'sdk', 'web', 'openhongguo'], async () => {
     const calls = [];
     let protectedPlayback = true, appAvailable = true;
     const f = load('hongguo.js', {
@@ -350,7 +356,7 @@ const checks = [
     appAvailable = true; calls.length = 0;
     assert.equal((await f.fetchPlayUrlSingle('11', '1', { quality: '1080p' })).source, 'app');
     assert.deepEqual(calls, ['app'], 'explicit quality remains App-only');
-  }],
+  })],
   ['Web accepts only an identity-bound VideoObject and ignores earlier recommended media', async () => {
     const unrelated = `<script type="application/ld+json">${JSON.stringify({ '@type': 'VideoObject', url: 'https://hongguoduanju.com/player/2/22', contentUrl: media('recommendation') })}</script>`;
     let html = unrelated + webPage();
@@ -456,16 +462,17 @@ const checks = [
     f.markWebMediaFailure(first); f.state.calls.length = 0;
     const recovered = await f.fetchPlayUrlSingle('11', '1', { force: true });
     assert.equal(recovered.source, 'web', 'five-minute penalty must not hide the only working source');
-    assert.deepEqual(f.state.calls, ['app', 'api', 'sdk', 'openhongguo', 'web']);
+    assert.deepEqual(f.state.calls, ['openhongguo', 'sdk', 'app', 'api', 'web']);
     f.state.app = true; f.state.calls.length = 0;
-    assert.equal((await f.fetchPlayUrlSingle('11', '1')).source, 'app');
-    assert.deepEqual(f.state.calls, ['app'], 'web penalty remains after last-resort recovery');
+    assert.equal((await f.fetchPlayUrlSingle('11', '1', { force: true })).source, 'app');
+    assert.deepEqual(f.state.calls.slice(0, 2), ['openhongguo', 'sdk'], 'the new default is attempted before App');
+    assert.ok(!f.state.calls.includes('web'), 'web penalty remains after last-resort recovery');
   }],
   ['Unavailable source reports safe per-route reasons without declaring web metadata a global block', async () => {
     const f = routeFixture(); f.state.web = false;
     const unavailable = await f.fetchPlayUrlSingle('11', '1');
     assert.equal(unavailable.code, 'SOURCE_UNAVAILABLE');
-    assert.deepEqual(Array.from(unavailable.sources, item => item.source), ['app', 'api', 'sdk', 'web', 'openhongguo']);
+    assert.deepEqual(Array.from(unavailable.sources, item => item.source), ['openhongguo', 'sdk', 'app', 'api', 'web']);
     assert.doesNotMatch(JSON.stringify(unavailable), /secret|signed\.invalid|private|前.*集|付费|会员/);
     assert.ok(unavailable.sources.every(item => item.code && item.message));
     f.state.app = true;
@@ -496,7 +503,7 @@ const checks = [
       assert.equal((await f.fetchPlayUrlSingle('11', '1', { quality: '1080p', allowLowerQuality: true })).source, 'web');
       assert.deepEqual(f.state.calls, ['app', 'api', 'sdk', 'openhongguo', 'web']);
     } finally {
-      sourceOrder.setSourceOrder(['app', 'sdk', 'web', 'openhongguo']);
+      sourceOrder.setSourceOrder(['openhongguo', 'sdk', 'app', 'web']);
     }
   }],
 ];

@@ -7,6 +7,8 @@ const { abortError, throwIfAborted } = require('./request-signal');
 const { normalizeDownloadQuality } = require('./download-quality');
 const { isPublicMediaUrl } = require('./web-media-guard');
 
+const ANONYMOUS_LIMIT_COOLDOWN_MS = 60_000;
+
 function profilePath() {
   try {
     const { app } = require('electron');
@@ -166,18 +168,38 @@ function candidateFrom(stream, playback, contentKey, vid) {
   }));
 }
 
-function createOpenhongguoSource({ getClient = defaultClient } = {}) {
+function createOpenhongguoSource({
+  getClient = defaultClient,
+  now = Date.now,
+  anonymousLimitCooldownMs = ANONYMOUS_LIMIT_COOLDOWN_MS,
+} = {}) {
+  let anonymousLimitedUntil = 0;
+  const noteFailure = error => {
+    if (error?.code === 'ANONYMOUS_LIMITED') anonymousLimitedUntil = now() + anonymousLimitCooldownMs;
+    return error;
+  };
   async function resolve(vid, options = {}) {
     throwIfAborted(options.signal);
+    if (now() < anonymousLimitedUntil) {
+      throw Object.assign(new Error('openhongguo 匿名设备暂时受限，已跳过本次请求'), {
+        code: 'ANONYMOUS_LIMITED',
+        cooldown: true,
+      });
+    }
     const client = await withAbort(getClient(), options.signal);
     let result;
     try {
       result = await withAbort(client.resolvePlayback(String(vid)), options.signal);
     } catch (error) {
       throwIfAborted(options.signal);
+      noteFailure(error);
       if (error?.code === 'DEVICE_REJECTED' && typeof client.resetDevice === 'function') {
         await withAbort(client.resetDevice(), options.signal).catch(() => {});
-        result = await withAbort(client.resolvePlayback(String(vid)), options.signal);
+        try {
+          result = await withAbort(client.resolvePlayback(String(vid)), options.signal);
+        } catch (retryError) {
+          throw noteFailure(retryError);
+        }
       } else throw error;
     }
     const playback = result?.playback;

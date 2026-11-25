@@ -13,6 +13,7 @@ const page = `<script>window._ROUTER_DATA=${JSON.stringify({ loaderData: {
 function fixture({ web = true, api = false, app = false, blockedVids = [], html = page, stalledPlayer = false } = {}) {
   let now = 0;
   const state = { web, api, app, get: 0, post: 0, appCalls: 0, waits: 0, playerCancelled: false };
+  require('../src/native/source-order').setSourceOrder(['web', 'app', 'sdk', 'openhongguo']);
   const axios = {
     async get(url, options) {
       state.get++;
@@ -36,7 +37,15 @@ function fixture({ web = true, api = false, app = false, blockedVids = [], html 
   };
   const context = {
     module: { exports: {} }, Buffer, AbortController, process: { env: {} },
-    require: name => name === 'axios' ? axios : name === './app-source' ? { fetchAppPlayUrl: async () => { state.appCalls++; if (!state.app) throw Error('app unavailable'); return { url: 'https://media.example/app.mp4', contentKey: '01'.repeat(16), source: 'app' }; } } : require(name.startsWith('.') ? path.join(path.dirname(sourcePath), name) : name),
+    require: name => name === 'axios' ? axios
+      : name === './app-source' ? { fetchAppPlayUrl: async (_vid, options) => {
+        if (options?.allowV8 === false) throw Error('sdk unavailable');
+        state.appCalls++;
+        if (!state.app) throw Error('app unavailable');
+        return { url: 'https://media.example/app.mp4', contentKey: '01'.repeat(16), source: 'app' };
+      } }
+      : name === './openhongguo-source' ? { fetchPlayUrlSingle: async () => { throw Error('openhongguo unavailable'); } }
+      : require(name.startsWith('.') ? path.join(path.dirname(sourcePath), name) : name),
     Date: class extends Date { static now() { return now; } },
     setTimeout: (fn, ms) => { if (ms === 600) return setTimeout(fn, 0); state.waits++; fn(); },
     console: { warn() {}, log() {} },

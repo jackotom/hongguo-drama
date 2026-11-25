@@ -15,6 +15,7 @@ function harness(t) {
   const handlers = {}, root = path.resolve(__dirname, '../..'), source = fs.readFileSync(path.join(root, 'main.js'), 'utf8');
   let regionHelpers = {}; try { regionHelpers = require('./stealth-region'); } catch (error) { if (error.code !== 'MODULE_NOT_FOUND') throw error; }
   const context = { ...regionHelpers, store, ipcMain: { handle: (name, fn) => { handlers[name] = fn; } },
+    playbackSourceOrder: require('./source-order'),
     require: createRequire(path.join(root, 'main.js')), path, app: { getPath: () => directory }, IS_PREVIEW: false,
     normalizeProxySettings: settings => ({ ...settings }), normalizeDownloadQuality: value => value, validateProxyDraft() {},
     invalidateSeriesProgress() {},

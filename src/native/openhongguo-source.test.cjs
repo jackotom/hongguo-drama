@@ -127,3 +127,27 @@ test('device rejection resets once through the official SDK recovery path', asyn
   assert.equal(attempts, 2);
   assert.equal(resets, 1);
 });
+
+test('anonymous limits cool down before another openhongguo request', async () => {
+  let currentTime = 1_000, attempts = 0;
+  const provider = createOpenhongguoSource({
+    now: () => currentTime,
+    getClient: async () => ({
+      async resolvePlayback() {
+        attempts++;
+        throw Object.assign(new Error('anonymous limited'), { code: 'ANONYMOUS_LIMITED' });
+      },
+    }),
+  });
+  await assert.rejects(provider.resolve('11'), { code: 'ANONYMOUS_LIMITED' });
+  currentTime += 59_999;
+  await assert.rejects(provider.resolve('12'), error => {
+    assert.equal(error.code, 'ANONYMOUS_LIMITED');
+    assert.equal(error.cooldown, true);
+    return true;
+  });
+  assert.equal(attempts, 1);
+  currentTime += 1;
+  await assert.rejects(provider.resolve('13'), { code: 'ANONYMOUS_LIMITED' });
+  assert.equal(attempts, 2);
+});

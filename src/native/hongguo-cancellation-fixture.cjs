@@ -8,7 +8,8 @@ function deferred() {
     return { promise, resolve, reject };
 }
 
-function loadNative({ axios = {}, appFetch, timers } = {}) {
+function loadNative({ axios = {}, appFetch, timers, sourceOrder = ['app', 'sdk', 'web', 'openhongguo'] } = {}) {
+    require('./source-order').setSourceOrder(sourceOrder);
     const modules = new Map();
     let requestSignal;
     if (timers) {
@@ -18,7 +19,14 @@ function loadNative({ axios = {}, appFetch, timers } = {}) {
     }
     function local(name) {
         if (name === 'axios') return axios;
-        if (name === './app-source' && appFetch) return { fetchAppPlayUrl: appFetch };
+        if (name === './app-source' && appFetch) return {
+            fetchAppPlayUrl: (vid, options) => options?.allowV8 === false
+                ? Promise.reject(Object.assign(new Error('fixture SDK unavailable'), { code: 'ERR_NETWORK' }))
+                : appFetch(vid, options),
+        };
+        if (name === './openhongguo-source') return {
+            fetchPlayUrlSingle: async () => { throw new Error('fixture openhongguo unavailable'); },
+        };
         if (name === './request-signal' && requestSignal) return requestSignal.exports;
         if (!name.startsWith('.')) return require(name);
         const file = require.resolve(path.join(__dirname, name));
@@ -30,7 +38,14 @@ function loadNative({ axios = {}, appFetch, timers } = {}) {
             new Function('require', 'module', 'exports', 'console', fs.readFileSync(file, 'utf8') + extra)(
                 local, module, module.exports, { warn() {} });
         }
-        return modules.get(file).exports;
+        const exports = modules.get(file).exports;
+        if (path.basename(file) === 'app-source.js' && !appFetch) return {
+            ...exports,
+            fetchAppPlayUrl: (vid, options) => options?.allowV8 === false
+                ? Promise.reject(Object.assign(new Error('fixture SDK unavailable'), { code: 'ERR_NETWORK' }))
+                : exports.fetchAppPlayUrl(vid, options),
+        };
+        return exports;
     }
     return local('./hongguo');
 }

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 'use strict';
 
-const SOURCE_IDS = Object.freeze(['app', 'sdk', 'web', 'openhongguo']);
+const SOURCE_IDS = Object.freeze(['openhongguo', 'sdk', 'app', 'web']);
 let activeOrder = [...SOURCE_IDS];
 
 function normalizeSourceOrder(input) {
