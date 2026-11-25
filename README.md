@@ -24,20 +24,20 @@
 
 ## 下载与安装
 
-**当前正式版：8.2**（内部`8.2.0`，桌面构建`8.2.1`）。
+**当前正式版：8.3**（内部`8.3.0`，桌面构建`8.3.1`）。
 
-8.2 修改为“V8/当前 App 官方取源优先，失败后再走 SDK，最后才用网页或旧接口”。同时合入 SDK `--serve` 会话复用、批量多分集取源，并修复 Electron 44.11.5 在 macOS hardened runtime 下的主程序、Renderer/GPU Helper 与 SDK helper entitlement。
+8.3 新增 Ed25519 签名、可热更新的声明式取源策略包，以及用户可调整的取源优先级。默认顺序为 `openhongguo → SDK → App 动态策略 → 官网公开片源`；openhongguo 遇到匿名限流会冷却 60 秒并继续回退。
 
-macOS arm64 已通过普通双击、DMG 内启动和真实 V8 两集静音播放；双 Mac 已签名、公证、装订，Windows 与 Linux 最终包真实播放通过，23 份附件远端摘要和匿名入口均已核对。实际状态见[8.2记录](docs/release-8.2.md)。
+macOS arm64 已从最终 DMG 普通启动并完成真实 1080P 静音播放、全屏和切集；双 Mac 已签名、公证、装订，Windows 与 Linux 使用云端构建。实际状态见[8.3记录](docs/release-8.3.md)。
 
-| 平台 | 8.2 正式附件 | 验收状态 |
+| 平台 | 8.3 正式附件 | 验收状态 |
 |---|---|---|
-| Apple芯片Mac，macOS 13+ | [DMG](https://github.com/jackotom/hongguo-drama/releases/download/v8.2/Hongguo-8.2-mac-arm64.dmg) | 普通启动、V8 两集、公证装订通过 |
-| Intel Mac，macOS 13+ | [DMG](https://github.com/jackotom/hongguo-drama/releases/download/v8.2/Hongguo-8.2-mac-x64.dmg) | Rosetta 启动与公证通过；实体 Intel 未验 |
-| Windows x64 | [安装版](https://github.com/jackotom/hongguo-drama/releases/download/v8.2/hongguo-downloader-8.2-win-x64-setup.exe) · [便携EXE](https://github.com/jackotom/hongguo-drama/releases/download/v8.2/hongguo-downloader-8.2-win-x64.exe) · [便携ZIP](https://github.com/jackotom/hongguo-drama/releases/download/v8.2/hongguo-downloader-8.2-win-x64.zip) | V8 两集、队列、播放和安装升级通过；EXE 未签名 |
-| Linux x64 | [AppImage](https://github.com/jackotom/hongguo-drama/releases/download/v8.2/hongguo-downloader-8.2-linux-x64.AppImage) | 最终 AppImage 两集真实静音播放通过 |
+| Apple芯片Mac，macOS 13+ | [DMG](https://github.com/jackotom/hongguo-drama/releases/download/v8.3/Hongguo-8.3-mac-arm64.dmg) | 普通启动、真实 1080P 播放、全屏与切集、公证装订通过 |
+| Intel Mac，macOS 13+ | [DMG](https://github.com/jackotom/hongguo-drama/releases/download/v8.3/Hongguo-8.3-mac-x64.dmg) | Rosetta 启动与公证通过；实体 Intel 未验 |
+| Windows x64 | [安装版](https://github.com/jackotom/hongguo-drama/releases/download/v8.3/hongguo-downloader-8.3-win-x64-setup.exe) · [便携EXE](https://github.com/jackotom/hongguo-drama/releases/download/v8.3/hongguo-downloader-8.3-win-x64.exe) · [便携ZIP](https://github.com/jackotom/hongguo-drama/releases/download/v8.3/hongguo-downloader-8.3-win-x64.zip) | 云端构建与最终队列、播放、安装升级验收；EXE 未签名 |
+| Linux x64 | [AppImage](https://github.com/jackotom/hongguo-drama/releases/download/v8.3/hongguo-downloader-8.3-linux-x64.AppImage) | 最终 AppImage 两集真实静音播放通过 |
 
-[8.2发行页](https://github.com/jackotom/hongguo-drama/releases/tag/v8.2) · [SHA256](https://github.com/jackotom/hongguo-drama/releases/download/v8.2/SHA256SUMS.txt) · [精确源码](https://github.com/jackotom/hongguo-drama/releases/download/v8.2/hongguo-drama-8.2-source.zip)。上游部分网页片源仍可能 404、仅预览、空响应或 CDN 超时，不保证所有内容永久可播。
+[8.3发行页](https://github.com/jackotom/hongguo-drama/releases/tag/v8.3) · [SHA256](https://github.com/jackotom/hongguo-drama/releases/download/v8.3/SHA256SUMS.txt) · [精确源码](https://github.com/jackotom/hongguo-drama/releases/download/v8.3/hongguo-drama-8.3-source.zip)。上游部分片源仍可能限流、404、仅预览、空响应或 CDN 超时，不保证所有内容永久可播。
 
 **Android手机APK／Android TV版：** 请前往 [N3urda/hongguoTV](https://github.com/N3urda/hongguoTV) 下载。该项目独立维护；版本、兼容性与测试状态以该项目发布页为准，不计入本项目的四平台附件或验收。
 

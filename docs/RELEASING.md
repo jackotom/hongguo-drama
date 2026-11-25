@@ -5,7 +5,11 @@
 - 每次发行页必须在附件列表前的醒目位置保留以下推荐；这是独立第三方项目，不计入本项目附件和平台验收：
   > **Android手机APK／Android TV版：** 请前往 [N3urda/hongguoTV](https://github.com/N3urda/hongguoTV) 下载。该项目独立维护；版本、兼容性与测试状态以该项目发布页为准，不计入本项目的四平台附件或验收。
 
-# 8.2 最新正式发行
+# 8.3 最新正式发行
+
+8.3 已于 2026-11-25 12:50:48（Asia/Shanghai）正式公开并设 Latest，内部 8.3.0、桌面构建 8.3.1，运行代码冻结 `f31d87437a77e9b1b3fa8dfd81c9cecee52296eb`，Release ID `457646713`。新增签名热更新取源策略、用户取源优先级和 openhongguo 社区 SDK；macOS 本机签名公证，Windows/Linux 由 Actions 构建并直接上传 Draft，23 份附件远端摘要与匿名入口通过。详见[8.3记录](release-8.3.md)。
+
+# 8.2 上一正式发行
 
 # 8.2 正式发行
 
