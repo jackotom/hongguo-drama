@@ -13,6 +13,14 @@ function publishMergedOutput(source, destination) {
   }
 }
 
+async function publishMergedOutputAsync(source, destination) {
+  try { await fs.promises.link(source, destination); }
+  catch (error) {
+    if (!['ENOTSUP', 'EOPNOTSUPP', 'EPERM', 'EXDEV', 'ENOSYS'].includes(error.code)) throw error;
+    await fs.promises.copyFile(source, destination, fs.constants.COPYFILE_EXCL);
+  }
+}
+
 function stopMergeChildren(task) {
   for (const child of new Set([task.child, ...(task.children || [])].filter(Boolean))) {
     try { child.kill('SIGTERM'); } catch (_) {}
@@ -191,9 +199,9 @@ async function runMerge({ task, ordered, outDir, ffmpegPath, ffprobePath, probe,
     });
     check();
     // Publish without replacing a file created while the merge was running.
-    publishMergedOutput(tmpOutput, task.output);
+    await publishMergedOutputAsync(tmpOutput, task.output);
     task.verified = '';
-    task.outputBytes = fs.statSync(task.output).size;
+    task.outputBytes = (await fs.promises.stat(task.output)).size;
     recordStage();
     task.status = 'completed'; task.stage = 'completed'; task.stageText = '合并完成'; task.progress = 100; task.done = ordered.length; task.etaSeconds = 0;
   } finally {

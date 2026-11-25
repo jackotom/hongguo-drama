@@ -886,9 +886,9 @@ async function verifyDownloadQuality(file, quality, existing = false, verifyDeco
   return `${Math.min(info.w, info.h)}p`;
 }
 
-function publishDownloadFile(temporary, destination) {
+async function publishDownloadFile(temporary, destination) {
   // A hard link would change the final file's ctime when deferred temporary cleanup runs.
-  fs.copyFileSync(temporary, destination, fs.constants.COPYFILE_EXCL);
+  await fsp.copyFile(temporary, destination, fs.constants.COPYFILE_EXCL);
 }
 
 async function completeNasExports(task) {
@@ -1011,7 +1011,7 @@ async function executeHongguoDownload(task) {
         await temporary.checkInput();
         source.token.throwIfRequested();
         checkCustomAccess(vid);
-        publishDownloadFile(tmpPath, finalPath);
+        await publishDownloadFile(tmpPath, finalPath);
         task.receivedBytes = task.totalBytes = cached.size;
         cached.lastUsed = Date.now();
         return true;
@@ -1073,7 +1073,7 @@ async function executeHongguoDownload(task) {
         task.actualQuality = await verifyReceived(tmpPath, playInfo.duration);
         await temporary.checkInput();
         source.token.throwIfRequested(); checkCustomAccess(vid);
-        publishDownloadFile(tmpPath,finalPath);
+        await publishDownloadFile(tmpPath,finalPath);
         return;
       }
       const response = await requestMedia(playInfo, { cancelToken: source.token });
@@ -1120,7 +1120,7 @@ async function executeHongguoDownload(task) {
           task.actualQuality = await verifyReceived(decodedPath, playInfo.duration);
           await temporary.checkOutput();
           source.token.throwIfRequested();
-          publishDownloadFile(decodedPath, finalPath);
+          await publishDownloadFile(decodedPath, finalPath);
         } catch (error) {
           await temporary.removeOutput().catch(() => {});
           throw error;
@@ -1136,7 +1136,7 @@ async function executeHongguoDownload(task) {
           task.actualQuality = await verifyReceived(decodedPath, playInfo.duration);
           await temporary.checkOutput();
           source.token.throwIfRequested();
-          publishDownloadFile(decodedPath, finalPath);
+          await publishDownloadFile(decodedPath, finalPath);
         }
         catch (error) {
           await temporary.removeOutput().catch(() => {});
@@ -1146,7 +1146,7 @@ async function executeHongguoDownload(task) {
         task.actualQuality = await verifyReceived(tmpPath, playInfo.duration);
         await temporary.checkInput();
         source.token.throwIfRequested();
-        publishDownloadFile(tmpPath, finalPath);
+        await publishDownloadFile(tmpPath, finalPath);
       }
     });
     task.published = true;
@@ -3543,13 +3543,17 @@ function localPlayUrl(filePath, validate) {
  * 「Not allowed to load local resource」拒绝 file:// 请求（表现为播放器黑屏、进度 0:00）。
  * 走自定义协议后开发/打包两种模式行为一致，并且支持 Range 拖动进度。
  */
-function localMediaBody(file, options) {
+function localMediaBody(file, options, signal) {
   const stream = fs.createReadStream(file, options);
   localFileReaders.set(file, (localFileReaders.get(file) || 0) + 1);
+  const abort = () => { if (!stream.destroyed) stream.destroy(); };
+  signal?.addEventListener('abort', abort, { once: true });
   stream.once('close', () => {
-    const remaining = localFileReaders.get(file) - 1;
-    if (remaining) localFileReaders.set(file, remaining); else localFileReaders.delete(file);
+    signal?.removeEventListener('abort', abort);
+    const remaining = (localFileReaders.get(file) || 1) - 1;
+    if (remaining > 0) localFileReaders.set(file, remaining); else localFileReaders.delete(file);
   });
+  if (signal?.aborted) abort();
   return Readable.toWeb(stream);
 }
 
@@ -3558,7 +3562,7 @@ function registerLocalProtocol() {
     try {
       if (!['GET', 'HEAD'].includes(request.method)) return new Response(null, { status: 405 });
       const filePath = mediaAccess.resolveLocal(request.url);
-      if (!filePath || !mediaAccess.isValid(request.url)) {
+      if (!filePath || !(await mediaAccess.isValidAsync(request.url))) {
         return new Response('bad path', { status: 400, headers: { 'Content-Type': 'text/plain' } });
       }
       // 只允许取视频文件，避免该协议被用来读取任意本地文件
@@ -3578,7 +3582,7 @@ function registerLocalProtocol() {
       if (range === false) return new Response(null, { status: 416, headers: { 'Content-Range': `bytes */${size}` } });
       if (range) {
         const { start, end } = range;
-        return new Response(request.method === 'HEAD' ? null : localMediaBody(filePath, { start, end }), {
+        return new Response(request.method === 'HEAD' ? null : localMediaBody(filePath, { start, end }, request.signal), {
           status: 206,
           headers: {
             'Content-Type': 'video/mp4',
@@ -3589,7 +3593,7 @@ function registerLocalProtocol() {
         });
       }
 
-      return new Response(request.method === 'HEAD' ? null : localMediaBody(filePath), {
+      return new Response(request.method === 'HEAD' ? null : localMediaBody(filePath, undefined, request.signal), {
         status: 200,
         headers: {
           'Content-Type': 'video/mp4',
@@ -4806,7 +4810,9 @@ async function saveSettings(settings) {
       sendToRenderer('app-update-preference', merged.app_updates_enabled !== false);
     }
     getCurrentSettings(); // 刷新并发数
+    const wasFallback = proxyStartupFallback;
     proxyStartupFallback = false;
+    if (wasFallback) ensureBackgroundSchedules();
     return { success: true };
   } catch (error) {
     return { success: false, error: error.message };
@@ -5866,6 +5872,24 @@ app.on('web-contents-created', (_event, contents) => {
   contents.session.setPermissionCheckHandler((webContents, permission, _origin, details) => allowed(webContents, permission, details));
 });
 
+let sourcePackTimerStarted = false;
+let watchHistoryTimerStarted = false;
+function ensureBackgroundSchedules() {
+  if (proxyStartupFallback) return;
+  if (appSourcePacks && !sourcePackTimerStarted) {
+    sourcePackTimerStarted = true;
+    void appSourcePacks.check().then(result => sendToRenderer('source-pack-status', result)).catch(() => {});
+    setInterval(() => {
+      if (!proxyStartupFallback) void appSourcePacks.check().then(result => sendToRenderer('source-pack-status', result)).catch(() => {});
+    }, 6 * 60 * 60 * 1000).unref();
+  }
+  if (!watchHistoryTimerStarted) {
+    watchHistoryTimerStarted = true;
+    setTimeout(() => { if (!proxyStartupFallback) void refreshWatchHistory(); }, 10000).unref();
+    setInterval(() => { if (!proxyStartupFallback) void refreshWatchHistory(); }, 15 * 60 * 1000).unref();
+  }
+}
+
 if (hasSingleInstanceLock) app.whenReady().then(async () => {
   let startupStage = '读取本地数据';
   try {
@@ -5909,12 +5933,6 @@ if (hasSingleInstanceLock) app.whenReady().then(async () => {
         bundledEnvelope,
         request: (url, options) => axios.get(url, options),
       });
-      if (!proxyStartupFallback) {
-        void appSourcePacks.check().then(result => sendToRenderer('source-pack-status', result)).catch(() => {});
-        setInterval(() => {
-          if (!proxyStartupFallback) void appSourcePacks.check().then(result => sendToRenderer('source-pack-status', result)).catch(() => {});
-        }, 6 * 60 * 60 * 1000).unref();
-      }
     } catch (error) {
       console.warn('[SourcePack] 内置动态取源包不可用:', error.message);
     }
@@ -5956,11 +5974,10 @@ if (hasSingleInstanceLock) app.whenReady().then(async () => {
         } catch (_) { /* 无窗口环境忽略 */ }
       }, 500);
     } else {
-      setTimeout(() => { void refreshWatchHistory(); }, 10000).unref();
-      setInterval(() => { void refreshWatchHistory(); }, 15 * 60 * 1000).unref();
+      ensureBackgroundSchedules();
     }
-  } catch (_) {
-    console.error(`[Startup] ${startupStage}失败`);
+  } catch (error) {
+    console.error(`[Startup] ${startupStage}失败:`, safeErrorText(error?.message || String(error || '')));
     try {
       dialog.showErrorBox(`${APP_TITLE}启动失败`, `未能完成${startupStage}。请退出后重试；若仍失败，请将此提示反馈给开发者。已有资料不会被清空。`);
     } finally { app.quit(); }
@@ -5980,7 +5997,7 @@ app.on('before-quit', event => {
   if (compatClearing) pending.push(compatClearing);
   if (mergeTempCleanup) pending.push(mergeTempCleanup);
   const downloading = downloadRuns.size || downloadQueue.length || sourceRetryTimers.size;
-  if (!pending.length && !downloading) { quitReady = true; return; }
+  if (!pending.length && !downloading) { bossKey.dispose(); quitReady = true; return; }
   event.preventDefault();
   if (downloading) {
     try { pauseAllTasks(); }
