@@ -1,6 +1,6 @@
 const assert = require('node:assert/strict');
 const { test } = require('node:test');
-const { createOpenhongguoSource } = require('./openhongguo-source');
+const { axiosTransport, createLazyClient, createOpenhongguoSource } = require('./openhongguo-source');
 
 function playback(extra = {}) {
   return {
@@ -9,6 +9,9 @@ function playback(extra = {}) {
       streams: [
         { url: 'https://cdn.example/low.mp4', codec: 'h264', width: 720, height: 1280, definition: '720p' },
         { url: 'https://cdn.example/high.mp4', backup_url: 'https://backup.example/high.mp4', codec: 'hevc', width: 1080, height: 1920, definition: '1080p' },
+        { url: 'https://cdn.example/high-h264.mp4', codec: 'h264', width: 1080, height: 1920, definition: '1080p' },
+        { url: 'https://cdn.example/bytevc2.mp4', codec: 'bytevc2', width: 2160, height: 3840, definition: '4k' },
+        { url: 'http://127.0.0.1/private.mp4', codec: 'h264', width: 2160, height: 3840, definition: '4k' },
         { url: 'https://cdn.example/audio.m4a', dash: true },
       ],
     },
@@ -25,9 +28,51 @@ test('openhongguo provider maps compatible streams and uses the highest quality 
   const result = await provider.resolve('11', { quality: 'auto' });
   assert.equal(calls, 1);
   assert.equal(result.sourceProvider, 'openhongguo');
-  assert.equal(result.codec, 'hevc');
+  assert.equal(result.codec, 'h264');
   assert.equal(result.contentKey, '11'.repeat(16));
-  assert.deepEqual(result.candidates.map(item => item.url), ['https://cdn.example/high.mp4', 'https://backup.example/high.mp4']);
+  assert.equal(result.url, 'https://cdn.example/high-h264.mp4');
+  assert.ok(result.candidates.every(item => !/127\.0\.0\.1|bytevc2/.test(item.url)));
+});
+
+test('openhongguo axios transport preserves raw bodies and inherits ambient proxy handling', async () => {
+  let config;
+  const transport = axiosTransport({ request: async value => {
+    config = value;
+    return {
+      status: 200,
+      headers: { 'content-type': 'application/json', 'content-encoding': 'gzip', 'set-cookie': ['a=1; Path=/'] },
+      data: Buffer.from('raw-body'),
+    };
+  } });
+  const response = await transport({ method: 'POST', url: 'https://api.example/j', headers: { Accept: '*' }, body: new Uint8Array([1, 2, 3]) });
+  assert.equal(config.decompress, false);
+  assert.equal(Object.hasOwn(config, 'proxy'), false, 'ambient app proxy environment must remain in control');
+  assert.deepEqual([...config.data], [1, 2, 3]);
+  assert.equal(Buffer.from(response.body).toString(), 'raw-body');
+  assert.equal(response.headers['content-encoding'], 'gzip');
+  assert.equal(response.cookies.a, '1');
+});
+
+test('a failed openhongguo initialization is not cached permanently', async () => {
+  let attempts = 0;
+  const client = { marker: true };
+  const lazy = createLazyClient({
+    getProfilePath: () => '/tmp/test-profile.json',
+    createTransport: () => ({ transport: true }),
+    loadSdk: async () => {
+      attempts++;
+      if (attempts === 1) throw new Error('temporary wasm load failure');
+      return {
+        fileProfileStore: path => ({ path }),
+        createClient: async options => ({ ...client, options }),
+      };
+    },
+  });
+  await assert.rejects(lazy(), /temporary wasm load failure/);
+  const recovered = await lazy();
+  assert.equal(recovered.marker, true);
+  assert.equal(recovered.options.transport.transport, true);
+  assert.equal(attempts, 2);
 });
 
 test('openhongguo quality, key and cancellation failures stay explicit', async () => {

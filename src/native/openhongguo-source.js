@@ -2,10 +2,10 @@
 'use strict';
 
 const path = require('node:path');
+const axios = require('axios');
 const { abortError, throwIfAborted } = require('./request-signal');
 const { normalizeDownloadQuality } = require('./download-quality');
-
-let defaultClientPromise = null;
+const { isPublicMediaUrl } = require('./web-media-guard');
 
 function profilePath() {
   try {
@@ -19,14 +19,69 @@ function profilePath() {
   }
 }
 
-async function defaultClient() {
-  defaultClientPromise ||= import('openhongguo').then(({ createClient, fileProfileStore }) => createClient({
-    profile: fileProfileStore(profilePath()),
-    retryAttempts: 1,
-    deviceResets: 0,
-    timeoutMs: 15000,
-  }));
-  return defaultClientPromise;
+function createLazyClient({
+  loadSdk = () => import('openhongguo'),
+  createTransport = axiosTransport,
+  getProfilePath = profilePath,
+} = {}) {
+  let pending = null;
+  return async () => {
+    if (!pending) {
+      pending = Promise.resolve()
+        .then(loadSdk)
+        .then(({ createClient, fileProfileStore }) => createClient({
+          profile: fileProfileStore(getProfilePath()),
+          transport: createTransport(),
+          retryAttempts: 1,
+          deviceResets: 0,
+          timeoutMs: 15000,
+        }))
+        .catch(error => {
+          pending = null;
+          throw error;
+        });
+    }
+    return pending;
+  };
+}
+
+const defaultClient = createLazyClient();
+
+function axiosTransport({ request = axios, timeout = 15000 } = {}) {
+  return async req => {
+    const response = await request({
+      method: req.method || 'GET',
+      url: req.url,
+      headers: req.headers,
+      ...(req.body?.length ? { data: Buffer.from(req.body) } : {}),
+      responseType: 'arraybuffer',
+      responseEncoding: null,
+      transformResponse: [data => data],
+      decompress: false,
+      maxRedirects: 5,
+      timeout,
+      validateStatus: () => true,
+    });
+    const headers = {};
+    const cookies = {};
+    for (const [name, raw] of Object.entries(response.headers || {})) {
+      if (name === 'set-cookie') {
+        for (const line of Array.isArray(raw) ? raw : [raw]) {
+          const pair = String(line || '').split(';', 1)[0];
+          const index = pair.indexOf('=');
+          if (index > 0) cookies[pair.slice(0, index).trim()] = pair.slice(index + 1).trim();
+        }
+      } else if (name !== 'cookie' && raw !== undefined) {
+        headers[name] = Array.isArray(raw) ? String(raw[0]) : String(raw);
+      }
+    }
+    return {
+      status: Number(response.status) || 0,
+      headers,
+      cookies,
+      body: new Uint8Array(Buffer.from(response.data || [])),
+    };
+  };
 }
 
 function withAbort(promise, signal) {
@@ -54,13 +109,24 @@ function selectStreams(playback, quality, allowLowerQuality) {
   const target = requested === 'auto' ? 0 : Number(String(requested).replace(/\D/g, '')) || 0;
   const rows = (Array.isArray(playback?.streams) ? playback.streams : [])
     .filter(stream => stream && (stream.url || stream.backup_url) && !stream.dash)
-    .map(stream => ({ stream, pixels: streamPixels(stream), codec: String(stream.codec || '').toLowerCase() }))
+    .map(stream => {
+      const codec = String(stream.codec || '').toLowerCase();
+      return {
+        stream,
+        pixels: streamPixels(stream),
+        codec,
+        safeUrls: [stream.url, stream.backup_url].filter(url => isPublicMediaUrl(url)),
+        codecRank: ['h264', 'avc', 'avc1'].includes(codec) ? 0
+          : ['bytevc1', 'hvc1', 'hev1', 'hevc', 'h265'].includes(codec) ? 1 : 9,
+      };
+    })
+    .filter(row => row.codecRank < 9 && row.safeUrls.length > 0)
     .filter(row => requested === 'auto' || allowLowerQuality || !target || row.pixels >= target)
     .sort((a, b) => {
       if (requested === 'auto' || allowLowerQuality) {
-        return b.pixels - a.pixels || (a.stream.hls ? 1 : 0) - (b.stream.hls ? 1 : 0);
+        return a.codecRank - b.codecRank || b.pixels - a.pixels || (a.stream.hls ? 1 : 0) - (b.stream.hls ? 1 : 0);
       }
-      return a.pixels - b.pixels || (a.stream.hls ? 1 : 0) - (b.stream.hls ? 1 : 0);
+      return a.pixels - b.pixels || a.codecRank - b.codecRank || (a.stream.hls ? 1 : 0) - (b.stream.hls ? 1 : 0);
     });
   if (!rows.length && requested !== 'auto' && !allowLowerQuality) {
     throw Object.assign(new Error(`本集暂无满足 ${requested} 的 openhongguo 片源，未降级`), {
@@ -75,7 +141,7 @@ function selectStreams(playback, quality, allowLowerQuality) {
 }
 
 function candidateFrom(stream, playback, contentKey, vid) {
-  const urls = [stream.url, stream.backup_url].filter(Boolean);
+  const urls = [stream.url, stream.backup_url].filter(url => isPublicMediaUrl(url));
   const codec = String(stream.codec || '').toLowerCase();
   return urls.map(url => ({
     url,
@@ -128,6 +194,8 @@ function createOpenhongguoSource({ getClient = defaultClient } = {}) {
 const provider = createOpenhongguoSource();
 module.exports = {
   profilePath,
+  axiosTransport,
+  createLazyClient,
   selectStreams,
   candidateFrom,
   createOpenhongguoSource,
