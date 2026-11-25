@@ -7,6 +7,7 @@ import AppearanceSettings from './AppearanceSettings';
 import ShortcutSettings from './ShortcutSettings';
 import StealthWakeRegion from './StealthWakeRegion.jsx';
 import CustomSources from './CustomSources';
+import SourcePackSettings from './SourcePackSettings';
 import BuiltinSources from './BuiltinSources';
 import AnnouncementSettings from './AnnouncementSettings';
 import { Settings, Folder, Check, Globe, X, RefreshCw, AlertCircle } from './icons';
@@ -287,6 +288,7 @@ function SettingsPage({ active = true, preview = false, appInfo = null, wakeRegi
         <StealthWakeRegion active={active} focusRequest={wakeRegionFocus} />
       </section>}
       <BuiltinSources />
+      <SourcePackSettings />
       <CustomSources active={active} />
       <p className="settings-hint">{t("播放页顶部可开启小窗模式：窗口缩小、置顶并在支持的系统上跨虚拟桌面可见；鼠标移开时暂停隐藏，移回继续，Esc 或 Dock 可恢复主窗口。")}</p>
       <fieldset className="settings-card" disabled={saving}>

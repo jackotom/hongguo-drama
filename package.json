@@ -63,6 +63,7 @@
       "build/sdk-playback/darwin-*/hongguo-sdk-playback",
       "build/sdk-playback/win32-x64/hongguo-sdk-playback.exe",
       "build/sdk-playback/README.txt",
+      "source-packs/**/*",
       "src/native/**/*",
       "src/store.js"
     ],

@@ -5,6 +5,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 const { signPlayer } = require('./playback-signature');
+const sourcePolicy = require('./source-policy');
 const signerEntropy = { randField: 420072733, ladonRandom: Buffer.from('01020304', 'hex') };
 
 const vid = '7700946421087751193';
@@ -94,6 +95,28 @@ test('production playback uses current-app preload first and the exact episode',
     assert.equal(f.signatures[0].signed.url, request.url);
     assert.ok(request.timeout > 0 && request.timeout <= 12000);
     assert.ok(request.signal);
+});
+
+test('signed source policy can reorder, disable and change official request fields', async () => {
+    sourcePolicy.setPolicy(sourcePolicy.normalizePolicy({
+        revision: 9,
+        routes: [
+            { id: 'preload_current', enabled: false },
+            { id: 'video_tab', order: 0, url: 'https://api5-normal-sinfonlinea.fqnovel.com/reading/bookapi/video_tab/multi_video_model/v1/',
+                values: { version_code: '75555', version_name: '7.5.5.55' } },
+        ],
+    }));
+    try {
+        const f = fixture(response({ code: 0, data: { '1004': { [vid]: { video_model: model() } } } }));
+        assert.equal((await f.fetch()).url, media);
+        assert.equal(f.calls.length, 1);
+        const request = f.calls[0], url = new URL(request.url);
+        assert.equal(url.hostname, 'api5-normal-sinfonlinea.fqnovel.com');
+        assert.equal(url.searchParams.get('version_code'), '75555');
+        assert.equal(url.searchParams.get('version_name'), '7.5.5.55');
+    } finally {
+        sourcePolicy.setPolicy(null);
+    }
 });
 
 for (const wrap of [value => ({ code: 0, data: { [vid]: { video_model: value } } }), nested,

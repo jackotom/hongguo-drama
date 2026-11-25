@@ -11,6 +11,7 @@ const { gzipSync } = require('node:zlib');
 const { setTimeout: delay } = require('node:timers/promises');
 const playbackDevice = require('./playback-device');
 const sdkPlayback = require('./sdk-playback');
+const sourcePolicy = require('./source-policy');
 const { signPlayer } = require('./playback-signature');
 const { signPlaybackV5 } = require('./playback-v5');
 const { abortError, throwIfAborted, boundedSignal, networkFailure } = require('./request-signal');
@@ -25,6 +26,7 @@ let playbackRejection = null;
 let playbackEmptyRounds = 0;
 let playbackIdentityResetAt = 0;
 let preferredPlaybackRoute = '';
+let preferredPlaybackPolicyRevision = 0;
 let playbackV8CooldownUntil = 0;
 let playbackV8Probe = null;
 const V8_EMPTY_COOLDOWN_MS = 60 * 1000;
@@ -91,6 +93,63 @@ function pythonUrlEncode(values) {
             .replace(/[!'()]/g, (ch) => `%${ch.charCodeAt(0).toString(16).toUpperCase()}`);
         return `${encode(key)}=${encode(value)}`;
     }).join('&');
+}
+function mergeObject(base, extra) {
+    return { ...(base || {}), ...(extra || {}) };
+}
+function applyBodyOverrides(base, extra) {
+    const result = JSON.parse(JSON.stringify(base || {}));
+    for (const [path, value] of Object.entries(extra || {})) {
+        const parts = path.split('.');
+        let target = result;
+        for (let i = 0; i < parts.length - 1; i += 1) {
+            if (!target[parts[i]] || typeof target[parts[i]] !== 'object' || Array.isArray(target[parts[i]])) {
+                target[parts[i]] = {};
+            }
+            target = target[parts[i]];
+        }
+        target[parts.at(-1)] = value;
+    }
+    return result;
+}
+function signedRoute(base, values, body, route = {}, { field21, method = 'POST' } = {}) {
+    const profile = mergeObject(values, route.values);
+    const headers = mergeObject({}, route.headers);
+    if ((route.auth || 'v5') === 'player') {
+        const requestTicket = Date.now(), khronos = Math.floor(requestTicket / 1000);
+        const query = pythonUrlEncode({ ...profile, ts: String(khronos), _rticket: String(requestTicket) });
+        const signature = signPlayer({ query, body, ts: khronos });
+        return {
+            url: `${route.url || base}?${query}`, body, method,
+            headers: {
+                'User-Agent': headers['user-agent'] || VIDEO_UA, Accept: headers.accept || 'application/json; charset=utf-8,application/x-protobuf',
+                'x-ss-req-ticket': signature['x-ss-req-ticket'], 'sdk-version': '2', 'x-xs-from-web': '0',
+                'passport-sdk-version': '5051452', 'x-ss-dp': String(profile.aid || '8662'),
+                'x-khronos': signature['x-khronos'], 'x-ladon': signature['x-ladon'], 'x-argus': signature['x-argus'],
+                'x-ss-stub': signature['x-ss-stub'], 'Content-Type': 'application/json; charset=UTF-8',
+                ...(body ? { 'Content-Encoding': 'gzip' } : {}),
+            },
+        };
+    }
+    if (route.auth === 'none') {
+        const requestTicket = Date.now(), khronos = Math.floor(requestTicket / 1000);
+        const query = pythonUrlEncode({ ...profile, ts: String(khronos), _rticket: String(requestTicket) });
+        return {
+            url: `${route.url || base}${query ? `?${query}` : ''}`, body, method,
+            headers: { 'User-Agent': headers['user-agent'] || VIDEO_UA, Accept: headers.accept || 'application/json',
+                ...(body ? { 'Content-Type': 'application/json; charset=UTF-8', 'Content-Encoding': 'gzip' } : {}) },
+        };
+    }
+    const signed = signPlaybackV5({
+        base: route.url || base, values: profile, body, now: Date.now(),
+        ...(field21 != null ? { field21 } : {}), ...(route.field21 != null ? { field21: route.field21 } : {}),
+    });
+    return {
+        ...signed, body, method, headers: { ...signed.headers,
+            'User-Agent': headers['user-agent'] || 'okhttp/4.12.0',
+            Accept: headers.accept || 'application/json',
+            ...(body ? { 'Content-Type': 'application/json; charset=utf-8', 'Content-Encoding': 'gzip' } : {}) },
+    };
 }
 function md5(value) { return crypto.createHash('md5').update(value).digest('hex').toUpperCase(); }
 function preserveLargeJsonIntegers(raw, fields) {
@@ -189,91 +248,59 @@ function helios(khronos) {
 }
 
 function branchOf(url, body, khronos) { const bodyMd5 = body ? crypto.createHash('md5').update(body).digest() : Buffer.alloc(16); const q = sm3(url.split('?')[1]); const iv = getIv(getIv(getIv(0x20230928, q), bodyMd5), le32(khronos)); const low = iv & 15; return low - (((low * 171) >> 9) * 3); }
-function playbackRequest(payload, identity, videoId = '', alternate = false) {
-    // Sign the final query and actual gzip body; other API families retain their original signer.
-    if (videoId) {
-        const body = gzipSync(Buffer.from(payload));
-        const signed = signPlaybackV5({ base: alternate ? PLAYER_API.replace('sinfonlineb.', 'sinfonlinea.') : PLAYER_API,
-            values: { aid: '8662', app_name: 'novelread', version_code: '74332', version_name: '7.4.3.32',
-                channel: 'vivo_8662_64', device_platform: 'android', device_type: 'PGT-AN10', os_version: '12',
-                update_version_code: '74332', iid: identity.iid, cdid: identity.cdid, device_id: identity.device_id },
-            body, now: Date.now() });
-        return { ...signed, body, method: 'POST', headers: { ...signed.headers,
-            'User-Agent': 'com.phoenix.read/73932 (Linux; U; Android 12; zh_CN_#Hans; PGT-AN10; Build/V417IR;tt-ok/3.12.13.20)',
-            Accept: 'application/json', 'Content-Type': 'application/json; charset=utf-8', 'Content-Encoding': 'gzip' } };
-    }
+function playbackRequest(payload, identity, videoId = '', routeId = 'legacy') {
+    const route = { ...(routeId === 'legacy' ? { auth: 'player' } : {}), ...(sourcePolicy.route(routeId) || {}) };
     const body = gzipSync(Buffer.from(payload));
-    const requestTicket = Date.now(), khronos = Math.floor(requestTicket / 1000);
-    const device = { ...PLAYBACK_DEVICE, ...identity };
-    const query = pythonUrlEncode({ ...device, ts: String(khronos), _rticket: String(requestTicket) });
-    const api = VIDEO_API;
-    const url = `${api}?${query}`;
-    const signature = signPlayer({ query, body, ts: khronos });
-    const headers = {
-        'User-Agent': VIDEO_UA.replace(DEVICE.version_code, device.version_code), Accept: 'application/json; charset=utf-8,application/x-protobuf',
-        'x-ss-req-ticket': signature['x-ss-req-ticket'], 'sdk-version': '2', 'x-xs-from-web': '0',
-        'passport-sdk-version': '5051452', 'x-ss-dp': String(device.aid),
-        'x-khronos': signature['x-khronos'],
-        'x-ladon': signature['x-ladon'], 'x-argus': signature['x-argus'], 'x-tt-dt': '',
-        'x-tt-store-region': 'cn', 'x-tt-store-region-src': 'did',
-    };
-    Object.assign(headers, { 'Content-Type': 'application/json; charset=UTF-8',
-        'Content-Encoding': 'gzip', 'x-ss-stub': signature['x-ss-stub'] });
-    return { url, body, headers, method: 'POST' };
+    const values = videoId
+        ? { aid: '8662', app_name: 'novelread', version_code: '74332', version_name: '7.4.3.32',
+            channel: 'vivo_8662_64', device_platform: 'android', device_type: 'PGT-AN10', os_version: '12',
+            update_version_code: '74332', iid: identity.iid, cdid: identity.cdid, device_id: identity.device_id }
+        : { ...PLAYBACK_DEVICE, ...identity };
+    const base = videoId
+        ? (routeId === 'player_a' ? PLAYER_API.replace('sinfonlineb.', 'sinfonlinea.') : PLAYER_API)
+        : VIDEO_API;
+    return signedRoute(base, values, body, route);
 }
 
-function playbackModelRequest(identity, videoId, base, contentType = '1004') {
-    const payload = JSON.stringify({
+function playbackModelRequest(identity, videoId, base, contentType = '1004', routeId = 'model_0') {
+    const route = sourcePolicy.route(routeId) || {};
+    const payload = JSON.stringify(applyBodyOverrides({
         biz_param: { detail_page_version: 0, device_level: 3, disable_digg_stat: false, from_video_id: '',
             need_all_video_definition: true, need_mp4_align: false, source: 9, use_os_player: false,
             use_server_dns: false, video_platform: 3 },
         content_type: Number(contentType),
         video_id: String(videoId),
-    });
+    }, route.body));
     const body = gzipSync(Buffer.from(payload));
-    const signed = signPlaybackV5({
-        base,
-        values: { aid: '8662', app_name: 'novelread', version_code: '74332', version_name: '7.4.3.32',
-            channel: 'vivo_8662_64', device_platform: 'android', device_type: 'PGT-AN10', os_version: '12',
-            update_version_code: '74332', iid: identity.iid, cdid: identity.cdid, device_id: identity.device_id },
-        body, now: Date.now(),
-    });
-    return { ...signed, body, method: 'POST', headers: { ...signed.headers,
-        'User-Agent': 'com.phoenix.read/73932 (Linux; U; Android 12; zh_CN_#Hans; PGT-AN10; Build/V417IR;tt-ok/3.12.13.20)',
-        Accept: 'application/json', 'Content-Type': 'application/json; charset=utf-8', 'Content-Encoding': 'gzip' } };
+    return signedRoute(base, { aid: '8662', app_name: 'novelread', version_code: '74332', version_name: '7.4.3.32',
+        channel: 'vivo_8662_64', device_platform: 'android', device_type: 'PGT-AN10', os_version: '12',
+        update_version_code: '74332', iid: identity.iid, cdid: identity.cdid, device_id: identity.device_id }, body, route);
 }
 
-function preloadRequest(identity, videoId, contentType = '1004') {
+function preloadRequest(identity, videoId, contentType = '1004', routeId = 'preload_current') {
     // Current-app profile from N3urda/hongguoTV ef328f3a: V5 preload + device_level=2.
-    const payload = JSON.stringify({
+    const route = sourcePolicy.route(routeId) || {};
+    const payload = JSON.stringify(applyBodyOverrides({
         biz_param: { detail_page_version: 0, device_level: 2, disable_digg_stat: false,
             disable_video_relate_book: false, need_all_video_definition: true, need_mp4_align: false,
             use_os_player: false, use_server_dns: false, video_platform: 1024 },
         mixed_video_id_map: { [contentType]: [String(videoId)] },
         dr_scene: 'preload',
-    });
+    }, route.body));
     const body = gzipSync(Buffer.from(payload));
-    const signed = signPlaybackV5({
-        base: PRELOAD_API,
-        values: {
+    return signedRoute(PRELOAD_API, {
             aid: '8662', app_name: 'novelread', version_code: '74532', version_name: '7.4.5.32',
             update_version_code: '74532', manifest_version_code: '74532', os: 'android', ssmix: 'a',
             channel: 'update_64', device_platform: 'android', device_type: '25053RT47C',
             device_brand: 'Redmi', os_version: '16', os_api: '36', ac: 'wifi', language: 'zh',
             host_abi: 'arm64-v8a', iid: identity.iid, cdid: identity.cdid, device_id: identity.device_id,
-        },
-        body, now: Date.now(), field21: 312,
-    });
-    return { ...signed, body, method: 'POST', headers: { ...signed.headers,
-        'User-Agent': 'okhttp/4.12.0', Accept: 'application/json',
-        'Content-Type': 'application/json; charset=utf-8', 'Content-Encoding': 'gzip' } };
+        }, body, route, { field21: 312 });
 }
 
-function videoTabRequest(identity, videoId) {
+function videoTabRequest(identity, videoId, routeId = 'video_tab') {
     // video_tab belongs to the player family; generic Argus/Ladon signing is rejected with an empty body.
-    const signed = signPlaybackV5({
-        base: VIDEO_TAB_API,
-        values: {
+    const route = sourcePolicy.route(routeId) || {};
+    const signed = signedRoute(VIDEO_TAB_API, {
             aid: '8662', app_name: 'novelread', version_code: '74332', version_name: '7.4.3.32',
             channel: 'vivo_8662_64', device_platform: 'android', device_type: 'PGT-AN10',
             os_version: '12', update_version_code: '74332',
@@ -281,12 +308,8 @@ function videoTabRequest(identity, videoId) {
             video_id: String(videoId), video_id_type: '0', device_level: '1',
             need_all_video_definition: '1', need_mp4_align: '0', use_os_player: '0',
             video_platform: '1024', source: '0', from_video_id: '',
-        },
-        body: null,
-        now: Date.now(),
-    });
-    return { url: signed.url, body: null, method: 'GET',
-        headers: { ...signed.headers, 'User-Agent': VIDEO_UA.replace(DEVICE.version_code, '73932'), Accept: 'application/json' } };
+        }, null, route, { method: 'GET' });
+    return { ...signed, body: null, method: 'GET' };
 }
 
 function parseSearchInteger(value) {
@@ -634,20 +657,26 @@ async function fetchAppPlayUrlFresh(vid, options) {
     const request = boundedSignal(options.signal, 12000);
     const { signal } = request;
     try {
-        const candidates = [
-            { id: 'preload_current', create: () => preloadRequest(identity, vid, contentType) },
-            { id: 'video_tab', create: () => videoTabRequest(identity, vid) },
-            { id: 'player_b', create: () => playbackRequest(payload, identity, vid) },
-            { id: 'player_a', create: () => playbackRequest(payload, identity, vid, true) },
+        const policyRevision = sourcePolicy.getPolicy().revision;
+        if (policyRevision !== preferredPlaybackPolicyRevision) {
+            preferredPlaybackRoute = '';
+            preferredPlaybackPolicyRevision = policyRevision;
+        }
+        const candidates = sourcePolicy.applyRoutes([
+            { id: 'preload_current', order: 10, auth: 'v5', create: () => preloadRequest(identity, vid, contentType, 'preload_current') },
+            { id: 'video_tab', order: 20, auth: 'v5', create: () => videoTabRequest(identity, vid, 'video_tab') },
+            { id: 'player_b', order: 30, auth: 'v5', create: () => playbackRequest(payload, identity, vid, 'player_b') },
+            { id: 'player_a', order: 40, auth: 'v5', create: () => playbackRequest(payload, identity, vid, 'player_a') },
             ...MODEL_APIS.map((base, index) => ({
-                id: `model_${index}`, create: () => playbackModelRequest(identity, vid, base, contentType),
+                id: `model_${index}`, order: 50 + index * 10, auth: 'v5',
+                create: () => playbackModelRequest(identity, vid, base, contentType, `model_${index}`),
             })),
-            { id: 'legacy', create: () => {
-                const legacy = playbackRequest(payload, identity, '');
+            { id: 'legacy', order: 70, auth: 'player', create: () => {
+                const legacy = playbackRequest(payload, identity, '', 'legacy');
                 legacy.headers.Connection = 'close';
                 return legacy;
             } },
-        ];
+        ]);
         const preferred = candidates.find(route => route.id === preferredPlaybackRoute);
         const routes = preferred ? [preferred, ...candidates.filter(route => route !== preferred)] : candidates;
         let response, lastError, successfulRoute = '';

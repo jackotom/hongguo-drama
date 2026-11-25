@@ -70,6 +70,7 @@ const { fitWindowBounds, getWindowScale, saveWindowZoom, restoreMainWindowBounds
 const { createEpisodePanelController } = require('./src/native/episode-panel');
 const { availableRelease } = require('./src/native/app-update');
 const { createAnnouncementService } = require('./src/native/app-announcements');
+const { createSourcePackService, DEFAULT_PUBLIC_KEY } = require('./src/native/source-pack');
 const { fetchPublicDetails } = require('./src/native/public-details');
 const { fetchEpisodeComments } = require('./src/native/episode-comments');
 const { fetchDanmaku, setDeviceIdentityFile } = require('./src/native/danmaku');
@@ -5436,6 +5437,31 @@ ipcMain.handle('set-announcement-preferences', (_event, patch) => {
   return result;
 });
 
+// ===== 动态取源策略：签名包热更新，只允许声明式官方请求配置 =====
+let appSourcePacks = null;
+function sourcePackUnavailable() {
+  return { success: false, error: '动态取源服务尚未初始化，请稍后重试' };
+}
+ipcMain.handle('get-source-pack-status', () => appSourcePacks?.status() || sourcePackUnavailable());
+ipcMain.handle('set-source-pack-enabled', async (_event, enabled) => {
+  if (!appSourcePacks) return sourcePackUnavailable();
+  const result = await appSourcePacks.setEnabled(enabled !== false);
+  sendToRenderer('source-pack-status', result);
+  return result;
+});
+ipcMain.handle('check-source-pack', async () => {
+  if (!appSourcePacks) return sourcePackUnavailable();
+  const result = await appSourcePacks.check({ force: true });
+  sendToRenderer('source-pack-status', result);
+  return result;
+});
+ipcMain.handle('rollback-source-pack', async () => {
+  if (!appSourcePacks) return sourcePackUnavailable();
+  const result = await appSourcePacks.rollback();
+  sendToRenderer('source-pack-status', result);
+  return result;
+});
+
 // ===== 应用内更新：固定官方源，下载和重启均由用户确认 =====
 let updateRequest = null;
 let latestAppRelease = null;
@@ -5845,6 +5871,25 @@ if (hasSingleInstanceLock) app.whenReady().then(async () => {
         console.log(`[Queue] 启动自动续跑 ${resumed} 个等待中任务，并发 ${MAX_CONCURRENT_DOWNLOADS}`);
         pumpQueue();
       }
+    }
+
+    try {
+      const bundledPath = path.join(__dirname, 'source-packs', 'hongguo-playback.pack.json');
+      const bundledEnvelope = JSON.parse(fs.readFileSync(bundledPath, 'utf8'));
+      appSourcePacks = createSourcePackService({
+        filePath: path.join(app.getPath('userData'), 'source-packs.json'),
+        publicKey: DEFAULT_PUBLIC_KEY,
+        bundledEnvelope,
+        request: (url, options) => axios.get(url, options),
+      });
+      if (!proxyStartupFallback) {
+        void appSourcePacks.check().then(result => sendToRenderer('source-pack-status', result)).catch(() => {});
+        setInterval(() => {
+          if (!proxyStartupFallback) void appSourcePacks.check().then(result => sendToRenderer('source-pack-status', result)).catch(() => {});
+        }, 6 * 60 * 60 * 1000).unref();
+      }
+    } catch (error) {
+      console.warn('[SourcePack] 内置动态取源包不可用:', error.message);
     }
 
     app.on('activate', () => {
