@@ -1,4 +1,7 @@
-.source-pack-settings .settings-label { display: flex; align-items: center; gap: 8px; }
+.source-pack-settings { margin: 22px 0; padding: 22px 28px; }
+.source-pack-heading { display: flex; align-items: center; gap: 9px; margin-bottom: 12px; }
+.source-pack-heading h3 { margin: 0; font-size: 15px; font-weight: 600; }
+.source-pack-settings .proxy-switch-row { margin-top: 4px; }
 .source-pack-status { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin: 14px 0; }
 .source-pack-status > div { min-width: 0; padding: 10px 12px; border: 1px solid var(--border-muted); border-radius: 9px; background: var(--bg-subtle); }
 .source-pack-status span { display: block; margin-bottom: 4px; color: var(--text-secondary); font-size: 11px; }
@@ -6,3 +9,4 @@
 .source-pack-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 .source-pack-message { margin-top: 12px; color: var(--success); font-size: 12px; line-height: 1.7; }
 @media (max-width: 760px) { .source-pack-status { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 640px) { .source-pack-settings { padding: 20px; } }

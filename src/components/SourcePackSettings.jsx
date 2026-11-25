@@ -46,8 +46,8 @@ export default function SourcePackSettings() {
   };
 
   const sourceLabel = status?.source === 'remote' ? '在线更新包' : '内置稳定包';
-  return <section className="settings-group source-pack-settings" aria-labelledby="source-pack-title">
-    <span className="settings-label" id="source-pack-title"><Shield size={17} />{t("自动获取播放源")}</span>
+  return <section className="settings-card source-pack-settings" aria-labelledby="source-pack-title">
+    <div className="source-pack-heading"><Shield size={18} /><h3 id="source-pack-title">{t("自动获取播放源")}</h3></div>
     <label className="proxy-switch-row">
       <input type="checkbox" checked={status?.enabled !== false} disabled={!status || !!busy}
         onChange={event => run('toggle', () => window.electronAPI.setSourcePackEnabled(event.target.checked),
