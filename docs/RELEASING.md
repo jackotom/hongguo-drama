@@ -5,6 +5,13 @@
 - 每次发行页必须在附件列表前的醒目位置保留以下推荐；这是独立第三方项目，不计入本项目附件和平台验收：
   > **Android手机APK／Android TV版：** 请前往 [N3urda/hongguoTV](https://github.com/N3urda/hongguoTV) 下载。该项目独立维护；版本、兼容性与测试状态以该项目发布页为准，不计入本项目的四平台附件或验收。
 
+# 云端构建与 Draft 补传规则（2026-11-25）
+
+- 当前网络不稳定。除 macOS 必须本地执行 Developer ID 签名、公证和装订外，Windows、Linux 及其他可云端构建附件一律由 GitHub Actions 云端虚拟机构建和验收，并由 Actions 直接上传到同一 Draft Release；不得下载到本机后再次上传。
+- 云端上传工作流必须核对精确冻结源码 SHA、平台 SHA256、Draft 状态和最终附件集合；失败时保留 Draft、修复并重跑。
+- macOS 完成本机构建、签名、公证、装订后，及时上传最终 DMG、更新 ZIP 和 `latest-mac.yml`，可以早于 Windows/Linux 完成。
+- Draft 允许陆续补传；只有四平台附件、必要源码、更新清单和总 SHA256 全部齐备、远端摘要与匿名入口核对通过后，才能一次公开并更新 Latest。禁止先公开部分平台。
+
 # 8.3 最新正式发行
 
 8.3 已于 2026-11-25 12:50:48（Asia/Shanghai）正式公开并设 Latest，内部 8.3.0、桌面构建 8.3.1，运行代码冻结 `f31d87437a77e9b1b3fa8dfd81c9cecee52296eb`，Release ID `457646713`。新增签名热更新取源策略、用户取源优先级和 openhongguo 社区 SDK；macOS 本机签名公证，Windows/Linux 由 Actions 构建并直接上传 Draft，23 份附件远端摘要与匿名入口通过。详见[8.3记录](release-8.3.md)。
