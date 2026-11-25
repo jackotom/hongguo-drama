@@ -28,7 +28,6 @@
     "build:linux": "npm run build:react && node scripts/check-linux-media.cjs && electron-builder --linux AppImage --x64 --publish never"
   },
   "dependencies": {
-    "anime4k-webgpu": "1.0.0",
     "axios": "1.20.0",
     "electron-updater": "6.8.9",
     "openhongguo": "0.4.1"
@@ -36,6 +35,7 @@
   "devDependencies": {
     "@libmedia/avplayer": "1.3.1",
     "@vitejs/plugin-react": "^4.3.4",
+    "anime4k-webgpu": "1.0.0",
     "concurrently": "^8.2.2",
     "electron": "44.11.5",
     "electron-builder": "26.15.3",
@@ -62,20 +62,23 @@
       "main.js",
       "preload.js",
       "dist-react/**/*",
-      "build/sdk-playback/darwin-*/hongguo-sdk-playback",
-      "build/sdk-playback/win32-x64/hongguo-sdk-playback.exe",
       "build/sdk-playback/README.txt",
       "source-packs/**/*",
       "src/native/**/*",
+      "!src/native/**/*.test.cjs",
+      "!src/native/fixtures/**",
+      "!src/native/*fixture*.cjs",
       "src/store.js"
     ],
     "asar": true,
     "asarUnpack": [
-      "build/sdk-playback/**/*",
-      "build/sdk-playback/win32-x64/**"
+      "build/sdk-playback/**/*"
     ],
     "artifactName": "hongguo-downloader-8.3-${os}-${arch}.${ext}",
     "win": {
+      "files": [
+        "build/sdk-playback/win32-${arch}/hongguo-sdk-playback.exe"
+      ],
       "target": [
         {
           "target": "nsis",
@@ -129,6 +132,9 @@
       "artifactName": "hongguo-downloader-8.3-win-x64-setup.${ext}"
     },
     "mac": {
+      "files": [
+        "build/sdk-playback/darwin-${arch}/hongguo-sdk-playback"
+      ],
       "target": [
         {
           "target": "dmg",
