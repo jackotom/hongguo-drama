@@ -58,6 +58,8 @@ const { createIpcBoundary } = require('./src/native/ipc-boundary');
 const { downloadTaskView, pathConflicts } = require('./src/native/download-task-view');
 const { createProxyConfig } = require('./src/native/proxy-config');
 const { createProxyManager } = require('./src/native/proxy-manager');
+const { registerProxyIpc } = require('./src/native/proxy-ipc');
+const { registerAppUpdateIpc } = require('./src/native/app-update-ipc');
 const { createHistoryService } = require('./src/native/history-service');
 const { createAccountController } = require('./src/native/account-controller');
 const { episodeDisplayTitle } = require('./src/native/xifan');
@@ -4827,65 +4829,9 @@ ipcMain.handle('save-settings', (_event, settings) => {
 });
 
 // ===== IPC：网络代理 =====
-ipcMain.handle('get-proxy-status', async () => {
-  const settings = getCurrentSettings();
-  const resolved = resolveProxyConfig(settings);
-  return {
-    enabled: settings.proxy_enabled === true,
-    mode: resolved.mode,
-    url: publicProxyUrl(resolved.url),
-    effective: resolved.mode !== 'direct' && !!resolved.url,
-  };
-});
-
-// 用当前表单值实测代理是否连通（未保存也能测）
-ipcMain.handle('test-proxy', async (event, draft) => {
-  const settings = applyEditableSettings(getCurrentSettings(), draft);
-  const resolved = resolveProxyConfig(settings);
-  if (resolved.mode === 'custom' && !resolved.url) {
-    return { success: false, error: '请填写完整的代理地址与端口' };
-  }
-
-  // 只测 API/下载路由。system 使用启动快照，避免未保存的草稿读到当前手动/直连环境。
-  let proxyOption;
-  try { proxyOption = proxyConfig.requestOption(resolved); }
-  catch { return { success: false, error: '代理地址格式无效' }; }
-
-  const started = Date.now();
-  const controller = new AbortController();
-  const deadline = setTimeout(() => controller.abort(), 12000);
-  try {
-    const res = await axios.get(PROXY_TEST_URL, {
-      timeout: 12000,
-      signal: controller.signal,
-      proxy: proxyOption,
-      headers: { 'User-Agent': 'Mozilla/5.0' },
-      validateStatus: () => true,
-    });
-    const ms = Date.now() - started;
-    if (res.status >= 200 && res.status < 400) {
-      return {
-        success: true,
-        elapsed: ms,
-        mode: resolved.mode,
-        via: publicProxyUrl(resolved.url) || '(直连)',
-        message: `红果官网连接正常（HTTP ${res.status}，耗时 ${ms}ms）`,
-      };
-    }
-    return { success: false, error: `请求返回 HTTP ${res.status}（耗时 ${ms}ms）` };
-  } catch (error) {
-    const ms = Date.now() - started;
-    const code = (error && error.code) || '';
-    let hint = publicProxyError(error.message, settings, resolved);
-    if (['UNABLE_TO_VERIFY_LEAF_SIGNATURE', 'UNABLE_TO_GET_ISSUER_CERT_LOCALLY', 'CERT_HAS_EXPIRED', 'DEPTH_ZERO_SELF_SIGNED_CERT', 'SELF_SIGNED_CERT_IN_CHAIN', 'ERR_TLS_CERT_ALTNAME_INVALID'].includes(code)) hint = `测试站点证书校验失败，连接已拒绝；请检查系统时间、证书链或代理的 HTTPS 配置（${code}）`;
-    else if (code === 'ECONNREFUSED') hint = '代理端口拒绝连接，请确认代理软件已启动、端口填写正确';
-    else if (controller.signal.aborted || code === 'ETIMEDOUT' || code === 'ECONNABORTED') hint = '连接超时，请检查代理地址/端口或代理是否可用';
-    else if (code === 'ENOTFOUND') hint = '无法解析代理地址，请检查主机名';
-    else if (/407/.test(hint)) hint = '代理需要认证，请填写用户名与密码';
-    return { success: false, error: `${hint}（耗时 ${ms}ms）`, code };
-  } finally {
-    clearTimeout(deadline);
-  }
+registerProxyIpc({
+  ipcMain, axios, getCurrentSettings, applyEditableSettings,
+  resolveProxyConfig, publicProxyUrl, publicProxyError, proxyConfig, PROXY_TEST_URL,
 });
 
 // ===== IPC：下载管理 =====
@@ -5492,105 +5438,29 @@ ipcMain.handle('rollback-source-pack', async () => {
 });
 
 // ===== 应用内更新：固定官方源，下载和重启均由用户确认 =====
-let updateRequest = null;
 let latestAppRelease = null;
-function appUpdateSupport() {
-  let reason = '';
-  if (IS_PREVIEW || !app.isPackaged) reason = '开发或预览版本不支持应用内安装，请使用正式安装版。';
-  else if (process.platform === 'win32' && (portableConfig.mode === 'portable' || portableConfig.portableDir
-    || process.env.PORTABLE_EXECUTABLE_FILE || process.env.PORTABLE_EXECUTABLE_DIR)) reason = '便携版需手动更新。请先退出旧程序，再运行发布页中的 setup 安装包，并从安装后生成的快捷方式启动；安装版支持后续应用内更新。若仍用便携版，请完整解压新版并直接运行新版文件。';
-  else if (!['darwin', 'win32'].includes(process.platform)) reason = '当前系统请前往发布页手动更新。';
-  else if (process.platform === 'darwin' && (process.execPath.startsWith('/Volumes/') || process.execPath.includes('/AppTranslocation/'))) reason = '请先将应用放入“应用程序”文件夹后重新打开，再使用应用内更新。';
-  return { supported: !reason, reason };
-}
-function appUpdateState() {
-  return appUpdateInstaller?.getState() || { ...appUpdateSupport(), status: 'idle', version: null, percent: 0, error: '' };
-}
-function getAppUpdateInstaller() {
-  if (!appUpdateInstaller) {
-    appUpdater = require('electron-updater').autoUpdater;
-    appUpdater.on('login', (authInfo, callback) => {
-      if (matchesProxyAuth(authInfo)) callback(proxyManager.activeAuth.username, proxyManager.activeAuth.password);
-      else callback();
-    });
-    appUpdateInstaller = require('./src/native/app-update-installer').createUpdateInstaller({
-      updater: appUpdater,
-      currentVersion: APP_VERSION,
-      isEnabled: () => !IS_PREVIEW && getCurrentSettings().app_updates_enabled !== false,
-      installBlocker: () => {
-        if (pendingUpdateOperations) return '正在处理任务或保存设置，请稍后再安装更新。';
-        if (downloadRuns.size || downloadQueue.length || sourceRetryTimers.size) return '还有下载或等待重试的任务，请先在下载管理中暂停全部任务，再安装更新。';
-        if (mergeTasks.some(task => task.status === 'running') || compatPreparing.size || onlinePreparing.size) return '正在合并或准备视频，请等待完成或取消后再安装更新。';
-        if (storageError) return '本地数据保存异常，请先处理保存问题，再安装更新。';
-        return '';
-      },
-      emit: state => sendToRenderer('app-update-state', state),
-    });
-  }
-  return appUpdateInstaller;
-}
-ipcMain.handle('get-app-update-state', () => appUpdateState());
-ipcMain.handle('download-app-update', async () => {
-  const support = appUpdateSupport();
-  if (!support.supported) return { success: false, error: support.reason };
-  if (!latestAppRelease || getCurrentSettings().app_updates_enabled === false) return { success: false, error: '更新信息已失效，请重新检查更新。' };
-  try {
-    const request = updateDownloadGeneration;
-    const installer = getAppUpdateInstaller();
-    if (!['checking', 'downloading', 'downloaded', 'installing'].includes(installer.getState().status)) {
-      await applyProxyToSession(proxyManager.desired || resolveProxyConfig(getCurrentSettings()), [appUpdater.netSession]);
-    }
-    if (request !== updateDownloadGeneration) return { success: false, error: '更新已取消。', state: installer.getState() };
-    return await installer.download(latestAppRelease.version);
-  }
-  catch (_) { return { success: false, error: '无法准备应用内更新，请重试或前往发布页下载安装。' }; }
-});
-ipcMain.handle('cancel-app-update', () => {
-  if (appUpdateInstaller?.getState().status === 'installing') return { success: false, error: '正在安装更新，无法取消。', state: appUpdateState() };
-  updateDownloadGeneration++;
-  if (!appUpdateInstaller) return { success: true, state: appUpdateState() };
-  return appUpdateInstaller.cancel();
-});
-ipcMain.handle('install-app-update', () => {
-  if (!appUpdateInstaller) return { success: false, error: '请先完成更新下载。' };
-  return appUpdateInstaller.install();
-});
-ipcMain.handle('check-app-update', async event => {
-  if (proxyStartupFallback) return { enabled: false, release: null, error: '请先修复或明确关闭代理。' };
-  if (IS_PREVIEW || !mainWindow || event.sender !== mainWindow.webContents) return { enabled: false, release: null };
-  if (getCurrentSettings().app_updates_enabled === false) {
-    latestAppRelease = null;
-    return { enabled: false, release: null };
-  }
-  if (!updateRequest) {
-    updateRequest = axios.get('https://api.github.com/repos/jackotom/hongguo-drama/releases/latest', {
-      timeout: 10000, maxRedirects: 0, maxContentLength: 1024 * 1024,
-      headers: { Accept: 'application/vnd.github+json', 'User-Agent': 'Hongguo-Drama-Update-Check' },
-    }).catch(() => axios.get('https://github.com/jackotom/hongguo-drama/releases/latest', {
-      // GitHub's public release endpoint does not consume the anonymous API quota.
-      timeout: 10000, maxRedirects: 0, maxContentLength: 1024 * 1024,
-      headers: { Accept: 'application/json', 'User-Agent': 'Hongguo-Drama-Update-Check' },
-      validateStatus: status => status === 200 || status === 302,
-    }).then(response => {
-      if (response.status !== 302) return response;
-      const tag = /^https:\/\/github\.com\/jackotom\/hongguo-drama\/releases\/tag\/(v?\d+\.\d+(?:\.\d+)?)$/.exec(response.headers.location || '');
-      if (!tag) throw new Error('Unexpected update redirect');
-      return { data: { tag_name: tag[1] } };
-    })).then(response => ({ release: availableRelease(response.data, APP_VERSION), error: '' }))
-      .catch(() => ({ release: null, error: '暂时无法检查更新，请检查网络后重试。' }))
-      .finally(() => { updateRequest = null; });
-  }
-  const result = await updateRequest;
-  const enabled = getCurrentSettings().app_updates_enabled !== false;
-  latestAppRelease = enabled ? result.release : null;
-  return { enabled, release: latestAppRelease, error: enabled ? result.error : '' };
-});
-ipcMain.handle('open-app-update', async event => {
-  if (IS_PREVIEW || !mainWindow || event.sender !== mainWindow.webContents || getCurrentSettings().app_updates_enabled === false) {
-    return { success: false, error: '更新信息已失效，请稍后重试' };
-  }
-  try { await shell.openExternal(latestAppRelease?.url || 'https://github.com/jackotom/hongguo-drama/releases/latest'); return { success: true }; }
-  catch { return { success: false, error: '无法打开浏览器，请稍后重试' }; }
+registerAppUpdateIpc({
+  ipcMain, app, shell, axios, availableRelease, APP_VERSION, IS_PREVIEW, portableConfig,
+  getMainWindow: () => mainWindow,
+  getCurrentSettings,
+  getProxyStartupFallback: () => proxyStartupFallback,
+  matchesProxyAuth, proxyManager, resolveProxyConfig, applyProxyToSession, sendToRenderer,
+  getAppUpdateInstallerRef: () => appUpdateInstaller,
+  setAppUpdateInstallerRef: value => { appUpdateInstaller = value; },
+  getAppUpdaterRef: () => appUpdater,
+  setAppUpdaterRef: value => { appUpdater = value; },
+  loadAutoUpdater: () => require('electron-updater').autoUpdater,
+  getLatestAppRelease: () => latestAppRelease,
+  setLatestAppRelease: value => { latestAppRelease = value; },
+  getUpdateDownloadGeneration: () => updateDownloadGeneration,
+  bumpUpdateDownloadGeneration: () => { updateDownloadGeneration++; },
+  getInstallBlocker: () => {
+    if (pendingUpdateOperations) return '正在处理任务或保存设置，请稍后再安装更新。';
+    if (downloadRuns.size || downloadQueue.length || sourceRetryTimers.size) return '还有下载或等待重试的任务，请先在下载管理中暂停全部任务，再安装更新。';
+    if (mergeTasks.some(task => task.status === 'running') || compatPreparing.size || onlinePreparing.size) return '正在合并或准备视频，请等待完成或取消后再安装更新。';
+    if (storageError) return '本地数据保存异常，请先处理保存问题，再安装更新。';
+    return '';
+  },
 });
 
 // ===== 应用信息 =====
