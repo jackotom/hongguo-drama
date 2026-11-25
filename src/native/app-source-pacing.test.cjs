@@ -145,6 +145,19 @@ test('V8 official route is attempted before SDK fallback for downloads', async (
     assert.deepEqual(f.sdkCalls.map(call => call.vid), ['11']);
 });
 
+test('App-only provider never falls through to SDK, and SDK-only never probes V8', async () => {
+    const appOnly = fixture(() => ({ status: 200, headers: {}, data: '{"code":12345}' }), undefined,
+        async () => sdkSuccess('unexpected'));
+    await assert.rejects(appOnly.fetch('11', { allowSdk: false }), { code: 'BUSINESS_REJECTED' });
+    assert.equal(appOnly.sdkCalls.length, 0);
+
+    const sdkOnly = fixture(undefined, undefined, async () => sdkSuccess('sdk-only'));
+    const result = await sdkOnly.fetch('11', { allowV8: false, allowSdk: true });
+    assert.equal(result.sourceProvider, 'sdk');
+    assert.equal(sdkOnly.calls.length, 0);
+    assert.equal(sdkOnly.registrations.length, 0);
+});
+
 test('an empty preferred V8 route opens the circuit and moves directly to SDK', async () => {
     const empty = { status: 200, headers: {}, data: '' };
     const f = fixture(() => empty, undefined, async () => sdkSuccess('circuit'));

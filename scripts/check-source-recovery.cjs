@@ -81,7 +81,11 @@ function routeFixture() {
       get: async url => { state.calls.push('web'); return { data: state.web && url.endsWith('/11') ? webPage() : '' }; },
       post: async () => { state.calls.push('api'); return { status: 200, headers: {}, data: Buffer.alloc(0) }; },
     },
-    './app-source': { fetchAppPlayUrl: async () => { state.calls.push('app'); if (!state.app) throw new Error('secret https://signed.invalid/?token=private'); return { url: media('app'), source: 'app' }; } },
+    './app-source': { fetchAppPlayUrl: async (_vid, options) => {
+      state.calls.push(options?.allowV8 === false ? 'sdk' : 'app');
+      if (!state.app) throw new Error('secret https://signed.invalid/?token=private');
+      return { url: media('app'), source: 'app' };
+    } },
   });
   return { ...native, state };
 }
@@ -316,7 +320,7 @@ const checks = [
         post: async () => { calls.push('api'); return { status: 200, headers: {}, data: Buffer.alloc(0) }; },
       },
       './app-source': { fetchAppPlayUrl: async (_vid, options) => {
-        calls.push(options?.quality || 'app');
+        calls.push(options?.allowV8 === false ? 'sdk' : 'app');
         if (!appAvailable) throw new Error('unavailable');
         return { url: media('complete'), source: 'app' };
       } },
@@ -335,7 +339,7 @@ const checks = [
     assert.equal((await f.fetchPlayUrlSingle('11', '1', { force: true })).source, 'web', 'complete public web remains a valid recovery');
     appAvailable = true; calls.length = 0;
     assert.equal((await f.fetchPlayUrlSingle('11', '1', { quality: '1080p' })).source, 'app');
-    assert.deepEqual(calls, ['1080p'], 'explicit quality remains App-only');
+    assert.deepEqual(calls, ['app'], 'explicit quality remains App-only');
   }],
   ['Web accepts only an identity-bound VideoObject and ignores earlier recommended media', async () => {
     const unrelated = `<script type="application/ld+json">${JSON.stringify({ '@type': 'VideoObject', url: 'https://hongguoduanju.com/player/2/22', contentUrl: media('recommendation') })}</script>`;
@@ -442,7 +446,7 @@ const checks = [
     f.markWebMediaFailure(first); f.state.calls.length = 0;
     const recovered = await f.fetchPlayUrlSingle('11', '1', { force: true });
     assert.equal(recovered.source, 'web', 'five-minute penalty must not hide the only working source');
-    assert.deepEqual(f.state.calls, ['app', 'api', 'web']);
+    assert.deepEqual(f.state.calls, ['app', 'api', 'sdk', 'web']);
     f.state.app = true; f.state.calls.length = 0;
     assert.equal((await f.fetchPlayUrlSingle('11', '1')).source, 'app');
     assert.deepEqual(f.state.calls, ['app'], 'web penalty remains after last-resort recovery');
@@ -451,11 +455,27 @@ const checks = [
     const f = routeFixture(); f.state.web = false;
     const unavailable = await f.fetchPlayUrlSingle('11', '1');
     assert.equal(unavailable.code, 'SOURCE_UNAVAILABLE');
-    assert.deepEqual(Array.from(unavailable.sources, item => item.source), ['app', 'web', 'api']);
+    assert.deepEqual(Array.from(unavailable.sources, item => item.source), ['app', 'api', 'sdk', 'web']);
     assert.doesNotMatch(JSON.stringify(unavailable), /secret|signed\.invalid|private|前.*集|付费|会员/);
     assert.ok(unavailable.sources.every(item => item.code && item.message));
     f.state.app = true;
     assert.equal((await f.fetchPlayUrlSingle('11', '1')).source, 'app', 'failures must not be cached');
+  }],
+  ['User source priority controls App, SDK and web dispatch order', async () => {
+    const sourceOrder = require('../src/native/source-order');
+    try {
+      sourceOrder.setSourceOrder(['sdk', 'web', 'app']);
+      const f = routeFixture();
+      assert.equal((await f.fetchPlayUrlSingle('11', '1')).source, 'web');
+      assert.deepEqual(f.state.calls, ['sdk', 'web']);
+
+      sourceOrder.setSourceOrder(['web', 'app', 'sdk']);
+      const webFirst = routeFixture();
+      assert.equal((await webFirst.fetchPlayUrlSingle('11', '1')).source, 'web');
+      assert.deepEqual(webFirst.state.calls, ['web']);
+    } finally {
+      sourceOrder.setSourceOrder(['app', 'sdk', 'web']);
+    }
   }],
 ];
 (async () => {

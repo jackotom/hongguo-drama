@@ -1,11 +1,12 @@
 import { t, useLanguage } from '../i18n';
 import React, { useEffect, useRef, useState } from 'react';
-import { RefreshCw, Shield } from './icons';
+import { ChevronDown, RefreshCw, Shield } from './icons';
 import './SourcePackSettings.css';
 
 export default function SourcePackSettings() {
   useLanguage();
   const [status, setStatus] = useState(null);
+  const [sourceOrder, setSourceOrder] = useState(['app', 'sdk', 'web']);
   const [busy, setBusy] = useState('');
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
@@ -24,6 +25,9 @@ export default function SourcePackSettings() {
     }).catch(failure => {
       if (active) setError(failure.message || '动态取源状态读取失败，请重启软件后重试。');
     });
+    window.electronAPI.getPlaybackSourceOrder?.().then(next => {
+      if (active && next?.success) setSourceOrder(next.order || ['app', 'sdk', 'web']);
+    }).catch(() => {});
     return () => { active = false; unsubscribe?.(); };
   }, []);
 
@@ -46,6 +50,28 @@ export default function SourcePackSettings() {
   };
 
   const sourceLabel = status?.source === 'remote' ? '在线更新包' : '内置稳定包';
+  const sourceDetails = {
+    app: ['官方 App 动态策略', '使用当前签名策略包里的官方请求入口、字段和签名族'],
+    sdk: ['SDK 取源', '调用官方 SDK helper；首次使用会自动注册匿名设备'],
+    web: ['官网公开片源', '使用官网公开的完整 MP4 兜底，画质可能低于 App 片源'],
+  };
+  const move = async (index, delta) => {
+    const target = index + delta;
+    if (target < 0 || target >= sourceOrder.length || busy) return;
+    const previous = sourceOrder;
+    const next = [...sourceOrder];
+    [next[index], next[target]] = [next[target], next[index]];
+    setSourceOrder(next); setError(''); setMessage('');
+    try {
+      const result = await window.electronAPI.setPlaybackSourceOrder(next);
+      if (!result?.success) throw new Error(result?.error || '取源顺序保存失败');
+      setSourceOrder(result.order);
+      setMessage('取源优先级已保存，下次播放或下载立即使用。');
+    } catch (failure) {
+      setSourceOrder(previous);
+      setError(failure.message || '取源顺序保存失败');
+    }
+  };
   return <section className="settings-card source-pack-settings" aria-labelledby="source-pack-title">
     <div className="source-pack-heading"><Shield size={18} /><h3 id="source-pack-title">{t("自动获取播放源")}</h3></div>
     <label className="proxy-switch-row">
@@ -56,6 +82,25 @@ export default function SourcePackSettings() {
         <em>{t("启动时及每 6 小时检查一次。只接受项目签名且通过格式校验的红果官方请求入口、字段和签名族，不会执行远端脚本。")}</em>
       </span>
     </label>
+    <div className="source-order-heading">
+      <strong>{t("取源优先级")}</strong>
+      <span>{t("点击右侧箭头上下调整；越靠上越先尝试")}</span>
+    </div>
+    <ol className="source-order-list" aria-label={t("取源优先级")}>
+      {sourceOrder.map((id, index) => <li key={id}>
+        <span className="source-order-index">{index + 1}</span>
+        <span className="source-order-copy">
+          <strong>{t(sourceDetails[id]?.[0] || id)}</strong>
+          <small>{t(sourceDetails[id]?.[1] || '')}</small>
+        </span>
+        <span className="source-order-actions">
+          <button type="button" className="source-order-arrow up" aria-label={`${t('上移')} ${t(sourceDetails[id]?.[0] || id)}`}
+            disabled={index === 0 || !!busy} onClick={() => move(index, -1)}><ChevronDown size={16} /></button>
+          <button type="button" className="source-order-arrow" aria-label={`${t('下移')} ${t(sourceDetails[id]?.[0] || id)}`}
+            disabled={index === sourceOrder.length - 1 || !!busy} onClick={() => move(index, 1)}><ChevronDown size={16} /></button>
+        </span>
+      </li>)}
+    </ol>
     <div className="source-pack-status" role="status">
       <div><span>{t("当前策略")}</span><strong>{t(sourceLabel)}</strong></div>
       <div><span>{t("策略版本")}</span><strong>{status?.revision || 0}</strong></div>

@@ -71,6 +71,7 @@ const { createEpisodePanelController } = require('./src/native/episode-panel');
 const { availableRelease } = require('./src/native/app-update');
 const { createAnnouncementService } = require('./src/native/app-announcements');
 const { createSourcePackService } = require('./src/native/source-pack');
+const playbackSourceOrder = require('./src/native/source-order');
 const { fetchPublicDetails } = require('./src/native/public-details');
 const { fetchEpisodeComments } = require('./src/native/episode-comments');
 const { fetchDanmaku, setDeviceIdentityFile } = require('./src/native/danmaku');
@@ -254,6 +255,7 @@ function getDefaultSettings() {
     download_quality: 'auto',
     download_metadata: false,
     custom_sources: [],
+    playback_source_order: ['app', 'sdk', 'web'],
     // 看完一集后自动删除本地文件（边看边清，避免占用磁盘）
     auto_delete_watched: false,
     // 兼容模式：本机无法解码 HEVC 时自动转码为 H.264（解决「黑屏有声」）
@@ -4722,7 +4724,7 @@ ipcMain.handle('select-folder', async () => {
   return result.filePaths[0];
 });
 
-const SETTINGS_KEYS = ['root', 'name_format', 'max_concurrent', 'download_quality', 'download_metadata', 'export_text', 'auto_delete_watched', 'compat_mode', 'fast_conversion', 'cache_next_episode', 'picture_in_picture_mode', 'stealth_wake_region', 'show_danmaku_controls', 'app_updates_enabled', 'watch_updates_enabled', 'watch_sequels_enabled', 'watch_notifications_enabled', 'search_app_enabled', 'proxy_enabled', 'proxy_mode', 'proxy_host', 'proxy_port', 'proxy_username', 'proxy_password'];
+const SETTINGS_KEYS = ['root', 'name_format', 'max_concurrent', 'download_quality', 'download_metadata', 'export_text', 'auto_delete_watched', 'compat_mode', 'fast_conversion', 'cache_next_episode', 'playback_source_order', 'picture_in_picture_mode', 'stealth_wake_region', 'show_danmaku_controls', 'app_updates_enabled', 'watch_updates_enabled', 'watch_sequels_enabled', 'watch_notifications_enabled', 'search_app_enabled', 'proxy_enabled', 'proxy_mode', 'proxy_host', 'proxy_port', 'proxy_username', 'proxy_password'];
 
 function normalizeTextExportKinds(value) {
   return { danmaku: value?.danmaku === true, comments: value?.comments === true, reviews: value?.reviews === true };
@@ -4747,6 +4749,9 @@ function applyEditableSettings(current, incoming) {
   }
   if (Object.prototype.hasOwnProperty.call(source, 'stealth_wake_region')) merged.stealth_wake_region = validateStealthWakeRegion(source.stealth_wake_region);
   if (Object.prototype.hasOwnProperty.call(source, 'export_text')) merged.export_text = normalizeTextExportKinds(source.export_text);
+  if (Object.prototype.hasOwnProperty.call(source, 'playback_source_order')) {
+    merged.playback_source_order = playbackSourceOrder.normalizeSourceOrder(source.playback_source_order);
+  }
   if (source.clear_proxy_password === true) merged.proxy_password = '';
   else if (typeof source.proxy_password === 'string' && source.proxy_password.length > 0) merged.proxy_password = source.proxy_password;
   else merged.proxy_password = current.proxy_password || '';
@@ -4755,6 +4760,17 @@ function applyEditableSettings(current, incoming) {
 }
 
 ipcMain.handle('get-settings', async () => settingsForRenderer(getCurrentSettings()));
+ipcMain.handle('get-playback-source-order', () => ({ success: true, order: playbackSourceOrder.getSourceOrder() }));
+ipcMain.handle('set-playback-source-order', async (_event, value) => {
+  try {
+    const order = playbackSourceOrder.normalizeSourceOrder(value);
+    store.saveSettings({ ...getCurrentSettings(), playback_source_order: order });
+    playbackSourceOrder.setSourceOrder(order);
+    return { success: true, order };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
 
 async function saveSettings(settings) {
   try {
@@ -4772,7 +4788,10 @@ async function saveSettings(settings) {
     // Window/source preferences may change while the native proxy operation is pending.
     const latest = applyEditableSettings(getCurrentSettings(), settings);
     latest.download_quality = merged.download_quality;
-    try { store.saveSettings(latest, { clearProxyPassword: settings?.clear_proxy_password === true && !String(settings?.proxy_password || '') }); }
+    try {
+      store.saveSettings(latest, { clearProxyPassword: settings?.clear_proxy_password === true && !String(settings?.proxy_password || '') });
+      playbackSourceOrder.setSourceOrder(latest.playback_source_order);
+    }
     catch (error) {
       try { await applyProxyWithTimeout(current, 5000); } catch (_) { /* 旧配置也可能已不可用 */ }
       throw error;
@@ -5854,6 +5873,7 @@ if (hasSingleInstanceLock) app.whenReady().then(async () => {
     registerStreamProtocol();
     registerLocalProtocol();
     const settings = getCurrentSettings();
+    playbackSourceOrder.setSourceOrder(settings.playback_source_order);
 
     bossKey.start();
 

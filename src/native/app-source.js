@@ -531,9 +531,18 @@ async function fetchAppPlayUrl(vid, options = {}) {
     vid = String(vid || '');
     if (!/^\d{1,30}$/.test(vid)) throw new Error('分集编号无效');
     options = { ...options, contentType: ['1001', '1004'].includes(String(options.contentType)) ? String(options.contentType) : '1004' };
+    const allowV8 = options.allowV8 !== false;
+    const allowSdk = options.allowSdk !== false;
     let sdkFailure = null;
-    const trySdk = async () => resolveSdkAppPlayUrl(vid, options, error => { sdkFailure = error; });
-    const parallelSdk = options.preferSdk && options.parallelSdk === true;
+    const trySdk = async () => allowSdk
+      ? resolveSdkAppPlayUrl(vid, options, error => { sdkFailure = error; })
+      : null;
+    if (!allowV8) {
+        const preferred = await trySdk();
+        if (preferred) return preferred;
+        throw sdkFailure || Object.assign(new Error('SDK 取源不可用'), { code: 'SDK_UNAVAILABLE' });
+    }
+    const parallelSdk = allowSdk && options.preferSdk && options.parallelSdk === true;
     if (parallelSdk) {
         const preferred = await trySdk();
         if (preferred) return preferred;
@@ -608,13 +617,13 @@ async function fetchAppPlayUrl(vid, options = {}) {
                     playbackEmptyRounds = 0;
                 }
             }
-            if (!options.preferSdk) {
+            if (!options.preferSdk && allowSdk) {
                 const preferred = await trySdk();
                 if (preferred) return preferred;
             }
             const sdkCannotRun = !sdkFailure
                 || ['SDK_UNAVAILABLE', 'SDK_INIT_FAILED', 'SDK_SPAWN_FAILED'].includes(sdkFailure.code);
-            if (error.v8CircuitBreak && !options.v8Fallback && sdkCannotRun) {
+            if (error.v8CircuitBreak && !options.v8Fallback && sdkCannotRun && allowV8) {
                 const result = await fetchAppPlayUrlFresh(vid, { ...options, v8Fallback: true });
                 if (sdkFailure) result.sdkFailure = sdkFailure;
                 return result;
