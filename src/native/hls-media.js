@@ -21,6 +21,7 @@ async function remuxHls({ url, output, ffmpeg, signal, cancelToken, request = re
   const controller = new AbortController(), files = new Map();
   let temporary, child, failure, killed, killTimer, spaceTimer, diskJob, writer;
   let received = 0, lastProgress = 0, stagedBytes = 0, committedBytes = 0, remuxing = false;
+  let lastStatfsAt = 0, lastStatfsBytes = 0;
   const capacityBytes = Number.isFinite(tempCapacityBytes) && tempCapacityBytes >= 0 ? tempCapacityBytes : Infinity;
   const stopChild = () => {
     if (!child || killed) return;
@@ -33,8 +34,12 @@ async function remuxHls({ url, output, ffmpeg, signal, cancelToken, request = re
     if (failure) throw failure;
     checkAccess();
   };
-  const ensureCapacity = extra => {
+  const ensureCapacity = (extra, forceStatfs = false) => {
     if (stagedBytes + extra > capacityBytes) throw new Error('HLS 暂存空间不足，已停止');
+    const now = Date.now();
+    if (!forceStatfs && extra > 0 && now - lastStatfsAt < 250 && stagedBytes + extra - lastStatfsBytes < 1024 * 1024) return;
+    lastStatfsAt = now;
+    lastStatfsBytes = stagedBytes + extra;
     const stat = fs.statfsSync(temporary), free = Number(stat.bsize) * Number(stat.bavail);
     const needed = [...diskJobs].filter(job => job.device === diskJob.device)
       .reduce((sum, job) => sum + job.remaining(job === diskJob ? extra : 0), DISK_RESERVE);

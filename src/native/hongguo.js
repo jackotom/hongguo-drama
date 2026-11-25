@@ -919,8 +919,8 @@ async function fetchPlayUrlFresh(vid, sid, skipWeb = false, signal, quality = 'a
     return null;
   };
 
-  // Per-provider timeout budgets prevent one stalled provider from exhausting the 30s outer deadline.
-  const providerBudgets = { openhongguo: 12000, sdk: 20000, app: 20000, web: 10000 };
+  // Per-provider timeout budgets prevent stalled early providers from exhausting the 30s outer deadline.
+  const providerBudgets = { openhongguo: 9000, sdk: 12000, app: 12000, web: 8000 };
 
   for (const provider of order) {
     throwIfAborted(signal);

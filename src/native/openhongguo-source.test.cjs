@@ -180,3 +180,22 @@ test('concurrent DEVICE_REJECTED failures coalesce resetDevice and reject plaint
   assert.equal(ra.url, 'https://cdn.example/secure.mp4');
   assert.equal(rb.url, 'https://cdn.example/secure.mp4');
 });
+
+test('openhongguo transport validates redirect Location instead of local proxy host', async () => {
+  let config;
+  const transport = axiosTransport({ request: async value => {
+    config = value;
+    return { status: 200, headers: {}, data: Buffer.from('ok') };
+  } });
+  await transport({ method: 'GET', url: 'https://api.example/start', headers: {} });
+  assert.doesNotThrow(() => config.beforeRedirect(
+    { protocol: 'http:', hostname: '127.0.0.1', port: 7890, path: 'https://cdn.example/next' },
+    { headers: { location: 'https://cdn.example/next' } },
+    { url: 'https://api.example/start' },
+  ));
+  assert.throws(() => config.beforeRedirect(
+    { protocol: 'http:', hostname: '127.0.0.1', port: 7890, path: 'http://127.0.0.1/secret' },
+    { headers: { location: 'http://127.0.0.1/secret' } },
+    { url: 'https://api.example/start' },
+  ), { code: 'SECURITY_BLOCKED' });
+});

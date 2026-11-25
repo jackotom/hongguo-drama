@@ -72,9 +72,11 @@ function axiosTransport({ request = axios, timeout = 15000 } = {}) {
       decompress: false,
       maxContentLength: 8 * 1024 * 1024,
       maxRedirects: 5,
-      beforeRedirect: options => {
-        const nextUrl = `${options.protocol || ''}//${options.hostname || ''}${options.port ? `:${options.port}` : ''}${options.path || '/'}`;
-        if (!isPublicMediaUrl(nextUrl)) throw Object.assign(new Error('openhongguo 重定向地址不安全'), { code: 'SECURITY_BLOCKED' });
+      beforeRedirect: (options, response, request) => {
+        const target = response?.headers?.location
+          ? new URL(response.headers.location, request?.url || req.url).href
+          : `${options.protocol || ''}//${options.hostname || ''}${options.port ? `:${options.port}` : ''}${options.path || '/'}`;
+        if (!isPublicMediaUrl(target)) throw Object.assign(new Error('openhongguo 重定向地址不安全'), { code: 'SECURITY_BLOCKED' });
       },
       timeout,
       validateStatus: () => true,

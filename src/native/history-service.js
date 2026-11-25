@@ -132,8 +132,9 @@ function createHistoryService({
     const latest = family.reduce((best, row) => watchHistory.seasonOf(row) > watchHistory.seasonOf(best) ? row : best, family[0]);
     const sequelDue = new Set();
     if (getSettings().watch_sequels_enabled !== false) {
+      const playbackMap = store.getPlayback();
       for (const row of items) {
-        const previous = store.getPlayback()[String(row.series_id)];
+        const previous = playbackMap[String(row.series_id)];
         if (force || Date.now() - (previous?.lastSequelCheckAt || 0) >= SEQUEL_INTERVAL) sequelDue.add(String(row.series_id));
       }
     }
