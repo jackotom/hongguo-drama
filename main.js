@@ -1052,7 +1052,7 @@ async function executeHongguoDownload(task) {
         && /^\d{1,30}$/.test(String(queued.hongguoInfo?.vid || '')) && String(queued.hongguoInfo.vid) !== String(vid))
       .map(queued => String(queued.hongguoInfo.vid))].slice(0, 8) : undefined;
     if (!reusedCache) await withMediaRecovery(vid, hongguoInfo?.series_id, { playInfo: checkedPlayInfo, quality, allowLowerQuality,
-      content_type: hongguoInfo?.content_type, preferSdk: false, parallelSdk: false, sdkPriority: false,
+      content_type: hongguoInfo?.content_type, sdkPriority: false,
       sdkBatchVids, force: true, cancelToken: source.token,
       onSourceReady: () => {
         if (numeric) clearHongguoSourceBackoff();
@@ -3353,8 +3353,8 @@ async function withMediaRecovery(vid, seriesId, options, consume) {
         if (!info) {
           lookup = boundedSignal(controller.signal, 30000);
           info = await awaitMediaOperation(hongguo.fetchPlayUrlSingle(vid, seriesId,
-            { quality: options.quality, allowLowerQuality: options.allowLowerQuality, preferSdk: options.preferSdk === true,
-              parallelSdk: options.parallelSdk === true, sdkPriority: options.sdkPriority === true,
+            { quality: options.quality, allowLowerQuality: options.allowLowerQuality,
+              sdkPriority: options.sdkPriority === true,
               content_type: options.content_type,
               sdkBatchVids: !round ? options.sdkBatchVids : undefined, sdkFresh: round > 0,
               force: options.force || round > 0, signal: lookup.signal }), lookup.signal);
@@ -4760,13 +4760,17 @@ function applyEditableSettings(current, incoming) {
 }
 
 ipcMain.handle('get-settings', async () => settingsForRenderer(getCurrentSettings()));
-ipcMain.handle('get-playback-source-order', () => ({ success: true, order: playbackSourceOrder.getSourceOrder() }));
+ipcMain.handle('get-playback-source-order', () => ({
+  success: true,
+  order: playbackSourceOrder.getSourceOrder(),
+  availability: { sdk: sdkPlaybackAvailable() },
+}));
 ipcMain.handle('set-playback-source-order', async (_event, value) => {
   try {
     const order = playbackSourceOrder.normalizeSourceOrder(value);
     store.saveSettings({ ...getCurrentSettings(), playback_source_order: order });
     playbackSourceOrder.setSourceOrder(order);
-    return { success: true, order };
+    return { success: true, order, availability: { sdk: sdkPlaybackAvailable() } };
   } catch (error) {
     return { success: false, error: error.message };
   }
@@ -5643,12 +5647,16 @@ ipcMain.handle('set-interface-language', (_event, language) => {
   return { success: true };
 });
 
-ipcMain.handle('get-app-info', async () => {
-  let sdkPlaybackAvailable = false;
+function sdkPlaybackAvailable() {
   try {
     const executable = require('./src/native/sdk-playback').executablePath(app);
-    sdkPlaybackAvailable = !!executable && fs.statSync(executable).isFile();
-  } catch {}
+    return !!executable && fs.statSync(executable).isFile();
+  } catch {
+    return false;
+  }
+}
+
+ipcMain.handle('get-app-info', async () => {
   return {
     version: APP_VERSION,
     brand: APP_TITLE,
@@ -5660,7 +5668,7 @@ ipcMain.handle('get-app-info', async () => {
       process.env, app.getPreferredSystemLanguages?.()[0] || app.getLocale(), process.platform),
     configMode: portableConfig.mode,
     configNote: portableConfig.reason || '',
-    sdkPlaybackAvailable,
+    sdkPlaybackAvailable: sdkPlaybackAvailable(),
   };
 });
 

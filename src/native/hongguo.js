@@ -855,9 +855,12 @@ async function fetchPlayUrlFresh(vid, sid, skipWeb = false, signal, quality = 'a
   throwIfAborted(signal);
   const sources = [];
   const requestedOrder = playbackSourceOrder.getSourceOrder();
-  const order = skipWeb
+  let order = skipWeb
     ? [...requestedOrder.filter(item => item !== 'web'), 'web']
     : requestedOrder;
+  if (quality !== 'auto' && allowLowerQuality && order.includes('web')) {
+    order = [...order.filter(item => item !== 'web'), 'web'];
+  }
 
   const fetchApp = async () => {
     try {
@@ -899,7 +902,7 @@ async function fetchPlayUrlFresh(vid, sid, skipWeb = false, signal, quality = 'a
       try {
         const result = await require('./app-source').fetchAppPlayUrl(String(vid), {
           quality, allowLowerQuality, allowV8: false, allowSdk: true,
-          preferSdk: true, parallelSdk: true, sdkPriority: true,
+          preferSdk: true, parallelSdk: true, sdkPriority: sdkPriority === true,
           contentType, sdkBatchVids, sdkFresh, signal,
         });
         throwIfAborted(signal);

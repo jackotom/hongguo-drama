@@ -3,14 +3,18 @@ import React, { useEffect, useRef, useState } from 'react';
 import { ChevronDown, RefreshCw, Shield } from './icons';
 import './SourcePackSettings.css';
 
+const DEFAULT_SOURCE_ORDER = ['app', 'sdk', 'web', 'openhongguo'];
+
 export default function SourcePackSettings() {
   useLanguage();
   const [status, setStatus] = useState(null);
-  const [sourceOrder, setSourceOrder] = useState(['app', 'sdk', 'web', 'openhongguo']);
+  const [sourceOrder, setSourceOrder] = useState(DEFAULT_SOURCE_ORDER);
+  const [sdkAvailable, setSdkAvailable] = useState(true);
   const [busy, setBusy] = useState('');
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const pending = useRef(false);
+  const orderSaving = useRef(false);
 
   useEffect(() => {
     let active = true;
@@ -26,7 +30,10 @@ export default function SourcePackSettings() {
       if (active) setError(failure.message || '动态取源状态读取失败，请重启软件后重试。');
     });
     window.electronAPI.getPlaybackSourceOrder?.().then(next => {
-      if (active && next?.success) setSourceOrder(next.order || ['app', 'sdk', 'web', 'openhongguo']);
+      if (active && next?.success) {
+        setSourceOrder(next.order || DEFAULT_SOURCE_ORDER);
+        setSdkAvailable(next.availability?.sdk !== false);
+      }
     }).catch(() => {});
     return () => { active = false; unsubscribe?.(); };
   }, []);
@@ -56,23 +63,33 @@ export default function SourcePackSettings() {
     web: ['官网公开片源', '使用官网公开的完整 MP4 兜底，画质可能低于 App 片源'],
     openhongguo: ['openhongguo 社区 SDK', '固定版本 Apache-2.0 本地 WASM，使用独立匿名设备档案'],
   };
-  const move = async (index, delta) => {
-    const target = index + delta;
-    if (target < 0 || target >= sourceOrder.length || busy) return;
+  const saveOrder = async (next, successMessage) => {
+    if (orderSaving.current || busy) return;
+    orderSaving.current = true;
     const previous = sourceOrder;
-    const next = [...sourceOrder];
-    [next[index], next[target]] = [next[target], next[index]];
-    setSourceOrder(next); setError(''); setMessage('');
+    setSourceOrder(next); setBusy('order'); setError(''); setMessage('');
     try {
       const result = await window.electronAPI.setPlaybackSourceOrder(next);
       if (!result?.success) throw new Error(result?.error || '取源顺序保存失败');
       setSourceOrder(result.order);
-      setMessage('取源优先级已保存，下次播放或下载立即使用。');
+      setSdkAvailable(result.availability?.sdk !== false);
+      setMessage(successMessage);
     } catch (failure) {
       setSourceOrder(previous);
       setError(failure.message || '取源顺序保存失败');
+    } finally {
+      orderSaving.current = false;
+      setBusy('');
     }
   };
+  const move = (index, delta) => {
+    const target = index + delta;
+    if (target < 0 || target >= sourceOrder.length || busy) return;
+    const next = [...sourceOrder];
+    [next[index], next[target]] = [next[target], next[index]];
+    saveOrder(next, '取源优先级已保存，下次播放或下载立即使用。');
+  };
+  const isDefaultOrder = sourceOrder.every((id, index) => id === DEFAULT_SOURCE_ORDER[index]);
   return <section className="settings-card source-pack-settings" aria-labelledby="source-pack-title">
     <div className="source-pack-heading"><Shield size={18} /><h3 id="source-pack-title">{t("自动获取播放源")}</h3></div>
     <label className="proxy-switch-row">
@@ -86,14 +103,22 @@ export default function SourcePackSettings() {
     <div className="source-order-heading">
       <strong>{t("取源优先级")}</strong>
       <span>{t("点击右侧箭头上下调整；越靠上越先尝试")}</span>
+      {!isDefaultOrder && <button type="button" className="source-order-reset" disabled={!!busy}
+        onClick={() => saveOrder(DEFAULT_SOURCE_ORDER, '已恢复默认取源优先级。')}>{t("恢复默认")}</button>}
     </div>
+    {sourceOrder[0] === 'web' && <p className="source-order-warning" role="status">
+      {t("官网公开片源排在首位，可能优先得到较低画质的公开 MP4。")}
+    </p>}
     <ol className="source-order-list" aria-label={t("取源优先级")}>
       {sourceOrder.map((id, index) => <li key={id}>
         <span className="source-order-index">{index + 1}</span>
         <span className="source-order-copy">
           <strong>{t(sourceDetails[id]?.[0] || id)}</strong>
-          <small>{t(sourceDetails[id]?.[1] || '')}</small>
+          <small>{id === 'sdk' && !sdkAvailable
+            ? t('当前环境未内置或未启用 SDK；置顶会先失败一次再继续回退')
+            : t(sourceDetails[id]?.[1] || '')}</small>
         </span>
+        {id === 'sdk' && !sdkAvailable && <span className="source-order-unavailable">{t("当前不可用")}</span>}
         <span className="source-order-actions">
           <button type="button" className="source-order-arrow up" aria-label={`${t('上移')} ${t(sourceDetails[id]?.[0] || id)}`}
             disabled={index === 0 || !!busy} onClick={() => move(index, -1)}><ChevronDown size={16} /></button>

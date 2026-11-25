@@ -79,7 +79,7 @@ function appFixture(rows) {
   return { ...app, calls };
 }
 function routeFixture() {
-  const state = { web: true, app: false, openhongguo: false, calls: [] };
+  const state = { web: true, app: false, openhongguo: false, calls: [], sdkPriority: null };
   const native = load('hongguo.js', {
     axios: {
       get: async url => { state.calls.push('web'); return { data: state.web && url.endsWith('/11') ? webPage() : '' }; },
@@ -87,6 +87,7 @@ function routeFixture() {
     },
     './app-source': { fetchAppPlayUrl: async (_vid, options) => {
       state.calls.push(options?.allowV8 === false ? 'sdk' : 'app');
+      if (options?.allowV8 === false) state.sdkPriority = options.sdkPriority;
       if (!state.app) throw new Error('secret https://signed.invalid/?token=private');
       return { url: media('app'), source: 'app' };
     } },
@@ -475,8 +476,9 @@ const checks = [
     try {
       sourceOrder.setSourceOrder(['sdk', 'web', 'app']);
       const f = routeFixture();
-      assert.equal((await f.fetchPlayUrlSingle('11', '1')).source, 'web');
+      assert.equal((await f.fetchPlayUrlSingle('11', '1', { sdkPriority: true })).source, 'web');
       assert.deepEqual(f.state.calls, ['sdk', 'web']);
+      assert.equal(f.state.sdkPriority, true);
 
       sourceOrder.setSourceOrder(['web', 'app', 'sdk']);
       const webFirst = routeFixture();
@@ -484,6 +486,17 @@ const checks = [
       assert.deepEqual(webFirst.state.calls, ['web']);
     } finally {
       sourceOrder.setSourceOrder(['app', 'sdk', 'web']);
+    }
+  }],
+  ['Explicit quality moves the lower-quality web provider behind HD-capable providers', async () => {
+    const sourceOrder = require('../src/native/source-order');
+    try {
+      sourceOrder.setSourceOrder(['web', 'app', 'sdk', 'openhongguo']);
+      const f = routeFixture();
+      assert.equal((await f.fetchPlayUrlSingle('11', '1', { quality: '1080p', allowLowerQuality: true })).source, 'web');
+      assert.deepEqual(f.state.calls, ['app', 'api', 'sdk', 'openhongguo', 'web']);
+    } finally {
+      sourceOrder.setSourceOrder(['app', 'sdk', 'web', 'openhongguo']);
     }
   }],
 ];

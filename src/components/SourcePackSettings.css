@@ -2,9 +2,12 @@
 .source-pack-heading { display: flex; align-items: center; gap: 9px; margin-bottom: 12px; }
 .source-pack-heading h3 { margin: 0; font-size: 15px; font-weight: 600; }
 .source-pack-settings .proxy-switch-row { margin-top: 4px; }
-.source-order-heading { display: flex; align-items: baseline; gap: 10px; margin-top: 12px; padding-top: 14px; border-top: 1px solid var(--border-muted); }
+.source-order-heading { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; margin-top: 12px; padding-top: 14px; border-top: 1px solid var(--border-muted); }
 .source-order-heading strong { font-size: 13px; }
 .source-order-heading span { color: var(--text-secondary); font-size: 11px; }
+.source-order-reset { margin-left: auto; padding: 4px 8px; border: 0; background: transparent; color: var(--accent-text); font-size: 11px; cursor: pointer; }
+.source-order-reset:disabled { opacity: .45; cursor: default; }
+.source-order-warning { margin: 8px 0 0; padding: 8px 10px; border-radius: 7px; background: var(--warning-bg, var(--bg-inset)); color: var(--warning-text, var(--text-secondary)); font-size: 11px; line-height: 1.6; }
 .source-order-list { list-style: none; padding: 0; margin: 8px 0 0; border: 1px solid var(--border-muted); border-radius: 10px; overflow: hidden; }
 .source-order-list li { display: flex; align-items: center; gap: 12px; min-width: 0; padding: 11px 12px; background: var(--bg-card); }
 .source-order-list li + li { border-top: 1px solid var(--border-muted); }
@@ -13,6 +16,7 @@
 .source-order-copy strong, .source-order-copy small { display: block; overflow-wrap: anywhere; }
 .source-order-copy strong { font-size: 12px; }
 .source-order-copy small { margin-top: 3px; color: var(--text-secondary); font-size: 11px; line-height: 1.55; }
+.source-order-unavailable { flex: 0 0 auto; padding: 2px 6px; border-radius: 999px; background: var(--danger-bg); color: var(--danger); font-size: 10px; white-space: nowrap; }
 .source-order-actions { display: flex; gap: 5px; }
 .source-order-arrow { display: grid; place-items: center; width: 30px; height: 30px; padding: 0; border: 1px solid var(--border-color); border-radius: 7px; background: var(--bg-card); color: var(--text-secondary); cursor: pointer; }
 .source-order-arrow:hover:not(:disabled) { color: var(--accent-text); border-color: var(--accent); }
