@@ -1,0 +1,96 @@
+name: Upload cloud-built release assets
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Draft release tag
+        type: string
+        required: true
+      source_sha:
+        description: Exact frozen source SHA used by both builds
+        type: string
+        required: true
+      version:
+        description: Public two-part version
+        type: string
+        required: true
+      windows_run_id:
+        description: Successful Windows candidate run ID
+        type: string
+        required: true
+      linux_run_id:
+        description: Successful Linux candidate run ID
+        type: string
+        required: true
+
+permissions:
+  actions: read
+  contents: write
+
+jobs:
+  upload:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download verified cloud artifacts
+        env:
+          GH_TOKEN: ${{ github.token }}
+          WINDOWS_RUN_ID: ${{ inputs.windows_run_id }}
+          LINUX_RUN_ID: ${{ inputs.linux_run_id }}
+        run: |
+          mkdir -p cloud/windows cloud/linux
+          gh run download "$WINDOWS_RUN_ID" --repo "$GITHUB_REPOSITORY" --name windows-release-candidate --dir cloud/windows
+          gh run download "$LINUX_RUN_ID" --repo "$GITHUB_REPOSITORY" --name linux-appimage-candidate --dir cloud/linux
+
+      - name: Verify source identity and cloud digests
+        env:
+          SOURCE_SHA: ${{ inputs.source_sha }}
+          VERSION: ${{ inputs.version }}
+        run: |
+          test "$(tr -d '\r' < cloud/windows/SOURCE-SHA.txt)" = "$SOURCE_SHA"
+          test "$(cat cloud/linux/SOURCE-SHA.txt)" = "$SOURCE_SHA"
+          (cd cloud/windows && tr -d '\r' < WINDOWS-SHA256SUMS.txt | sha256sum -c -)
+          (cd cloud/linux && sed 's#  dist/#  #' LINUX-SHA256SUMS.txt | sha256sum -c -)
+          test -f "cloud/windows/hongguo-downloader-$VERSION-win-x64.exe"
+          test -f "cloud/windows/hongguo-downloader-$VERSION-win-x64.zip"
+          test -f "cloud/windows/hongguo-downloader-$VERSION-win-x64-setup.exe"
+          test -f "cloud/windows/hongguo-downloader-$VERSION-windows-source.zip"
+          test -f "cloud/linux/hongguo-downloader-$VERSION-linux-x64.AppImage"
+
+      - name: Upload directly from Actions to Draft Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
+          VERSION: ${{ inputs.version }}
+        run: |
+          gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --json isDraft --jq '.isDraft' | grep -qx true
+          gh release upload "$RELEASE_TAG" \
+            "cloud/windows/hongguo-downloader-$VERSION-win-x64.exe" \
+            "cloud/windows/hongguo-downloader-$VERSION-win-x64.zip" \
+            "cloud/windows/hongguo-downloader-$VERSION-win-x64-setup.exe" \
+            "cloud/windows/hongguo-downloader-$VERSION-win-x64-setup.exe.blockmap" \
+            "cloud/windows/latest.yml" \
+            "cloud/windows/hongguo-downloader-$VERSION-windows-source.zip" \
+            cloud/windows/ffmpeg-*-win-x64-corresponding-source.tar.gz \
+            cloud/windows/librempeg-*-win-x64-corresponding-source.tar.gz \
+            "cloud/linux/hongguo-downloader-$VERSION-linux-x64.AppImage" \
+            cloud/linux/ffmpeg-*-linux-x64-corresponding-source.tar.gz \
+            cloud/linux/librempeg-*-linux-x64-corresponding-source.tar.gz \
+            --repo "$GITHUB_REPOSITORY" --clobber
+
+      - name: Write upload receipt
+        env:
+          RELEASE_TAG: ${{ inputs.release_tag }}
+          SOURCE_SHA: ${{ inputs.source_sha }}
+        run: |
+          mkdir -p receipt
+          gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --json assets \
+            --jq '{tag: .tagName, sourceSha: "'"$SOURCE_SHA"'", assets: [.assets[] | {name, size, state}]}' > receipt/cloud-upload.json
+          cat receipt/cloud-upload.json
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cloud-release-upload-receipt
+          path: receipt/cloud-upload.json
