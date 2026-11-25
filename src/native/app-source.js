@@ -25,6 +25,9 @@ let playbackRejection = null;
 let playbackEmptyRounds = 0;
 let playbackIdentityResetAt = 0;
 let preferredPlaybackRoute = '';
+let playbackV8CooldownUntil = 0;
+let playbackV8Probe = null;
+const V8_EMPTY_COOLDOWN_MS = 60 * 1000;
 const VIDEO_API = 'https://api5-normal-sinfonlineb.fqnovel.com/novel/player/multi_video_model/v1/';
 const VIDEO_TAB_API = 'https://api5-normal-sinfonlineb.fqnovel.com/reading/bookapi/video_tab/multi_video_model/v1/';
 const PLAYER_API = 'https://api5-normal-sinfonlineb.fqnovel.com/novel/player/multi_video_model/player/v1';
@@ -47,6 +50,37 @@ const DEVICE = {
 const PLAYBACK_DEVICE = { ...DEVICE, version_code: '74332', version_name: '7.4.3.32',
     manifest_version_code: '74332', update_version_code: '74332', pv_player: '74332' };
 const PLAYBACK_UA = VIDEO_UA.replace(DEVICE.version_code, PLAYBACK_DEVICE.version_code);
+
+function beginPlaybackV8Probe() {
+    if (Date.now() < playbackV8CooldownUntil) return { skip: true };
+    if (playbackV8Probe) return { waiting: playbackV8Probe };
+    let resolve;
+    const promise = new Promise(done => { resolve = done; });
+    playbackV8Probe = promise;
+    return {
+        leader: true,
+        settle(state) {
+            if (playbackV8Probe === promise) playbackV8Probe = null;
+            resolve(state);
+        },
+    };
+}
+
+function waitForPlaybackV8Probe(promise, signal) {
+    if (!signal) return promise;
+    throwIfAborted(signal);
+    return new Promise((resolve, reject) => {
+        const abort = () => {
+            cleanup();
+            reject(abortError(signal));
+        };
+        const cleanup = () => signal.removeEventListener('abort', abort);
+        signal.addEventListener('abort', abort, { once: true });
+        promise.then(value => { cleanup(); resolve(value); }, error => { cleanup(); reject(error); });
+        if (signal.aborted) abort();
+    });
+}
+
 function str(value, fallback = '') { return String(value == null ? fallback : value).trim(); }
 function cleanUrl(value) { return str(value).replace(/\\\//g, '/').replace(/\\u0026/g, '&').replace(/&amp;/g, '&'); }
 function jsonBody(value) { try { return JSON.parse(value); } catch { return null; } }
@@ -480,8 +514,23 @@ async function fetchAppPlayUrl(vid, options = {}) {
         const preferred = await trySdk();
         if (preferred) return preferred;
     }
-    // Playback, prefetch and downloads share one paced turn, including registration.
     const previousRejection = playbackRejection;
+    const v8Probe = options.preferSdk ? null : beginPlaybackV8Probe();
+    let v8ProbeSettled = false;
+    const settleV8Probe = state => {
+        if (v8ProbeSettled || !v8Probe?.settle) return;
+        v8ProbeSettled = true;
+        v8Probe.settle(state);
+    };
+    let skipV8 = v8Probe?.skip === true;
+    if (v8Probe?.waiting) {
+        skipV8 = await waitForPlaybackV8Probe(v8Probe.waiting, options.signal) === 'skip';
+    }
+    if (skipV8) {
+        const preferred = await trySdk();
+        if (preferred) return preferred;
+    }
+    // Playback, prefetch and downloads share one paced turn, including registration.
     const pending = playbackQueue.then(async () => {
         throwIfAborted(options.signal);
         if (playbackRejection !== previousRejection) throw playbackRejection;
@@ -508,6 +557,10 @@ async function fetchAppPlayUrl(vid, options = {}) {
                     throwIfAborted(options.signal);
                     const empty = error.code === 'EMPTY_RESPONSE';
                     const rejected = error.code === 'BUSINESS_REJECTED' && Number(error.businessCode) === 110001;
+                    if (error.v8CircuitBreak) {
+                        settleV8Probe('skip');
+                        throw error;
+                    }
                     if (identityRotated || (!empty && !rejected)) throw error;
                     if (empty && Date.now() - playbackIdentityResetAt < 30000) throw error;
                     playbackDevice.resetPlaybackDevice?.();
@@ -535,6 +588,13 @@ async function fetchAppPlayUrl(vid, options = {}) {
                 const preferred = await trySdk();
                 if (preferred) return preferred;
             }
+            const sdkCannotRun = !sdkFailure
+                || ['SDK_UNAVAILABLE', 'SDK_INIT_FAILED', 'SDK_SPAWN_FAILED'].includes(sdkFailure.code);
+            if (error.v8CircuitBreak && !options.v8Fallback && sdkCannotRun) {
+                const result = await fetchAppPlayUrlFresh(vid, { ...options, v8Fallback: true });
+                if (sdkFailure) result.sdkFailure = sdkFailure;
+                return result;
+            }
             if (sdkFailure) error.sdkFailure = sdkFailure;
             // An explicit refusal also stops work queued before it was received.
             if ([403, 429].includes(error.status) || error.code === 'BUSINESS_REJECTED' && Number(error.businessCode) !== 110001
@@ -543,7 +603,7 @@ async function fetchAppPlayUrl(vid, options = {}) {
             throw error;
         }
         finally { playbackReadyAt = Math.max(playbackReadyAt, Date.now() + 1000); }
-    });
+    }).finally(() => settleV8Probe('ok'));
     playbackQueue = pending.catch(() => {});
     if (!options.signal) return pending;
     let cancel;
@@ -605,6 +665,11 @@ async function fetchAppPlayUrlFresh(vid, options) {
                     throwIfAborted(signal);
                     lastError = error;
                     if (error.code !== 'EMPTY_RESPONSE') throw error;
+                    if (!options.v8Fallback) {
+                        playbackV8CooldownUntil = Date.now() + V8_EMPTY_COOLDOWN_MS;
+                        error.v8CircuitBreak = true;
+                        throw error;
+                    }
                     if (attempt || deadline - Date.now() < 1000) break;
                     try { await delay(250, undefined, { signal }); }
                     catch (waitError) { throwIfAborted(signal); throw waitError; }
@@ -634,6 +699,7 @@ async function fetchAppPlayUrlFresh(vid, options) {
                 code: 'EMPTY_RESPONSE', status: 200, emptyResponse: true,
             });
         }
+        playbackV8CooldownUntil = 0;
         playbackEmptyRounds = 0;
         const businessCode = Number(response.Code || response.code || 0);
         if (businessCode !== 0) throw Object.assign(new Error('App 接口暂未提供本集播放信息'), {

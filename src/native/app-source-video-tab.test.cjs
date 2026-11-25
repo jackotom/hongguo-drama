@@ -118,12 +118,12 @@ test('backup_url_1 remains available when the primary media URL is rejected', as
 test('empty v5 model retains the bounded signed legacy fallback', async () => {
     const f = fixture({ status: 200, headers: {}, data: '' }, { legacyResponse: response(nested(model())) });
     assert.equal((await f.fetch()).url, media);
-    assert.equal(f.calls.length, 13); assert.equal(f.registrations(), 1);
-    for (let i = 0; i < 2; i++) {
+    assert.equal(f.calls.length, 14); assert.equal(f.registrations(), 1);
+    for (let i = 0; i < 3; i++) {
         assert.equal(f.calls[i].method, 'POST');
         assert.equal(new URL(f.calls[i].url).pathname, '/novel/player/multi_video_model/preload/v1');
     }
-    for (let i = 2; i < 4; i++) {
+    for (let i = 3; i < 5; i++) {
         assert.equal(f.calls[i].method, 'GET');
         assert.equal(new URL(f.calls[i].url).pathname, '/reading/bookapi/video_tab/multi_video_model/v1/');
     }
@@ -148,8 +148,8 @@ for (const [name, result, code] of [
     test(`v5 ${name} stops within the existing request budget`, async () => {
         const f = fixture(result);
         await assert.rejects(f.fetch(), error => code ? error.code === code : error.status === 403);
-        assert.equal(f.calls.length, code === 'EMPTY_RESPONSE' ? 28 : 1);
-        assert.equal(f.registrations(), code === 'EMPTY_RESPONSE' ? 2 : 1);
+        assert.equal(f.calls.length, code === 'EMPTY_RESPONSE' ? 15 : 1);
+        assert.equal(f.registrations(), 1);
     });
 }
 
@@ -158,7 +158,7 @@ test('an empty current response retains the successful legacy recovery', async (
         legacyResponse: response({ code: 0, data: { [vid]: { video_model: model() } } }),
     });
     assert.equal((await f.fetch()).url, media);
-    assert.equal(f.calls.length, 13);
+    assert.equal(f.calls.length, 14);
     assert.equal(f.registrations(), 1);
 });
 
@@ -215,7 +215,7 @@ for (const legacyResponse of [response({ code: 1 }), { status: 429, headers: {},
     test(`explicit legacy rejection remains terminal (${legacyResponse.status})`, async () => {
         const f = fixture({ status: 200, headers: {}, data: '' }, { legacyResponse });
         await assert.rejects(f.fetch());
-        assert.equal(f.calls.length, 13);
+        assert.equal(f.calls.length, 14);
         assert.equal(f.registrations(), 1);
     });
 }

@@ -66,8 +66,8 @@ test('empty V5 responses recover through the current episode video_tab with the 
 test('empty current routes keep the failure bounded and never accept the preview page', async () => {
   const f = fixture({ status: 200, headers: {}, data: '' });
   await assert.rejects(f.fetch(), { code: 'EMPTY_RESPONSE' });
-  assert.equal(f.calls.length, 28);
-  assert.equal(f.registrations(), 2);
+  assert.equal(f.calls.length, 15);
+  assert.equal(f.registrations(), 1);
   assert.ok(f.calls.some(call => new URL(call.url).pathname === '/novel/player/video_model/v1/'));
   assert.ok(f.calls.some(call => new URL(call.url).pathname === '/reading/bookapi/video_tab/multi_video_model/v1/'));
   assert.equal(new URL(f.calls.at(-1).url).pathname, '/novel/player/multi_video_model/v1/');
@@ -84,7 +84,7 @@ test('an empty route is reprobed with the same identity instead of registering a
   assert.equal((await f.fetch()).url, media);
   assert.equal(f.registrations(), 1);
   assert.equal(f.resets(), 0);
-  assert.equal(f.calls.length, 4);
+  assert.equal(f.calls.length, 5);
 });
 
 test('business code 110001 rotates the anonymous identity and retries', async () => {
