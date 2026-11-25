@@ -20,6 +20,7 @@
     "build:mac": "node scripts/setup-ffmpeg-mac.js arm64 x64 && npm run build:react && electron-builder --mac dmg zip --arm64 --x64 --publish never",
     "build:mac:dir": "node scripts/setup-ffmpeg-mac.js arm64 x64 && npm run build:react && electron-builder --mac --arm64 --x64 --dir --publish never",
     "test": "node scripts/test.cjs",
+    "test:source-pack": "node scripts/source-pack-check.cjs",
     "setup:software": "node scripts/setup-software-player.cjs",
     "setup:sdk:win": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-sdk-playback-win.ps1",
     "predev": "npm run setup:software",

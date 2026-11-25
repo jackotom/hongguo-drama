@@ -70,7 +70,7 @@ const { fitWindowBounds, getWindowScale, saveWindowZoom, restoreMainWindowBounds
 const { createEpisodePanelController } = require('./src/native/episode-panel');
 const { availableRelease } = require('./src/native/app-update');
 const { createAnnouncementService } = require('./src/native/app-announcements');
-const { createSourcePackService, DEFAULT_PUBLIC_KEY } = require('./src/native/source-pack');
+const { createSourcePackService } = require('./src/native/source-pack');
 const { fetchPublicDetails } = require('./src/native/public-details');
 const { fetchEpisodeComments } = require('./src/native/episode-comments');
 const { fetchDanmaku, setDeviceIdentityFile } = require('./src/native/danmaku');
@@ -5878,7 +5878,6 @@ if (hasSingleInstanceLock) app.whenReady().then(async () => {
       const bundledEnvelope = JSON.parse(fs.readFileSync(bundledPath, 'utf8'));
       appSourcePacks = createSourcePackService({
         filePath: path.join(app.getPath('userData'), 'source-packs.json'),
-        publicKey: DEFAULT_PUBLIC_KEY,
         bundledEnvelope,
         request: (url, options) => axios.get(url, options),
       });

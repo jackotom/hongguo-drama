@@ -29,6 +29,9 @@ jobs:
       - run: npm test
         env:
           ELECTRON_OVERRIDE_DIST_PATH: ${{ runner.temp }}/unused-electron
+      - name: Verify merged source pack signature
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: npm run test:source-pack
       - run: node --test server/*.test.cjs
       - run: npm ci --prefix android --no-audit --no-fund
       - run: npm --prefix android test
