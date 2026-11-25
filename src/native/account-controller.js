@@ -159,6 +159,26 @@ function createAccountController({
     return result;
   });
   ipcMain.handle('get-account-history', async (_event, options) => action(current => current.history({ refresh: options?.refresh === true })));
+  // 官方「我的 → 收藏」：读的是账号云端书架，不是本机收藏列表。
+  ipcMain.handle('get-account-favorites', async () => action(current => current.favorites()));
+  // 打开官方收藏里的剧：收藏接口只给剧号和封面，分集仍要走正常的取剧集流程。
+  ipcMain.handle('play-account-favorite', async (_event, seriesId) => {
+    try {
+      const sid = String(seriesId || '');
+      if (!/^\d{1,30}$/.test(sid)) return { success: false, error: '官方收藏剧号无效' };
+      let entry = getSeriesRegistry().find(item => String(item.series_id) === sid);
+      if (!entry) entry = upsertSeriesRegistry(await hongguo.fetchEpisodeList(sid));
+      if (!entry || !entry.episodes?.length) return { success: false, error: '暂时无法读取这部剧的分集' };
+      if (entry.dismissed) {
+        entry.dismissed = false;
+        entry.forgotten = false;
+        saveSeriesRegistry();
+      }
+      return navigateToPlayer({ seriesId: sid, vidIndex: 1 });
+    } catch (error) {
+      return { success: false, error: safeMessage(error, '打开官方收藏失败') };
+    }
+  });
   ipcMain.handle('play-account-history', async (_event, seriesId) => {
     try {
       const sid = String(seriesId || '');
