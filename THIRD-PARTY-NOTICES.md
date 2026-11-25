@@ -26,11 +26,20 @@
 | axios | 1.20.0 | MIT | https://github.com/axios/axios |
 | follow-redirects（axios依赖） | 1.16.3 | MIT | https://github.com/follow-redirects/follow-redirects |
 | electron-updater | 6.8.9 | MIT | https://github.com/electron-userland/electron-builder |
+| openhongguo（可选社区取源） | 0.4.1 | Apache-2.0 | https://github.com/beilunyang/openhongguo |
 
 Electron 打包产物中已包含 Chromium 与 Node.js 的许可声明：
 
 - `LICENSE.electron.txt`
 - `LICENSES.chromium.html`
+
+### openhongguo 社区 SDK（Apache-2.0）
+
+- 固定 npm 版本 `0.4.1`，包完整性在 `package-lock.json` 中锁定。
+- 项目地址：https://github.com/beilunyang/openhongguo
+- 该提供者作为用户可排序的可选取源使用，默认排在 SDK、内置 App 和官网公开源之前。
+- Node 包包含 Go SDK 编译的 `openhongguo.wasm`、`wasm_exec.js`、Apache-2.0 许可与 Go 许可；不跟随 `main` 自动更新。
+- 使用独立匿名设备档案，不共享内置 SDK helper 的缓存；不启用第三方远程签名服务。
 
 ---
 

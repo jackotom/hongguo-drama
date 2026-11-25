@@ -18,6 +18,7 @@ function load(axios, { realDevice = false, getPlaybackDevice, registerPlaybackDe
       if (name === 'node:crypto') return crypto;
       if (name === './sm3') return require('../src/native/sm3');
       if (name === './download-quality') return require('../src/native/download-quality');
+      if (name === './source-policy') return require('../src/native/source-policy');
       if (name === './request-signal') return require('../src/native/request-signal');
       if (name === './playback-v5') return require('../src/native/playback-v5');
       if (name === './playback-signature') return require('../src/native/playback-signature');
@@ -123,8 +124,8 @@ function row(definition, width, height, suffix) {
     return identities[0];
   } });
   assert.equal((await recovery.fetchAppPlayUrl(vid)).url, plain.main_url, 'empty current routes recover through the official single-episode model');
-  assert.equal(recoverCalls, 9, 'preload, video_tab, both current model hosts and the recovery model');
-  assert.equal(recoveryRegistrations, 1, 'all routes reuse the same identity');
+  assert.equal(recoverCalls, 10, 'bounded current-route probes and the recovery model');
+  assert.equal(recoveryRegistrations, 2, 'one empty round rotates the identity once before recovery');
   for (const status of [200, 403, 404]) {
     let calls = 0, registrations = 0;
     const unavailable = load(async () => { calls++; return { status, headers: {}, data: '' }; },
@@ -132,13 +133,13 @@ function row(definition, width, height, suffix) {
         device_id: String(100 + ++registrations), iid: String(200 + registrations), cdid: 'fixture',
       }) });
     await assert.rejects(unavailable.fetchAppPlayUrl(vid), error => status === 200 ? error.code === 'EMPTY_RESPONSE' : error.status === status);
-    assert.equal(calls, status === 200 ? 28 : 1, 'one empty identity rotation remains bounded; HTTP rejection must not retry');
+    assert.equal(calls, status === 200 ? 15 : 1, 'the V8 circuit-break probe remains bounded; HTTP rejection must not retry');
     assert.equal(registrations, status === 200 ? 2 : 1);
   }
   let cooldownCalls = 0;
   await assert.rejects(load(async () => { cooldownCalls++; return { status: 200, headers: {}, data: '' }; },
     { getPlaybackDevice: async () => identities[0] }).fetchAppPlayUrl(vid), error => error.code === 'EMPTY_RESPONSE');
-  assert.equal(cooldownCalls, 28, 'empty responses use one bounded two-identity seven-route probe');
+  assert.equal(cooldownCalls, 15, 'empty responses use one bounded V8 circuit-break probe');
   let clock = Date.now(), slowCalls = 0;
   const slowRegistration = load(async config => {
     slowCalls++;
@@ -159,6 +160,7 @@ function row(definition, width, height, suffix) {
   }, { getPlaybackDevice: async () => identities[0] });
   assert.equal((await alternate.fetchAppPlayUrl(vid)).url, plain.main_url);
   assert.deepEqual(routes, [['POST', '/novel/player/multi_video_model/preload/v1'],
+    ['POST', '/novel/player/multi_video_model/preload/v1'],
     ['POST', '/novel/player/multi_video_model/preload/v1'],
     ['GET', '/reading/bookapi/video_tab/multi_video_model/v1/'],
     ['GET', '/reading/bookapi/video_tab/multi_video_model/v1/'],

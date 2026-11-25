@@ -145,6 +145,62 @@ test('V8 official route is attempted before SDK fallback for downloads', async (
     assert.deepEqual(f.sdkCalls.map(call => call.vid), ['11']);
 });
 
+test('App-only provider never falls through to SDK, and SDK-only never probes V8', async () => {
+    const appOnly = fixture(() => ({ status: 200, headers: {}, data: '{"code":12345}' }), undefined,
+        async () => sdkSuccess('unexpected'));
+    await assert.rejects(appOnly.fetch('11', { allowSdk: false }), { code: 'BUSINESS_REJECTED' });
+    assert.equal(appOnly.sdkCalls.length, 0);
+
+    const sdkOnly = fixture(undefined, undefined, async () => sdkSuccess('sdk-only'));
+    const result = await sdkOnly.fetch('11', { allowV8: false, allowSdk: true });
+    assert.equal(result.sourceProvider, 'sdk');
+    assert.equal(sdkOnly.calls.length, 0);
+    assert.equal(sdkOnly.registrations.length, 0);
+});
+
+test('an empty preferred V8 route opens the circuit and moves directly to SDK', async () => {
+    const empty = { status: 200, headers: {}, data: '' };
+    const f = fixture(() => empty, undefined, async () => sdkSuccess('circuit'));
+    const result = await f.fetch('11');
+    assert.equal(result.url, 'https://qznovelvod.com/circuit.mp4');
+    assert.equal(result.sourceProvider, 'sdk');
+    assert.equal(f.calls.length, 1, 'only the preferred V8 route is probed');
+    assert.equal(f.registrations.length, 1, 'an empty V8 family must not rotate identity');
+    assert.deepEqual(f.sdkCalls.map(call => call.vid), ['11']);
+});
+
+test('queued consumers share the V8 failure probe and enter SDK in parallel', async () => {
+    const empty = { status: 200, headers: {}, data: '' };
+    const held = [deferred(), deferred()], vids = [];
+    const f = fixture(() => empty, undefined, vid => {
+        vids.push(vid);
+        return held[vids.length - 1].promise;
+    });
+    const first = f.fetch('11');
+    const second = f.fetch('12');
+    for (let i = 0; i < 5; i++) await turn();
+    assert.deepEqual(vids, ['11', '12'], 'both consumers must skip the full V8 route set');
+    assert.equal(f.calls.length, 1, 'concurrent consumers share one V8 probe');
+    assert.equal(f.registrations.length, 1);
+    held[0].resolve(sdkSuccess('first'));
+    held[1].resolve(sdkSuccess('second'));
+    assert.equal((await first).sourceProvider, 'sdk');
+    assert.equal((await second).sourceProvider, 'sdk');
+});
+
+test('V8 circuit expires after sixty seconds and probes the preferred route again', async () => {
+    const empty = { status: 200, headers: {}, data: '' };
+    const f = fixture(() => empty, undefined, async () => sdkSuccess('circuit'));
+    await f.fetch('11');
+    assert.equal(f.calls.length, 1);
+    await f.advance(59999);
+    await f.fetch('12');
+    assert.equal(f.calls.length, 1, 'the circuit must remain closed-for-V8 before expiry');
+    await f.advance(1);
+    await f.fetch('13');
+    assert.equal(f.calls.length, 2, 'the preferred V8 route is probed after expiry');
+});
+
 test('SDK unavailable under preferSdk still falls back to the official route', async () => {
     const f = fixture(undefined, undefined, async (_vid, options) => {
         options.onError({ code: 'SDK_UNAVAILABLE', message: '当前平台未启用后续集 SDK' });
@@ -207,7 +263,7 @@ test('cancelling the source cooldown does not send a request or extend the next 
     assert.equal(f.calls[1].at - f.calls[0].at, 1000);
 });
 
-test('empty current routes rotate identity once and stop', async () => {
+test('empty current routes stop after one probe plus one bounded fallback pass', async () => {
     const f = fixture(() => ({ status: 200, headers: {}, data: '' }));
     const result = f.fetch().then(value => ({ value }), error => ({ error }));
     await turn();
@@ -215,8 +271,10 @@ test('empty current routes rotate identity once and stop', async () => {
     const settled = await Promise.race([result, new Promise(resolve => setTimeout(() => resolve({ timeout: true }), 100))]);
     assert.equal(settled.timeout, undefined, JSON.stringify({ calls: f.calls.length, liveTimers: f.liveTimers().length }));
     assert.equal(settled.error.code, 'EMPTY_RESPONSE');
-    assert.equal(f.registrations.length, 2, 'one empty-result identity rotation is bounded');
-    const round = [
+    assert.equal(f.registrations.length, 2, 'the SDK-unavailable fallback gets no repeated route rounds');
+    assert.equal(f.calls.length, 15);
+    assert.deepEqual(f.calls.map(config => new URL(config.url).pathname), [
+        '/novel/player/multi_video_model/preload/v1',
         '/novel/player/multi_video_model/preload/v1',
         '/novel/player/multi_video_model/preload/v1',
         '/reading/bookapi/video_tab/multi_video_model/v1/',
@@ -231,8 +289,7 @@ test('empty current routes rotate identity once and stop', async () => {
         '/novel/player/video_model/v1/',
         '/novel/player/multi_video_model/v1/',
         '/novel/player/multi_video_model/v1/',
-    ];
-    assert.deepEqual(f.calls.map(config => new URL(config.url).pathname), [...round, ...round]);
+    ]);
 });
 
 test('explicit HTTP refusal remains terminal for queued consumers and permits a later action', async () => {

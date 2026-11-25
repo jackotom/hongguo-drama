@@ -72,25 +72,18 @@ test('empty playback responses keep their classification through the public sour
         models++;
         stages.push(modelStage(config));
         return { status: 200, headers: { 'x-tt-logid': 'PRIVATE_SENTINEL' }, data: '' };
-    } });
+    }, sourceOrder: ['app'] });
     const result = await native.fetchPlayUrlSingle('11', '22', { quality: '1080p' });
     assert.equal(result.url, null);
     assert.equal(result.code, 'SOURCE_UNAVAILABLE');
-    assert.deepEqual(result.sources.map(item => item.code), ['EMPTY_RESPONSE']);
+    assert.equal(result.sources.find(item => item.source === 'app')?.code, 'EMPTY_RESPONSE');
     assert.match(result.error, /所选清晰度 1080p，未降级/);
     assert.match(result.error, /空响应.*原因尚未确认/);
     assert.doesNotMatch(JSON.stringify(result), /签名|鉴权|请检查网络|PRIVATE_SENTINEL/);
-    assert.equal(registrations, 2, 'empty routes rotate identity once');
-    assert.equal(models, 24, 'six routes each probe twice for two identities');
+    assert.equal(registrations, 1, 'empty routes retain one identity while the V8 probe circuit-breaks');
+    assert.equal(models, 12, 'six routes each probe twice with the retained identity');
     assert.deepEqual(stages, [
         'registration',
-        'video-tab', 'video-tab',
-        'primary', 'primary',
-        'alternate', 'alternate',
-        'model-a', 'model-a',
-        'model-c', 'model-c',
-        'legacy', 'legacy',
-        'renewal',
         'video-tab', 'video-tab',
         'primary', 'primary',
         'alternate', 'alternate',

@@ -5,6 +5,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 const { signPlayer } = require('./playback-signature');
+const sourcePolicy = require('./source-policy');
 const signerEntropy = { randField: 420072733, ladonRandom: Buffer.from('01020304', 'hex') };
 
 const vid = '7700946421087751193';
@@ -96,6 +97,28 @@ test('production playback uses current-app preload first and the exact episode',
     assert.ok(request.signal);
 });
 
+test('signed source policy can reorder, disable and change official request fields', async () => {
+    sourcePolicy.setPolicy(sourcePolicy.normalizePolicy({
+        revision: 9,
+        routes: [
+            { id: 'preload_current', enabled: false },
+            { id: 'video_tab', order: 0, url: 'https://api5-normal-sinfonlinea.fqnovel.com/reading/bookapi/video_tab/multi_video_model/v1/',
+                values: { version_code: '75555', version_name: '7.5.5.55' } },
+        ],
+    }));
+    try {
+        const f = fixture(response({ code: 0, data: { '1004': { [vid]: { video_model: model() } } } }));
+        assert.equal((await f.fetch()).url, media);
+        assert.equal(f.calls.length, 1);
+        const request = f.calls[0], url = new URL(request.url);
+        assert.equal(url.hostname, 'api5-normal-sinfonlinea.fqnovel.com');
+        assert.equal(url.searchParams.get('version_code'), '75555');
+        assert.equal(url.searchParams.get('version_name'), '7.5.5.55');
+    } finally {
+        sourcePolicy.setPolicy(null);
+    }
+});
+
 for (const wrap of [value => ({ code: 0, data: { [vid]: { video_model: value } } }), nested,
     value => ({ code: 0, data: { '1004': { [vid]: { video_model: JSON.stringify(value) } } } })]) {
     test('v5 accepts existing flat, video_model_data and new 1004 model maps', async () => {
@@ -118,12 +141,12 @@ test('backup_url_1 remains available when the primary media URL is rejected', as
 test('empty v5 model retains the bounded signed legacy fallback', async () => {
     const f = fixture({ status: 200, headers: {}, data: '' }, { legacyResponse: response(nested(model())) });
     assert.equal((await f.fetch()).url, media);
-    assert.equal(f.calls.length, 13); assert.equal(f.registrations(), 1);
-    for (let i = 0; i < 2; i++) {
+    assert.equal(f.calls.length, 14); assert.equal(f.registrations(), 1);
+    for (let i = 0; i < 3; i++) {
         assert.equal(f.calls[i].method, 'POST');
         assert.equal(new URL(f.calls[i].url).pathname, '/novel/player/multi_video_model/preload/v1');
     }
-    for (let i = 2; i < 4; i++) {
+    for (let i = 3; i < 5; i++) {
         assert.equal(f.calls[i].method, 'GET');
         assert.equal(new URL(f.calls[i].url).pathname, '/reading/bookapi/video_tab/multi_video_model/v1/');
     }
@@ -148,8 +171,8 @@ for (const [name, result, code] of [
     test(`v5 ${name} stops within the existing request budget`, async () => {
         const f = fixture(result);
         await assert.rejects(f.fetch(), error => code ? error.code === code : error.status === 403);
-        assert.equal(f.calls.length, code === 'EMPTY_RESPONSE' ? 28 : 1);
-        assert.equal(f.registrations(), code === 'EMPTY_RESPONSE' ? 2 : 1);
+        assert.equal(f.calls.length, code === 'EMPTY_RESPONSE' ? 15 : 1);
+        assert.equal(f.registrations(), 1);
     });
 }
 
@@ -158,7 +181,7 @@ test('an empty current response retains the successful legacy recovery', async (
         legacyResponse: response({ code: 0, data: { [vid]: { video_model: model() } } }),
     });
     assert.equal((await f.fetch()).url, media);
-    assert.equal(f.calls.length, 13);
+    assert.equal(f.calls.length, 14);
     assert.equal(f.registrations(), 1);
 });
 
@@ -215,7 +238,7 @@ for (const legacyResponse of [response({ code: 1 }), { status: 429, headers: {},
     test(`explicit legacy rejection remains terminal (${legacyResponse.status})`, async () => {
         const f = fixture({ status: 200, headers: {}, data: '' }, { legacyResponse });
         await assert.rejects(f.fetch());
-        assert.equal(f.calls.length, 13);
+        assert.equal(f.calls.length, 14);
         assert.equal(f.registrations(), 1);
     });
 }

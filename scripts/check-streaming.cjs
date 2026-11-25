@@ -126,6 +126,7 @@ function load(fetchPlayUrlSingle, overrides = {}) {
     let now = Date.now(), webHits = 0, appHits = 0, appAvailable = false;
     const nativePath = path.resolve(__dirname, '../src/native/hongguo.js');
     const nativeRequire = createRequire(nativePath);
+    require('../src/native/source-order').setSourceOrder(['web', 'app', 'sdk', 'openhongguo']);
     const context = vm.createContext({ module: { exports: {} }, Buffer, URL, AbortController, process: { env: {} }, console,
       Date: class extends Date { static now() { return now; } },
       require: name => name === 'axios' ? { get: async url => {
@@ -136,11 +137,14 @@ function load(fetchPlayUrlSingle, overrides = {}) {
             publicVideoSeo: { available: true, itemId: vid, seriesId: '1' } },
         } })}</script><script type="application/ld+json">${JSON.stringify({ '@type': 'VideoObject', url: `https://hongguoduanju.com/player/1/${vid}`, contentUrl: 'https://media.example/web.mp4' })}</script>` };
       } }
-        : name === './app-source' ? { fetchAppPlayUrl: async () => {
+        : name === './app-source' ? { fetchAppPlayUrl: async (_vid, options) => {
+          if (options?.allowV8 === false) throw new Error('SDK unavailable');
           appHits++;
           if (!appAvailable) throw new Error('App temporarily unavailable');
           return { url: 'https://media.example/app.mp4', source: 'app' };
-        } } : nativeRequire(name),
+        } }
+        : name === './openhongguo-source' ? { fetchPlayUrlSingle: async () => { throw new Error('openhongguo unavailable'); } }
+        : nativeRequire(name),
     });
     vm.runInContext(fs.readFileSync(nativePath, 'utf8'), context);
     const native = context.module.exports;
@@ -151,7 +155,7 @@ function load(fetchPlayUrlSingle, overrides = {}) {
     await assert.rejects(h.context.requestMedia({ ...first, url: base + '/missing' }));
     assert.equal((await native.fetchPlayUrlSingle('11', '1')).source, 'app', 'failed cached URL must not be returned again');
     assert.equal((await native.fetchPlayUrlSingle('11', '1', { force: true })).source, 'app');
-    assert.equal(webHits, 1); assert.equal(appHits, 3);
+    assert.equal(webHits, 1); assert.equal(appHits, 2);
     appAvailable = false;
     assert.equal((await native.fetchPlayUrlSingle('22', '1')).source, 'web');
     now += 5 * 60 * 1000 + 1;

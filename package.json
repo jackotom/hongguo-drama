@@ -20,6 +20,7 @@
     "build:mac": "node scripts/setup-ffmpeg-mac.js arm64 x64 && npm run build:react && electron-builder --mac dmg zip --arm64 --x64 --publish never",
     "build:mac:dir": "node scripts/setup-ffmpeg-mac.js arm64 x64 && npm run build:react && electron-builder --mac --arm64 --x64 --dir --publish never",
     "test": "node scripts/test.cjs",
+    "test:source-pack": "node scripts/source-pack-check.cjs",
     "setup:software": "node scripts/setup-software-player.cjs",
     "setup:sdk:win": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-sdk-playback-win.ps1",
     "predev": "npm run setup:software",
@@ -29,7 +30,8 @@
   "dependencies": {
     "anime4k-webgpu": "1.0.0",
     "axios": "1.20.0",
-    "electron-updater": "6.8.9"
+    "electron-updater": "6.8.9",
+    "openhongguo": "0.4.1"
   },
   "devDependencies": {
     "@libmedia/avplayer": "1.3.1",
@@ -63,6 +65,7 @@
       "build/sdk-playback/darwin-*/hongguo-sdk-playback",
       "build/sdk-playback/win32-x64/hongguo-sdk-playback.exe",
       "build/sdk-playback/README.txt",
+      "source-packs/**/*",
       "src/native/**/*",
       "src/store.js"
     ],

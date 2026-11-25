@@ -6,6 +6,7 @@ const { URL } = require('node:url');
 const { normalizeDownloadQuality } = require('./download-quality');
 const { isPublicMediaUrl, webMediaRequestOptions } = require('./web-media-guard');
 const { abortError, throwIfAborted } = require('./request-signal');
+const playbackSourceOrder = require('./source-order');
 
 const API = "https://api5-normal-sinfonlineb.fqnovel.com";
 const UA = "com.phoenix.read/71532 (Linux; U; Android 9; SM-N9860; Build/PQ3A.190705.10241111;tt-ok/3.12.13.20)";
@@ -765,25 +766,12 @@ async function fetchPlayUrlSingle(vid, sid, options = {}) {
     const contentType = ['1001', '1004'].includes(String(options.content_type || options.contentType)) ? String(options.content_type || options.contentType) : '1004';
     const sdkBatchVids = Array.isArray(options.sdkBatchVids) ? options.sdkBatchVids : undefined;
     const sdkFresh = options.sdkFresh === true;
-    const cacheKey = `play:${sid || ''}:${vid}${quality === 'auto' ? '' : `:${quality}`}${contentType === '1004' ? '' : `:type-${contentType}`}${skipWeb ? ':fallback' : ''}${allowLowerQuality ? ':lower-quality' : ''}${options.preferSdk ? ':sdk-first' : ''}${options.parallelSdk ? ':parallel-sdk' : ''}`;
-    const result = await cachedRequest(cacheKey, 30000, signal => quality === 'auto'
-      ? fetchPlayUrlFresh(vid, sid, skipWeb, signal, options.preferSdk === true, options.parallelSdk === true,
-        contentType, options.sdkPriority === true, sdkBatchVids, sdkFresh)
-      : require('./app-source').fetchAppPlayUrl(String(vid), { quality, allowLowerQuality, preferSdk: options.preferSdk === true,
-        parallelSdk: options.parallelSdk === true, sdkPriority: options.sdkPriority === true,
-        contentType, sdkBatchVids, sdkFresh, signal }).catch(async error => {
-        throwIfAborted(signal);
-        if (error.code === 'ERR_CANCELED') throw error;
-        const sources = [sourceFailure('app', error)];
-        if (allowLowerQuality && !skipWeb) {
-          let webError;
-          const web = await fetchPlayUrlFromWeb(vid, sid, failure => { webError = failure; }, signal);
-          throwIfAborted(signal);
-          if (web?.url) return web;
-          if (webError) sources.push(sourceFailure('web', webError));
-        }
-        throw unavailableSources(sources, allowLowerQuality ? 'auto' : quality);
-      }), options);
+    const sourceOrder = playbackSourceOrder.getSourceOrder();
+    const cacheKey = `play:${sid || ''}:${vid}${quality === 'auto' ? '' : `:${quality}`}${contentType === '1004' ? '' : `:type-${contentType}`}${skipWeb ? ':fallback' : ''}${allowLowerQuality ? ':lower-quality' : ''}:order-${sourceOrder.join('-')}`;
+    const result = await cachedRequest(cacheKey, 30000, signal => fetchPlayUrlFresh(
+      vid, sid, skipWeb, signal, quality, allowLowerQuality, contentType,
+      options.sdkPriority === true, sdkBatchVids, sdkFresh,
+    ), options);
     throwIfAborted(options.signal);
     // Last-resort web recovery must not replace App priority during the penalty window.
     if (skipWeb && result.source === 'web' && responseCache.get(cacheKey)?.value === result) responseCache.delete(cacheKey);
@@ -838,6 +826,7 @@ function classifySourceFailure(source, error) {
   if (network.networkFailure || ['ENOTFOUND', 'EAI_AGAIN', 'ECONNRESET', 'ECONNREFUSED', 'EHOSTUNREACH', 'ENETUNREACH', 'EPIPE', 'ERR_NETWORK'].includes(code)) return { source, code: 'NETWORK_ERROR', ...network,
     message: network.networkFailure ? `${networkDetails[network.networkFailure]}，请稍后重试` : '网络连接失败，请稍后重试' };
   if (code === 'PREVIEW_ONLY') return { source, code, message: '网页仅提供预览，未作为完整片源' };
+  if (code === 'ANONYMOUS_LIMITED') return { source, code, message: '匿名设备暂时受限，已短暂跳过该来源' };
   if (code === 'QUALITY_UNAVAILABLE') return { source, code, message: ['720p', '1080p'].includes(error?.quality)
     ? `本集暂无尺寸可确认且满足 ${error.quality} 的 H.264/HEVC 片源，未降级` : '未取得满足所选清晰度的片源，未降级' };
   if (code === 'NO_COMPATIBLE_SOURCE') return { source, code, message: '本集暂未提供兼容的 H.264/HEVC 片源' };
@@ -848,7 +837,7 @@ function classifySourceFailure(source, error) {
 }
 
 function unavailableSources(sources, quality = 'auto') {
-  const names = { web: '网页', app: 'App', api: '旧接口' };
+  const names = { web: '网页', app: 'App', sdk: 'SDK', openhongguo: 'openhongguo', api: '旧接口' };
   const publicLimited = sources.some(item => item.code === 'PUBLIC_ACCESS_LIMITED');
   const sdkFailure = sources.find(item => item.sdkFailure);
   const message = sdkFailure
@@ -862,50 +851,92 @@ function unavailableSources(sources, quality = 'auto') {
   return error;
 }
 
-async function fetchPlayUrlFresh(vid, sid, skipWeb = false, signal, preferSdk = false, parallelSdk = false,
+async function fetchPlayUrlFresh(vid, sid, skipWeb = false, signal, quality = 'auto', allowLowerQuality = false,
   contentType = '1004', sdkPriority = false, sdkBatchVids = undefined, sdkFresh = false) {
   throwIfAborted(signal);
   const sources = [];
-  try {
-    const result = await require('./app-source').fetchAppPlayUrl(String(vid), {
-      preferSdk, parallelSdk, sdkPriority, contentType, sdkBatchVids, sdkFresh, signal,
-    });
-    throwIfAborted(signal);
-    return result;
-  } catch (error) {
-    throwIfAborted(signal);
-    if (error.code === 'ERR_CANCELED') throw error;
-    sources.push(sourceFailure('app', error));
+  const requestedOrder = playbackSourceOrder.getSourceOrder();
+  let order = skipWeb
+    ? [...requestedOrder.filter(item => item !== 'web'), 'web']
+    : requestedOrder;
+  if (quality !== 'auto' && allowLowerQuality && order.includes('web')) {
+    order = [...order.filter(item => item !== 'web'), 'web'];
   }
 
-  const web = !skipWeb && await fetchPlayUrlFromWeb(vid, sid, error => sources.push(sourceFailure('web', error)), signal);
-  throwIfAborted(signal);
-  if (web && web.url) return web;
-
-  const body = {
-    biz_param: MODEL_BIZ_PARAM,
-    dr_scene: "preload",
-    mixed_video_id_map: { "1004": [vid] },
+  const fetchApp = async () => {
+    try {
+      return await require('./app-source').fetchAppPlayUrl(String(vid), {
+        quality, allowLowerQuality, allowV8: true, allowSdk: false,
+        sdkPriority, contentType, signal,
+      });
+    } catch (error) {
+      throwIfAborted(signal);
+      if (error.code === 'ERR_CANCELED') throw error;
+      sources.push(sourceFailure('app', error));
+    }
+    const body = {
+      biz_param: MODEL_BIZ_PARAM,
+      dr_scene: 'preload',
+      mixed_video_id_map: { '1004': [vid] },
+    };
+    try {
+      const j = await apiCall('/novel/player/multi_video_model/preload/v1', body, 1, 6000, 0, signal);
+      throwIfAborted(signal);
+      const item = j?.data?.[vid] || {};
+      const [url, spadeA, codec] = parseModelVideo(item.video_model);
+      if (url) return { url, spadeA, codec, source: 'api', vid: String(vid), userAgent: UA };
+      sources.push(sourceFailure('api'));
+    } catch (e) {
+      throwIfAborted(signal);
+      if (e.code === 'ERR_CANCELED') throw e;
+      sources.push(sourceFailure('api', e));
+    }
+    return null;
   };
-  try {
-    const j = await apiCall("/novel/player/multi_video_model/preload/v1", body, 1, 6000, 0, signal);
+
+  for (const provider of order) {
     throwIfAborted(signal);
-    const item = j?.data?.[vid] || {};
-    const [url, spadeA, codec] = parseModelVideo(item.video_model);
-    if (url) return { url, spadeA, codec, source: 'api', vid: String(vid), userAgent: UA };
-    sources.push(sourceFailure('api'));
-  } catch (e) {
-    throwIfAborted(signal);
-    if (e.code === 'ERR_CANCELED') throw e;
-    sources.push(sourceFailure('api', e));
+    if (provider === 'app') {
+      const result = await fetchApp();
+      if (result?.url) return result;
+    } else if (provider === 'sdk') {
+      try {
+        const result = await require('./app-source').fetchAppPlayUrl(String(vid), {
+          quality, allowLowerQuality, allowV8: false, allowSdk: true,
+          preferSdk: true, parallelSdk: true, sdkPriority: sdkPriority === true,
+          contentType, sdkBatchVids, sdkFresh, signal,
+        });
+        throwIfAborted(signal);
+        return result;
+      } catch (error) {
+        throwIfAborted(signal);
+        if (error.code === 'ERR_CANCELED') throw error;
+        sources.push(sourceFailure('sdk', error));
+      }
+    } else if (provider === 'web') {
+      if (quality !== 'auto' && !allowLowerQuality) {
+        sources.push({ source: 'web', code: 'QUALITY_UNAVAILABLE', message: `未选择允许降级到官网公开片源（${quality}）` });
+        continue;
+      }
+      const web = await fetchPlayUrlFromWeb(vid, sid, error => sources.push(sourceFailure('web', error)), signal);
+      throwIfAborted(signal);
+      if (web?.url) return web;
+    } else if (provider === 'openhongguo') {
+      try {
+        const result = await require('./openhongguo-source').fetchPlayUrlSingle(String(vid), {
+          quality, allowLowerQuality, signal,
+        });
+        throwIfAborted(signal);
+        if (result?.url) return result;
+        sources.push(sourceFailure('openhongguo'));
+      } catch (error) {
+        throwIfAborted(signal);
+        if (error.code === 'ERR_CANCELED') throw error;
+        sources.push(sourceFailure('openhongguo', error));
+      }
+    }
   }
-  // A transient CDN failure changes priority, not permanent source availability.
-  if (skipWeb) {
-    const lastWeb = await fetchPlayUrlFromWeb(vid, sid, error => sources.push(sourceFailure('web', error)), signal);
-    throwIfAborted(signal);
-    if (lastWeb?.url) return lastWeb;
-  }
-  throw unavailableSources(sources);
+  throw unavailableSources(sources, allowLowerQuality ? 'auto' : quality);
 }
 
 /**

@@ -40,7 +40,8 @@ const buildOptions = {
   inject: [path.join(root, 'web/globals.js')],
   define: { 'process.env.NODE_ENV': '"production"', 'import.meta.env.DEV': 'false' },
   alias: { 'android-decrypt': path.join(root,'build/mobile-decrypt.js'), 'node:crypto': path.join(root,'web/crypto.js'), 'node:zlib': path.join(root,'web/zlib.js'), 'node:timers/promises': path.join(root,'web/timers.cjs'),
-    'node:fs': path.join(root,'mobile/fs.cjs'), 'node:path': path.join(root,'mobile/path.cjs'),
+    'node:fs': path.join(root,'mobile/fs.cjs'), 'node:os': path.join(root,'mobile/os.cjs'),
+    'node:path': path.join(root,'mobile/path.cjs'),
     'node:child_process': path.join(root,'mobile/child-process.cjs'),
     axios: path.join(root,'mobile/axios.cjs'), electron: path.join(root,'mobile/electron.cjs') },
   plugins: [{ name: 'android-media-boundary', setup(build) {

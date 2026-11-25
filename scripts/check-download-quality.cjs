@@ -62,15 +62,18 @@ function appFixture(videoList, model = {}) {
 }
 function routeFixture(appError = false) {
   const calls = [];
+  require('../src/native/source-order').setSourceOrder(['app', 'sdk', 'web', 'openhongguo']);
   const native = load('hongguo.js', {
     axios: { get: async () => { calls.push('web'); return { data: `<script>window._ROUTER_DATA=${JSON.stringify({ loaderData: {
       'player_(series_id)/(vid)/page': { vid: '11', series_id: '1', seriesDetail: { series_id: '1' }, publicVideoSeo: { available: true, itemId: '11', seriesId: '1' } },
     } })}</script><script type="application/ld+json">${JSON.stringify({ '@type': 'VideoObject', url: 'https://hongguoduanju.com/player/1/11', contentUrl: mediaUrl('web') })}</script>` }; } },
     './app-source': { fetchAppPlayUrl: async (_vid, options) => {
+      if (options.allowV8 === false) throw Object.assign(new Error('fixture SDK unavailable'), { code: 'ERR_NETWORK' });
       calls.push(options.allowLowerQuality ? options.quality + ':fallback' : options.quality);
       if (appError) throw new Error('没有符合所选清晰度的片源');
       return { url: mediaUrl(`${options.quality || 'auto'}-${calls.length}`), quality: options.quality };
     } },
+    './openhongguo-source': { fetchPlayUrlSingle: async () => { throw new Error('fixture openhongguo unavailable'); } },
     './hema': { fetchPlayUrlSingle: async () => { calls.push('hema'); return { url: mediaUrl('hema') }; } },
     './xifan': { fetchPlayUrlSingle: async () => { calls.push('xifan'); return { url: mediaUrl('xifan') }; } },
   });
@@ -175,7 +178,7 @@ const checks = [
     assert.notEqual(fresh.url, hd.url);
     assert.equal((await f.fetchPlayUrlSingle('11', '1', { quality: 'auto' })).url, auto.url);
     assert.equal((await f.fetchPlayUrlSingle('11', '1', { quality: '720p' })).url, sd.url);
-    assert.deepEqual(f.calls, [undefined, '1080p', '720p', '1080p']);
+    assert.deepEqual(f.calls, ['auto', '1080p', '720p', '1080p']);
   }],
   ['explicit App failure returns no URL and never silently falls back to web', async () => {
     const f = routeFixture(true);

@@ -287,7 +287,7 @@ function mountSettings() {
       if (id === './useDialogKeyboard') return () => {};
       if (id === './Settings.css') return {};
       if (id === './icons') return Object.fromEntries(['Settings', 'Folder', 'Check', 'Globe', 'X', 'RefreshCw', 'AlertCircle'].map(name => [name, name]));
-      if (/^\.\/(?:AppearanceSettings|ShortcutSettings|StealthWakeRegion\.jsx|CustomSources|BuiltinSources|AnnouncementSettings)$/.test(id)) {
+      if (/^\.\/(?:AppearanceSettings|ShortcutSettings|StealthWakeRegion\.jsx|SourcePackSettings|CustomSources|BuiltinSources|AnnouncementSettings)$/.test(id)) {
         return { default: id.replace('./', '') };
       }
       throw new Error(`Unexpected import: ${id}`);

@@ -1,0 +1,80 @@
+{
+  "format": 2,
+  "id": "hongguo-playback",
+  "keyId": "primary-2026-11",
+  "revision": 1,
+  "issuedAt": "2026-11-25T02:30:00.000Z",
+  "policy": {
+    "routes": [
+      {
+        "id": "preload_current",
+        "order": 10,
+        "enabled": true,
+        "auth": "v5",
+        "url": "https://reading.snssdk.com/novel/player/multi_video_model/preload/v1",
+        "values": {
+          "version_code": "74532",
+          "version_name": "7.4.5.32",
+          "update_version_code": "74532",
+          "manifest_version_code": "74532"
+        },
+        "body": {
+          "biz_param.device_level": 2,
+          "biz_param.video_platform": 1024
+        }
+      },
+      {
+        "id": "video_tab",
+        "order": 20,
+        "enabled": true,
+        "auth": "v5",
+        "url": "https://api5-normal-sinfonlineb.fqnovel.com/reading/bookapi/video_tab/multi_video_model/v1/",
+        "values": {
+          "version_code": "74332",
+          "version_name": "7.4.3.32",
+          "update_version_code": "74332"
+        }
+      },
+      {
+        "id": "player_b",
+        "order": 30,
+        "enabled": true,
+        "auth": "v5",
+        "url": "https://api5-normal-sinfonlineb.fqnovel.com/novel/player/multi_video_model/player/v1",
+        "values": {
+          "version_code": "74332",
+          "version_name": "7.4.3.32",
+          "update_version_code": "74332"
+        }
+      },
+      {
+        "id": "player_a",
+        "order": 40,
+        "enabled": true,
+        "auth": "v5",
+        "url": "https://api5-normal-sinfonlinea.fqnovel.com/novel/player/multi_video_model/player/v1"
+      },
+      {
+        "id": "model_0",
+        "order": 50,
+        "enabled": true,
+        "auth": "v5",
+        "url": "https://api5-normal-sinfonlinea.fqnovel.com/novel/player/video_model/v1/"
+      },
+      {
+        "id": "model_1",
+        "order": 60,
+        "enabled": true,
+        "auth": "v5",
+        "url": "https://api5-normal-sinfonlinec.fqnovel.com/novel/player/video_model/v1/"
+      },
+      {
+        "id": "legacy",
+        "order": 70,
+        "enabled": true,
+        "auth": "player",
+        "url": "https://api5-normal-sinfonlineb.fqnovel.com/novel/player/multi_video_model/v1/"
+      }
+    ]
+  }
+}

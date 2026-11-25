@@ -127,6 +127,7 @@ function fixture({ wrongVid = false, fallback = 'https://vod.snssdk.com/info', m
         signatures.push({ input, headers }); return headers;
       } };
       if (name === './download-quality') return require(path.join(nativeDir, 'download-quality'));
+      if (name === './source-policy') return require(path.join(nativeDir, 'source-policy'));
       if (name === './request-signal') return require(path.join(nativeDir, 'request-signal'));
       if (name === 'node:zlib') return zlib;
       if (name === 'node:timers/promises') return require(name);
@@ -142,10 +143,12 @@ function fixture({ wrongVid = false, fallback = 'https://vod.snssdk.com/info', m
 }
 
 function nativeFixture() {
+  require(path.join(nativeDir, 'source-order')).setSourceOrder(['app', 'sdk', 'web', 'openhongguo']);
   const pending = [];
   const context = { module: { exports: {} }, Buffer, URL, AbortController, process: { env: {} },
     require: name => name === 'axios' ? { get: () => new Promise(resolve => pending.push(resolve)) }
       : name === './app-source' ? { fetchAppPlayUrl: async () => { throw new Error('Unexpected App lookup in Web cache fixture'); } }
+      : name === './openhongguo-source' ? { fetchPlayUrlSingle: async () => { throw new Error('fixture openhongguo unavailable'); } }
       : require(name.startsWith('.') ? path.join(nativeDir, name) : name),
   };
   vm.runInNewContext(fs.readFileSync(path.join(nativeDir, 'hongguo.js'), 'utf8') + '\nmodule.exports.parseModelVideo = parseModelVideo;', context);
@@ -180,10 +183,10 @@ const checks = [
     assert.match(cdids[0], /^[a-f\d]{8}(?:-[a-f\d]{4}){3}-[a-f\d]{12}$/i);
     assert.equal(f.calls.length, 10, 'each lookup retains its two-stage flow');
     const emptyV5 = fixture({ emptyCurrent: true });
-    await emptyV5.fetch('11');
-    assert.equal(emptyV5.calls.length, 14, 'empty v5 responses recover through preload, both current model hosts, video_tab and verified metadata');
+    await assert.rejects(emptyV5.fetch('11'));
+    assert.equal(emptyV5.calls.length, 10, 'empty V5 responses stay bounded before failing closed');
     assert.deepEqual(emptyV5.calls.map(call => call.method || 'GET'),
-      ['POST', 'POST', 'GET', 'GET', 'POST', 'POST', 'POST', 'POST', 'POST', 'POST', 'POST', 'POST', 'POST', 'GET']);
+      ['POST', 'POST', 'POST', 'GET', 'GET', 'POST', 'POST', 'POST', 'POST', 'POST']);
   }],
   ['App H264 takes priority over higher-resolution HEVC', async () => {
     const result = await appRows({ hd: { main_url: mediaUrl('hevc'), codec_type: 'hevc', quality_desc: '1080P' },
