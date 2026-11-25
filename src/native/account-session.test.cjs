@@ -4,7 +4,7 @@ const os = require('node:os');
 const path = require('node:path');
 const { test } = require('node:test');
 const {
-  createAccountService, secureSessionStore, parseQr, parseHistory,
+  createAccountService, secureSessionStore, parseQr, parseHistory, parseFavorites,
 } = require('./account-session');
 const { preserveLargeJsonIntegers } = require('./app-source');
 
@@ -40,8 +40,56 @@ test('account history parser keeps current APP rows with display metadata', () =
   assert.equal(rows.find(row => row.series_id === '1001').cover, 'https://p3-novel.byteimg.com/novel-pic/cover~tplv-shrink:320:0.webp');
 });
 
-test('large account episode IDs stay exact strings', () => {
-  const raw = '{"vid":7390123456789012345,"other":7390123456789012345}';
+test('official favorites parser reads the cloud shelf with nested video data', () => {
+  const rows = parseFavorites({
+    message: 'success',
+    data: { video_shelf_info: [
+      { series_title: '云端收藏甲', series_cover_url: 'https://p3-novel.byteimg.com/a.jpg',
+        series_intro: '简介甲', collect_time: 1700000000, category_schema: '[{"name":"都市"}]',
+        video_data: { series_id: '1001', title: '云端收藏甲', episode_cnt: 30 } },
+      { series_title: '云端收藏乙', collect_time: 1800000000000,
+        video_data: { series_id: '1002', cover_url: 'https://p3-novel.byteimg.com/b.jpg', episode_count: 12 } },
+      { series_title: '无效条目', video_data: { series_id: 'bad' } },
+      { series_title: '缺少剧号', video_data: { title: '无 id' } },
+    ] },
+  });
+  assert.equal(rows.length, 2);
+  const first = rows.find(row => row.series_id === '1001');
+  assert.equal(first.series_title, '云端收藏甲');
+  assert.equal(first.cover, 'https://p3-novel.byteimg.com/a.jpg');
+  assert.equal(first.total, 30);
+  assert.equal(first.intro, '简介甲');
+  // collect_time 两种口径都要归一成毫秒，新收藏排在前面。
+  assert.equal(first.collectedAt, 1700000000000);
+  assert.equal(rows[0].series_id, '1002');
+  // 已经是毫秒的值不能再乘一次，否则会落到几百年后。
+  assert.equal(rows[0].collectedAt, 1800000000000);
+});
+
+test('official favorites parser reports an empty shelf but rejects a changed format', () => {
+  // 官方用 null 表示空书架，这是正常状态，不是错误。
+  assert.deepEqual(parseFavorites({ message: 'success', data: { video_shelf_info: null } }), []);
+  assert.deepEqual(parseFavorites({ message: 'success', data: { video_shelf_info: [] } }), []);
+  // 缺少 video_shelf_info 说明官方改了结构，必须报错而不是假装没有收藏。
+  assert.throws(() => parseFavorites({ message: 'success', data: { other: [] } }), /格式已变化/);
+  // 有条目却一条都解析不出来，同样要如实报错。
+  assert.throws(() => parseFavorites({ message: 'success', data: { video_shelf_info: [{ unknown: 1 }] } }), /格式已变化/);
+});
+
+test('official favorites parser keeps only well formed series ids and de-duplicates', () => {
+  const rows = parseFavorites({
+    message: 'success',
+    data: { video_shelf_info: [
+      { series_title: '重复剧', video_data: { series_id: '2001' } },
+      { series_title: '重复剧', video_data: { series_id: '2001' } },
+      { series_title: '另一部', video_data: { series_id: '2002' } },
+    ] },
+  });
+  assert.equal(rows.length, 2);
+  assert.deepEqual(rows.map(row => row.series_id).sort(), ['2001', '2002']);
+});
+
+test('large account episode IDs stay exact strings', () => {  const raw = '{"vid":7390123456789012345,"other":7390123456789012345}';
   const preserved = preserveLargeJsonIntegers(raw, ['vid']);
   assert.equal(JSON.parse(preserved).vid, '7390123456789012345');
   assert.equal(typeof JSON.parse(preserved).other, 'number');

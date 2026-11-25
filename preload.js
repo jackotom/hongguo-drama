@@ -169,6 +169,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   cancelAccountLogin: (loginId) => ipcRenderer.invoke('cancel-account-login', loginId),
   logoutAccount: () => ipcRenderer.invoke('logout-account'),
   getAccountHistory: (options) => ipcRenderer.invoke('get-account-history', options),
+  getAccountFavorites: () => ipcRenderer.invoke('get-account-favorites'),
+  playAccountFavorite: (seriesId) => ipcRenderer.invoke('play-account-favorite', seriesId),
   playAccountHistory: (seriesId) => ipcRenderer.invoke('play-account-history', seriesId),
   onAccountUpdated: (cb) => {
     const listener = (_event, data) => cb(data);
