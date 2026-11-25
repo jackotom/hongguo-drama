@@ -46,11 +46,28 @@ test('openhongguo axios transport preserves raw bodies and inherits ambient prox
   } });
   const response = await transport({ method: 'POST', url: 'https://api.example/j', headers: { Accept: '*' }, body: new Uint8Array([1, 2, 3]) });
   assert.equal(config.decompress, false);
+  assert.equal(config.maxContentLength, 8 * 1024 * 1024);
   assert.equal(Object.hasOwn(config, 'proxy'), false, 'ambient app proxy environment must remain in control');
   assert.deepEqual([...config.data], [1, 2, 3]);
   assert.equal(Buffer.from(response.body).toString(), 'raw-body');
   assert.equal(response.headers['content-encoding'], 'gzip');
   assert.equal(response.cookies.a, '1');
+});
+
+test('explicit quality prefers a stream that meets the target before allowing lower fallback', async () => {
+  const provider = createOpenhongguoSource({ getClient: async () => ({
+    async resolvePlayback() {
+      const value = playback();
+      value.playback.streams = [
+        { url: 'https://cdn.example/h264-720.mp4', codec: 'h264', width: 720, height: 1280, definition: '720p' },
+        { url: 'https://cdn.example/hevc-1080.mp4', codec: 'hevc', width: 1080, height: 1920, definition: '1080p' },
+      ];
+      return value;
+    },
+  }) });
+  const result = await provider.resolve('11', { quality: '1080p', allowLowerQuality: true });
+  assert.equal(result.url, 'https://cdn.example/hevc-1080.mp4');
+  assert.equal(result.codec, 'hevc');
 });
 
 test('a failed openhongguo initialization is not cached permanently', async () => {

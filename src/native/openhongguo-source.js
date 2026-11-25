@@ -58,6 +58,7 @@ function axiosTransport({ request = axios, timeout = 15000 } = {}) {
       responseEncoding: null,
       transformResponse: [data => data],
       decompress: false,
+      maxContentLength: 8 * 1024 * 1024,
       maxRedirects: 5,
       timeout,
       validateStatus: () => true,
@@ -123,10 +124,15 @@ function selectStreams(playback, quality, allowLowerQuality) {
     .filter(row => row.codecRank < 9 && row.safeUrls.length > 0)
     .filter(row => requested === 'auto' || allowLowerQuality || !target || row.pixels >= target)
     .sort((a, b) => {
-      if (requested === 'auto' || allowLowerQuality) {
+      if (requested === 'auto') {
         return a.codecRank - b.codecRank || b.pixels - a.pixels || (a.stream.hls ? 1 : 0) - (b.stream.hls ? 1 : 0);
       }
-      return a.pixels - b.pixels || a.codecRank - b.codecRank || (a.stream.hls ? 1 : 0) - (b.stream.hls ? 1 : 0);
+      const aMeets = !target || a.pixels >= target;
+      const bMeets = !target || b.pixels >= target;
+      if (aMeets !== bMeets) return Number(bMeets) - Number(aMeets);
+      return (aMeets ? a.pixels - b.pixels : b.pixels - a.pixels)
+        || a.codecRank - b.codecRank
+        || (a.stream.hls ? 1 : 0) - (b.stream.hls ? 1 : 0);
     });
   if (!rows.length && requested !== 'auto' && !allowLowerQuality) {
     throw Object.assign(new Error(`本集暂无满足 ${requested} 的 openhongguo 片源，未降级`), {
