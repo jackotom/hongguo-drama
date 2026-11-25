@@ -6,7 +6,7 @@ import './SourcePackSettings.css';
 export default function SourcePackSettings() {
   useLanguage();
   const [status, setStatus] = useState(null);
-  const [sourceOrder, setSourceOrder] = useState(['app', 'sdk', 'web']);
+  const [sourceOrder, setSourceOrder] = useState(['app', 'sdk', 'web', 'openhongguo']);
   const [busy, setBusy] = useState('');
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
@@ -26,7 +26,7 @@ export default function SourcePackSettings() {
       if (active) setError(failure.message || '动态取源状态读取失败，请重启软件后重试。');
     });
     window.electronAPI.getPlaybackSourceOrder?.().then(next => {
-      if (active && next?.success) setSourceOrder(next.order || ['app', 'sdk', 'web']);
+      if (active && next?.success) setSourceOrder(next.order || ['app', 'sdk', 'web', 'openhongguo']);
     }).catch(() => {});
     return () => { active = false; unsubscribe?.(); };
   }, []);
@@ -54,6 +54,7 @@ export default function SourcePackSettings() {
     app: ['官方 App 动态策略', '使用当前签名策略包里的官方请求入口、字段和签名族'],
     sdk: ['SDK 取源', '调用官方 SDK helper；首次使用会自动注册匿名设备'],
     web: ['官网公开片源', '使用官网公开的完整 MP4 兜底，画质可能低于 App 片源'],
+    openhongguo: ['openhongguo 社区 SDK', '固定版本 Apache-2.0 本地 WASM，使用独立匿名设备档案'],
   };
   const move = async (index, delta) => {
     const target = index + delta;

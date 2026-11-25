@@ -255,7 +255,7 @@ function getDefaultSettings() {
     download_quality: 'auto',
     download_metadata: false,
     custom_sources: [],
-    playback_source_order: ['app', 'sdk', 'web'],
+    playback_source_order: ['app', 'sdk', 'web', 'openhongguo'],
     // 看完一集后自动删除本地文件（边看边清，避免占用磁盘）
     auto_delete_watched: false,
     // 兼容模式：本机无法解码 HEVC 时自动转码为 H.264（解决「黑屏有声」）

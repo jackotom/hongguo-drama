@@ -1,0 +1,135 @@
+// SPDX-License-Identifier: GPL-3.0-only
+'use strict';
+
+const path = require('node:path');
+const { abortError, throwIfAborted } = require('./request-signal');
+const { normalizeDownloadQuality } = require('./download-quality');
+
+let defaultClientPromise = null;
+
+function profilePath() {
+  try {
+    const { app } = require('electron');
+    return path.join(app.getPath('userData'), 'openhongguo', 'anonymous.json');
+  } catch {
+    const base = process.platform === 'darwin'
+      ? path.join(process.env.HOME || '', 'Library', 'Application Support')
+      : process.env.XDG_CONFIG_HOME || path.join(process.env.HOME || '', '.config');
+    return path.join(base, 'openhongguo', 'anonymous.json');
+  }
+}
+
+async function defaultClient() {
+  defaultClientPromise ||= import('openhongguo').then(({ createClient, fileProfileStore }) => createClient({
+    profile: fileProfileStore(profilePath()),
+    retryAttempts: 1,
+    deviceResets: 0,
+    timeoutMs: 15000,
+  }));
+  return defaultClientPromise;
+}
+
+function withAbort(promise, signal) {
+  if (!signal) return promise;
+  throwIfAborted(signal);
+  return new Promise((resolve, reject) => {
+    const abort = () => {
+      cleanup();
+      reject(abortError(signal));
+    };
+    const cleanup = () => signal.removeEventListener('abort', abort);
+    signal.addEventListener('abort', abort, { once: true });
+    promise.then(value => { cleanup(); resolve(value); }, error => { cleanup(); reject(error); });
+    if (signal.aborted) abort();
+  });
+}
+
+function streamPixels(stream) {
+  const pair = [stream?.width, stream?.height].map(Number);
+  return pair.every(value => Number.isFinite(value) && value > 0) ? Math.min(...pair) : 0;
+}
+
+function selectStreams(playback, quality, allowLowerQuality) {
+  const requested = normalizeDownloadQuality(quality);
+  const target = requested === 'auto' ? 0 : Number(String(requested).replace(/\D/g, '')) || 0;
+  const rows = (Array.isArray(playback?.streams) ? playback.streams : [])
+    .filter(stream => stream && (stream.url || stream.backup_url) && !stream.dash)
+    .map(stream => ({ stream, pixels: streamPixels(stream), codec: String(stream.codec || '').toLowerCase() }))
+    .filter(row => requested === 'auto' || allowLowerQuality || !target || row.pixels >= target)
+    .sort((a, b) => {
+      if (requested === 'auto' || allowLowerQuality) {
+        return b.pixels - a.pixels || (a.stream.hls ? 1 : 0) - (b.stream.hls ? 1 : 0);
+      }
+      return a.pixels - b.pixels || (a.stream.hls ? 1 : 0) - (b.stream.hls ? 1 : 0);
+    });
+  if (!rows.length && requested !== 'auto' && !allowLowerQuality) {
+    throw Object.assign(new Error(`本集暂无满足 ${requested} 的 openhongguo 片源，未降级`), {
+      code: 'QUALITY_UNAVAILABLE', quality: requested,
+    });
+  }
+  if (requested === 'auto' && !allowLowerQuality) {
+    const best = rows[0]?.pixels || 0;
+    return rows.filter(row => row.pixels === best);
+  }
+  return rows;
+}
+
+function candidateFrom(stream, playback, contentKey, vid) {
+  const urls = [stream.url, stream.backup_url].filter(Boolean);
+  const codec = String(stream.codec || '').toLowerCase();
+  return urls.map(url => ({
+    url,
+    source: 'openhongguo',
+    sourceProvider: 'openhongguo',
+    vid: String(playback.episode_id || vid),
+    codec: ['bytevc1', 'hvc1', 'hev1', 'hevc', 'h265'].includes(codec) ? 'hevc'
+      : codec === 'bytevc2' ? 'bytevc2' : codec || '',
+    format: stream.hls ? 'hls' : 'mp4',
+    quality: stream.definition || stream.quality || '',
+    width: Number(stream.width) || undefined,
+    height: Number(stream.height) || undefined,
+    duration: Number(playback.duration_seconds) || 0,
+    contentKey,
+    userAgent: 'okhttp/4.12.0',
+  }));
+}
+
+function createOpenhongguoSource({ getClient = defaultClient } = {}) {
+  async function resolve(vid, options = {}) {
+    throwIfAborted(options.signal);
+    const client = await withAbort(getClient(), options.signal);
+    let result;
+    try {
+      result = await withAbort(client.resolvePlayback(String(vid)), options.signal);
+    } catch (error) {
+      throwIfAborted(options.signal);
+      if (error?.code === 'DEVICE_REJECTED' && typeof client.resetDevice === 'function') {
+        await withAbort(client.resetDevice(), options.signal).catch(() => {});
+        result = await withAbort(client.resolvePlayback(String(vid)), options.signal);
+      } else throw error;
+    }
+    const playback = result?.playback;
+    if (!playback || !Array.isArray(playback.streams) || !playback.streams.length) {
+      throw Object.assign(new Error('openhongguo 未返回可播放片源'), { code: 'MISSING_MODEL' });
+    }
+    const contentKey = result.contentKey?.key || '';
+    if (playback.protected && !/^[a-f0-9]{32}$/i.test(contentKey)) {
+      throw Object.assign(new Error('openhongguo 未返回有效内容密钥'), { code: 'INVALID_RESPONSE' });
+    }
+    const rows = selectStreams(playback, options.quality, options.allowLowerQuality === true);
+    const candidates = rows.flatMap(row => candidateFrom(row.stream, playback, contentKey || null, vid));
+    if (!candidates.length) throw Object.assign(new Error('openhongguo 未返回有效视频地址'), { code: 'MISSING_MODEL' });
+    return { ...candidates[0], candidates };
+  }
+
+  return { resolve };
+}
+
+const provider = createOpenhongguoSource();
+module.exports = {
+  profilePath,
+  selectStreams,
+  candidateFrom,
+  createOpenhongguoSource,
+  fetchPlayUrlSingle: (...args) => provider.resolve(...args),
+};

@@ -836,7 +836,7 @@ function classifySourceFailure(source, error) {
 }
 
 function unavailableSources(sources, quality = 'auto') {
-  const names = { web: '网页', app: 'App', sdk: 'SDK', api: '旧接口' };
+  const names = { web: '网页', app: 'App', sdk: 'SDK', openhongguo: 'openhongguo', api: '旧接口' };
   const publicLimited = sources.some(item => item.code === 'PUBLIC_ACCESS_LIMITED');
   const sdkFailure = sources.find(item => item.sdkFailure);
   const message = sdkFailure
@@ -917,6 +917,19 @@ async function fetchPlayUrlFresh(vid, sid, skipWeb = false, signal, quality = 'a
       const web = await fetchPlayUrlFromWeb(vid, sid, error => sources.push(sourceFailure('web', error)), signal);
       throwIfAborted(signal);
       if (web?.url) return web;
+    } else if (provider === 'openhongguo') {
+      try {
+        const result = await require('./openhongguo-source').fetchPlayUrlSingle(String(vid), {
+          quality, allowLowerQuality, signal,
+        });
+        throwIfAborted(signal);
+        if (result?.url) return result;
+        sources.push(sourceFailure('openhongguo'));
+      } catch (error) {
+        throwIfAborted(signal);
+        if (error.code === 'ERR_CANCELED') throw error;
+        sources.push(sourceFailure('openhongguo', error));
+      }
     }
   }
   throw unavailableSources(sources, allowLowerQuality ? 'auto' : quality);

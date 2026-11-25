@@ -1368,6 +1368,8 @@
   "调用官方 SDK helper；首次使用会自动注册匿名设备": "Call the official SDK helper; anonymous device registration happens automatically on first use",
   "官网公开片源": "Official website source",
   "使用官网公开的完整 MP4 兜底，画质可能低于 App 片源": "Use the complete public MP4 fallback from the official website; quality may be lower",
+  "openhongguo 社区 SDK": "openhongguo community SDK",
+  "固定版本 Apache-2.0 本地 WASM，使用独立匿名设备档案": "Pinned Apache-2.0 local WASM with a separate anonymous device profile",
   "上移": "Move up",
   "下移": "Move down",
   "取源顺序保存失败": "Could not save source priority",

@@ -42,7 +42,11 @@ const webPage = (vid = '11', sid = '1', extra = {}) => `<script>window._ROUTER_D
     publicVideoSeo: { available: true, itemId: vid, seriesId: sid }, ...extra },
 } })}</script><script type="application/ld+json">${JSON.stringify({ '@type': 'VideoObject', url: `https://hongguoduanju.com/player/${sid}/${vid}`, contentUrl: media('web') })}</script>`;
 function load(file, dependencies) {
-  dependencies = { './playback-device': { registerPlaybackDevice: async () => playbackDevice }, ...dependencies };
+  dependencies = {
+    './playback-device': { registerPlaybackDevice: async () => playbackDevice },
+    './openhongguo-source': { fetchPlayUrlSingle: async () => { throw new Error('openhongguo unavailable'); } },
+    ...dependencies,
+  };
   const context = { Buffer, URL, URLSearchParams, AbortSignal, AbortController, process: { env: {} }, module: { exports: {} },
     console: { warn() {} }, setTimeout: (fn, ms) => ms === 600 ? setTimeout(fn, 0) : fn(),
     require: name => Object.hasOwn(dependencies, name) ? dependencies[name] : require(name.startsWith('.') ? path.join(nativeDir, name) : name) };
@@ -75,7 +79,7 @@ function appFixture(rows) {
   return { ...app, calls };
 }
 function routeFixture() {
-  const state = { web: true, app: false, calls: [] };
+  const state = { web: true, app: false, openhongguo: false, calls: [] };
   const native = load('hongguo.js', {
     axios: {
       get: async url => { state.calls.push('web'); return { data: state.web && url.endsWith('/11') ? webPage() : '' }; },
@@ -85,6 +89,11 @@ function routeFixture() {
       state.calls.push(options?.allowV8 === false ? 'sdk' : 'app');
       if (!state.app) throw new Error('secret https://signed.invalid/?token=private');
       return { url: media('app'), source: 'app' };
+    } },
+    './openhongguo-source': { fetchPlayUrlSingle: async () => {
+      state.calls.push('openhongguo');
+      if (!state.openhongguo) throw new Error('unavailable');
+      return { url: media('openhongguo'), source: 'openhongguo' };
     } },
   });
   return { ...native, state };
@@ -446,7 +455,7 @@ const checks = [
     f.markWebMediaFailure(first); f.state.calls.length = 0;
     const recovered = await f.fetchPlayUrlSingle('11', '1', { force: true });
     assert.equal(recovered.source, 'web', 'five-minute penalty must not hide the only working source');
-    assert.deepEqual(f.state.calls, ['app', 'api', 'sdk', 'web']);
+    assert.deepEqual(f.state.calls, ['app', 'api', 'sdk', 'openhongguo', 'web']);
     f.state.app = true; f.state.calls.length = 0;
     assert.equal((await f.fetchPlayUrlSingle('11', '1')).source, 'app');
     assert.deepEqual(f.state.calls, ['app'], 'web penalty remains after last-resort recovery');
@@ -455,7 +464,7 @@ const checks = [
     const f = routeFixture(); f.state.web = false;
     const unavailable = await f.fetchPlayUrlSingle('11', '1');
     assert.equal(unavailable.code, 'SOURCE_UNAVAILABLE');
-    assert.deepEqual(Array.from(unavailable.sources, item => item.source), ['app', 'api', 'sdk', 'web']);
+    assert.deepEqual(Array.from(unavailable.sources, item => item.source), ['app', 'api', 'sdk', 'web', 'openhongguo']);
     assert.doesNotMatch(JSON.stringify(unavailable), /secret|signed\.invalid|private|前.*集|付费|会员/);
     assert.ok(unavailable.sources.every(item => item.code && item.message));
     f.state.app = true;
