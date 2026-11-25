@@ -1,5 +1,5 @@
 import { t, useLanguage, getLanguage } from '../i18n';
-import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Play, RefreshCw, Clock } from './icons';
 import './WatchHistory.css';
 import { groupHistory, historyGroupSuggestions } from './historyGroups.mjs';
@@ -46,16 +46,20 @@ export default function WatchHistory({ active = true, onNavigate }) {
   const request = useRef(0);
   const openingRef = useRef(false);
   const openingRequest = useRef(0);
-  const groups = groupHistory(rows, decisions);
-  const groupById = new Map(groups.flatMap(items => items.map(row => [row.series_id, items])));
-  const suggestionsByGroup = new Map(groups.map(items => [items, historyGroupSuggestions(items)]));
-  const listedGroups = groups.map(items => hideLowSeasons && !expanded[items[0].series_id] ? items.slice(0, 1) : items);
-  const listedRows = listedGroups.flat();
-  const completedCount = listedRows.filter(row => row.completed === true).length;
-  const visibleRows = listedGroups.map(items => items
+  const memo = (fn, deps) => (typeof useMemo === 'function' ? useMemo(fn, deps) : fn());
+  const groups = memo(() => groupHistory(rows, decisions), [rows, decisions]);
+  const groupById = memo(() => new Map(groups.flatMap(items => items.map(row => [row.series_id, items]))), [groups]);
+  const suggestionsByGroup = memo(() => new Map(groups.map(items => [items, historyGroupSuggestions(items)])), [groups]);
+  const listedGroups = memo(
+    () => groups.map(items => hideLowSeasons && !expanded[items[0].series_id] ? items.slice(0, 1) : items),
+    [groups, hideLowSeasons, expanded],
+  );
+  const listedRows = memo(() => listedGroups.flat(), [listedGroups]);
+  const completedCount = memo(() => listedRows.filter(row => row.completed === true).length, [listedRows]);
+  const visibleRows = memo(() => listedGroups.map(items => items
     .filter(row => filter === 'all' || (row.completed === true) === (filter === 'completed'))
     .sort((a, b) => b.updatedAt - a.updatedAt))
-    .filter(items => items.length).sort((a, b) => b[0].updatedAt - a[0].updatedAt).flat();
+    .filter(items => items.length).sort((a, b) => b[0].updatedAt - a[0].updatedAt).flat(), [listedGroups, filter]);
 
   const savePreferences = next => {
     setPreferences(next);

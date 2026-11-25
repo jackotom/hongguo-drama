@@ -32,7 +32,7 @@ export function VideoEnhancementControls({ enhancement, available = true }) {
     </label>
     {mode === 'sharpen' && <label className="video-enhancement-strength">{t("锐化强度")}<input aria-label={t("锐化强度")} type="range" min="0" max="100" step="5" value={strength}
         disabled={!available} onChange={event => update({ strength: Number(event.target.value) })} />
-      <output>{t(strength)}%</output>
+      <output>{strength}%</output>
     </label>}
     <p className="video-enhancement-note">{t("只增强播放画面，下载文件保持原画。")}</p>
     {mode === 'anime4k' && <p className="video-enhancement-note">{t("适合动漫；支持 1080p 及以下片源，真人画面可能偏平滑。")}</p>}
@@ -104,7 +104,18 @@ export default function VideoEnhancement({ videoRef, source, available = true, e
           canvas.style.visibility = 'visible';
           setStatus(current => current.state === 'ready' ? current : { state: 'ready', message: 'Anime4K 2× 已开启' });
         }
-      } catch (error) { fail(error); }
+      } catch (error) {
+        if (error?.code === 'DIMENSION_CHANGED') {
+          revision++;
+          canvas.style.visibility = 'hidden';
+          renderer?.dispose();
+          renderer = null;
+          redraw = false;
+          if (!abort.signal.aborted && !failed) void initialize();
+          return;
+        }
+        fail(error);
+      }
       finally {
         drawing = false;
         if (redraw) { redraw = false; draw(); }

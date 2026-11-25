@@ -54,8 +54,10 @@ export function useCommentDanmaku({ seriesId, episodeId, active }) {
   }, [running, feed]);
 
   const update = patch => {
-    const next = { enabled: preferences.enabled, ...preferences, ...patch };
+    const base = preferencesRef.current;
+    const next = { enabled: base.enabled, ...base, ...patch };
     const validated = { enabled: next.enabled === true, ...normalizeDanmakuSettings(next) };
+    preferencesRef.current = validated;
     setPreferences(validated);
     try { window.localStorage.setItem(STORAGE_KEY, JSON.stringify(validated)); setSaveError(''); }
     catch { setSaveError('设置已生效，但本机保存失败'); }
@@ -76,6 +78,10 @@ export default function CommentDanmaku({ videoRef, source, available, danmaku })
   const [items, setItems] = useState([]);
   const [reducedMotion, setReducedMotion] = useState(() => window.matchMedia('(prefers-reduced-motion: reduce)').matches);
   const { running, settings, comments, feed } = danmaku;
+  const commentsRef = useRef(comments);
+  commentsRef.current = comments;
+  const settingsRef = useRef(settings);
+  settingsRef.current = settings;
 
   useEffect(() => {
     const media = window.matchMedia('(prefers-reduced-motion: reduce)');
@@ -94,6 +100,10 @@ export default function CommentDanmaku({ videoRef, source, available, danmaku })
       nextY = item.y + settings.fontSize + 12;
     }
     setItems([...state.items]);
+  }, [feed, settings.fontSize, settings.sensitiveFilter, settings.blockedWords]);
+
+  useEffect(() => {
+    const state = feed.animation;
     const layer = layerRef.current;
     const video = videoRef.current;
     if (!running || !available || !layer || !video) return;
@@ -103,12 +113,13 @@ export default function CommentDanmaku({ videoRef, source, available, danmaku })
     let height = layer.clientHeight;
     const controls = layer.parentElement?.querySelector('.player-controls-bar');
     let bottomInset = Math.max(76, (controls?.clientHeight || 0) + 8);
-    const options = () => ({ width, height, settings, reducedMotion, bottomInset });
+    const options = () => ({ width, height, settings: settingsRef.current, reducedMotion, bottomInset });
     const reset = () => {
       state.items = [];
       state.replayQueue = [];
       state.cooldown = 0;
       previous = 0;
+      dirtyRender = false;
       setItems([...state.items]);
     };
     const paint = () => state.items.forEach(item => {
@@ -117,21 +128,24 @@ export default function CommentDanmaku({ videoRef, source, available, danmaku })
     });
     const canAdvance = () => !video.paused && !video.ended && !document.hidden;
     let lastCommit = 0, dirtyRender = false;
+    const flushDirty = (now = (typeof performance !== 'undefined' ? performance.now() : Date.now())) => {
+      if (!dirtyRender) return;
+      lastCommit = now;
+      dirtyRender = false;
+      setItems([...state.items]);
+    };
     const tick = now => {
       frame = 0;
-      if (!canAdvance()) { previous = 0; return; }
+      if (!canAdvance()) { previous = 0; flushDirty(now); return; }
       const delta = previous ? Math.min((now - previous) / 1000, 0.1) * video.playbackRate : 0.001;
       previous = now;
-      if (advanceDanmaku(state, comments, delta, options())) dirtyRender = true;
-      if (dirtyRender && now - lastCommit >= 100) {
-        lastCommit = now; dirtyRender = false;
-        setItems([...state.items]);
-      }
+      if (advanceDanmaku(state, commentsRef.current, delta, options())) dirtyRender = true;
+      if (dirtyRender && now - lastCommit >= 100) flushDirty(now);
       paint();
       frame = requestAnimationFrame(tick);
     };
     const start = () => { if (!frame && canAdvance()) { previous = 0; frame = requestAnimationFrame(tick); } };
-    const stop = () => { cancelAnimationFrame(frame); frame = 0; previous = 0; };
+    const stop = () => { cancelAnimationFrame(frame); frame = 0; previous = 0; flushDirty(); };
     const emptied = () => { stop(); reset(); };
     const resize = () => {
       const nextWidth = layer.clientWidth;
@@ -140,6 +154,7 @@ export default function CommentDanmaku({ videoRef, source, available, danmaku })
       if (!resizeDanmaku(state, options(), { ...options(), width: nextWidth, height: nextHeight })) return;
       width = nextWidth; height = nextHeight;
       bottomInset = Math.max(76, (controls?.clientHeight || 0) + 8);
+      dirtyRender = false;
       setItems([...state.items]); paint(); start();
     };
     // Settings keep current trajectories and consumption; only new arrivals use the new lanes.
@@ -149,7 +164,7 @@ export default function CommentDanmaku({ videoRef, source, available, danmaku })
     const events = { playing: start, play: start, seeked: start, canplay: start, pause: stop, ended: stop, waiting: start, seeking: start, emptied };
     Object.entries(events).forEach(([name, handler]) => video.addEventListener(name, handler));
     return () => { stop(); observer.disconnect(); Object.entries(events).forEach(([name, handler]) => video.removeEventListener(name, handler)); };
-  }, [running, available, comments, settings, reducedMotion, source, videoRef, feed]);
+  }, [running, available, reducedMotion, source, videoRef, feed]);
 
   if (!running || !available) return null;
   return <div ref={layerRef} className={`comment-danmaku ${reducedMotion ? 'comment-danmaku-static' : ''}`}>
@@ -170,9 +185,9 @@ export function DanmakuSettings({ danmaku, onClose, panelRef, maxHeight }) {
     </button></div>
     <label>{t("弹幕来源")}<select aria-label={t("弹幕来源")} value={danmaku.sourceKind || 'comments'} onChange={event => danmaku.setSource?.(event.target.value)}><option value="official">{t("时间轴弹幕")}</option><option value="comments">{t("本集评论（备用）")}</option></select></label>
     <p>{t(danmaku.sourceKind === 'official' ? '按视频时间展示红果剧集弹幕，快进、回退和切集时重新对齐。接口异常时可手动切换本集评论。' : '本集公开评论依次展示，与视频时间无对应。全文可在「剧评与收藏」查看。')}</p>
-    <label>{t("不透明度 ")}<output>{t(settings.opacity)}%</output><input autoFocus aria-label={t("弹幕不透明度")} type="range" min="20" max="100" step="5" value={settings.opacity} onChange={event => update({ opacity: Number(event.target.value) })} /></label>
-    <label>{t("字号 ")}<output>{t(settings.fontSize)}px</output><input aria-label={t("弹幕字号")} type="range" min="16" max="32" step="2" value={settings.fontSize} onChange={event => update({ fontSize: Number(event.target.value) })} /></label>
-    <label>{t("滚动速度 ")}<output>{t(settings.speed)}×</output><input aria-label={t("弹幕滚动速度")} type="range" min="0.5" max="2" step="0.25" value={settings.speed} onChange={event => update({ speed: Number(event.target.value) })} /></label>
+    <label>{t("不透明度 ")}<output>{settings.opacity}%</output><input autoFocus aria-label={t("弹幕不透明度")} type="range" min="20" max="100" step="5" value={settings.opacity} onChange={event => update({ opacity: Number(event.target.value) })} /></label>
+    <label>{t("字号 ")}<output>{settings.fontSize}px</output><input aria-label={t("弹幕字号")} type="range" min="16" max="32" step="2" value={settings.fontSize} onChange={event => update({ fontSize: Number(event.target.value) })} /></label>
+    <label>{t("滚动速度 ")}<output>{settings.speed}×</output><input aria-label={t("弹幕滚动速度")} type="range" min="0.5" max="2" step="0.25" value={settings.speed} onChange={event => update({ speed: Number(event.target.value) })} /></label>
     <label>{t("显示区域")}<select aria-label={t("弹幕显示区域")} value={settings.area} onChange={event => update({ area: event.target.value })}><option value="quarter">{t("四分之一屏")}</option><option value="half">{t("半屏")}</option><option value="full">{t("全屏")}</option></select></label>
     <label>{t("弹幕密度")}<select aria-label={t("弹幕密度")} value={settings.density} onChange={event => update({ density: event.target.value })}><option value="sparse">{t("稀疏")}</option><option value="normal">{t("适中")}</option><option value="dense">{t("密集")}</option></select></label>
     <label className="danmaku-filter-toggle">{t("内置敏感词过滤")}<input aria-label={t("内置敏感词过滤")} type="checkbox" checked={settings.sensitiveFilter} onChange={event => update({ sensitiveFilter: event.target.checked })} /></label>

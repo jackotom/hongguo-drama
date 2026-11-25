@@ -120,6 +120,10 @@ export default function OfficialDanmaku({ videoRef, source, available, danmaku }
   const [reducedMotion, setReducedMotion] = useState(() => window.matchMedia('(prefers-reduced-motion: reduce)').matches);
   const { running, enabled, active, supported, settings, feed, status, error, loading } = danmaku;
   const list = feed.groupedDanmaku || feed.danmaku;
+  const listRef = useRef(list);
+  listRef.current = list;
+  const settingsRef = useRef(settings);
+  settingsRef.current = settings;
 
   useEffect(() => {
     const media = window.matchMedia('(prefers-reduced-motion: reduce)');
@@ -135,11 +139,15 @@ export default function OfficialDanmaku({ videoRef, source, available, danmaku }
     setItems([]);
   }, [source, feed, enabled, active, supported, available, settings.fontSize, settings.area, settings.density, reducedMotion]);
 
-  // 布局改变时重对齐；透明度、速度与屏蔽词调整保留当前轨迹。
   useEffect(() => {
     const state = feed.animation;
     state.items = state.items.filter(item => !commentIsBlocked(item.content, settings));
     setItems([...state.items]);
+  }, [feed, settings.sensitiveFilter, settings.blockedWords]);
+
+  // 布局改变时重对齐；透明度、速度与屏蔽词调整保留当前轨迹，无需重绑视频监听。
+  useEffect(() => {
+    const state = feed.animation;
     const layer = layerRef.current;
     const video = videoRef.current;
     if (!running || !available || !layer || !video) return undefined;
@@ -149,7 +157,7 @@ export default function OfficialDanmaku({ videoRef, source, available, danmaku }
     layoutRef.current = { width, height };
     const controls = layer.parentElement?.querySelector('.player-controls-bar');
     let bottomInset = Math.max(76, (controls?.clientHeight || 0) + 8);
-    const options = () => ({ width, height, settings, reducedMotion, bottomInset });
+    const options = () => ({ width, height, settings: settingsRef.current, reducedMotion, bottomInset });
     const paint = () => state.items.forEach(item => {
       const node = nodes.current.get(item.id);
       if (node) node.style.transform = `translate(${item.x}px, ${item.y}px)`;
@@ -157,25 +165,30 @@ export default function OfficialDanmaku({ videoRef, source, available, danmaku }
     const canAnimate = () => !video.paused && !video.ended && !document.hidden;
     let lastFrame;
     let lastCommit = 0, dirtyRender = false;
+    const flushDirty = (now = (typeof performance !== 'undefined' ? performance.now() : Date.now())) => {
+      if (!dirtyRender) return;
+      lastCommit = now;
+      dirtyRender = false;
+      setItems([...state.items]);
+    };
     const tick = now => {
       frame = 0;
-      if (!canAnimate()) return;
+      if (!canAnimate()) { flushDirty(now); return; }
       // Wall time keeps existing comments smooth while a seek or buffer stalls the media clock.
       const delta = lastFrame === undefined ? 0 : Math.max(0, (now - lastFrame) / 1000) * video.playbackRate;
       lastFrame = now;
       const emitting = !video.seeking && video.readyState >= 2;
+      const list = listRef.current;
       if (advanceTimedDanmaku(state, list, video.currentTime, delta, { ...options(), emitting })) dirtyRender = true;
-      if (dirtyRender && now - lastCommit >= 100) {
-        lastCommit = now; dirtyRender = false;
-        setItems([...state.items]);
-      }
+      if (dirtyRender && now - lastCommit >= 100) flushDirty(now);
       paint();
       if (emitting || state.items.length) frame = requestAnimationFrame(tick);
+      else flushDirty(now);
     };
     const start = () => { if (!frame && canAnimate()) frame = requestAnimationFrame(tick); };
-    const stop = () => { cancelAnimationFrame(frame); frame = 0; lastFrame = undefined; };
+    const stop = () => { cancelAnimationFrame(frame); frame = 0; lastFrame = undefined; flushDirty(); };
     const seek = () => { state.lastTime = undefined; start(); };
-    const emptied = () => { stop(); state.lastTime = undefined; state.items = []; state.replayQueue = []; setItems([]); };
+    const emptied = () => { stop(); state.lastTime = undefined; state.items = []; state.replayQueue = []; dirtyRender = false; setItems([]); };
     const resize = () => {
       const nextWidth = layer.clientWidth;
       const nextHeight = layer.clientHeight;
@@ -184,6 +197,7 @@ export default function OfficialDanmaku({ videoRef, source, available, danmaku }
       width = nextWidth; height = nextHeight;
       bottomInset = Math.max(76, (controls?.clientHeight || 0) + 8);
       layoutRef.current = { width, height };
+      dirtyRender = false;
       setItems([...state.items]); paint(); start();
     };
     resize();
@@ -193,7 +207,7 @@ export default function OfficialDanmaku({ videoRef, source, available, danmaku }
     const events = { playing: start, play: start, seeked: seek, canplay: start, pause: stop, ended: stop, waiting: start, seeking: seek, emptied };
     Object.entries(events).forEach(([name, handler]) => video.addEventListener(name, handler));
     return () => { stop(); observer.disconnect(); Object.entries(events).forEach(([name, handler]) => video.removeEventListener(name, handler)); };
-  }, [running, available, list, settings, reducedMotion, source, videoRef, feed]);
+  }, [running, available, reducedMotion, source, videoRef, feed]);
 
   if (!enabled || !active || !supported || !available) return null;
   return <div ref={layerRef} className={`comment-danmaku ${reducedMotion ? 'comment-danmaku-static' : ''}`}>

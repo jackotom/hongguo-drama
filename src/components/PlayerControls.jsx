@@ -32,6 +32,8 @@ export default function PlayerControls({ danmaku, enhancement, shortcuts = DEFAU
   const [danmakuHeight, setDanmakuHeight] = useState(300);
   const [menuHeight, setMenuHeight] = useState(240);
   const [controlsHidden, setControlsHidden] = useState(false);
+  const controlsHiddenRef = useRef(controlsHidden);
+  controlsHiddenRef.current = controlsHidden;
   useEffect(() => { onControlsHiddenChange?.(controlsHidden); }, [controlsHidden, onControlsHiddenChange]);
   const controlsRef = useRef(null);
   const menuRef = useRef(null);
@@ -136,7 +138,7 @@ export default function PlayerControls({ danmaku, enhancement, shortcuts = DEFAU
     if (menuOpen || danmakuOpen || selectionPanel || (!continuing && !available)) reveal();
     else if (!continuing && media.paused && !(media.ended && autoContinue)) {
       // A native pause can precede ended; explicit key/click pauses already reveal immediately.
-      if (autoContinue && controlsHidden) pauseTimer = setTimeout(() => {
+      if (autoContinue && controlsHiddenRef.current) pauseTimer = setTimeout(() => {
         if (videoRef.current?.paused && !videoRef.current.ended) reveal();
       }, 120);
       else reveal();
@@ -163,9 +165,26 @@ export default function PlayerControls({ danmaku, enhancement, shortcuts = DEFAU
     setSelectionPanel(null);
     const video = videoRef.current;
     if (!video) return;
-    const sync = () => setMedia({ paused: video.paused, ended: video.ended, time: Number.isFinite(video.currentTime) ? video.currentTime : 0,
-      duration: Number.isFinite(video.duration) && video.duration > 0 ? video.duration : 0, muted: video.muted, volume: video.volume,
-      width: available ? video.videoWidth : 0, height: available ? video.videoHeight : 0 });
+    const sync = (event) => {
+      const next = {
+        paused: video.paused,
+        ended: video.ended,
+        time: Number.isFinite(video.currentTime) ? video.currentTime : 0,
+        duration: Number.isFinite(video.duration) && video.duration > 0 ? video.duration : 0,
+        muted: video.muted,
+        volume: video.volume,
+        width: available ? video.videoWidth : 0,
+        height: available ? video.videoHeight : 0,
+      };
+      setMedia(prev => {
+        if (event?.type === 'timeupdate'
+          && prev.paused === next.paused && prev.ended === next.ended
+          && prev.duration === next.duration && prev.muted === next.muted
+          && prev.volume === next.volume && prev.width === next.width && prev.height === next.height
+          && Math.abs(prev.time - next.time) < 0.25) return prev;
+        return next;
+      });
+    };
     const events = ['play', 'pause', 'ended', 'timeupdate', 'loadedmetadata', 'durationchange', 'volumechange', 'emptied', 'resize'];
     events.forEach(name => video.addEventListener(name, sync));
     sync();
@@ -221,12 +240,13 @@ export default function PlayerControls({ danmaku, enhancement, shortcuts = DEFAU
       setDanmakuOpen(false); (mobile ? menuButtonRef : danmakuButtonRef).current?.focus();
     };
     measure();
-    const observer = new stageWindow.ResizeObserver(measure);
-    if (stageRef.current) observer.observe(stageRef.current);
-    if (controlsRef.current) observer.observe(controlsRef.current);
+    const Observer = stageWindow.ResizeObserver;
+    const observer = typeof Observer === 'function' ? new Observer(measure) : null;
+    if (stageRef.current) observer?.observe(stageRef.current);
+    if (controlsRef.current) observer?.observe(controlsRef.current);
     stageDocument.addEventListener('pointerdown', outside);
     stageDocument.addEventListener('keydown', escape);
-    return () => { observer.disconnect(); stageDocument.removeEventListener('pointerdown', outside); stageDocument.removeEventListener('keydown', escape); };
+    return () => { observer?.disconnect(); stageDocument.removeEventListener('pointerdown', outside); stageDocument.removeEventListener('keydown', escape); };
   }, [danmakuOpen, floating, stageRef]);
 
   useEffect(() => {

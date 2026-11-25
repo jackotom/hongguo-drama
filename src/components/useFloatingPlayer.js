@@ -11,6 +11,10 @@ export default function useFloatingPlayer(title, onChange, onBeforeMove) {
   const popup = useRef(null);
   const latestTitle = useRef(title);
   latestTitle.current = title;
+  const onChangeRef = useRef(onChange);
+  onChangeRef.current = onChange;
+  const onBeforeMoveRef = useRef(onBeforeMove);
+  onBeforeMoveRef.current = onBeforeMove;
   const disposing = useRef(false);
   const pendingRestore = useRef(null);
   const lastAspectRatio = useRef(null);
@@ -44,7 +48,7 @@ export default function useFloatingPlayer(title, onChange, onBeforeMove) {
       volume: video.volume, rate: video.playbackRate, source: video.currentSrc || video.src } : null;
     pendingRestore.current?.();
     if (snapshot) {
-      onBeforeMove?.(snapshot);
+      onBeforeMoveRef.current?.(snapshot);
       video.pause();
       const restore = () => {
         if (video.src !== snapshot.source && video.currentSrc !== snapshot.source) return;
@@ -61,7 +65,7 @@ export default function useFloatingPlayer(title, onChange, onBeforeMove) {
       destination.appendChild(host);
       restore();
     } else destination.appendChild(host);
-  }, [host, onBeforeMove]);
+  }, [host]);
 
   const attachSlot = useCallback(element => {
     slot.current = element;
@@ -78,7 +82,8 @@ export default function useFloatingPlayer(title, onChange, onBeforeMove) {
       popup.current = null;
       lastAspectRatio.current = null;
       if (slot.current) moveHost(slot.current);
-      if (!disposing.current) { setFloating(false); onChange?.(false); }
+      if (!disposing.current) setFloating(false);
+      onChangeRef.current?.(false);
     };
     child.addEventListener('beforeunload', restore);
     child.addEventListener('pagehide', restore);
@@ -95,14 +100,26 @@ export default function useFloatingPlayer(title, onChange, onBeforeMove) {
       child.document.head.appendChild(style);
       moveHost(child.document.body);
       setFloating(true);
-      onChange?.(true);
+      onChangeRef.current?.(true);
       syncAspectRatio();
       child.focus();
     } catch (error) {
       restore(); child.close();
       throw new Error('悬浮窗初始化失败，请重试', { cause: error });
     }
-  }, [host, onChange, moveHost, syncAspectRatio]);
+  }, [host, moveHost, syncAspectRatio]);
+
+  useEffect(() => {
+    if (!floating || typeof MutationObserver !== 'function') return undefined;
+    const syncTheme = () => {
+      if (popup.current && !popup.current.closed) {
+        popup.current.document.documentElement.dataset.theme = document.documentElement.dataset.theme || 'light';
+      }
+    };
+    const observer = new MutationObserver(syncTheme);
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+    return () => observer.disconnect();
+  }, [floating]);
 
   useEffect(() => {
     if (popup.current && !popup.current.closed) popup.current.document.title = title;
@@ -112,7 +129,10 @@ export default function useFloatingPlayer(title, onChange, onBeforeMove) {
     disposing.current = false;
     return () => {
       disposing.current = true;
+      const hadPopup = !!popup.current;
       popup.current?.close();
+      popup.current = null;
+      if (hadPopup) onChangeRef.current?.(false);
       pendingRestore.current?.();
     };
   }, []);

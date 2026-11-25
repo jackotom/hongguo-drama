@@ -137,17 +137,20 @@ function Browse({ onNavigate, active = true }) {
     toastTimer.current = setTimeout(() => setToast(null), 3000);
   }, []);
 
+  const progressRequest = useRef(0);
   const loadDownloadedMap = useCallback(async (visibleIds) => {
+    const requestId = ++progressRequest.current;
     try {
       const res = await window.electronAPI.getSeriesProgress();
-      if (!res?.success) return;
+      if (requestId !== progressRequest.current || !res?.success) return;
       const map = { ...(res.progress || {}) };
       setDownloadedMap(map);
       const known = new Set(visibleIds.map(String));
       for (const seriesId of res.pending || []) {
+        if (requestId !== progressRequest.current) return;
         if (!known.has(String(seriesId))) continue;
         const warmed = await window.electronAPI.warmSeriesProgress(seriesId);
-        if (!warmed?.success) continue;
+        if (requestId !== progressRequest.current || !warmed?.success) continue;
         map[String(seriesId)] = warmed.progress;
         setDownloadedMap({ ...map });
       }
@@ -294,6 +297,7 @@ function Browse({ onNavigate, active = true }) {
   useEffect(() => {
     if (!active) return;
     void loadDownloadedMap(results.map(item => item.series_id));
+    return () => { progressRequest.current++; };
   }, [active, results, loadDownloadedMap]);
 
   useEffect(() => {
@@ -603,8 +607,6 @@ function Browse({ onNavigate, active = true }) {
       {source === 'xifan' && <p className="browse-source-note">{t("当前提供题材分类，西饭热播榜暂未接入。")}</p>}
       {source === 'reelshort' && <p className="browse-source-note">{t("官网公开片单，按原顺序显示，每类最多 12 部；当前只提供首页快照，无后续分页。受地区限制，付费集请在官方平台确认权限。")}</p>}
 
-      {source === 'reelshort' && <p className="browse-source-note">官网公开片单，按原顺序显示，每类最多 12 部；当前只提供首页快照，无后续分页。受地区限制，付费集请在官方平台确认权限。</p>}
-
       {/* 题材 chips */}
       <FilterContainer className={mobile ? 'mobile-browse-filters' : undefined}>
       {mobile && <summary>{t("筛选题材与状态")}{genre && <> · {t(meta.genres.find(item => item.slug === genre)?.label || '')}</>}{completion !== 'all' && <> · {t(completion === 'completed' ? '已完结' : '更新中')}</>}</summary>}
@@ -691,8 +693,8 @@ function Browse({ onNavigate, active = true }) {
                 {item.heat && <div className="browse-card-heat">{t(item.heat)}</div>}
                 {item.tags && item.tags.length > 0 && (
                   <div className="browse-card-tags">
-                    {item.tags.slice(0, 2).map((t) => (
-                      <span key={t} className="browse-tag">{t}</span>
+                    {item.tags.slice(0, 2).map((tag) => (
+                      <span key={tag} className="browse-tag">{tag}</span>
                     ))}
                   </div>
                 )}
@@ -830,7 +832,7 @@ function Browse({ onNavigate, active = true }) {
 
       {toast && (
         <div className={`dm-toast dm-toast-${toast.type}`} onClick={() => setToast(null)}>
-          {toast.text}
+          {t(toast.text)}
         </div>
       )}
     </div>

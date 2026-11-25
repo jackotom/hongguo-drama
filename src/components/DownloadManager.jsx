@@ -209,6 +209,17 @@ function DownloadManager({ onNavigate, active = true }) {
       reorder ||= affectsOrder || taskIndex.current.get(data.id)?.status !== status;
       schedule();
     };
+    let mergePatches = new Map(), mergeTimer = null, lastMergeFlush = 0;
+    const flushMergeProgress = () => {
+      mergeTimer = null;
+      if (!mergePatches.size) return;
+      lastMergeFlush = Date.now();
+      const updates = mergePatches;
+      mergePatches = new Map();
+      setMergeTasks((prev) =>
+        prev.map((item) => (updates.has(item.id) ? { ...item, ...updates.get(item.id) } : item))
+      );
+    };
     const cleanups = [
       window.electronAPI.onDownloadProgress((data) => {
         patchTask(data, 'downloading');
@@ -232,9 +243,14 @@ function DownloadManager({ onNavigate, active = true }) {
       }),
       window.electronAPI.onMergeTaskAdded(() => loadMergeTasks()),
       window.electronAPI.onMergeProgress((data) => {
-        setMergeTasks((prev) =>
-          prev.map((t) => (t.id === data.id ? { ...t, ...data } : t))
-        );
+        mergePatches.set(data.id, { ...(mergePatches.get(data.id) || {}), ...data });
+        const elapsed = Date.now() - lastMergeFlush;
+        if (elapsed >= 200) {
+          clearTimeout(mergeTimer);
+          flushMergeProgress();
+        } else if (!mergeTimer) {
+          mergeTimer = setTimeout(flushMergeProgress, 200 - elapsed);
+        }
       }),
       window.electronAPI.onMergeCompleted((data) => {
         loadMergeTasks();
@@ -269,6 +285,7 @@ function DownloadManager({ onNavigate, active = true }) {
       clearInterval(timer);
       clearTimeout(verifyTimer);
       clearTimeout(batchTimer);
+      clearTimeout(mergeTimer);
       for (const key of Object.keys(requests.current)) requests.current[key]++;
     };
   }, [active, refresh, loadQueue, loadSeriesList, loadMergeTasks, showToast]);
@@ -281,15 +298,7 @@ function DownloadManager({ onNavigate, active = true }) {
   };
 
   const clearSelection = () => setSelected(new Set());
-
-  const fmtSize = (b) => {
-    if (!b || b <= 0) return '0 B';
-    const u = ['B', 'KB', 'MB', 'GB', 'TB'];
-    let i = 0;
-    let v = b;
-    while (v >= 1024 && i < u.length - 1) { v /= 1024; i++; }
-    return v.toFixed(v >= 100 || i === 0 ? 0 : 1) + ' ' + u[i];
-  };
+  const fmtSize = fmtBytes;
 
   /** 弹删除确认：默认只删记录，可勾选同时删除本地文件 */
   const askDelete = (list, label) => {
@@ -485,21 +494,31 @@ function DownloadManager({ onNavigate, active = true }) {
   const scopedTasks = useMemo(() => activeFilter
     ? tasks.filter(task => seriesKey(task) === activeFilter) : tasks, [tasks, activeFilter]);
   const scopedIds = useMemo(() => activeFilter
-    ? sortedIds.filter(id => seriesKey(taskById.get(id)) === activeFilter) : sortedIds,
+    ? sortedIds.filter(id => {
+      const task = taskById.get(id);
+      return !!task && seriesKey(task) === activeFilter;
+    }) : sortedIds,
   [sortedIds, taskById, activeFilter]);
   const allSelected = scopedTasks.length > 0 && scopedTasks.every(task => selected.has(task.id));
   const selectAll = () => setSelected(new Set(scopedTasks.map(task => task.id)));
   const pageCount = Math.max(1, Math.ceil(scopedIds.length / PAGE_SIZE));
   const currentPage = Math.min(page, pageCount);
-  const visibleTasks = scopedIds.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE).map(id => taskById.get(id)).filter(Boolean);
-
-  const activeCount = scopedTasks.filter((t) => t.status === 'downloading' || t.status === 'pending').length;
-  const completedCount = scopedTasks.filter((t) => t.status === 'completed').length;
-  const retryingCount = scopedTasks.filter(isWaitingRetry).length;
-  const failedTasks = useMemo(
-    () => scopedTasks.filter(needsManualRetry),
-    [scopedTasks]
+  const visibleTasks = useMemo(
+    () => scopedIds.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE).map(id => taskById.get(id)).filter(Boolean),
+    [scopedIds, currentPage, taskById],
   );
+
+  const { activeCount, completedCount, retryingCount, failedTasks } = useMemo(() => {
+    let activeTotal = 0, completedTotal = 0, retryingTotal = 0;
+    const failed = [];
+    for (const item of scopedTasks) {
+      if (item.status === 'downloading' || item.status === 'pending') activeTotal++;
+      else if (item.status === 'completed') completedTotal++;
+      if (isWaitingRetry(item)) retryingTotal++;
+      if (needsManualRetry(item)) failed.push(item);
+    }
+    return { activeCount: activeTotal, completedCount: completedTotal, retryingCount: retryingTotal, failedTasks: failed };
+  }, [scopedTasks]);
   const failedCount = failedTasks.length;
 
   // 与主进程 pauseAllTasks 一致；按钮始终控制所有剧，不受当前筛选影响。
@@ -833,14 +852,14 @@ function DownloadManager({ onNavigate, active = true }) {
 
       {toast && (
         <div className={`dm-toast dm-toast-${toast.type}`} role={toast.type === 'error' ? 'alert' : 'status'} onClick={() => setToast(null)}>
-          {toast.text}
+          {t(toast.text)}
         </div>
       )}
 
       {/* 合并格式选择 */}
       {mergeAsk && (
         <div className="player-confirm-mask" onClick={() => closeMergeDialog()}>
-          <div className="player-confirm" role="dialog" aria-modal="true" aria-label={t(confirmAsk ? confirmAsk.title : '合并导出')} tabIndex={-1} onClick={(e) => e.stopPropagation()}>
+          <div className="player-confirm" role="dialog" aria-modal="true" aria-label={t('合并导出')} tabIndex={-1} onClick={(e) => e.stopPropagation()}>
             <div className="player-confirm-title" style={{ color: 'var(--accent)' }}>
               <Layers size={17} />{t("合并整部剧")}</div>
             <div className="player-confirm-msg">
