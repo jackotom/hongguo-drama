@@ -92,6 +92,7 @@ const deviceIdentity = () => {
     catch (error) {
       if (error.code !== 'ENOENT') throw error;
       saved = create();
+      fs.mkdirSync(require('node:path').dirname(identityFile), { recursive: true });
       try { fs.writeFileSync(identityFile, JSON.stringify(saved), { flag: 'wx', mode: 0o600 }); }
       catch (writeError) {
         if (writeError.code !== 'EEXIST') throw writeError;
@@ -446,8 +447,8 @@ async function fetchDanmaku(options = {}) {
   const hit = cache.get(cacheKey);
   // `fresh` 供界面上的"重试"使用：失败结果有 15 秒 TTL，不绕过的话用户点了重试
   // 只会再拿到同一条缓存失败，看起来像按钮没反应。
-  if (hit && hit.expires > Date.now() && options.fresh !== true) return present(hit.result, hit.items, limit);
-  if (!signal && pending.has(cacheKey)) {
+  if (hit && hit.expires > now() && options.fresh !== true) return present(hit.result, hit.items, limit);
+  if (!signal && options.fresh !== true && pending.has(cacheKey)) {
     const shared = await pending.get(cacheKey);
     return present(shared.result, shared.items, limit);
   }
@@ -535,7 +536,7 @@ async function fetchDanmaku(options = {}) {
     // 缓存完整结果与完整列表；limit 只在呈现时裁剪，避免缓存被"半截"结果污染。
     const result = finalize({ seriesId, vid, items: collected, truncated, error: failure });
     cache.set(cacheKey, {
-      expires: Date.now() + (failure ? CACHE_TTL_FAIL : CACHE_TTL_OK),
+      expires: now() + (failure ? CACHE_TTL_FAIL : CACHE_TTL_OK),
       items: collected,
       result,
     });

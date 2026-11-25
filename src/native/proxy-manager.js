@@ -1,3 +1,5 @@
+const crypto = require('node:crypto');
+
 function createProxyManager({
   config,
   getSessions,
@@ -25,12 +27,17 @@ function createProxyManager({
       auth = built.auth;
       proxy = { mode: 'fixed_servers', proxyRules: built.rule };
     }
-    const key = JSON.stringify([proxy, auth]);
+    // Hash credentials so plaintext proxy passwords are never retained in WeakMap keys.
+    const authDigest = auth
+      ? crypto.createHash('sha256').update(JSON.stringify(auth)).digest('hex')
+      : '';
+    const key = JSON.stringify([proxy, authDigest]);
     await Promise.all(sessions.filter(Boolean).map(async currentSession => {
+      if (expectedVersion !== version) throw new Error('代理设置已被更新');
       if (sessionProxyConfigs.get(currentSession) !== key) {
         await currentSession.setProxy(proxy);
-        await currentSession.clearAuthCache?.();
-        await currentSession.closeAllConnections?.();
+        if (expectedVersion === version) await currentSession.clearAuthCache?.();
+        if (expectedVersion === version) await currentSession.closeAllConnections?.();
       }
       if (expectedVersion !== version) {
         sessionProxyConfigs.delete(currentSession);
@@ -47,7 +54,10 @@ function createProxyManager({
     const currentVersion = ++version;
     desired = resolved;
     try { await applyToSession(resolved, getSessions(), currentVersion); }
-    catch { throw new Error('设置网络代理失败，请重试。'); }
+    catch (error) {
+      if (error?.message === '代理设置已被更新') throw error;
+      throw new Error('设置网络代理失败，请重试。');
+    }
     if (currentVersion !== version) throw new Error('代理设置已被更新');
     config.applyToEnv(resolved);
     log(`[Proxy] mode=${resolved.mode}`);

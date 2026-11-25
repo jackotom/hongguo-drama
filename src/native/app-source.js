@@ -548,7 +548,9 @@ async function fetchAppPlayUrl(vid, options = {}) {
         if (preferred) return preferred;
     }
     const previousRejection = playbackRejection;
-    const v8Probe = options.preferSdk ? null : beginPlaybackV8Probe();
+    // When SDK is orchestrated outside app-source (allowSdk=false), skip V8-to-SDK circuit-break probing
+    // and run the dynamic route list directly in one pass without double-probing route #1.
+    const v8Probe = (options.preferSdk || !allowSdk) ? null : beginPlaybackV8Probe();
     let v8ProbeSettled = false;
     const settleV8Probe = state => {
         if (v8ProbeSettled || !v8Probe?.settle) return;
@@ -563,6 +565,7 @@ async function fetchAppPlayUrl(vid, options = {}) {
         const preferred = await trySdk();
         if (preferred) return preferred;
     }
+    const v8Options = allowSdk ? options : { ...options, v8Fallback: true };
     // Playback, prefetch and downloads share one paced turn, including registration.
     const pending = playbackQueue.then(async () => {
         throwIfAborted(options.signal);
@@ -582,7 +585,7 @@ async function fetchAppPlayUrl(vid, options = {}) {
             }
             for (;;) {
                 try {
-                    const result = await fetchAppPlayUrlFresh(vid, options);
+                    const result = await fetchAppPlayUrlFresh(vid, v8Options);
                     if (sdkFailure) result.sdkFailure = sdkFailure;
                     return result;
                 }
@@ -594,6 +597,7 @@ async function fetchAppPlayUrl(vid, options = {}) {
                         settleV8Probe('skip');
                         throw error;
                     }
+                    if (empty && !allowSdk) throw error;
                     if (identityRotated || (!empty && !rejected)) throw error;
                     if (empty && Date.now() - playbackIdentityResetAt < 30000) throw error;
                     playbackDevice.resetPlaybackDevice?.();
@@ -688,7 +692,7 @@ async function fetchAppPlayUrlFresh(vid, options) {
         ]);
         const preferred = candidates.find(route => route.id === preferredPlaybackRoute);
         const routes = preferred ? [preferred, ...candidates.filter(route => route !== preferred)] : candidates;
-        let response, lastError, successfulRoute = '';
+        let response, lastError, successfulRoute = '', model = null;
         const rememberPreferredRoute = () => Promise.resolve().then(() => {
             if (!signal.aborted && successfulRoute) preferredPlaybackRoute = successfulRoute;
         });
@@ -730,24 +734,17 @@ async function fetchAppPlayUrlFresh(vid, options) {
                     code: entry?.video_model ? 'INVALID_RESPONSE' : 'MISSING_MODEL',
                 });
             }
+            model = candidate;
             successfulRoute = routeCandidate.id;
             break;
         }
-        if (!response) {
+        if (!response || !model) {
             throw lastError || Object.assign(new Error('App 接口返回空响应（HTTP 200），原因尚未确认'), {
                 code: 'EMPTY_RESPONSE', status: 200, emptyResponse: true,
             });
         }
         playbackV8CooldownUntil = 0;
         playbackEmptyRounds = 0;
-        const businessCode = Number(response.Code || response.code || 0);
-        if (businessCode !== 0) throw Object.assign(new Error('App 接口暂未提供本集播放信息'), {
-            code: 'BUSINESS_REJECTED', businessCode,
-        });
-        const entries = response.data?.[contentType] ?? response.data?.video_model_data ?? response.data;
-        const entry = entries?.[vid];
-        const model = typeof entry?.video_model === 'string' ? jsonBody(entry.video_model) : entry?.video_model;
-        if (!model || typeof model !== 'object' || Array.isArray(model)) throw Object.assign(new Error('App 接口未返回所选分集，已停止取址'), { code: entry?.video_model ? 'INVALID_RESPONSE' : 'MISSING_MODEL' });
         const inline = model.video_list && typeof model.video_list === 'object' && Object.keys(model.video_list).length > 0;
         const readFallback = async ({ codec = '', forceCodec = '' } = {}) => {
             let fallback = parseFallback(model.fallback_api);
@@ -806,6 +803,7 @@ async function fetchAppPlayUrlFresh(vid, options) {
                     rememberPreferredRoute();
                     return parsed;
                 } catch (fallbackError) {
+                    throwIfAborted(signal);
                     lastError = fallbackError;
                 }
             }

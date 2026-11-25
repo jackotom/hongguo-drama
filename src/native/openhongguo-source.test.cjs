@@ -151,3 +151,32 @@ test('anonymous limits cool down before another openhongguo request', async () =
   await assert.rejects(provider.resolve('13'), { code: 'ANONYMOUS_LIMITED' });
   assert.equal(attempts, 2);
 });
+
+test('concurrent DEVICE_REJECTED failures coalesce resetDevice and reject plaintext http media URLs', async () => {
+  let resets = 0, calls = 0;
+  let releaseReset;
+  const provider = createOpenhongguoSource({ getClient: async () => ({
+    async resolvePlayback() {
+      calls++;
+      if (calls <= 2) throw Object.assign(new Error('device rejected'), { code: 'DEVICE_REJECTED' });
+      const value = playback();
+      value.playback.streams = [
+        { url: 'http://cdn.example/insecure.mp4', codec: 'h264', width: 1080, height: 1920, definition: '1080p' },
+        { url: 'https://cdn.example/secure.mp4', codec: 'h264', width: 1080, height: 1920, definition: '1080p' },
+      ];
+      return value;
+    },
+    resetDevice() {
+      resets++;
+      return new Promise(resolve => { releaseReset = resolve; });
+    },
+  }) });
+  const a = provider.resolve('11');
+  const b = provider.resolve('12');
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(resets, 1);
+  releaseReset();
+  const [ra, rb] = await Promise.all([a, b]);
+  assert.equal(ra.url, 'https://cdn.example/secure.mp4');
+  assert.equal(rb.url, 'https://cdn.example/secure.mp4');
+});

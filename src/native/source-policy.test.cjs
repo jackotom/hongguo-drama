@@ -19,6 +19,8 @@ test('source policy accepts bounded route changes and rejects unsafe expansion',
     { id: 'video_tab', headers: { Cookie: 'secret' } },
     { id: 'video_tab', values: { device_id: 'attacker' } },
     { id: 'video_tab', body: { '__proto__.polluted': true } },
+    { id: 'video_tab', url: 'https://api5-normal-sinfonlineb.fqnovel.com/path?device_id=evil' },
+    { id: 'video_tab', headers: { 'user-agent': 'bad\r\nX-Injected: 1' } },
   ]) assert.throws(() => policy.normalizePolicy({ revision: 1, routes: [bad] }));
   assert.throws(() => policy.normalizePolicy({ revision: 1, routes: [{ id: 'video_tab' }, { id: 'video_tab' }] }));
 });
