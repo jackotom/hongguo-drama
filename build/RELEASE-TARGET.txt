@@ -1,4 +1,4 @@
-Hongguo Drama 8.2
-Internal version: 8.2.0
-Desktop build: 8.2.1
+Hongguo Drama 8.3
+Internal version: 8.3.0
+Desktop build: 8.3.1
 Platforms: macOS arm64, macOS x64, Windows x64, Linux x64 AppImage
