@@ -8,5 +8,7 @@
     "Windows x64",
     "Linux x64 AppImage"
   ],
-  "status": "draft-candidate"
+  "status": "published",
+  "frozenSha": "a82112521dc8cf44060b4d3a7bf272ef3a4116b1",
+  "releaseId": 458787896
 }

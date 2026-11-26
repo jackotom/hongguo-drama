@@ -1,5 +1,10 @@
-<!-- 8.4 source and release target; historical credits retained. -->
+<!-- 8.4 official release; historical credits retained. -->
 # 贡献者与问题反馈致谢
+
+## 8.3 / 8.4 社区取源与云端书架致谢（2026-11-26）
+
+- **[@beilunyang](https://github.com/beilunyang)**：提供开源项目 [beilunyang/openhongguo](https://github.com/beilunyang/openhongguo)，为本项目提供 `openhongguo` 社区 SDK 取源通道。
+- **[@xiaowangbb](https://github.com/xiaowangbb)**：提交 [PR #194](https://github.com/jackotom/hongguo-drama/pull/194) 支持读取红果账号官方收藏夹（云端书架），并长期反馈关键性能与稳定性问题（#176、#177、#193、#206）。
 
 8.0 延续公开贡献记录；感谢 #179 的多位用户及时提供空响应、无法在线播放和下载失败现象，感谢 #178 提供弹幕表情代码的显示需求。详细署名与历史致谢保留在下方。
 
