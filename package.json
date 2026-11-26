@@ -264,5 +264,6 @@
   "engines": {
     "node": ">=22.12"
   },
-  "desktopName": "hongguo-drama.desktop"
+  "desktopName": "hongguo-drama.desktop",
+  "homepage": "https://github.com/jackotom/hongguo-drama"
 }

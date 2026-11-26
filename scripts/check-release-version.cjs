@@ -165,4 +165,4 @@ for (const current of ['8.3', '8.3.0']) for (const tag of ['v8.3', '8.3', 'v8.3.
 assert.equal(availableRelease({ tag_name: 'v8.4' }, '8.3.0').version, '8.4');
 for (const current of ['8.4', '8.4.0']) for (const tag of ['v8.4', '8.4', 'v8.4.0', '8.4.0']) assert.equal(availableRelease({ tag_name: tag }, current), null);
 
-console.log(`PASS ${checks} version pairs, equivalent versions, invalid versions and unpublished releases`);
+console.log(`PASS ${checks} version pairs, equivalent versions, invalid versions and unpublished releases (8.4)`);
