@@ -1,4 +1,4 @@
-<!-- 8.2 desktop release target; this directory keeps its existing scope. -->
+<!-- 8.4 desktop release target; this directory keeps its existing scope. -->
 <!-- 6.7 unified release. -->
 # 红果短剧 6.3 设计资料
 
