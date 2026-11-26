@@ -1,5 +1,5 @@
 import React from 'react';
-import { t } from '../i18n';
+import { t, useLanguage } from '../i18n';
 import { Layers, Trash2 } from './icons';
 
 function PlayerDialogs({
@@ -13,6 +13,7 @@ function PlayerDialogs({
   confirmAsk,
   onCloseConfirm,
 }) {
+  useLanguage();
   return (
     <>
       {mergeAsk && (
@@ -57,7 +58,7 @@ function PlayerDialogs({
                 onClick={async () => {
                   const fn = confirmAsk.onOk;
                   onCloseConfirm();
-                  await fn();
+                  try { await fn?.(); } catch (_) {}
                 }}
               >
                 {t(confirmAsk.okText || '确定')}

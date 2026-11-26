@@ -39,9 +39,12 @@ function registerProxyIpc({
     const started = Date.now();
     const controller = new AbortController();
     const deadline = setTimeout(() => controller.abort(), 12000);
+    deadline.unref?.();
     try {
       const res = await axios.get(PROXY_TEST_URL, {
         timeout: 12000,
+        maxContentLength: 2 * 1024 * 1024,
+        maxRedirects: 5,
         signal: controller.signal,
         proxy: proxyOption,
         headers: { 'User-Agent': 'Mozilla/5.0' },

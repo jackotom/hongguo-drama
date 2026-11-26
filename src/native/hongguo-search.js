@@ -18,7 +18,10 @@ const RETRY_DELAY_MS = 400;
 const CACHE_TTL_MS = 60 * 1000;
 const CACHE_LIMIT = 30;
 
+const MAX_RESPONSE_BYTES = 8 * 1024 * 1024;
+
 const cache = new Map();
+const pending = new Map();
 
 class HongguoSearchError extends Error {
   constructor(message, kind, { fallback = false, cause } = {}) {
@@ -163,6 +166,7 @@ async function defaultRequest(keyword, page, { timeout }) {
       },
       timeout,
       responseType: 'json',
+      maxContentLength: MAX_RESPONSE_BYTES,
       maxRedirects: 5,
     });
   } catch (error) {
@@ -203,33 +207,42 @@ async function searchHongguo(keyword, options = {}) {
   const key = `${kw}\u0000${page}`;
   const cached = useCache ? cache.get(key) : null;
   if (cached && cached.expires > Date.now()) return cached.value;
+  const sharePending = useCache && request === defaultRequest;
+  if (sharePending && pending.has(key)) return pending.get(key);
 
-  let lastError = null;
-  for (let attempt = 0; attempt <= retries; attempt++) {
-    if (remaining() < 1000) {
-      lastError = new HongguoSearchError('搜索超时，请稍后重试', 'timeout');
-      break;
+  const run = (async () => {
+    let lastError = null;
+    for (let attempt = 0; attempt <= retries; attempt++) {
+      if (remaining() < 1000) {
+        lastError = new HongguoSearchError('搜索超时，请稍后重试', 'timeout');
+        break;
+      }
+      try {
+        const attemptTimeout = Math.min(timeout, Math.max(1000, remaining()));
+        const payload = await request(kw, page, { timeout: attemptTimeout });
+        const parsed = parseSearchResponse(payload);
+        const value = { ...parsed, keyword: kw };
+        if (useCache) remember(key, value);
+        return value;
+      } catch (error) {
+        lastError = error instanceof HongguoSearchError
+          ? error
+          : new HongguoSearchError(`搜索失败：${error?.message || '未知错误'}`, 'upstream', { cause: error });
+        if (lastError.fallback || attempt === retries) break;
+        await delay(RETRY_DELAY_MS * (attempt + 1));
+      }
     }
-    try {
-      const attemptTimeout = Math.min(timeout, Math.max(1000, remaining()));
-      const payload = await request(kw, page, { timeout: attemptTimeout });
-      const parsed = parseSearchResponse(payload);
-      const value = { ...parsed, keyword: kw };
-      if (useCache) remember(key, value);
-      return value;
-    } catch (error) {
-      lastError = error instanceof HongguoSearchError
-        ? error
-        : new HongguoSearchError(`搜索失败：${error?.message || '未知错误'}`, 'upstream', { cause: error });
-      if (lastError.fallback || attempt === retries) break;
-      await delay(RETRY_DELAY_MS * (attempt + 1));
-    }
-  }
-  throw lastError;
+    throw lastError;
+  })();
+  if (!sharePending) return run;
+  pending.set(key, run);
+  try { return await run; }
+  finally { if (pending.get(key) === run) pending.delete(key); }
 }
 
 function clearSearchCache() {
   cache.clear();
+  pending.clear();
 }
 
 module.exports = {

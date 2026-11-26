@@ -1,5 +1,5 @@
 import React from 'react';
-import { t } from '../i18n';
+import { t, useLanguage } from '../i18n';
 import { Film, X, Trash2, Zap } from './icons';
 
 function SeriesPicker({
@@ -27,6 +27,8 @@ function SeriesPicker({
   onClearCache,
   onClearCompatCache,
 }) {
+  useLanguage();
+  const normalizedQuery = pickerQuery.trim().toLowerCase();
   return (
     <div className="series-picker">
       <div className="series-picker-head">
@@ -46,7 +48,7 @@ function SeriesPicker({
       <div className="series-picker-list">
         {seriesList.length === 0 && <div className="series-picker-empty">{t("还没有剧集")}</div>}
         {seriesList
-          .filter((s) => !pickerQuery.trim() || (s.series_title || '').includes(pickerQuery.trim()))
+          .filter((s) => !normalizedQuery || (s.series_title || '').toLowerCase().includes(normalizedQuery))
           .map((s) => {
             const isActive = String(s.series_id) === String(activeSeriesId);
             const dl = downloadedMap[String(s.series_id)];
@@ -127,7 +129,7 @@ function SeriesPicker({
 
       <div className="series-picker-foot">
         {storageTotal.files > 0 && (
-          <span className="series-picker-usage">{t("本地已占用 ")}<b>{t(fmtSize(storageTotal.bytes))}</b> / {t(storageTotal.files)}{t(" 个文件")}</span>
+          <span className="series-picker-usage">{t("本地已占用 ")}<b>{fmtSize(storageTotal.bytes)}</b> / {storageTotal.files}{t(" 个文件")}</span>
         )}
         {storageTotal.files > 0 && (
           <button
@@ -150,11 +152,11 @@ function SeriesPicker({
           >{t("删除全部已下载")}</button>
         )}
         <button className="btn btn-outline btn-sm" onClick={onClearCache} title={t("释放在线播放占用的内存")}>
-          <Zap size={14} />{t("清空播放缓存")}{t(cacheInfo.count > 0 ? ` (${cacheInfo.count})` : '')}
+          <Zap size={14} />{t("清空播放缓存")}{cacheInfo.count > 0 ? ` (${cacheInfo.count})` : ''}
         </button>
         {compatCache.files > 0 && (
           <button className="btn btn-outline btn-sm" onClick={onClearCompatCache} title={t("删除转码产生的兼容格式文件")}>
-            <Trash2 size={14} />{t("清空转码缓存 (")}{t(fmtSize(compatCache.bytes))})
+            <Trash2 size={14} />{t("清空转码缓存 (")}{fmtSize(compatCache.bytes)})
           </button>
         )}
       </div>

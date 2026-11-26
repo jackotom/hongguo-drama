@@ -17,35 +17,76 @@ function walk(dir, exts, out = []) {
   return out;
 }
 
+// Token-level JSON parser to detect duplicate keys in single-line, multi-line, or array-nested objects.
 function checkDuplicateJsonKeys(file) {
   const text = fs.readFileSync(file, 'utf8');
   JSON.parse(text);
-  // Check top-level and nested object duplicate keys via line-level key scan within brace depth.
-  const stack = [new Set()];
-  const lines = text.split('\n');
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i].trim();
-    if (line.endsWith('{')) {
-      const m = line.match(/^"((?:\\.|[^"\\])*)"\s*:/);
-      if (m) {
-        const current = stack[stack.length - 1];
-        if (current.has(m[1])) errors.push(`${path.relative(root, file)}:${i + 1} 重复 JSON 键 "${m[1]}"`);
-        current.add(m[1]);
+  const rel = path.relative(root, file);
+  let i = 0;
+  const n = text.length;
+  const skipWs = () => { while (i < n && /\s/.test(text[i])) i++; };
+  const readString = () => {
+    const start = i++;
+    let out = '';
+    while (i < n) {
+      const ch = text[i++];
+      if (ch === '\\') { out += ch + (text[i++] || ''); continue; }
+      if (ch === '"') return JSON.parse(text.slice(start, i));
+      out += ch;
+    }
+    return '';
+  };
+  const parseValue = () => {
+    skipWs();
+    const ch = text[i];
+    if (ch === '{') {
+      i++;
+      const keys = new Set();
+      skipWs();
+      if (text[i] === '}') { i++; return; }
+      while (i < n) {
+        skipWs();
+        const keyPos = i;
+        const key = readString();
+        if (keys.has(key)) {
+          const line = text.slice(0, keyPos).split('\n').length;
+          errors.push(`${rel}:${line} 重复 JSON 键 "${key}"`);
+        }
+        keys.add(key);
+        skipWs();
+        if (text[i] === ':') i++;
+        parseValue();
+        skipWs();
+        if (text[i] === ',') { i++; continue; }
+        if (text[i] === '}') { i++; return; }
+        break;
       }
-      stack.push(new Set());
-      continue;
+      return;
     }
-    if (line.startsWith('}')) {
-      if (stack.length > 1) stack.pop();
-      continue;
+    if (ch === '[') {
+      i++;
+      skipWs();
+      if (text[i] === ']') { i++; return; }
+      while (i < n) {
+        parseValue();
+        skipWs();
+        if (text[i] === ',') { i++; continue; }
+        if (text[i] === ']') { i++; return; }
+        break;
+      }
+      return;
     }
-    const m = line.match(/^"((?:\\.|[^"\\])*)"\s*:/);
-    if (m) {
-      const current = stack[stack.length - 1];
-      if (current.has(m[1])) errors.push(`${path.relative(root, file)}:${i + 1} 重复 JSON 键 "${m[1]}"`);
-      current.add(m[1]);
-    }
-  }
+    if (ch === '"') { readString(); return; }
+    while (i < n && !/[\s,\]\}]/.test(text[i])) i++;
+  };
+  parseValue();
+}
+
+function stripCommentsAndStrings(code) {
+  return code
+    .replace(/\/\*[\s\S]*?\*\//g, ' ')
+    .replace(/(^|[^:\\])\/\/[^\n]*/g, '$1 ')
+    .replace(/'(?:\\.|[^'\\])*'|"(?:\\.|[^"\\])*"|`(?:\\.|[^`\\])*`/g, '""');
 }
 
 const codeFiles = [
@@ -62,18 +103,23 @@ for (const file of codeFiles) {
   if (/^(<<<<<<<|=======|>>>>>>>)/m.test(source)) {
     errors.push(`${rel}: 存在未解决的 Git 冲突标记`);
   }
-  if (/\bdebugger\b/.test(source)) {
-    errors.push(`${rel}: 存在残留 debugger 语句`);
-  }
   const loader = file.endsWith('.jsx') ? 'jsx' : 'js';
   try {
-    esbuild.transformSync(source, { loader, sourcefile: rel });
+    const transformed = esbuild.transformSync(source, { loader, sourcefile: rel });
+    if (/\bdebugger\b/.test(stripCommentsAndStrings(transformed.code))) {
+      errors.push(`${rel}: 存在残留 debugger 语句`);
+    }
   } catch (err) {
     errors.push(`${rel}: 语法错误 - ${err.message}`);
   }
 }
 
-for (const jsonFile of walk(path.join(root, 'src/i18n'), ['.json'])) {
+const jsonFiles = [
+  path.join(root, 'package.json'),
+  ...walk(path.join(root, 'src/i18n'), ['.json']),
+].filter(file => fs.existsSync(file));
+
+for (const jsonFile of jsonFiles) {
   try {
     checkDuplicateJsonKeys(jsonFile);
   } catch (err) {
@@ -86,4 +132,4 @@ if (errors.length) {
   for (const e of errors) console.error('  -', e);
   process.exit(1);
 }
-console.log(`check-code-hygiene: ${codeFiles.length} source files + i18n JSON passed`);
+console.log(`check-code-hygiene: ${codeFiles.length} source files + ${jsonFiles.length} JSON files passed`);

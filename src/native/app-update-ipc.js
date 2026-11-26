@@ -82,8 +82,9 @@ function registerAppUpdateIpc({
     try {
       const request = getUpdateDownloadGeneration();
       const installer = getAppUpdateInstaller();
-      if (!['checking', 'downloading', 'downloaded', 'installing'].includes(installer.getState().status)) {
-        await applyProxyToSession(proxyManager.desired || resolveProxyConfig(getCurrentSettings()), [getAppUpdaterRef().netSession]);
+      const netSession = getAppUpdaterRef()?.netSession;
+      if (netSession && !['checking', 'downloading', 'downloaded', 'installing'].includes(installer.getState().status)) {
+        await applyProxyToSession(proxyManager.desired || resolveProxyConfig(getCurrentSettings()), [netSession]);
       }
       if (request !== getUpdateDownloadGeneration()) return { success: false, error: '更新已取消。', state: installer.getState() };
       return await installer.download(release.version);
