@@ -271,9 +271,49 @@ async function fetchSiteHtml(url, timeout = 30000, signal, { trustedOfficialDns 
  * 2026-11-23 App 播放模型全链路返回 200/0 字节时，官网仍能通过该接口
  * 获取当前公开分集的完整 360p MP4。它不是 SEO 页里的 10 秒预览。
  */
-async function fetchPublicFallbackPlayUrl(vid, signal) {
+const episodeIndexByVid = new Map();
+const MAX_EPISODE_INDEX_CACHE = 4096;
+
+function rememberEpisodeIndices(list) {
+  const sid = String(list?.series_id || '');
+  if (!/^\d{1,30}$/.test(sid) || !Array.isArray(list?.episodes)) return list;
+  for (const ep of list.episodes) {
+    const vid = String(ep?.vid || '');
+    const idx = Number(ep?.vid_index);
+    if (!/^\d{1,30}$/.test(vid) || !Number.isSafeInteger(idx) || idx < 1) continue;
+    const key = `${sid}:${vid}`;
+    episodeIndexByVid.delete(key);
+    episodeIndexByVid.set(key, idx);
+  }
+  while (episodeIndexByVid.size > MAX_EPISODE_INDEX_CACHE) {
+    episodeIndexByVid.delete(episodeIndexByVid.keys().next().value);
+  }
+  return list;
+}
+
+async function fetchWebPublicTokens(sid, signal) {
+  if (!/^\d{1,30}$/.test(String(sid || ''))) return [];
+  return cachedRequest(`web-tokens:${sid}`, 300000, async (reqSignal) => {
+    const html = await fetchSiteHtml(`${SITE_ORIGIN}/player/${encodeURIComponent(sid)}`, 4000, reqSignal);
+    throwIfAborted(reqSignal);
+    const router = require('./catalog').readRouterData(html);
+    const data = router.loaderData?.['player_(series_id)/page']
+      ?? router.loaderData?.['player_(series_id)/(vid)/page']
+      ?? router.loaderData?.detail_page;
+    const detail = data?.seriesDetail;
+    if (!data || data.isSuccess === false || String(detail?.series_id || '') !== String(sid)
+        || !Array.isArray(detail?.vid_list)) {
+      return [];
+    }
+    return detail.vid_list.map(String);
+  }, { signal });
+}
+
+async function fetchPublicFallbackPlayUrl(vid, signal, canonicalVid = vid) {
   throwIfAborted(signal);
-  if (!/^\d{1,30}$/.test(String(vid))) return null;
+  const itemId = String(vid);
+  if (!/^(?:\d{1,30}|v\d+_[A-Za-z0-9_-]{8,128})$/.test(itemId)) return null;
+  if (typeof axios !== 'function') return null;
   const guarded = webMediaRequestOptions(PUBLIC_FALLBACK_PLAY_URL, { trustedOfficialDns: true });
   const response = await axios({
     ...guarded,
@@ -285,7 +325,7 @@ async function fetchPublicFallbackPlayUrl(vid, signal) {
       'Content-Type': 'application/json',
       Referer: WEB_REFERER,
     },
-    data: { item_id: String(vid) },
+    data: { item_id: itemId },
     timeout: 6000,
     maxRedirects: 0,
     responseType: 'json',
@@ -317,7 +357,7 @@ async function fetchPublicFallbackPlayUrl(vid, signal) {
     contentKey: null,
     codec: 'h264',
     source: 'web',
-    vid: String(vid),
+    vid: String(canonicalVid),
     quality: '360p',
     width: 360,
     height: 640,
@@ -397,6 +437,23 @@ async function fetchPlayUrlFromWeb(vid, sid, onFailure, signal) {
   } catch (error) {
     throwIfAborted(signal);
     if (error.code === 'PUBLIC_ACCESS_LIMITED') {
+      const epIndex = sid ? episodeIndexByVid.get(`${sid}:${vid}`) : null;
+      if (epIndex >= 1 && epIndex <= 10) {
+        try {
+          const tokens = await fetchWebPublicTokens(sid, signal);
+          const token = tokens[epIndex - 1];
+          if (typeof token === 'string' && /^v\d+_[A-Za-z0-9_-]{8,128}$/.test(token)) {
+            const tokenFallback = await fetchPublicFallbackPlayUrl(token, signal, vid);
+            if (tokenFallback) return tokenFallback;
+          }
+        } catch (tokenError) {
+          throwIfAborted(signal);
+          if (tokenError.code === 'PUBLIC_ACCESS_LIMITED') {
+            onFailure?.(tokenError);
+            return null;
+          }
+        }
+      }
       onFailure?.(error);
       return null;
     }
@@ -570,14 +627,14 @@ async function fetchEpisodeList(seriesId, options = {}) {
   return cachedRequest(`episodes:${seriesId}`, 60000,
     async () => {
       try {
-        return await fetchEpisodeListFresh(seriesId, {
+        return rememberEpisodeIndices(await fetchEpisodeListFresh(seriesId, {
           deadline: Number(options.deadline) || 0,
           content_type: options.content_type || options.contentType,
-        });
+        }));
       } catch (error) {
         if (!/^\d{1,30}$/.test(String(seriesId))) throw error;
         try {
-          return await require('./hongguo-creator-album').fetchCreatorAlbum(seriesId, { deadline: Date.now() + 5000 });
+          return rememberEpisodeIndices(await require('./hongguo-creator-album').fetchCreatorAlbum(seriesId, { deadline: Date.now() + 5000 }));
         } catch {
           throw error;
         }

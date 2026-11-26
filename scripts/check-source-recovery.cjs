@@ -447,6 +447,55 @@ const checks = [
     assert.deepEqual(Array.from(result.episodes, e => e.vid), ['7706910230088518718', '7706910230088518719', '7706910230088518720']);
     assert.deepEqual(Array.from(result.episodes, e => e.locked), [false, false, true]);
   }],
+  ['Web public fallback maps numeric vid to v1_ token via cached episode index when numeric fallback is unavailable', async () => {
+    const sid = '7690112243203050521', vid1 = '7690125606729550872', vid3 = '7690125616825256984';
+    const token1 = 'v1_invniDx7dcZhofRa2PNnTxWThlE', token3 = 'v1_BkUI5CKWjPF9YEPfGC637Xc5xsg';
+    const playerHtml = `<script>window._ROUTER_DATA=${JSON.stringify({ loaderData: {
+      'player_(series_id)/page': { isSuccess: true, series_id: sid, seriesDetail: {
+        series_id: sid, series_name: '测试剧', episode_cnt: 100, vid_list: [token1, 'v1_FjeBprkuoqDaLWspFe7ylPPWIJw', token3],
+      } },
+    } })}</script>`;
+    const fallbackCalls = [];
+    let htmlCalls = 0;
+    const axiosMock = Object.assign(async config => {
+      if (config.url.includes('/fallback-play-info')) {
+        fallbackCalls.push(config.data?.item_id);
+        if (config.data?.item_id === token1) return { status: 200, data: { main_url: media('web-v1-ep1'), url_expire: Math.floor(Date.now() / 1000) + 3600 } };
+        if (config.data?.item_id === token3) return { status: 200, data: { main_url: media('web-v1-ep3'), url_expire: Math.floor(Date.now() / 1000) + 3600 } };
+        return { status: 400, data: { error: 'public_fallback_unavailable' } };
+      }
+      throw new Error('unexpected axios call');
+    }, {
+      get: async url => {
+        if (url === `https://hongguoduanju.com/player/${sid}`) { htmlCalls++; return { data: playerHtml }; }
+        return { data: '' };
+      },
+      post: async () => ({ status: 200, headers: {}, data: Buffer.alloc(0) }),
+    });
+    const f = load('hongguo.js', {
+      axios: axiosMock,
+      './openhongguo-source': {
+        fetchEpisodeList: async () => ({
+          series_id: sid, series_title: '测试剧', total: 3, source: 'openhongguo',
+          episodes: [
+            { vid: vid1, vid_index: 1 },
+            { vid: '7690125606729550873', vid_index: 2 },
+            { vid: vid3, vid_index: 3 },
+          ],
+        }),
+        fetchPlayUrlSingle: async () => { throw new Error('unavailable'); },
+      },
+    });
+    await f.fetchEpisodeList(sid);
+    const r1 = await f.fetchPlayUrlFromWeb(vid1, sid);
+    const r3 = await f.fetchPlayUrlFromWeb(vid3, sid);
+    assert.equal(r1?.url, media('web-v1-ep1'));
+    assert.equal(r1?.vid, vid1);
+    assert.equal(r3?.url, media('web-v1-ep3'));
+    assert.equal(r3?.vid, vid3);
+    assert.equal(htmlCalls, 1, 'player page token list must be cached across episodes');
+    assert.deepEqual(fallbackCalls, [vid1, token1, vid3, token3]);
+  }],
   ['Protected website SEO preview never replaces the complete App episode', () => withSourceOrder(['app', 'sdk', 'web', 'openhongguo'], async () => {
     const calls = [];
     let protectedPlayback = true, appAvailable = true;

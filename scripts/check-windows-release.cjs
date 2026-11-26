@@ -121,9 +121,14 @@ async function realFootage(mediaDir, ffmpeg, ffprobe, dataFile) {
       const unlocked = series.episodes.filter(episode => !episode.locked);
       if (unlocked.length < 2) continue;
       const start = Math.floor(Math.random() * unlocked.length);
-      const ordered = [...unlocked.slice(start), ...unlocked.slice(0, start)];
+      const rotated = [...unlocked.slice(start), ...unlocked.slice(0, start)];
+      const sample = [];
+      for (const ep of [...unlocked.slice(0, 3), ...rotated]) {
+        if (!sample.some(item => item.vid === ep.vid)) sample.push(ep);
+        if (sample.length === 12) break;
+      }
       const episodes = [];
-      for (const episode of ordered.slice(0, 12)) {
+      for (const episode of sample) {
         try {
           const info = await native.fetchPlayUrlSingle(episode.vid, series.series_id, { force: true });
           if (info?.url) episodes.push(episode);
