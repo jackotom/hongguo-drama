@@ -30,7 +30,7 @@ function SearchPanel({ onSelectSeries, onViewSeries, onSwitchToInput, active = t
     if (!active) return undefined;
     // Chromium's native datalist can stay at its old screen position after a container scroll.
     const dismissSuggestions = () => {
-      if (document.activeElement === inputRef.current) inputRef.current?.blur();
+      if (typeof document === 'undefined' || document.activeElement === inputRef.current) inputRef.current?.blur();
     };
     window.addEventListener('scroll', dismissSuggestions, true);
     window.addEventListener('resize', dismissSuggestions);

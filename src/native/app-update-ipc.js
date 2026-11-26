@@ -10,6 +10,8 @@ function registerAppUpdateIpc({
   APP_VERSION,
   IS_PREVIEW,
   portableConfig,
+  getPortableConfig = () => portableConfig,
+  proc = process,
   getMainWindow,
   getCurrentSettings,
   getProxyStartupFallback,
@@ -33,14 +35,15 @@ function registerAppUpdateIpc({
 
   function appUpdateSupport() {
     let reason = '';
+    const currentPortable = getPortableConfig();
     if (IS_PREVIEW || !app.isPackaged) {
       reason = '开发或预览版本不支持应用内安装，请使用正式安装版。';
-    } else if (process.platform === 'win32' && (portableConfig.mode === 'portable' || portableConfig.portableDir
-      || process.env.PORTABLE_EXECUTABLE_FILE || process.env.PORTABLE_EXECUTABLE_DIR)) {
+    } else if (proc.platform === 'win32' && (currentPortable.mode === 'portable' || currentPortable.portableDir
+      || proc.env.PORTABLE_EXECUTABLE_FILE || proc.env.PORTABLE_EXECUTABLE_DIR)) {
       reason = '便携版需手动更新。请先退出旧程序，再运行发布页中的 setup 安装包，并从安装后生成的快捷方式启动；安装版支持后续应用内更新。若仍用便携版，请完整解压新版并直接运行新版文件。';
-    } else if (!['darwin', 'win32'].includes(process.platform)) {
+    } else if (!['darwin', 'win32'].includes(proc.platform)) {
       reason = '当前系统请前往发布页手动更新。';
-    } else if (process.platform === 'darwin' && (process.execPath.startsWith('/Volumes/') || process.execPath.includes('/AppTranslocation/'))) {
+    } else if (proc.platform === 'darwin' && (proc.execPath.startsWith('/Volumes/') || proc.execPath.includes('/AppTranslocation/'))) {
       reason = '请先将应用放入“应用程序”文件夹后重新打开，再使用应用内更新。';
     }
     return { supported: !reason, reason };
@@ -146,6 +149,7 @@ function registerAppUpdateIpc({
     try { await shell.openExternal(getLatestAppRelease()?.url || 'https://github.com/jackotom/hongguo-drama/releases/latest'); return { success: true }; }
     catch { return { success: false, error: '无法打开浏览器，请稍后重试' }; }
   });
+  return { appUpdateSupport, appUpdateState };
 }
 
 module.exports = { registerAppUpdateIpc };

@@ -5439,8 +5439,10 @@ ipcMain.handle('rollback-source-pack', async () => {
 
 // ===== 应用内更新：固定官方源，下载和重启均由用户确认 =====
 let latestAppRelease = null;
-registerAppUpdateIpc({
-  ipcMain, app, shell, axios, availableRelease, APP_VERSION, IS_PREVIEW, portableConfig,
+const appUpdateIpc = registerAppUpdateIpc({
+  ipcMain, app, shell, axios, availableRelease, APP_VERSION, IS_PREVIEW,
+  getPortableConfig: () => portableConfig,
+  proc: process,
   getMainWindow: () => mainWindow,
   getCurrentSettings,
   getProxyStartupFallback: () => proxyStartupFallback,
@@ -5462,6 +5464,9 @@ registerAppUpdateIpc({
     return '';
   },
 });
+function appUpdateSupport() {
+  return appUpdateIpc.appUpdateSupport();
+}
 
 // ===== 应用信息 =====
 ipcMain.handle('get-public-details', async (event, seriesId, vid) => {
