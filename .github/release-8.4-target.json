@@ -1,0 +1,12 @@
+{
+  "publicVersion": "8.4",
+  "internalVersion": "8.4.0",
+  "desktopBuild": "8.4.1",
+  "platforms": [
+    "macOS arm64",
+    "macOS x64",
+    "Windows x64",
+    "Linux x64 AppImage"
+  ],
+  "status": "draft-candidate"
+}
