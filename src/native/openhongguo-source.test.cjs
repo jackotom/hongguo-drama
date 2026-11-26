@@ -34,6 +34,73 @@ test('openhongguo provider maps compatible streams and uses the highest quality 
   assert.ok(result.candidates.every(item => !/127\.0\.0\.1|bytevc2/.test(item.url)));
 });
 
+test('openhongguo returns every episode with numeric playback IDs', async () => {
+  const provider = createOpenhongguoSource({ getClient: async () => ({
+    async getSeriesBatch([sid]) {
+      assert.equal(sid, '7700000000000000001');
+      return [{
+        series: { id: sid, title: '完整剧', cover_url: 'https://img.example/cover.jpg', episode_count: 7 },
+        episodes: Array.from({ length: 7 }, (_, index) => ({
+          id: String(7700000000000000100n + BigInt(index)),
+          series_id: sid,
+          number: index + 1,
+          title: `第${index + 1}集`,
+          playable: true,
+        })),
+      }];
+    },
+  }) });
+  const result = await provider.list('7700000000000000001');
+  assert.equal(result.total, 7);
+  assert.equal(result.source, 'openhongguo');
+  assert.deepEqual(result.episodes.map(item => item.vid_index), [1, 2, 3, 4, 5, 6, 7]);
+  assert.ok(result.episodes.every(item => /^\d+$/.test(item.vid) && item.content_type === '1004'));
+});
+
+test('openhongguo rejects a partial series batch instead of returning preview episodes', async () => {
+  const provider = createOpenhongguoSource({ getClient: async () => ({
+    async getSeriesBatch([sid]) {
+      return [{
+        series: { id: sid, title: '缺集剧', episode_count: 80 },
+        episodes: [{ id: '7700000000000000201', series_id: sid, number: 1, playable: true }],
+      }];
+    },
+  }) });
+  await assert.rejects(provider.list('7700000000000000002'), { code: 'INVALID_RESPONSE' });
+});
+
+test('openhongguo list resets rejected anonymous device once and preserves SDK content_type', async () => {
+  let resets = 0, attempts = 0;
+  const provider = createOpenhongguoSource({ getClient: async () => ({
+    async getSeriesBatch([sid]) {
+      attempts++;
+      if (attempts === 1) throw Object.assign(new Error('device rejected'), { code: 'DEVICE_REJECTED' });
+      return [{
+        series: { id: sid, title: 'PUGC剧', cover_url: 'javascript:alert(1)', content_type: 1001, episode_count: 2 },
+        episodes: [
+          { id: '7700000000000000301', series_id: sid, number: 1, cover_url: 'https://img.example/ep1.jpg', content_type: 1001, playable: true },
+          { id: '7700000000000000302', series_id: sid, number: 2, cover_url: 'file:///etc/passwd', playable: false },
+        ],
+      }];
+    },
+    async resetDevice() { resets++; },
+  }) });
+  const result = await provider.list('7700000000000000003');
+  assert.equal(attempts, 2);
+  assert.equal(resets, 1);
+  assert.equal(result.content_type, '1001');
+  assert.equal(result.cover, 'https://img.example/ep1.jpg');
+  assert.deepEqual(result.episodes.map(item => item.content_type), ['1001', '1001']);
+  assert.deepEqual(result.episodes.map(item => item.cover), ['https://img.example/ep1.jpg', '']);
+  assert.deepEqual(result.episodes.map(item => item.locked), [false, true]);
+  const overridden = await provider.list('7700000000000000003', { content_type: '1004' });
+  assert.equal(overridden.content_type, '1004');
+  assert.deepEqual(overridden.episodes.map(item => item.content_type), ['1004', '1004']);
+  const controller = new AbortController();
+  controller.abort();
+  await assert.rejects(provider.list('7700000000000000003', { signal: controller.signal }), { code: 'ERR_CANCELED' });
+});
+
 test('openhongguo axios transport preserves raw bodies and inherits ambient proxy handling', async () => {
   let config;
   const transport = axiosTransport({ request: async value => {
@@ -46,6 +113,7 @@ test('openhongguo axios transport preserves raw bodies and inherits ambient prox
   } });
   const response = await transport({ method: 'POST', url: 'https://api.example/j', headers: { Accept: '*' }, body: new Uint8Array([1, 2, 3]) });
   assert.equal(config.decompress, false);
+  assert.equal(config.headers['Accept-Encoding'], 'gzip');
   assert.equal(config.maxContentLength, 8 * 1024 * 1024);
   assert.equal(Object.hasOwn(config, 'proxy'), false, 'ambient app proxy environment must remain in control');
   assert.deepEqual([...config.data], [1, 2, 3]);

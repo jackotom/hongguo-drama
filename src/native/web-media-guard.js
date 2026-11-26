@@ -32,13 +32,20 @@ globalV6.addSubnet('2000::', 3, 'ipv6');
 globalV6.addSubnet('::ffff:0:0', 96, 'ipv6');
 const fakeV4 = new BlockList();
 fakeV4.addSubnet('198.18.0.0', 15, 'ipv4');
+const fakeV6 = new BlockList();
+fakeV6.addSubnet('fc00::', 18, 'ipv6');
+fakeV6.addSubnet('::ffff:198.18.0.0', 111, 'ipv6');
 
 function isPublicAddress(address) {
   const family = isIP(address);
   return family === 4 ? !blocked.check(address, 'ipv4')
     : family === 6 && globalV6.check(address, 'ipv6') && !blocked.check(address, 'ipv6');
 }
-const isFakeAddress = address => isIP(address) === 4 && fakeV4.check(address, 'ipv4');
+function isFakeAddress(address) {
+  const family = isIP(address);
+  return family === 4 ? fakeV4.check(address, 'ipv4')
+    : family === 6 && fakeV6.check(address, 'ipv6');
+}
 
 function isPublicMediaUrl(value) {
   try {

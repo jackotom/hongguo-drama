@@ -60,10 +60,15 @@ const defaultClient = createLazyClient();
 
 function axiosTransport({ request = axios, timeout = 15000 } = {}) {
   return async req => {
+    const requestHeaders = { ...(req.headers || {}) };
+    for (const name of Object.keys(requestHeaders)) {
+      if (name.toLowerCase() === 'accept-encoding') delete requestHeaders[name];
+    }
+    requestHeaders['Accept-Encoding'] = 'gzip';
     const response = await request({
       method: req.method || 'GET',
       url: req.url,
-      headers: req.headers,
+      headers: requestHeaders,
       ...(req.body?.length ? { data: Buffer.from(req.body) } : {}),
       ...(req.signal ? { signal: req.signal } : {}),
       responseType: 'arraybuffer',
@@ -168,6 +173,16 @@ function candidateFrom(stream, playback, contentKey, vid) {
   }));
 }
 
+function episodeContentType(value, fallback = '1004') {
+  const normalized = String(value ?? '');
+  return ['1001', '1004'].includes(normalized) ? normalized : fallback;
+}
+
+function safeCoverUrl(value) {
+  const url = String(value || '').trim();
+  return /^https?:\/\//i.test(url) ? url : '';
+}
+
 function createOpenhongguoSource({
   getClient = defaultClient,
   now = Date.now,
@@ -226,7 +241,70 @@ function createOpenhongguoSource({
     return { ...candidates[0], candidates };
   }
 
-  return { resolve };
+  async function list(seriesId, options = {}) {
+    throwIfAborted(options.signal);
+    const sid = String(seriesId);
+    if (!/^\d{1,30}$/.test(sid)) throw Object.assign(new Error('红果剧集编号无效'), { code: 'INVALID_OPTIONS' });
+    const client = await withAbort(getClient(), options.signal);
+    let details;
+    try {
+      details = await withAbort(client.getSeriesBatch([sid]), options.signal);
+    } catch (error) {
+      throwIfAborted(options.signal);
+      if (error?.code === 'DEVICE_REJECTED' && typeof client.resetDevice === 'function') {
+        await withAbort(resetDeviceOnce(client), options.signal).catch(() => {});
+        throwIfAborted(options.signal);
+        details = await withAbort(client.getSeriesBatch([sid]), options.signal);
+      } else {
+        throw error;
+      }
+    }
+    const detail = Array.isArray(details) ? details[0] : null;
+    const series = detail?.series;
+    const rows = Array.isArray(detail?.episodes) ? detail.episodes : [];
+    if (String(series?.id || '') !== sid || !rows.length) {
+      throw Object.assign(new Error('openhongguo 未返回完整分集'), { code: 'INVALID_RESPONSE' });
+    }
+    const requestedContentType = episodeContentType(options.content_type || options.contentType, '');
+    const seriesContentType = episodeContentType(series?.content_type, '');
+    const seriesCover = safeCoverUrl(series.cover_url);
+    const episodes = rows.map((item, index) => {
+      const vid = String(item?.id || '');
+      if (!/^\d{1,30}$/.test(vid) || String(item?.series_id || '') !== sid) {
+        throw Object.assign(new Error('openhongguo 分集数据异常'), { code: 'INVALID_RESPONSE' });
+      }
+      const contentType = requestedContentType || episodeContentType(item?.content_type, seriesContentType || '1004');
+      return {
+        vid,
+        vid_index: Number(item.number) > 0 ? Number(item.number) : index + 1,
+        title: item.title || '',
+        series_id: sid,
+        series_title: series.title || '未命名短剧',
+        cover: safeCoverUrl(item.cover_url) || seriesCover,
+        content_type: contentType,
+        web_available: null,
+        locked: item.playable === false,
+      };
+    }).sort((a, b) => a.vid_index - b.vid_index);
+    if (new Set(episodes.map(item => item.vid)).size !== episodes.length
+        || Number(series.episode_count) > episodes.length) {
+      throw Object.assign(new Error('openhongguo 分集列表不完整'), { code: 'INVALID_RESPONSE' });
+    }
+    const topContentType = requestedContentType || seriesContentType || episodes[0]?.content_type || '1004';
+    return {
+      series_id: sid,
+      series_title: series.title || '未命名短剧',
+      cover: seriesCover || (episodes[0] && episodes[0].cover) || '',
+      description: series.description || '',
+      content_type: topContentType,
+      total: episodes.length,
+      web_accessible_episodes: null,
+      episodes,
+      source: 'openhongguo',
+    };
+  }
+
+  return { resolve, list };
 }
 
 const provider = createOpenhongguoSource();
@@ -237,5 +315,6 @@ module.exports = {
   selectStreams,
   candidateFrom,
   createOpenhongguoSource,
+  fetchEpisodeList: (...args) => provider.list(...args),
   fetchPlayUrlSingle: (...args) => provider.resolve(...args),
 };

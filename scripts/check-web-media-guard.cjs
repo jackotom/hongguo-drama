@@ -184,11 +184,21 @@ const checks = [
     ])).map(values => values[0].address));
     assert.deepEqual(redirected, ['8.8.8.8', '8.8.8.8']);
     assert.throws(() => guardWithDns(records).webMediaRequestOptions('https://198.18.14.190/a'), /公网/);
-    for (const address of ['127.0.0.1', '10.0.0.1', '192.168.1.1']) {
-      await assert.rejects(lookup(guardWithDns([...records, { address, family: 4 }])
+    for (const address of ['127.0.0.1', '10.0.0.1', '192.168.1.1', 'fd00::1']) {
+      const family = address.includes(':') ? 6 : 4;
+      await assert.rejects(lookup(guardWithDns([...records, { address, family }])
         .webMediaRequestOptions('https://hongguoduanju.com/a'), 'hongguoduanju.com'), /公网/,
       `mixed Fake-IP and ${address} must be rejected`);
     }
+    for (const dualRecords of [
+      [{ address: '198.18.14.190', family: 4 }, { address: 'fc00::42', family: 6 }],
+      [{ address: 'fc00::42', family: 6 }],
+      [{ address: '::ffff:198.18.14.190', family: 6 }],
+    ]) {
+      assert.equal((await lookup(guardWithDns(dualRecords).webMediaRequestOptions('https://media.example/a'), 'media.example'))[0].address, '8.8.8.8',
+        'dual-stack and IPv6 Fake-IP ranges must fall back to trusted public DNS');
+    }
+    assert.throws(() => guardWithDns(records).webMediaRequestOptions('https://[fc00::42]/a'), /公网/);
     guard.beforeRedirect({}, { headers: { location: 'http://hongguoduanju.com/b' } }, { url: 'https://hongguoduanju.com/a' });
     await assert.rejects(lookup(guard, 'hongguoduanju.com'), /公网/, 'downgraded redirect must not use trusted DNS');
   }],

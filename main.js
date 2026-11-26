@@ -1,4 +1,4 @@
-// Hongguo Drama 8.4 official release: desktop runtime; server entry is server/index.cjs.
+// Hongguo Drama 8.5: desktop runtime; server entry is server/index.cjs.
 /**
  * main.js - 红果短剧 6.2 下载器（独立版）主进程
  *
@@ -3271,7 +3271,10 @@ async function requestMedia(playInfo, options = {}) {
       const cancelled = config.signal?.aborted || config.cancelToken?.reason || axios.isCancel(error);
       if (!cancelled && (error.code === 'ERR_WEB_MEDIA_ADDRESS' || error.cause?.code === 'ERR_WEB_MEDIA_ADDRESS')) {
         hongguo.markWebMediaFailure?.(playInfo);
-        throw Object.assign(mediaTransferError('官网片源地址不安全，正在尝试其他片源'), { code: 'ERR_WEB_MEDIA_ADDRESS' });
+        const msg = web
+          ? '官网片源地址不安全，正在尝试其他片源'
+          : '片源地址校验未通过（域名解析到非公网地址，若开启代理/VPN 请检查 Fake-IP 或 DNS 设置）';
+        throw Object.assign(mediaTransferError(msg), { code: 'ERR_WEB_MEDIA_ADDRESS' });
       }
       const retryable = web ? [404, 410].includes(status) || status >= 500 && status <= 599 : status === 403;
       if (!cancelled && attempt === 0 && retryable) {
@@ -3658,8 +3661,8 @@ async function decryptContentKeyFile(input, output, contentKey, { signal, cancel
 }
 
 /** Encrypted sources and compatibility transcoding still require the complete MP4. */
-async function fetchDecryptedEpisode(vid, onProgress, seriesId, playInfo, signal, maxBytes = ONLINE_MAX_BYTES, force = false, quality = 'auto') {
-  return withMediaRecovery(vid, seriesId, { playInfo, signal, force, quality }, candidate =>
+async function fetchDecryptedEpisode(vid, onProgress, seriesId, playInfo, signal, maxBytes = ONLINE_MAX_BYTES, force = false, quality = 'auto', contentType = '') {
+  return withMediaRecovery(vid, seriesId, { playInfo, signal, force, quality, content_type: contentType }, candidate =>
     fetchDecryptedEpisodeOnce(vid, onProgress, seriesId, candidate, signal, maxBytes));
 }
 
@@ -4192,7 +4195,7 @@ async function transcodeForPlayback(payload, job = { controller: new AbortContro
           }
         });
         else {
-          const buf = cached?.buffer || await fetchDecryptedEpisode(String(vid), () => {}, seriesId, playInfo, signal, ONLINE_MAX_BYTES, !!force, quality);
+          const buf = cached?.buffer || await fetchDecryptedEpisode(String(vid), () => {}, seriesId, playInfo, signal, ONLINE_MAX_BYTES, !!force, quality, payload.contentType || '');
           checkCancelled(); fs.writeFileSync(tmpInput,buf);
         }
         inputPath = tmpInput;
@@ -4282,19 +4285,35 @@ async function transcodeForPlayback(payload, job = { controller: new AbortContro
       });
       checkCancelled();
 
-      if (code !== 0 || !fs.existsSync(tmpOut)) {
+      let outputInvalid = '';
+      if (code === 0 && fs.existsSync(tmpOut)) {
+        const outSize = fs.statSync(tmpOut).size;
+        if (outSize < 1024) {
+          outputInvalid = `输出文件过小（${outSize} 字节）`;
+        } else if (ffprobePath && fs.existsSync(ffprobePath)) {
+          const info = await probeVideoInfo(ffprobePath, tmpOut, job);
+          checkCancelled();
+          if (!info || info.codec !== 'h264' || !(info.w > 0) || !(info.h > 0)) {
+            outputInvalid = `输出视频轨道异常（codec=${info?.codec || 'none'}）`;
+          }
+        }
+      }
+
+      if (code !== 0 || !fs.existsSync(tmpOut) || outputInvalid) {
         try { fs.existsSync(tmpOut) && fs.unlinkSync(tmpOut); } catch (_) {}
-        const tail = stderrTail.split('\n').filter(Boolean).slice(-2).join(' ').slice(0, 300);
+        const tail = outputInvalid || stderrTail.split('\n').filter(Boolean).slice(-2).join(' ').slice(0, 300);
         console.warn('[Compat] 转码失败 code=', code, tail);
         if (encoder !== 'libx264') {
-          if (fastConversion && /No space left|Permission denied|Input\/output error|Disk quota|Read-only file system|File too large|Cannot allocate memory|Out of memory|Invalid data found|Error while decoding|Error submitting packet|corrupt|decryption/i.test(stderrTail)) {
+          if (fastConversion && !outputInvalid && /No space left|Permission denied|Input\/output error|Disk quota|Read-only file system|File too large|Cannot allocate memory|Out of memory|Invalid data found|Error while decoding|Error submitting packet|corrupt|decryption/i.test(stderrTail)) {
             return { success: false, error: '视频输入或存储不可用，转换已停止，原视频已保留' };
           }
           hardwareFallbackReason = 'encoder-failed';
           encoder = 'libx264';
           continue;
         }
-        return { success: false, error: `软件转码失败（ffmpeg 退出码 ${code}）${tail ? '：' + tail : ''}` };
+        return { success: false, error: outputInvalid
+          ? `转码产物校验未通过（${outputInvalid}），建议开启“软件解码”播放`
+          : `软件转码失败（ffmpeg 退出码 ${code}）${tail ? '：' + tail : ''}` };
       }
       break;
     }
