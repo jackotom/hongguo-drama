@@ -24,20 +24,27 @@
 
 ## 下载与安装
 
-**当前正式版：8.4**（内部`8.4.0`，桌面构建`8.4.1`）。
+**当前正式版：8.5**（内部`8.5.0`，桌面构建`8.5.1`）。
 
-8.4 在 8.3 四通道与签名热更新架构基础上完成全面性能优化与稳定性加固：修复本地代理（Clash/VPN）重定向误判与多网卡 DLNA 投屏发现，收紧四通道超时并保留 Windows SDK 冷启动预算，主进程采用零拷贝 Worker 解密与异步本地媒体发布，前端完成播放/弹幕/合并进度节流、打包瘦身与静态代码检查。实际状态见[8.4记录](docs/release-8.4.md)。
+8.5 修复官网剧集页 `vid_list` 缩水与混淆 `v1_...` ID 导致的缺集与公开兜底失效（#217），分集读取升级为 `openhongguo → 签名 App video_detail/v1 → 官网 → 旧 preload` 四路链路并支持 `v1_...` 公开兜底映射；修复双栈代理/VPN Fake-IP（`fc00::/18`、`::ffff:198.18.0.0/111`）触发的安全校验误判（#215）；修复兼容模式跨画质反复自动转码循环并补齐转码产物 H.264 校验（#216）。实际状态见[8.5记录](docs/release-8.5.md)。
 
-| 平台 | 8.4 正式附件 | 验收状态 |
+| 平台 | 8.5 正式附件 | 验收状态 |
 |---|---|---|
-| Apple芯片Mac，macOS 13+ | [DMG](https://github.com/jackotom/hongguo-drama/releases/download/v8.4/Hongguo-8.4-mac-arm64.dmg) | 签名、公证装订、Gatekeeper 与普通启动通过 |
-| Intel Mac，macOS 13+ | [DMG](https://github.com/jackotom/hongguo-drama/releases/download/v8.4/Hongguo-8.4-mac-x64.dmg) | Rosetta 普通启动与公证通过；实体 Intel 未验 |
-| Windows x64 | [安装版](https://github.com/jackotom/hongguo-drama/releases/download/v8.4/hongguo-downloader-8.4-win-x64-setup.exe) · [便携EXE](https://github.com/jackotom/hongguo-drama/releases/download/v8.4/hongguo-downloader-8.4-win-x64.exe) · [便携ZIP](https://github.com/jackotom/hongguo-drama/releases/download/v8.4/hongguo-downloader-8.4-win-x64.zip) | 云端构建与最终 SDK 队列、播放、安装升级验收；EXE 未签名 |
-| Linux x64 | [AppImage](https://github.com/jackotom/hongguo-drama/releases/download/v8.4/hongguo-downloader-8.4-linux-x64.AppImage) | 云端最终 AppImage 两集真实静音播放通过 |
+| Apple芯片Mac，macOS 13+ | [DMG](https://github.com/jackotom/hongguo-drama/releases/download/v8.5/Hongguo-8.5-mac-arm64.dmg) | 签名、公证装订、Gatekeeper 与普通启动通过 |
+| Intel Mac，macOS 13+ | [DMG](https://github.com/jackotom/hongguo-drama/releases/download/v8.5/Hongguo-8.5-mac-x64.dmg) | Rosetta 普通启动与公证通过；实体 Intel 未验 |
+| Windows x64 | [安装版](https://github.com/jackotom/hongguo-drama/releases/download/v8.5/hongguo-downloader-8.5-win-x64-setup.exe) · [便携EXE](https://github.com/jackotom/hongguo-drama/releases/download/v8.5/hongguo-downloader-8.5-win-x64.exe) · [便携ZIP](https://github.com/jackotom/hongguo-drama/releases/download/v8.5/hongguo-downloader-8.5-win-x64.zip) | 云端构建与最终 SDK 队列、播放、安装升级验收；EXE 未签名 |
+| Linux x64 | [AppImage](https://github.com/jackotom/hongguo-drama/releases/download/v8.5/hongguo-downloader-8.5-linux-x64.AppImage) | 云端最终 AppImage 两集真实静音播放通过 |
 
-[8.4发行页](https://github.com/jackotom/hongguo-drama/releases/tag/v8.4) · [SHA256](https://github.com/jackotom/hongguo-drama/releases/download/v8.4/SHA256SUMS.txt) · [精确源码](https://github.com/jackotom/hongguo-drama/releases/download/v8.4/hongguo-drama-8.4-source.zip)。上游部分片源仍可能限流、404、仅预览、空响应或 CDN 超时，不保证所有内容永久可播。
+[8.5发行页](https://github.com/jackotom/hongguo-drama/releases/tag/v8.5) · [SHA256](https://github.com/jackotom/hongguo-drama/releases/download/v8.5/SHA256SUMS.txt) · [精确源码](https://github.com/jackotom/hongguo-drama/releases/download/v8.5/hongguo-drama-8.5-source.zip)。上游部分片源仍可能限流、404、仅预览、空响应或 CDN 超时，不保证所有内容永久可播。
 
 **Android手机APK／Android TV版：** 请前往 [N3urda/hongguoTV](https://github.com/N3urda/hongguoTV) 下载。该项目独立维护；版本、兼容性与测试状态以该项目发布页为准，不计入本项目的四平台附件或验收。
+
+<details>
+<summary>8.4 历史下载与发行说明</summary>
+
+8.4 历史发行包与验收回执见[8.4发行页](https://github.com/jackotom/hongguo-drama/releases/tag/v8.4)及[8.4记录](docs/release-8.4.md)；历史签名、公证和平台验收不替代 8.5 结果。
+
+</details>
 
 <details>
 <summary>8.3 历史下载与发行说明</summary>
