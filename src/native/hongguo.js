@@ -920,7 +920,8 @@ async function fetchPlayUrlFresh(vid, sid, skipWeb = false, signal, quality = 'a
   };
 
   // Per-provider timeout budgets prevent stalled early providers from exhausting the 30s outer deadline.
-  const providerBudgets = { openhongguo: 9000, sdk: 12000, app: 12000, web: 8000 };
+  // SDK retains 20s to accommodate Windows PyInstaller/Unicorn cold-start on first episode.
+  const providerBudgets = { openhongguo: 9000, sdk: 20000, app: 12000, web: 8000 };
 
   for (const provider of order) {
     throwIfAborted(signal);
