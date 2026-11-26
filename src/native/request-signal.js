@@ -39,4 +39,23 @@ function networkFailure(code) {
     return undefined;
 }
 
-module.exports = { abortError, throwIfAborted, boundedSignal, networkFailure };
+function withAbort(promise, signal) {
+    if (!signal) return promise;
+    throwIfAborted(signal);
+    return new Promise((resolve, reject) => {
+        const abort = () => {
+            cleanup();
+            reject(abortError(signal));
+        };
+        const cleanup = () => signal.removeEventListener('abort', abort);
+        signal.addEventListener('abort', abort, { once: true });
+        Promise.resolve(promise).then(value => { cleanup(); resolve(value); }, error => { cleanup(); reject(error); });
+        if (signal.aborted) abort();
+    });
+}
+
+function createAbortController() {
+    return new AbortController();
+}
+
+module.exports = { abortError, throwIfAborted, boundedSignal, networkFailure, withAbort, createAbortController };

@@ -107,8 +107,22 @@ function parseBatchPayload(raw, requested) {
     return { result: models };
 }
 
+function killChildSafely(child) {
+    if (!child || child.killed) return;
+    try { child.kill('SIGTERM'); } catch {}
+    const force = setTimeout(() => {
+        try { if (!child.killed && child.exitCode === null) child.kill('SIGKILL'); } catch {}
+    }, 2000);
+    force.unref?.();
+    child.once?.('close', () => clearTimeout(force));
+}
+
 function runHelper(executable, args, signal, timeoutMs, maxOutput = MAX_OUTPUT, parser = parseSinglePayload) {
     return new Promise(resolve => {
+        if (signal?.aborted) {
+            resolve({ error: sdkError('SDK 取源已取消', 'ERR_CANCELED') });
+            return;
+        }
         let settled = false;
         let stdout = '';
         let stderr = '';
@@ -126,11 +140,11 @@ function runHelper(executable, args, signal, timeoutMs, maxOutput = MAX_OUTPUT, 
         };
         const fail = (message, code) => finish({ error: sdkError(message, code) });
         const cancel = () => {
-            if (!child.killed) child.kill();
+            killChildSafely(child);
             fail('SDK 取源已取消', 'ERR_CANCELED');
         };
         const timer = setTimeout(() => {
-            if (!child.killed) child.kill();
+            killChildSafely(child);
             fail('SDK 取源超时', 'SDK_TIMEOUT');
         }, timeoutMs);
         signal?.addEventListener('abort', cancel, { once: true });
@@ -138,7 +152,7 @@ function runHelper(executable, args, signal, timeoutMs, maxOutput = MAX_OUTPUT, 
         child.stdout.on('data', chunk => {
             stdout += chunk.toString('utf8');
             if (stdout.length > maxOutput) {
-                if (!child.killed) child.kill();
+                killChildSafely(child);
                 fail('SDK 返回数据过长', 'SDK_INVALID_RESPONSE');
             }
         });
@@ -399,14 +413,16 @@ function createSdkPlaybackSession(options = {}) {
         releaseHelper();
     }
 
-    function resetWorker(code = 'SDK_HELPER_FAILED') {
-        if (child && !child.killed) child.kill();
+    function resetWorker(code = 'SDK_HELPER_FAILED', reason = '') {
+        killChildSafely(child);
         child = null;
         buffer = '';
-        const detail = safeDetail(stderr);
+        const detail = safeDetail(stderr) || reason;
         stderr = '';
         for (const entry of pending.values()) {
-            if (detail) entry.onError?.(sdkError(`SDK 会话失败：${detail}`, code));
+            if (detail || code === 'SDK_TIMEOUT') {
+                entry.onError?.(sdkError(detail ? `SDK 会话失败：${detail}` : 'SDK 取源超时', code));
+            }
             entry.finish(null);
         }
         pending.clear();
@@ -420,12 +436,22 @@ function createSdkPlaybackSession(options = {}) {
         fs.mkdirSync(cachePath, { recursive: true });
         const cacheDir = fs.realpathSync(cachePath);
         await acquireHelper(signal, options.priority === true);
+        if (closed || signal?.aborted) {
+            releaseHelper();
+            return null;
+        }
+        let proc;
+        try {
+            proc = spawn(executable, ['--serve', '--cache', cacheDir], {
+                shell: false,
+                windowsHide: true,
+                stdio: ['pipe', 'pipe', 'pipe'],
+            });
+        } catch (error) {
+            releaseHelper();
+            throw error;
+        }
         childHoldsSlot = true;
-        const proc = spawn(executable, ['--serve', '--cache', cacheDir], {
-            shell: false,
-            windowsHide: true,
-            stdio: ['pipe', 'pipe', 'pipe'],
-        });
         proc.unref?.();
         child = proc;
         proc.stdout.on('data', chunk => {
@@ -471,7 +497,7 @@ function createSdkPlaybackSession(options = {}) {
         });
         proc.on('close', code => {
             if (code && stderr) {
-                console.warn('[SDK playback] helper failed:', stderr.replace(/\s+/g, ' ').slice(0, 240));
+                console.warn('[SDK playback] helper failed:', safeDetail(stderr));
             }
             if (child === proc) resetWorker();
         });
@@ -490,17 +516,18 @@ function createSdkPlaybackSession(options = {}) {
                 if (settled) return;
                 settled = true;
                 clearTimeout(timer);
-                callOptions.signal?.removeEventListener('abort', cancel);
+                callOptions.signal?.removeEventListener('abort', onAbort);
                 pending.delete(id);
                 resolve(value);
             };
-            const cancel = () => {
-                resetWorker();
+            const cancel = (code = 'ERR_CANCELED', reason = '') => {
+                resetWorker(code, reason);
                 finish(null);
             };
-            const timer = setTimeout(cancel, timeoutMs);
+            const onAbort = () => cancel('ERR_CANCELED');
+            const timer = setTimeout(() => cancel('SDK_TIMEOUT', '会话超时'), timeoutMs);
             timer.unref?.();
-            callOptions.signal?.addEventListener('abort', cancel, { once: true });
+            callOptions.signal?.addEventListener('abort', onAbort, { once: true });
             const id = nextId++;
             pending.set(id, { finish, onError: callOptions.onError });
             ensureWorker(callOptions.signal).then(proc => {
@@ -526,6 +553,12 @@ function createSdkPlaybackSession(options = {}) {
         });
     }
 
+    const onProcessExit = () => {
+        closed = true;
+        killChildSafely(child);
+    };
+    process.once('exit', onProcessExit);
+
     return {
         resolve(vid, callOptions = {}) {
             const run = queue.then(() => sendOne(vid, callOptions));
@@ -534,6 +567,7 @@ function createSdkPlaybackSession(options = {}) {
         },
         close() {
             closed = true;
+            process.removeListener('exit', onProcessExit);
             resetWorker();
         },
     };
@@ -592,6 +626,7 @@ async function resolveSdkPlayback(vid, options = {}) {
                 reportFailure(options, outcome.error);
                 return null;
             }
+            if (outcome.result) storeCachedModels([[key, outcome.result]], contentType);
             return outcome.result;
         } finally {
             releaseHelper();

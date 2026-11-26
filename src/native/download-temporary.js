@@ -188,11 +188,19 @@ async function createDownloadTemporary(directory, { owner, onChange = () => {} }
   const input = path.join(root, 'input.enc.tmp'), output = path.join(root, 'decoded.mp4');
   const reservations = new Map();
   const reserve = async file => {
+    const key = path.basename(file);
+    const previous = reservations.get(key);
     const reservation = await reserveOwnedFile(file, stat => {
-      record.files[path.basename(file)] = identityOf(stat); onChange(record);
+      record.files[key] = identityOf(stat); onChange(record);
     });
-    reservations.set(path.basename(file), reservation);
+    if (previous && previous !== reservation) await previous.close().catch(() => {});
+    reservations.set(key, reservation);
     return reservation;
+  };
+  const close = async () => {
+    const openReservations = [...reservations.values()];
+    reservations.clear();
+    await Promise.all(openReservations.map(reserved => reserved.close().catch(() => {})));
   };
   const removeOutput = async () => {
     if (record.files['decoded.mp4']) {
@@ -222,7 +230,7 @@ async function createDownloadTemporary(directory, { owner, onChange = () => {} }
   try { onChange(record); await reserve(input); }
   catch (error) { await cleanup().catch(() => {}); throw error; }
   return { input, output, record, reserveOutput: () => reserve(output),
-    removeOutput, cleanup,
+    removeOutput, close, cleanup,
     checkInput: async () => {
       if (reservations.has('input.enc.tmp')) return reservations.get('input.enc.tmp').check();
       if (!record.files['input.enc.tmp'] || !await isOwnedFile(input, record.files['input.enc.tmp'])) {

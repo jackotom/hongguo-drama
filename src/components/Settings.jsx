@@ -68,22 +68,32 @@ function SettingsPage({ active = true, preview = false, appInfo = null, wakeRegi
   const [loadError, setLoadError] = useState('');
   const testVersion = useRef(0);
   const savingRef = useRef(false);
+  const refreshVersion = useRef(0);
   const pictureModeRequest = useRef({ pending: false, version: 0 });
   const editedKeys = useRef(new Set());
   const savedTimer = useRef(null);
 
+  const withSettingsDefaults = value => ({ download_quality: 'auto', picture_in_picture_mode: 'custom', ...value });
+
   const loadSettings = async () => {
+    const version = ++refreshVersion.current;
     setLoadError('');
-    try { setSettings({ download_quality: 'auto', picture_in_picture_mode: 'custom', ...await window.electronAPI.getSettings() }); }
-    catch (error) { setLoadError(error.message || '设置加载失败，请重试'); }
+    try {
+      const fresh = withSettingsDefaults(await window.electronAPI.getSettings());
+      if (version === refreshVersion.current) setSettings(fresh);
+    } catch (error) {
+      if (version === refreshVersion.current) setLoadError(error.message || '设置加载失败，请重试');
+    }
   };
 
   // 重新进入设置页时同步播放器里刚改过的共享选项；保留用户未保存的字段。
   const refreshSettings = async () => {
     if (savingRef.current) return;
+    const version = ++refreshVersion.current;
     const modeVersion = pictureModeRequest.current.version;
     try {
-      const fresh = { download_quality: 'auto', picture_in_picture_mode: 'custom', ...await window.electronAPI.getSettings() };
+      const fresh = withSettingsDefaults(await window.electronAPI.getSettings());
+      if (version !== refreshVersion.current || savingRef.current) return;
       setSettings(prev => {
         if (!prev) return fresh;
         const merged = { ...fresh };
@@ -97,7 +107,7 @@ function SettingsPage({ active = true, preview = false, appInfo = null, wakeRegi
       });
       setLoadError('');
     } catch (error) {
-      setLoadError(error.message || '设置加载失败，请重试');
+      if (version === refreshVersion.current) setLoadError(error.message || '设置加载失败，请重试');
     }
   };
 
@@ -164,17 +174,31 @@ function SettingsPage({ active = true, preview = false, appInfo = null, wakeRegi
       const editable = ['root', 'name_format', 'download_quality', 'download_metadata', 'cache_next_episode', 'compat_mode', 'auto_delete_watched', 'show_danmaku_controls', 'max_concurrent', 'proxy_enabled', 'proxy_mode', 'proxy_host', 'proxy_port', 'proxy_username', 'proxy_password', 'watch_updates_enabled', 'watch_sequels_enabled', 'watch_notifications_enabled', 'search_app_enabled', 'app_updates_enabled'];
       const submitted = {};
       for (const key of editable) {
-        if (Object.hasOwn(next, key) && (editedKeys.current.has(key) || isProxy && key.startsWith('proxy_'))) submitted[key] = next[key];
+        if (!Object.hasOwn(next, key)) continue;
+        if (isProxy ? key.startsWith('proxy_') : editedKeys.current.has(key)) submitted[key] = next[key];
       }
       if (isProxy) submitted.clear_proxy_password = next.clear_proxy_password === true && !String(next.proxy_password || '');
       const res = await window.electronAPI.saveSettings(submitted);
       if (!res?.success) throw new Error(res?.error || '设置未保存，请重试');
+      refreshVersion.current++;
       if (isProxy) closeProxy();
-      const saved = await window.electronAPI.getSettings();
-      setSettings(saved);
+      const saved = withSettingsDefaults(await window.electronAPI.getSettings());
+      if (isProxy) {
+        for (const key of [...editedKeys.current]) if (key.startsWith('proxy_')) editedKeys.current.delete(key);
+        setSettings(prev => {
+          const merged = { ...saved };
+          if (prev) {
+            for (const key of editedKeys.current) if (Object.hasOwn(prev, key)) merged[key] = prev[key];
+          }
+          return merged;
+        });
+        setDirty(editedKeys.current.size > 0);
+      } else {
+        setSettings(saved);
+        editedKeys.current.clear();
+        setDirty(false);
+      }
       window.dispatchEvent(new CustomEvent('hongguo-playback-settings', { detail: saved }));
-      editedKeys.current.clear();
-      setDirty(false);
       setSaved(true);
       clearTimeout(savedTimer.current);
       savedTimer.current = setTimeout(() => setSaved(false), 2000);
@@ -238,7 +262,13 @@ function SettingsPage({ active = true, preview = false, appInfo = null, wakeRegi
   useDialogKeyboard(active && proxyOpen, () => { if (!savingRef.current) closeProxy(); }, '.proxy-modal');
 
   if (!settings) {
-    return <div className="settings-container">{t(loadError ? <div role="alert"><p>{t(loadError)}</p><button className="btn btn-outline" onClick={loadSettings}>{t("重新加载")}</button></div> : '加载中...')}</div>;
+    return (
+      <div className="settings-container">
+        {loadError
+          ? <div role="alert"><p>{t(loadError)}</p><button className="btn btn-outline" onClick={loadSettings}>{t("重新加载")}</button></div>
+          : t('加载中...')}
+      </div>
+    );
   }
 
   const proxyInfo = describeProxy(settings);

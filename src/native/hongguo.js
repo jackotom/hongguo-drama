@@ -5,7 +5,7 @@ const crypto = require('crypto');
 const { URL } = require('node:url');
 const { normalizeDownloadQuality } = require('./download-quality');
 const { isPublicMediaUrl, webMediaRequestOptions } = require('./web-media-guard');
-const { abortError, throwIfAborted } = require('./request-signal');
+const { abortError, throwIfAborted, boundedSignal } = require('./request-signal');
 const playbackSourceOrder = require('./source-order');
 
 const API = "https://api5-normal-sinfonlineb.fqnovel.com";
@@ -90,9 +90,9 @@ const MODEL_BIZ_PARAM = {
  * API 调用封装
  */
 async function apiCall(apiPath, body, retries = 3, timeout = 25000, deadline = 0, requestSignal) {
-  const q = { ...COMMON_QUERY, _rticket: Date.now().toString() };
   for (let i = 0; i < retries; i++) {
     throwIfAborted(requestSignal);
+    const q = { ...COMMON_QUERY, _rticket: Date.now().toString() };
     const remaining = deadline ? deadline - Date.now() : timeout;
     if (remaining <= 0) throw new Error('请求超时');
     const signal = {}; // 供错误信息回溯（HTTP 状态 / 字节数 / CDN logid）
@@ -150,7 +150,19 @@ async function apiCall(apiPath, body, retries = 3, timeout = 25000, deadline = 0
         if (err.detail === undefined) err.detail = signal;
         throw err;
       }
-      await new Promise(r => setTimeout(r, wait));
+      await new Promise((resolve, reject) => {
+        const timer = setTimeout(() => {
+          requestSignal?.removeEventListener('abort', onAbort);
+          resolve();
+        }, wait);
+        timer.unref?.();
+        const onAbort = () => {
+          clearTimeout(timer);
+          reject(abortError(requestSignal));
+        };
+        requestSignal?.addEventListener('abort', onAbort, { once: true });
+        if (requestSignal?.aborted) onAbort();
+      });
     }
   }
 }
@@ -597,8 +609,13 @@ async function fetchEpisodeListFromWeb(seriesId, deadline = 0) {
   // staring at a hung CDN edge for eight seconds; retry on fresh connections sooner.
   let firstValue = null;
   let firstError = null;
+  let hedgeTimer = null;
+  const hedgeCancel = new AbortController();
   const first = race(1500, true).then(value => {
-    firstValue = value; return value;
+    firstValue = value;
+    clearTimeout(hedgeTimer);
+    hedgeCancel.abort();
+    return value;
   }, error => {
     firstError = error; throw error;
   });
@@ -606,7 +623,11 @@ async function fetchEpisodeListFromWeb(seriesId, deadline = 0) {
     // Give the first attempt a short head start. A hung CDN edge usually reveals
     // itself within this window; a healthy page has already returned by then.
     const wait = deadline ? Math.min(600, Math.max(0, deadline - Date.now())) : 600;
-    await new Promise(resolve => setTimeout(resolve, wait));
+    await new Promise(resolve => {
+      hedgeTimer = setTimeout(resolve, wait);
+      hedgeTimer.unref?.();
+      hedgeCancel.signal.addEventListener('abort', () => { clearTimeout(hedgeTimer); resolve(); }, { once: true });
+    });
     if (firstValue) return firstValue; // the first attempt won; do not add traffic
     if (deadline && Date.now() >= deadline) throw new Error('加载超时或连接中断');
     // Keep trusted DNS for speed, but also retry the ordinary resolver so a blocked
@@ -618,6 +639,9 @@ async function fetchEpisodeListFromWeb(seriesId, deadline = 0) {
     const nested = (aggregate.errors || [aggregate]).flatMap(error => error?.errors || [error]);
     const second = nested.find(error => error !== firstError) || nested[0] || aggregate;
     throw new Error(`${describeWebLoadError(firstError)}；重试失败：${describeWebLoadError(second)}`);
+  } finally {
+    clearTimeout(hedgeTimer);
+    hedgeCancel.abort();
   }
 }
 
@@ -756,11 +780,11 @@ async function fetchPlayUrlSingle(vid, sid, options = {}) {
   try {
     throwIfAborted(options.signal);
     const quality = normalizeDownloadQuality(options.quality);
-    if (String(vid).startsWith('reelshort:') || String(sid).startsWith('reelshort:')) return require('./reelshort').fetchPlayUrlSingle(vid, sid);
+    if (String(vid).startsWith('reelshort:') || String(sid).startsWith('reelshort:')) return require('./reelshort').fetchPlayUrlSingle(vid, sid, options);
     if (String(vid).startsWith('dramabox:') || String(sid).startsWith('dramabox:')) return require('./dramabox').fetchPlayUrlSingle(vid, sid, options);
     if (String(vid).startsWith('custom:') || String(sid).startsWith('custom:')) return require('./custom-source').fetchPlayUrlSingle(vid, sid, options);
-    if (String(vid).startsWith('hema:') || String(sid).startsWith('hema:')) return require('./hema').fetchPlayUrlSingle(vid, sid);
-    if (String(vid).startsWith('xifan:') || String(sid).startsWith('xifan:')) return require('./xifan').fetchPlayUrlSingle(vid, sid);
+    if (String(vid).startsWith('hema:') || String(sid).startsWith('hema:')) return require('./hema').fetchPlayUrlSingle(vid, sid, options);
+    if (String(vid).startsWith('xifan:') || String(sid).startsWith('xifan:')) return require('./xifan').fetchPlayUrlSingle(vid, sid, options);
     const skipWeb = (failedWebMedia.get(String(vid)) || 0) > Date.now();
     const allowLowerQuality = options.allowLowerQuality === true && quality !== 'auto';
     const contentType = ['1001', '1004'].includes(String(options.content_type || options.contentType)) ? String(options.content_type || options.contentType) : '1004';
@@ -863,24 +887,25 @@ async function fetchPlayUrlFresh(vid, sid, skipWeb = false, signal, quality = 'a
     order = [...order.filter(item => item !== 'web'), 'web'];
   }
 
-  const fetchApp = async () => {
+  const fetchApp = async (attemptSignal) => {
     try {
       return await require('./app-source').fetchAppPlayUrl(String(vid), {
         quality, allowLowerQuality, allowV8: true, allowSdk: false,
-        sdkPriority, contentType, signal,
+        sdkPriority, contentType, signal: attemptSignal,
       });
     } catch (error) {
       throwIfAborted(signal);
       if (error.code === 'ERR_CANCELED') throw error;
       sources.push(sourceFailure('app', error));
     }
+    if (quality !== 'auto' && !allowLowerQuality) return null;
     const body = {
       biz_param: MODEL_BIZ_PARAM,
       dr_scene: 'preload',
-      mixed_video_id_map: { '1004': [vid] },
+      mixed_video_id_map: { [contentType]: [vid] },
     };
     try {
-      const j = await apiCall('/novel/player/multi_video_model/preload/v1', body, 1, 6000, 0, signal);
+      const j = await apiCall('/novel/player/multi_video_model/preload/v1', body, 1, 6000, 0, attemptSignal);
       throwIfAborted(signal);
       const item = j?.data?.[vid] || {};
       const [url, spadeA, codec] = parseModelVideo(item.video_model);
@@ -894,46 +919,55 @@ async function fetchPlayUrlFresh(vid, sid, skipWeb = false, signal, quality = 'a
     return null;
   };
 
+  // Per-provider timeout budgets prevent stalled early providers from exhausting the 30s outer deadline.
+  const providerBudgets = { openhongguo: 9000, sdk: 12000, app: 12000, web: 8000 };
+
   for (const provider of order) {
     throwIfAborted(signal);
-    if (provider === 'app') {
-      const result = await fetchApp();
-      if (result?.url) return result;
-    } else if (provider === 'sdk') {
-      try {
-        const result = await require('./app-source').fetchAppPlayUrl(String(vid), {
-          quality, allowLowerQuality, allowV8: false, allowSdk: true,
-          preferSdk: true, parallelSdk: true, sdkPriority: sdkPriority === true,
-          contentType, sdkBatchVids, sdkFresh, signal,
-        });
-        throwIfAborted(signal);
-        return result;
-      } catch (error) {
-        throwIfAborted(signal);
-        if (error.code === 'ERR_CANCELED') throw error;
-        sources.push(sourceFailure('sdk', error));
-      }
-    } else if (provider === 'web') {
-      if (quality !== 'auto' && !allowLowerQuality) {
-        sources.push({ source: 'web', code: 'QUALITY_UNAVAILABLE', message: `未选择允许降级到官网公开片源（${quality}）` });
-        continue;
-      }
-      const web = await fetchPlayUrlFromWeb(vid, sid, error => sources.push(sourceFailure('web', error)), signal);
-      throwIfAborted(signal);
-      if (web?.url) return web;
-    } else if (provider === 'openhongguo') {
-      try {
-        const result = await require('./openhongguo-source').fetchPlayUrlSingle(String(vid), {
-          quality, allowLowerQuality, signal,
-        });
-        throwIfAborted(signal);
+    const budget = boundedSignal(signal, providerBudgets[provider] || 15000);
+    const attemptSignal = budget.signal;
+    try {
+      if (provider === 'app') {
+        const result = await fetchApp(attemptSignal);
         if (result?.url) return result;
-        sources.push(sourceFailure('openhongguo'));
-      } catch (error) {
+      } else if (provider === 'sdk') {
+        try {
+          const result = await require('./app-source').fetchAppPlayUrl(String(vid), {
+            quality, allowLowerQuality, allowV8: false, allowSdk: true,
+            preferSdk: true, parallelSdk: true, sdkPriority: sdkPriority === true,
+            contentType, sdkBatchVids, sdkFresh, signal: attemptSignal,
+          });
+          throwIfAborted(signal);
+          return result;
+        } catch (error) {
+          throwIfAborted(signal);
+          if (error.code === 'ERR_CANCELED' && !attemptSignal.aborted) throw error;
+          sources.push(sourceFailure('sdk', attemptSignal.aborted ? abortError(attemptSignal) : error));
+        }
+      } else if (provider === 'web') {
+        if (quality !== 'auto' && !allowLowerQuality) {
+          sources.push({ source: 'web', code: 'QUALITY_UNAVAILABLE', message: `未选择允许降级到官网公开片源（${quality}）` });
+          continue;
+        }
+        const web = await fetchPlayUrlFromWeb(vid, sid, error => sources.push(sourceFailure('web', error)), attemptSignal);
         throwIfAborted(signal);
-        if (error.code === 'ERR_CANCELED') throw error;
-        sources.push(sourceFailure('openhongguo', error));
+        if (web?.url) return web;
+      } else if (provider === 'openhongguo') {
+        try {
+          const result = await require('./openhongguo-source').fetchPlayUrlSingle(String(vid), {
+            quality, allowLowerQuality, signal: attemptSignal,
+          });
+          throwIfAborted(signal);
+          if (result?.url) return result;
+          sources.push(sourceFailure('openhongguo'));
+        } catch (error) {
+          throwIfAborted(signal);
+          if (error.code === 'ERR_CANCELED' && !attemptSignal.aborted) throw error;
+          sources.push(sourceFailure('openhongguo', attemptSignal.aborted ? abortError(attemptSignal) : error));
+        }
       }
+    } finally {
+      budget.dispose();
     }
   }
   throw unavailableSources(sources, allowLowerQuality ? 'auto' : quality);
@@ -1323,16 +1357,18 @@ function decryptMp4Buffer(data, key) {
   const newMoov = rebuildMoov(data, moov.off, moov.size, top);
   const out = [];
   let off = 0;
-  while (off < total) {
+  while (off + 8 <= total) {
     let size = data.readUInt32BE(off);
     const typ = data.subarray(off + 4, off + 8).toString('latin1');
     let hdr = 8;
     if (size === 1) {
+      if (off + 16 > total) break;
       size = Number(data.readBigUInt64BE(off + 8));
       hdr = 16;
     } else if (size === 0) {
       size = total - off;
     }
+    if (!Number.isSafeInteger(size) || size < hdr || off + size > total) break;
     if (typ === 'moov') {
       out.push(newMoov);
     } else {

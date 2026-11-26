@@ -48,10 +48,17 @@ async function discover() {
     const packet = Buffer.from('M-SEARCH * HTTP/1.1\r\nHOST: 239.255.255.250:1900\r\nMAN: "ssdp:discover"\r\nMX: 2\r\nST: urn:schemas-upnp-org:device:MediaRenderer:1\r\n\r\n');
     const addresses = Object.values(networkInterfaces()).flat().filter(item => !item.internal && privateIp(item.address)).map(item => item.address);
     if (!addresses.length) throw new Error('没有可用的局域网连接');
+    let sent = 0, lastSendError = null;
     for (const address of addresses) {
-      socket.setMulticastInterface(address);
-      await new Promise((resolve,reject) => socket.send(packet,1900,'239.255.255.250',error => error ? reject(error) : resolve()));
+      try {
+        socket.setMulticastInterface(address);
+        await new Promise((resolve, reject) => socket.send(packet, 1900, '239.255.255.250', error => error ? reject(error) : resolve()));
+        sent++;
+      } catch (error) {
+        lastSendError = error;
+      }
     }
+    if (!sent) throw lastSendError || new Error('没有可用的局域网连接');
     await new Promise(resolve => setTimeout(resolve,3000));
   } finally { socket.close(); }
   return (await Promise.allSettled([...locations.keys()].map(async url => { const response = await request(url); return parseDevice(response.text,url,response.localAddress); }))).filter(result => result.status === 'fulfilled').map(result => result.value);
@@ -98,7 +105,7 @@ function createCastingService({ discoverDevices = discover, sendAction = soap } 
       try {
       const device = devices.get(id); if (!device) throw new Error('请重新搜索并选择电视');
       if (!media?.buffer && !media?.filePath) throw new Error('请先下载或缓存本集后投屏');
-      const size = media.buffer?.length || fs.statSync(media.filePath).size;
+      const size = media.buffer?.length || (await fs.promises.stat(media.filePath)).size;
       if (!size) throw new Error('视频文件为空');
       const previous = current;
       if (previous) {
@@ -122,11 +129,13 @@ function createCastingService({ discoverDevices = discover, sendAction = soap } 
       context = { server, device, streams, controller, release: media.release };
       current = context;
       await new Promise((resolve, reject) => {
-        const aborted = () => reject(new Error('投屏已取消'));
+        const aborted = () => { server.removeListener('error', onError); reject(new Error('投屏已取消')); };
+        const onError = error => { controller.signal.removeEventListener('abort', aborted); reject(error); };
         controller.signal.addEventListener('abort', aborted, { once: true });
-        server.once('error', reject);
+        server.once('error', onError);
         server.listen({ port: 0, host: device.localAddress, signal: controller.signal }, () => {
           controller.signal.removeEventListener('abort', aborted);
+          server.removeListener('error', onError);
           resolve();
         });
       });

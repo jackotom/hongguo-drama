@@ -10,6 +10,8 @@ const videoEnhancementStub = {
   useVideoEnhancement: () => ({ mode: 'original', strength: 50, update() {}, status: {}, setStatus() {} }),
 };
 const shortcutSource = transformSync(fs.readFileSync(path.join(__dirname, '../src/shortcuts.js'), 'utf8'), { loader: 'js', format: 'cjs' }).code;
+const seriesPickerSource = transformSync(fs.readFileSync(path.join(__dirname, '../src/components/SeriesPicker.jsx'), 'utf8'), { loader: 'jsx', format: 'cjs' }).code;
+const playerDialogsSource = transformSync(fs.readFileSync(path.join(__dirname, '../src/components/PlayerDialogs.jsx'), 'utf8'), { loader: 'jsx', format: 'cjs' }).code;
 const source = transformSync(fs.readFileSync(path.join(__dirname, '../src/components/Player.jsx'), 'utf8'), { loader: 'jsx', format: 'cjs' }).code;
 
 function mount({ local = false, localIndexes = [], localQuality, saved = null, transcode, prepare, props = {}, episodeCount = 2, storage = new Map(), seriesId = 'A', settings = {}, lockedIndexes = [], apiOverrides = {}, now = () => Date.now() } = {}) {
@@ -45,8 +47,12 @@ function mount({ local = false, localIndexes = [], localQuality, saved = null, t
     load: () => { media.currentTime = 0; media.readyState = 0; media.currentSrc = ''; media.paused = true; },
     addEventListener: (name, fn) => mediaEvents.set(name, fn), removeEventListener: name => mediaEvents.delete(name) };
   const changed = (old, deps) => !old || deps.some((d, i) => !Object.is(d, old[i]));
+  const expandedComponents = new Set();
   const react = {
-    createElement: (type, props, ...children) => ({ type, props: props || {}, children: children.flat(Infinity) }),
+    Fragment: Symbol.for('react.fragment'),
+    createElement: (type, props, ...children) => expandedComponents.has(type)
+      ? type({ ...(props || {}), children: children.flat(Infinity) })
+      : ({ type, props: props || {}, children: children.flat(Infinity) }),
     useState: initial => { const i = cursor++; if (!(i in slots)) slots[i] = typeof initial === 'function' ? initial() : initial; return [slots[i], v => { slots[i] = typeof v === 'function' ? v(slots[i]) : v; }]; },
     useRef: initial => { const i = cursor++; return slots[i] ||= { current: initial }; },
     useMemo: (fn, deps) => { const i = cursor++; if (!slots[i] || changed(slots[i].deps, deps)) slots[i] = { deps, value: fn() }; return slots[i].value; },
@@ -87,8 +93,17 @@ function mount({ local = false, localIndexes = [], localQuality, saved = null, t
   const popupDocument = { ...document, defaultView: floatingWindow };
   const shortcutModule = { exports: {} };
   vm.runInNewContext(shortcutSource, { module: shortcutModule, exports: shortcutModule.exports, window, Event });
+  const loadChildComponent = (code) => {
+    const mod = { exports: {} };
+    vm.runInNewContext(code, { module: mod, exports: mod.exports, window, document, console, require: n => n === 'react' ? react : n === '../i18n' ? i18nStub : {} });
+    const comp = mod.exports.default || mod.exports;
+    if (typeof comp === 'function') expandedComponents.add(comp);
+    return mod.exports;
+  };
+  const seriesPickerModule = loadChildComponent(seriesPickerSource);
+  const playerDialogsModule = loadChildComponent(playerDialogsSource);
   const setTimer = (fn, delay) => { const id = ++timerId; timers.set(id, { fn, delay }); return id; };
-  const context = { module: { exports: {} }, Date: class extends Date { static now() { return now(); } }, require: n => n === '../i18n' ? i18nStub : n === './SoftwareVideo' ? { __esModule: true, default: 'video' } : n === 'react-dom' ? { createPortal: children => children } : n === './useFloatingPlayer' ? { __esModule: true, default: () => ({ host: {}, attachSlot() {}, floating, toggle() { floating = !floating; stage.ownerDocument = floating ? popupDocument : document; render(); } }) } : n === 'react' ? react : n === './useDialogKeyboard' ? () => {} : n === '../shortcuts' ? shortcutModule.exports : n === './VideoEnhancement' ? videoEnhancementStub : n === './danmakuSource.mjs' ? { useDanmakuSource: () => 'official', writeDanmakuSource() {} } : n === './OfficialDanmaku' ? { useOfficialDanmaku: ({ preferences, active }) => ({ ...preferences, active }) } : n === './CommentDanmaku' ? { useCommentDanmaku: () => ({ enabled: false, settings: {}, comments: [] }) } : {}, window, document, navigator: {}, crypto: require('node:crypto').webcrypto, setTimeout: setTimer, clearTimeout: id => timers.delete(id), setInterval: setTimer, clearInterval: id => timers.delete(id), requestAnimationFrame: fn => setTimer(fn, 0), cancelAnimationFrame: id => timers.delete(id), console };
+  const context = { module: { exports: {} }, Date: class extends Date { static now() { return now(); } }, require: n => n === '../i18n' ? i18nStub : n === './SeriesPicker' ? seriesPickerModule : n === './PlayerDialogs' ? playerDialogsModule : n === './SoftwareVideo' ? { __esModule: true, default: 'video' } : n === 'react-dom' ? { createPortal: children => children } : n === './useFloatingPlayer' ? { __esModule: true, default: () => ({ host: {}, attachSlot() {}, floating, toggle() { floating = !floating; stage.ownerDocument = floating ? popupDocument : document; render(); } }) } : n === 'react' ? react : n === './useDialogKeyboard' ? () => {} : n === '../shortcuts' ? shortcutModule.exports : n === './VideoEnhancement' ? videoEnhancementStub : n === './danmakuSource.mjs' ? { useDanmakuSource: () => 'official', writeDanmakuSource() {} } : n === './OfficialDanmaku' ? { useOfficialDanmaku: ({ preferences, active }) => ({ ...preferences, active }) } : n === './CommentDanmaku' ? { useCommentDanmaku: () => ({ enabled: false, settings: {}, comments: [] }) } : {}, window, document, navigator: {}, crypto: require('node:crypto').webcrypto, setTimeout: setTimer, clearTimeout: id => timers.delete(id), setInterval: setTimer, clearInterval: id => timers.delete(id), requestAnimationFrame: fn => setTimer(fn, 0), cancelAnimationFrame: id => timers.delete(id), console };
   context.exports = context.module.exports;
   vm.runInNewContext(source, context);
   const nodes = () => { const out = []; const walk = n => { if (!n || typeof n !== 'object') return; out.push(n); n.children?.forEach(walk); }; walk(tree); return out; };

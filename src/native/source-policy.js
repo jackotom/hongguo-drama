@@ -15,6 +15,7 @@ let activePolicy = Object.freeze({ revision: 0, routes: Object.freeze([]) });
 function safeUrl(value) {
   const url = new URL(String(value || ''));
   if (url.protocol !== 'https:' || url.username || url.password || (url.port && url.port !== '443')
+      || url.search
       || !SAFE_HOSTS.some(host => url.hostname === host || url.hostname.endsWith(`.${host}`))) {
     throw new Error('动态取源地址不是受支持的红果官方 HTTPS 域名');
   }
@@ -36,7 +37,7 @@ function safeMap(value, label) {
     if (label === '查询字段' && PROTECTED_QUERY_FIELDS.has(key)) throw new Error(`不允许动态覆盖身份或时间字段 ${key}`);
     if (!['string', 'number', 'boolean'].includes(typeof raw)) throw new Error(`${label}字段值类型无效`);
     const text = String(raw);
-    if (text.length > MAX_VALUE_LENGTH) throw new Error(`${label}字段值过长`);
+    if (text.length > MAX_VALUE_LENGTH || /[\r\n\0]/.test(text)) throw new Error(`${label}字段值无效`);
     result[key] = raw;
   }
   return result;

@@ -71,22 +71,26 @@ export async function createAnime4KRenderer(video, canvas, { signal, onError }) 
   let context;
   let uploader;
   let disposed = false;
+  const report = message => { if (!disposed) onError(new Error(message)); };
+  const onUncapturedError = event => {
+    event.preventDefault();
+    report('显卡增强运算失败；已恢复原画，可改用锐化');
+  };
   const dispose = () => {
     if (disposed) return;
     disposed = true;
     signal.removeEventListener('abort', dispose);
+    device.removeEventListener('uncapturederror', onUncapturedError);
     uploader?.dispose();
     context?.unconfigure();
+    canvas.width = 0;
+    canvas.height = 0;
     device.destroy();
   };
   if (signal.aborted) { dispose(); signal.throwIfAborted(); }
   signal.addEventListener('abort', dispose, { once: true });
-  const report = message => { if (!disposed) onError(new Error(message)); };
   device.lost.then(info => report(`显卡增强已停止（${info.reason}）；已恢复原画`));
-  device.addEventListener('uncapturederror', event => {
-    event.preventDefault();
-    report('显卡增强运算失败；已恢复原画，可改用锐化');
-  });
+  device.addEventListener('uncapturederror', onUncapturedError);
   try {
     context = canvas.getContext('webgpu');
     if (!context) throw new Error('无法创建增强画面；已恢复原画');
@@ -119,13 +123,18 @@ export async function createAnime4KRenderer(video, canvas, { signal, onError }) 
     if (error) throw new Error('当前显卡不支持 Anime4K 运算；已恢复原画');
     let lastFrameAt = -Infinity;
     let slowFrames = 0;
+    let inFlightGpu = 0;
     return {
       dispose,
       async draw() {
         if (disposed || video.readyState < 2 || video.seeking) return false;
-        if (video.videoWidth !== width || video.videoHeight !== height) throw new Error('片源尺寸发生变化，请重新启用 Anime4K');
+        if (video.videoWidth !== width || video.videoHeight !== height) {
+          throw Object.assign(new Error('片源尺寸发生变化，正在重新准备 Anime4K'), { code: 'DIMENSION_CHANGED' });
+        }
         const started = performance.now();
         if (uploader.usesCanvas && !video.paused && started - lastFrameAt < 1000 / 30) return false;
+        // Drop overlapping submissions if GPU queue is already 2 frames behind instead of stalling CPU every frame.
+        if (inFlightGpu >= 2) return false;
         lastFrameAt = started;
         uploader.upload();
         const encoder = device.createCommandEncoder();
@@ -139,9 +148,15 @@ export async function createAnime4KRenderer(video, canvas, { signal, onError }) 
         pass.draw(3);
         pass.end();
         device.queue.submit([encoder.finish()]);
-        await device.queue.onSubmittedWorkDone();
-        slowFrames = performance.now() - started > 150 ? slowFrames + 1 : 0;
-        if (slowFrames >= 5) throw new Error('当前设备增强较慢；已恢复原画，可改用锐化');
+        inFlightGpu++;
+        device.queue.onSubmittedWorkDone().then(() => {
+          inFlightGpu = Math.max(0, inFlightGpu - 1);
+          if (disposed) return;
+          slowFrames = performance.now() - started > 150 ? slowFrames + 1 : 0;
+          if (slowFrames >= 5) report('当前设备增强较慢；已恢复原画，可改用锐化');
+        }, () => {
+          inFlightGpu = Math.max(0, inFlightGpu - 1);
+        });
         return !disposed;
       },
     };

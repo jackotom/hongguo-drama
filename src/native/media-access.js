@@ -7,6 +7,11 @@ function fileIdentity(resolved) {
   catch (_) { return null; }
 }
 
+async function fileIdentityAsync(resolved) {
+  try { return await readFileIdentityAsync(resolved); }
+  catch (_) { return null; }
+}
+
 function createMediaAccess(devUrl) {
   const files = new Map(), ids = new Map();
   const devOrigin = devUrl ? new URL(devUrl).origin : '';
@@ -54,6 +59,22 @@ function createMediaAccess(devUrl) {
         if (entry.identity === null) return false;
         if (!sameFileObject(entry.identity, fileIdentity(entry.file))) {
           files.delete(id);
+          if (ids.get(entry.file) === id) ids.delete(entry.file);
+          return false;
+        }
+        return typeof entry.validate === 'function' && entry.validate(entry.file) === true;
+      } catch (_) { return false; }
+    },
+    async isValidAsync(value) {
+      try {
+        const url = new URL(value);
+        const id = url.hostname === 'f' && !url.search && !url.hash ? url.pathname.slice(1) : null;
+        const entry = id && files.get(id);
+        if (!entry) return false;
+        if (entry.identity === null) return false;
+        const current = await fileIdentityAsync(entry.file);
+        if (!sameFileObject(entry.identity, current)) {
+          if (files.get(id) === entry) files.delete(id);
           if (ids.get(entry.file) === id) ids.delete(entry.file);
           return false;
         }

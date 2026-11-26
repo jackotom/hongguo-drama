@@ -1,10 +1,21 @@
 const { Worker, isMainThread, parentPort, workerData } = require('node:worker_threads');
 
+function transferableArrayBuffer(value) {
+  if (!value || !ArrayBuffer.isView(value)) return null;
+  if (value.byteOffset === 0 && value.byteLength === value.buffer.byteLength && !(value.buffer instanceof SharedArrayBuffer)) {
+    return value.buffer;
+  }
+  return null;
+}
+
 // Media parsing and sample decryption must not block Electron's cancellation IPC.
 function decryptInWorker(payload, { signal, cancelToken } = {}) {
   return new Promise((resolve, reject) => {
     if (signal?.aborted || cancelToken?.reason) return reject(new Error('已取消'));
-    const worker = new Worker(__filename, { workerData: payload });
+    const transferList = [];
+    const inputBuf = transferableArrayBuffer(payload?.buffer);
+    if (inputBuf) transferList.push(inputBuf);
+    const worker = new Worker(__filename, { workerData: payload, ...(transferList.length ? { transferList } : {}) });
     let settled = false;
     const finish = async (error, result) => {
       if (settled) return;
@@ -14,7 +25,7 @@ function decryptInWorker(payload, { signal, cancelToken } = {}) {
       // Wait for the writer to stop before the caller removes temporary files.
       await worker.terminate();
       if (error) reject(error);
-      else resolve(result?.buffer ? Buffer.from(result.buffer) : undefined);
+      else resolve(result?.buffer ? Buffer.from(result.buffer.buffer, result.buffer.byteOffset, result.buffer.byteLength) : undefined);
     };
     const cancel = () => { void finish(new Error('已取消')); };
     signal?.addEventListener('abort', cancel, { once: true });
@@ -34,8 +45,13 @@ if (!isMainThread) {
       native.decryptMp4File(workerData.srcPath, workerData.dstPath, key);
       parentPort.postMessage({ done: true });
     } else {
-      const result = native.decryptMp4Buffer(Buffer.from(workerData.buffer), key);
-      parentPort.postMessage({ buffer: result });
+      const input = Buffer.isBuffer(workerData.buffer)
+        ? workerData.buffer
+        : Buffer.from(workerData.buffer.buffer, workerData.buffer.byteOffset, workerData.buffer.byteLength);
+      const result = native.decryptMp4Buffer(input, key);
+      const outBuf = transferableArrayBuffer(result);
+      if (outBuf) parentPort.postMessage({ buffer: result }, [outBuf]);
+      else parentPort.postMessage({ buffer: result });
     }
   } catch (error) {
     parentPort.postMessage({ error: error.message });

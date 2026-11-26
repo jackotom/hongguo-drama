@@ -1370,7 +1370,6 @@
   "使用官网公开的完整 MP4 兜底，画质可能低于 App 片源": "Use the complete public MP4 fallback from the official website; quality may be lower",
   "openhongguo 社区 SDK": "openhongguo community SDK",
   "固定版本 Apache-2.0 本地 WASM，使用独立匿名设备档案": "Pinned Apache-2.0 local WASM with a separate anonymous device profile",
-  "恢复默认": "Restore defaults",
   "已恢复默认取源优先级。": "Default source priority restored.",
   "官网公开片源排在首位，可能优先得到较低画质的公开 MP4。": "The official website source is first and may return a lower-quality public MP4 first.",
   "当前环境未内置或未启用 SDK；置顶会先失败一次再继续回退": "SDK is not bundled or enabled in this environment; placing it first adds one failed attempt before fallback",

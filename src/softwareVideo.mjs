@@ -118,7 +118,17 @@ export function attachSoftwareVideo(video, loadPlayer, wasmBaseUrl) {
         return nativePlay();
       });
       playPromise = { pending, intent };
-      pending.catch(reason => { if (reason.name !== 'AbortError') fail(state, reason); });
+      pending.catch(reason => {
+        if (reason?.name === 'AbortError') return;
+        if (reason?.name === 'NotAllowedError') {
+          desiredPlayback = false;
+          playIntent++;
+          nativePause();
+          if (current(state) && state.loaded) enqueue(state, () => state.player.pause()).catch(() => {});
+          return;
+        }
+        fail(state, reason);
+      });
       pending.finally(() => { if (playPromise?.pending === pending) playPromise = null; }).catch(() => {});
       return pending;
     } },

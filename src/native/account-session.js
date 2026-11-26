@@ -14,7 +14,8 @@ const WEB_QUERY = {
 function safeMessage(error, fallback = '账号操作失败，请稍后重试') {
   return String(error?.message || fallback)
     .replace(/https?:\/\/\S+/gi, '[地址]')
-    .replace(/(?:sessionid|sid_tt|passport_csrf_token)=[^;\s]+/gi, '$1=[已隐藏]')
+    .replace(/(?:sessionid_ss|sessionid|sid_tt|sid_guard|uid_tt_ss|uid_tt|odin_tt|passport_csrf_token)=[^;\s]+/gi, '$1=[已隐藏]')
+    .replace(/(?:cookie|authorization)\s*:\s*[^\r\n]+/gi, '[已隐藏]')
     .slice(0, 160);
 }
 
@@ -223,12 +224,17 @@ function secureSessionStore({ filePath, safeStorage }) {
     save(credentials) {
       if (!encryptionAvailable()) throw new Error('系统安全存储不可用，本次登录只保留到应用退出');
       const encrypted = safeStorage.encryptString(JSON.stringify(credentials));
-      const temporary = `${filePath}.tmp`;
+      const temporary = `${filePath}.${process.pid}.${randomUUID().slice(0, 8)}.tmp`;
       fs.mkdirSync(path.dirname(filePath), { recursive: true });
       const fd = fs.openSync(temporary, 'w', 0o600);
       try { fs.writeFileSync(fd, encrypted); fs.fsyncSync(fd); }
       finally { fs.closeSync(fd); }
-      fs.renameSync(temporary, filePath);
+      try {
+        fs.renameSync(temporary, filePath);
+      } catch (error) {
+        try { fs.unlinkSync(temporary); } catch {}
+        throw error;
+      }
       try { fs.chmodSync(filePath, 0o600); } catch {}
     },
     load() {
@@ -300,6 +306,8 @@ function createAccountService({
           if (!/会话过期|登录态未通过|账号编号无效|HTTP\s*(?:401|403)/i.test(message)) return;
           credentials = null;
           profile = null;
+          history = [];
+          historyLoaded = false;
           restorePromise = Promise.resolve(publicAccount());
           try { sessionStore.clear(); } catch {}
           onAccountExpired();
@@ -363,6 +371,9 @@ function createAccountService({
     },
 
     async completeWebLogin(cookie) {
+      if (typeof cookie !== 'string' || !cookie.trim() || cookie.length > 32768 || /[\r\n\0]/.test(cookie)) {
+        throw new Error('登录态无效，请重新登录');
+      }
       const attempt = ++loginGeneration;
       login = null;
       const token = generation;
@@ -389,6 +400,7 @@ function createAccountService({
 
     async pollLogin(loginId) {
       if (!login || login.id !== loginId) throw new Error('扫码会话已失效，请重新获取二维码');
+      if (login.polling) return login.polling;
       if (now() >= login.expiresAt) {
         login = null;
         return { success: true, status: 'expired' };
@@ -396,38 +408,43 @@ function createAccountService({
       const currentLogin = login;
       const attempt = loginGeneration;
       const stillCurrent = () => login === currentLogin && attempt === loginGeneration;
-      const data = responseData(await webJson('/passport/web/check_qrconnect/', {
-        next: `${WEB_BASE}/`, token: login.token,
-      }, login.jar));
-      if (!stillCurrent()) return { success: true, status: 'cancelled' };
-      console.log('[Account] QR status:', String(data.status || ''), data.redirect_url ? 'redirect' : 'no-redirect');
-      if (['5', 'expired'].includes(String(data.status))) {
-        login = null;
-        return { success: true, status: 'expired' };
-      }
-      if (!['3', 'confirmed'].includes(String(data.status))) return { success: true, status: 'pending' };
-      if (data.redirect_url) await finishRedirect(String(data.redirect_url), login.jar);
-      if (!stillCurrent()) return { success: true, status: 'cancelled' };
-      console.log('[Account] Login session cookie:', login.jar.hasSession() ? 'present' : 'missing');
-      if (!login.jar.hasSession()) return { success: true, status: 'pending' };
+      const run = (async () => {
+        const data = responseData(await webJson('/passport/web/check_qrconnect/', {
+          next: `${WEB_BASE}/`, token: currentLogin.token,
+        }, currentLogin.jar));
+        if (!stillCurrent()) return { success: true, status: 'cancelled' };
+        console.log('[Account] QR status:', String(data.status || ''), data.redirect_url ? 'redirect' : 'no-redirect');
+        if (['5', 'expired'].includes(String(data.status))) {
+          login = null;
+          return { success: true, status: 'expired' };
+        }
+        if (!['3', 'confirmed'].includes(String(data.status))) return { success: true, status: 'pending' };
+        if (data.redirect_url) await finishRedirect(String(data.redirect_url), currentLogin.jar);
+        if (!stillCurrent()) return { success: true, status: 'cancelled' };
+        console.log('[Account] Login session cookie:', currentLogin.jar.hasSession() ? 'present' : 'missing');
+        if (!currentLogin.jar.hasSession()) return { success: true, status: 'pending' };
 
-      const cookie = login.jar.header();
-      console.log('[Account] Profile verify: start');
-      const nextProfile = await withTimeout(verify({ cookie }), 15000, '账号资料验证超时，请重试');
-      if (!stillCurrent()) return { success: true, status: 'cancelled' };
-      console.log('[Account] Profile verify: done');
-      const nextCredentials = { cookie };
-      let storageWarning = '';
-      try { sessionStore.save({ ...nextCredentials, profile: nextProfile }); }
-      catch (error) { storageWarning = safeMessage(error); }
-      credentials = nextCredentials;
-      profile = nextProfile;
-      history = [];
-      historyLoaded = false;
-      generation++;
-      login = null;
-      restorePromise = Promise.resolve(publicAccount());
-      return publicAccount({ storageWarning, status: 'signed-in' });
+        const cookie = currentLogin.jar.header();
+        console.log('[Account] Profile verify: start');
+        const nextProfile = await withTimeout(verify({ cookie }), 15000, '账号资料验证超时，请重试');
+        if (!stillCurrent()) return { success: true, status: 'cancelled' };
+        console.log('[Account] Profile verify: done');
+        const nextCredentials = { cookie };
+        let storageWarning = '';
+        try { sessionStore.save({ ...nextCredentials, profile: nextProfile }); }
+        catch (error) { storageWarning = safeMessage(error); }
+        credentials = nextCredentials;
+        profile = nextProfile;
+        history = [];
+        historyLoaded = false;
+        generation++;
+        login = null;
+        restorePromise = Promise.resolve(publicAccount());
+        return publicAccount({ storageWarning, status: 'signed-in' });
+      })();
+      currentLogin.polling = run;
+      try { return await run; }
+      finally { if (currentLogin.polling === run) currentLogin.polling = null; }
     },
 
     cancelLogin(loginId) {
@@ -479,7 +496,9 @@ function createAccountService({
     async favorites() {
       const current = credentials;
       if (!current || !profile) return { success: true, signedIn: false, account: null, results: [] };
+      const token = generation;
       const rows = parseFavorites(await accountJson(current, '/reading/bookapi/bookshelf/video/info/v1/'));
+      if (token !== generation) return { success: true, signedIn: false, account: null, results: [] };
       return publicAccount({ results: rows.map(row => ({ ...row })) });
     },
 

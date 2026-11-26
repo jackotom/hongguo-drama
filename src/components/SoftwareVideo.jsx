@@ -3,7 +3,13 @@ import { attachSoftwareVideo } from '../softwareVideo.mjs';
 
 let playerModule;
 const loadPlayer = async () => {
-  playerModule ||= import(/* @vite-ignore */ new URL('software/avplayer/avplayer.js', document.baseURI).href);
+  if (!playerModule) {
+    playerModule = import(/* @vite-ignore */ new URL('software/avplayer/avplayer.js', document.baseURI).href)
+      .catch(error => {
+        playerModule = null;
+        throw error;
+      });
+  }
   return (await playerModule).default;
 };
 

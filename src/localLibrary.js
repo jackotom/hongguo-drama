@@ -1,5 +1,27 @@
 const STORAGE_KEY = 'hongguo:public-library:v1';
 const CHANGE_EVENT = 'hongguo:public-library-changed';
+const MAX_TRANSIENT_SERIES = 500;
+const SHANGHAI_DATE_FORMATTER = new Intl.DateTimeFormat('en-CA', {
+  timeZone: 'Asia/Shanghai', year: 'numeric', month: '2-digit', day: '2-digit',
+});
+
+function emitLibraryChange(snapshot) {
+  if (typeof CustomEvent === 'function') {
+    window.dispatchEvent(new CustomEvent(CHANGE_EVENT, { detail: snapshot }));
+  } else {
+    window.dispatchEvent(new Event(CHANGE_EVENT));
+  }
+}
+
+function pruneLibrary(items) {
+  const retained = [];
+  const transient = [];
+  for (const item of items) {
+    if (item.favorite || (item.liked_episode_ids && item.liked_episode_ids.length > 0)) retained.push(item);
+    else transient.push(item);
+  }
+  return [...retained, ...transient.slice(-MAX_TRANSIENT_SERIES)];
+}
 
 export const validPublishedAt = value => typeof value === 'number' && Number.isFinite(value) && value > 0 && !Number.isNaN(new Date(value).getTime());
 
@@ -43,12 +65,13 @@ export function saveLocalSeries({ id, title, published_at, favorite, cover, like
     cover: typeof cover === 'string' && /^https?:\/\//i.test(cover) ? cover : previous?.cover || '',
     liked_episode_ids: nextEpisodeLikeIds,
   };
-  const items = [...current.items.filter(item => item.id !== seriesId), next];
+  const items = pruneLibrary([...current.items.filter(item => item.id !== seriesId), next]);
   try {
     // Persist public metadata and local reactions, never reviews.
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(items.map(item => ({ id: item.id, title: item.title, published_at: item.published_at, favorite: item.favorite, cover: item.cover || '', liked_episode_ids: item.liked_episode_ids }))));
-    window.dispatchEvent(new Event(CHANGE_EVENT));
-    return { items, error: '' };
+    const snapshot = { items, error: '' };
+    emitLibraryChange(snapshot);
+    return snapshot;
   } catch (error) {
     return { ...current, error: `未能保存到本机：${error.message}。请释放存储空间后重试。` };
   }
@@ -60,8 +83,9 @@ export function removeLocalSeries(id) {
   const items = current.items.filter(item => item.id !== id);
   try {
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
-    window.dispatchEvent(new Event(CHANGE_EVENT));
-    return { items, error: '' };
+    const snapshot = { items, error: '' };
+    emitLibraryChange(snapshot);
+    return snapshot;
   } catch (error) {
     return { ...current, error: `未能移除本机记录：${error.message}。原有记录未改动。` };
   }
@@ -70,6 +94,10 @@ export function removeLocalSeries(id) {
 export function subscribeLocalLibrary(callback) {
   const refresh = event => {
     if (event.type === 'storage' && event.key !== STORAGE_KEY && event.key !== null) return;
+    if (event.type === CHANGE_EVENT && event.detail && Array.isArray(event.detail.items)) {
+      callback(event.detail);
+      return;
+    }
     callback(readLocalLibrary());
   };
   window.addEventListener(CHANGE_EVENT, refresh);
@@ -82,7 +110,7 @@ export function subscribeLocalLibrary(callback) {
 
 export function publicDateKey(timestamp) {
   if (!validPublishedAt(timestamp)) return '';
-  const parts = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Shanghai', year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(timestamp);
+  const parts = SHANGHAI_DATE_FORMATTER.formatToParts(timestamp);
   const part = type => parts.find(item => item.type === type).value;
   return `${part('year')}-${part('month')}-${part('day')}`;
 }

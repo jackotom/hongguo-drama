@@ -1,4 +1,4 @@
-// 红果短剧 8.2：前端构建配置，运行版本由 package.json 提供。
+// 红果短剧 8.3：前端构建配置，运行版本由 package.json 提供。
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 
@@ -18,5 +18,16 @@ export default defineConfig({
   build: {
     outDir: 'dist-react',
     emptyOutDir: true,
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (id.includes('node_modules/react/') || id.includes('node_modules/react-dom/') || id.includes('node_modules/scheduler/')) {
+            return 'vendor-react';
+          }
+          if (id.includes('/src/i18n/')) return 'i18n';
+          return undefined;
+        },
+      },
+    },
   },
 });

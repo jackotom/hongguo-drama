@@ -177,8 +177,8 @@ const checks = [
   ])),
   ['issue157 copy failure keeps its original error when decoded cleanup also hits EPERM', async () => {
     await bytevc2Fixture(async h => {
-      const promises = require('node:fs/promises'), copy = fs.copyFileSync, unlink = promises.unlink;
-      fs.copyFileSync = () => { throw Object.assign(new Error('fixture original copy failure'), { code:'EIO' }); };
+      const promises = require('node:fs/promises'), copy = promises.copyFile, unlink = promises.unlink;
+      promises.copyFile = async () => { throw Object.assign(new Error('fixture original copy failure'), { code:'EIO' }); };
       promises.unlink = async file => {
         if (String(file).startsWith(h.root + path.sep)) throw Object.assign(new Error('fixture cleanup failure'), { code:'EPERM' });
         return unlink(file);
@@ -188,7 +188,7 @@ const checks = [
         assert.equal(h.saved()[0].status, 'failed');
         assert.equal(h.saved()[0].error, 'fixture original copy failure');
         assert.equal(fs.existsSync(h.saved()[0].savePath), false);
-      } finally { fs.copyFileSync = copy; promises.unlink = unlink; }
+      } finally { promises.copyFile = copy; promises.unlink = unlink; }
       const task = h.saved()[0], native = require('../src/native/download-temporary');
       for (const record of task.temporaryDownloads) assert.equal((await native.cleanupDownloadTemporary(record, native.downloadTemporaryOwner(task))).missing, true);
     }, { cenc:true });
@@ -284,8 +284,10 @@ const checks = [
     const owner = { taskId:'large', seriesId:'1', vid:'11', vidIndex:1, savePath:path.join(h.root, 'large.mp4') };
     await withLargeFileIds(h.root, async () => {
       const temporary = await native.createDownloadTemporary(h.root, { owner });
-      fs.writeFileSync(temporary.input, Buffer.alloc(120000));
-      await temporary.reserveOutput(); fs.writeFileSync(temporary.output, Buffer.alloc(130000));
+      try {
+        fs.writeFileSync(temporary.input, Buffer.alloc(120000));
+        await temporary.reserveOutput(); fs.writeFileSync(temporary.output, Buffer.alloc(130000));
+      } finally { await temporary.close(); }
       const receipt = JSON.parse(JSON.stringify(temporary.record));
       assert.equal(typeof receipt.files['input.enc.tmp'].ino, 'string');
       const state = native.inspectDownloadTemporary(receipt, owner);
@@ -314,7 +316,9 @@ const checks = [
     const h = fixture(), native = require('../src/native/download-temporary');
     const owner = { taskId:'legacy', seriesId:'1', vid:'11', vidIndex:1, savePath:path.join(h.root, 'legacy.mp4') };
     const temporary = await native.createDownloadTemporary(h.root, { owner });
-    fs.writeFileSync(temporary.input, Buffer.alloc(120000));
+    try {
+      fs.writeFileSync(temporary.input, Buffer.alloc(120000));
+    } finally { await temporary.close(); }
     const identity = file => { const stat = fs.lstatSync(file); return { dev:stat.dev, ino:stat.ino, birthtimeMs:stat.birthtimeMs }; };
     const receipt = JSON.parse(JSON.stringify(temporary.record));
     receipt.identity = identity(receipt.directory);
@@ -939,25 +943,25 @@ const checks = [
   }],
 
   ['exclusive copy publishes downloads without linking temporary file identities', async () => {
-    const originalLink = fs.linkSync, originalCopy = fs.copyFileSync;
+    const originalLink = fs.linkSync, originalCopy = fs.promises.copyFile;
     try {
       const h = fixture(); let copies = 0;
       fs.linkSync = () => assert.fail('Downloads must not share an inode with deferred temporary files');
-      fs.copyFileSync = (source, destination, flags) => { copies++; assert.equal(flags, fs.constants.COPYFILE_EXCL); return originalCopy(source, destination, flags); };
+      fs.promises.copyFile = (source, destination, flags) => { copies++; assert.equal(flags, fs.constants.COPYFILE_EXCL); return originalCopy(source, destination, flags); };
       await h.handlers['hongguo-download-batch']({}, payload());
       await h.run('executeHongguoDownload(downloadTasks[0])');
       assert.equal(h.saved()[0].status, 'completed', h.saved()[0].error);
       assert.equal(copies, 1);
       assert.equal(fs.statSync(h.saved()[0].savePath).size, 200000);
       assert.equal(h.run('hasCompleteTaskFile(downloadTasks[0])'), true);
-    } finally { fs.linkSync = originalLink; fs.copyFileSync = originalCopy; }
+    } finally { fs.linkSync = originalLink; fs.promises.copyFile = originalCopy; }
   }],
   ['publication preserves raced existing files and reports failed copies', async () => {
-    const originalCopy = fs.copyFileSync;
+    const originalCopy = fs.promises.copyFile;
     try {
       for (const conflict of [true, false]) {
         const h = fixture(); let copies = 0;
-        fs.copyFileSync = (source, destination, flags) => {
+        fs.promises.copyFile = async (source, destination, flags) => {
           copies++;
           assert.equal(flags, fs.constants.COPYFILE_EXCL);
           if (!conflict) throw Object.assign(new Error('fixture copy failed'), { code:'EIO' });
@@ -971,7 +975,7 @@ const checks = [
         if (conflict) assert.equal(fs.readFileSync(h.saved()[0].savePath, 'utf8'), 'preserve user file');
         else assert.equal(fs.existsSync(h.saved()[0].savePath), false);
       }
-    } finally { fs.copyFileSync = originalCopy; }
+    } finally { fs.promises.copyFile = originalCopy; }
   }],
 
 ];

@@ -118,6 +118,8 @@ function mountPlayer(props, { api, softwareDecode = false, shortcuts } = {}) {
     './SequelFinder': 'SequelFinder',
     './NasDownload': 'NasDownload',
     './CastPanel': 'CastPanel',
+    './SeriesPicker': 'SeriesPicker',
+    './PlayerDialogs': 'PlayerDialogs',
     './VideoEnhancement': { default: 'VideoEnhancement', useVideoEnhancement: () => ({}) },
     './Player.css': {},
     './icons': Object.fromEntries(['Play', 'Film', 'Download', 'Check', 'RefreshCw', 'Layers', 'X', 'Trash2', 'ChevronDown', 'Zap'].map(name => [name, name])),

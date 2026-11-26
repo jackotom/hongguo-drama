@@ -151,3 +151,51 @@ test('anonymous limits cool down before another openhongguo request', async () =
   await assert.rejects(provider.resolve('13'), { code: 'ANONYMOUS_LIMITED' });
   assert.equal(attempts, 2);
 });
+
+test('concurrent DEVICE_REJECTED failures coalesce resetDevice and reject plaintext http media URLs', async () => {
+  let resets = 0, calls = 0;
+  let releaseReset;
+  const provider = createOpenhongguoSource({ getClient: async () => ({
+    async resolvePlayback() {
+      calls++;
+      if (calls <= 2) throw Object.assign(new Error('device rejected'), { code: 'DEVICE_REJECTED' });
+      const value = playback();
+      value.playback.streams = [
+        { url: 'http://cdn.example/insecure.mp4', codec: 'h264', width: 1080, height: 1920, definition: '1080p' },
+        { url: 'https://cdn.example/secure.mp4', codec: 'h264', width: 1080, height: 1920, definition: '1080p' },
+      ];
+      return value;
+    },
+    resetDevice() {
+      resets++;
+      return new Promise(resolve => { releaseReset = resolve; });
+    },
+  }) });
+  const a = provider.resolve('11');
+  const b = provider.resolve('12');
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(resets, 1);
+  releaseReset();
+  const [ra, rb] = await Promise.all([a, b]);
+  assert.equal(ra.url, 'https://cdn.example/secure.mp4');
+  assert.equal(rb.url, 'https://cdn.example/secure.mp4');
+});
+
+test('openhongguo transport validates redirect Location instead of local proxy host', async () => {
+  let config;
+  const transport = axiosTransport({ request: async value => {
+    config = value;
+    return { status: 200, headers: {}, data: Buffer.from('ok') };
+  } });
+  await transport({ method: 'GET', url: 'https://api.example/start', headers: {} });
+  assert.doesNotThrow(() => config.beforeRedirect(
+    { protocol: 'http:', hostname: '127.0.0.1', port: 7890, path: 'https://cdn.example/next' },
+    { headers: { location: 'https://cdn.example/next' } },
+    { url: 'https://api.example/start' },
+  ));
+  assert.throws(() => config.beforeRedirect(
+    { protocol: 'http:', hostname: '127.0.0.1', port: 7890, path: 'http://127.0.0.1/secret' },
+    { headers: { location: 'http://127.0.0.1/secret' } },
+    { url: 'https://api.example/start' },
+  ), { code: 'SECURITY_BLOCKED' });
+});

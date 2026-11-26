@@ -4,7 +4,7 @@
 # 依赖
 node_modules/
 dist/
-dist-audit-final/
+dist-*/
 dist-react/
 
 # 内置的 ffmpeg 二进制（约 167MB，从网络获取，不纳入版本管理）
@@ -24,6 +24,7 @@ build/hongguo-sdk-playback/
 
 # 构建与打包输出
 release/
+release-*/
 out/
 .webpack/
 *.asar

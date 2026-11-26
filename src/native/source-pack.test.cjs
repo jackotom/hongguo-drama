@@ -150,3 +150,26 @@ test('checked-in playback pack verifies with a built-in active or standby key', 
   assert.equal(validatePack(payload).id, 'hongguo-playback');
   assert.ok(parsePack(envelope, 'embedded', SOURCE_PACK_KEYS).policy.routes.some(route => route.id === 'preload_current'));
 });
+
+test('decodeEnvelope rejects prototype property names as keyId', () => {
+  const key = makeKey();
+  const env = packEnvelope(key, 1);
+  assert.throws(() => decodeEnvelope({ ...env, keyId: 'toString' }, key.keyring), /未知签名密钥/);
+});
+
+test('a single persistence failure does not poison future source pack operations', async () => {
+  const key = makeKey();
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'hongguo-source-pack-recover-'));
+  const blocker = path.join(dir, 'state.json');
+  fs.mkdirSync(blocker); // directory at filePath forces rename/write failure
+  const service = createSourcePackService({
+    filePath: blocker, keyring: key.keyring,
+    request: async () => ({ data: packEnvelope(key, 1) }),
+  });
+  await assert.rejects(service.setEnabled(false));
+  fs.rmdirSync(blocker);
+  const recovered = await service.setEnabled(false);
+  assert.equal(recovered.enabled, false);
+  fs.rmSync(dir, { recursive: true, force: true });
+  policy.setPolicy(null);
+});

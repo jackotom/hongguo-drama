@@ -278,7 +278,7 @@ export default function App({ platformPages = {} }) {
         </div></div>}
         {stealthError && <div className="app-storage-error" role="alert">{t(stealthError)}</div>}
         {storageError && <div className="app-storage-error" role="alert"><span>{t(storageError)}</span><button className="btn btn-outline btn-sm" onClick={() => setStorageError('')}>{t("关闭提示")}</button></div>}
-        {visited.map((id) => <main className="main-content" data-page={id} hidden={page !== id} key={id}>{t(renderPage(id))}</main>)}
+        {visited.map((id) => <main className="main-content" data-page={id} hidden={page !== id} key={id}>{renderPage(id)}</main>)}
         {mobile && <nav className="mobile-navigation" aria-label={t("手机主导航")}>
           {MENU.filter(item => ['browse','download','player','history'].includes(item.id)).map(item => {
             const Icon = item.icon;

@@ -1,22 +1,31 @@
 // SPDX-License-Identifier: GPL-3.0-only
 'use strict';
 
+const os = require('node:os');
 const path = require('node:path');
 const axios = require('axios');
-const { abortError, throwIfAborted } = require('./request-signal');
+const { throwIfAborted, withAbort } = require('./request-signal');
 const { normalizeDownloadQuality } = require('./download-quality');
 const { isPublicMediaUrl } = require('./web-media-guard');
 
 const ANONYMOUS_LIMIT_COOLDOWN_MS = 60_000;
+
+function isSafeHttpsMediaUrl(value) {
+  if (!isPublicMediaUrl(value)) return false;
+  try { return new URL(String(value)).protocol === 'https:'; } catch { return false; }
+}
 
 function profilePath() {
   try {
     const { app } = require('electron');
     return path.join(app.getPath('userData'), 'openhongguo', 'anonymous.json');
   } catch {
-    const base = process.platform === 'darwin'
-      ? path.join(process.env.HOME || '', 'Library', 'Application Support')
-      : process.env.XDG_CONFIG_HOME || path.join(process.env.HOME || '', '.config');
+    const home = os.homedir() || '';
+    const base = process.platform === 'win32'
+      ? process.env.LOCALAPPDATA || path.join(home, 'AppData', 'Local')
+      : process.platform === 'darwin'
+      ? path.join(home, 'Library', 'Application Support')
+      : process.env.XDG_CONFIG_HOME || path.join(home, '.config');
     return path.join(base, 'openhongguo', 'anonymous.json');
   }
 }
@@ -56,12 +65,19 @@ function axiosTransport({ request = axios, timeout = 15000 } = {}) {
       url: req.url,
       headers: req.headers,
       ...(req.body?.length ? { data: Buffer.from(req.body) } : {}),
+      ...(req.signal ? { signal: req.signal } : {}),
       responseType: 'arraybuffer',
       responseEncoding: null,
       transformResponse: [data => data],
       decompress: false,
       maxContentLength: 8 * 1024 * 1024,
       maxRedirects: 5,
+      beforeRedirect: (options, response, request) => {
+        const target = response?.headers?.location
+          ? new URL(response.headers.location, request?.url || req.url).href
+          : `${options.protocol || ''}//${options.hostname || ''}${options.port ? `:${options.port}` : ''}${options.path || '/'}`;
+        if (!isPublicMediaUrl(target)) throw Object.assign(new Error('openhongguo 重定向地址不安全'), { code: 'SECURITY_BLOCKED' });
+      },
       timeout,
       validateStatus: () => true,
     });
@@ -87,21 +103,6 @@ function axiosTransport({ request = axios, timeout = 15000 } = {}) {
   };
 }
 
-function withAbort(promise, signal) {
-  if (!signal) return promise;
-  throwIfAborted(signal);
-  return new Promise((resolve, reject) => {
-    const abort = () => {
-      cleanup();
-      reject(abortError(signal));
-    };
-    const cleanup = () => signal.removeEventListener('abort', abort);
-    signal.addEventListener('abort', abort, { once: true });
-    promise.then(value => { cleanup(); resolve(value); }, error => { cleanup(); reject(error); });
-    if (signal.aborted) abort();
-  });
-}
-
 function streamPixels(stream) {
   const pair = [stream?.width, stream?.height].map(Number);
   return pair.every(value => Number.isFinite(value) && value > 0) ? Math.min(...pair) : 0;
@@ -118,7 +119,7 @@ function selectStreams(playback, quality, allowLowerQuality) {
         stream,
         pixels: streamPixels(stream),
         codec,
-        safeUrls: [stream.url, stream.backup_url].filter(url => isPublicMediaUrl(url)),
+        safeUrls: [stream.url, stream.backup_url].filter(url => isSafeHttpsMediaUrl(url)),
         codecRank: ['h264', 'avc', 'avc1'].includes(codec) ? 0
           : ['bytevc1', 'hvc1', 'hev1', 'hevc', 'h265'].includes(codec) ? 1 : 9,
       };
@@ -149,15 +150,14 @@ function selectStreams(playback, quality, allowLowerQuality) {
 }
 
 function candidateFrom(stream, playback, contentKey, vid) {
-  const urls = [stream.url, stream.backup_url].filter(url => isPublicMediaUrl(url));
+  const urls = [stream.url, stream.backup_url].filter(url => isSafeHttpsMediaUrl(url));
   const codec = String(stream.codec || '').toLowerCase();
   return urls.map(url => ({
     url,
     source: 'openhongguo',
     sourceProvider: 'openhongguo',
     vid: String(playback.episode_id || vid),
-    codec: ['bytevc1', 'hvc1', 'hev1', 'hevc', 'h265'].includes(codec) ? 'hevc'
-      : codec === 'bytevc2' ? 'bytevc2' : codec || '',
+    codec: ['bytevc1', 'hvc1', 'hev1', 'hevc', 'h265'].includes(codec) ? 'hevc' : codec || '',
     format: stream.hls ? 'hls' : 'mp4',
     quality: stream.definition || stream.quality || '',
     width: Number(stream.width) || undefined,
@@ -174,9 +174,18 @@ function createOpenhongguoSource({
   anonymousLimitCooldownMs = ANONYMOUS_LIMIT_COOLDOWN_MS,
 } = {}) {
   let anonymousLimitedUntil = 0;
+  let resettingDevice = null;
   const noteFailure = error => {
     if (error?.code === 'ANONYMOUS_LIMITED') anonymousLimitedUntil = now() + anonymousLimitCooldownMs;
     return error;
+  };
+  const resetDeviceOnce = client => {
+    if (!resettingDevice) {
+      resettingDevice = Promise.resolve().then(() => client.resetDevice()).finally(() => {
+        resettingDevice = null;
+      });
+    }
+    return resettingDevice;
   };
   async function resolve(vid, options = {}) {
     throwIfAborted(options.signal);
@@ -194,7 +203,8 @@ function createOpenhongguoSource({
       throwIfAborted(options.signal);
       noteFailure(error);
       if (error?.code === 'DEVICE_REJECTED' && typeof client.resetDevice === 'function') {
-        await withAbort(client.resetDevice(), options.signal).catch(() => {});
+        await withAbort(resetDeviceOnce(client), options.signal).catch(() => {});
+        throwIfAborted(options.signal);
         try {
           result = await withAbort(client.resolvePlayback(String(vid)), options.signal);
         } catch (retryError) {

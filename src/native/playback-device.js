@@ -6,11 +6,12 @@
 // Changes: fixed anonymous phone profile; process-only identity; no cookies or tokens.
 const crypto = require('node:crypto');
 const { gzipSync } = require('node:zlib');
-const { abortError, throwIfAborted, boundedSignal, networkFailure } = require('./request-signal');
+const { abortError, throwIfAborted, boundedSignal, networkFailure, withAbort, createAbortController } = require('./request-signal');
 
 const REGISTER_URL = 'https://log5-applog-lf.fqnovel.com/service/2/device_register/?tt_data=a&cronet_version=8d40f833_2026-03-03&ttnet_version=4.2.243.31-douyin&use_store_region_cookie=1';
 const KDF_SALT = Buffer.from('4dd4c2e6b83162090e52b3c7a6733ba41cb2462b829ab58a196b39db57177524f49baf7f08e8d68d26a72e37c1a95a2f1f05a51892aef2949732b62a38aadd58', 'hex');
 let registration;
+let registrationState = null;
 let retryAfter = 0;
 let registrationRetryAfter = 0;
 let lastRegistrationFailure;
@@ -100,21 +101,56 @@ async function registerPlaybackDevice(requestJson, { signal } = {}) {
 }
 
 function getPlaybackDevice(requestJson, { signal } = {}) {
+    if (signal?.aborted) return Promise.reject(abortError(signal));
     if (retryAfter && Date.now() >= retryAfter) {
         registration = undefined;
+        registrationState = null;
         retryAfter = 0;
     }
-    // Share failures briefly to avoid concurrent retries, then allow recovery without restarting.
-    registration ||= Promise.resolve().then(() => registerPlaybackDevice(requestJson, { signal })).catch(error => {
-        if (error.code === 'ERR_CANCELED') registration = undefined;
-        else retryAfter = Date.now() + 10000;
-        throw error;
+    // Share one in-flight registration across callers; only abort the underlying request when every waiter cancels.
+    if (!registration) {
+        const controller = createAbortController();
+        const state = { controller, waiters: 0, settled: false };
+        registrationState = state;
+        registration = Promise.resolve()
+            .then(() => registerPlaybackDevice(requestJson, { signal: controller.signal }))
+            .then(value => {
+                state.settled = true;
+                return value;
+            }, error => {
+                state.settled = true;
+                if (registrationState === state) registrationState = null;
+                if (error.code === 'ERR_CANCELED') registration = undefined;
+                else retryAfter = Date.now() + 10000;
+                throw error;
+            });
+    }
+    const state = registrationState;
+    if (!signal) {
+        if (state && !state.settled) state.waiters++;
+        return registration;
+    }
+    if (!state || state.settled) return withAbort(registration, signal);
+    state.waiters++;
+    let released = false;
+    const releaseWaiter = aborted => {
+        if (released) return;
+        released = true;
+        state.waiters = Math.max(0, state.waiters - 1);
+        if (aborted && !state.settled && state.waiters === 0) state.controller.abort();
+    };
+    const onAbort = () => releaseWaiter(true);
+    signal.addEventListener('abort', onAbort, { once: true });
+    return withAbort(registration, signal).finally(() => {
+        signal.removeEventListener('abort', onAbort);
+        releaseWaiter(false);
     });
-    return registration;
 }
 
 function resetPlaybackDevice() {
+    registrationState?.controller?.abort();
     registration = undefined;
+    registrationState = null;
     retryAfter = 0;
     registrationRetryAfter = 0;
     lastRegistrationFailure = undefined;
