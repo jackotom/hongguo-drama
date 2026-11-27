@@ -70,3 +70,72 @@
   .account-history-heading label, .account-history-heading .input-field { width: 100%; }
   .account-history-action { display: none; }
 }
+
+/* ===== 收藏行：主按钮 + 「查看」按钮 ===== */
+/* 行内用 flex，让主按钮占据剩余宽度，「查看」贴在右侧。
+   注意：上面 `.account-history-list button` 会给行内**所有**按钮套上
+   width:100% / display:flex / gap:14px，特异性 (0,1,1)，比单个类名高。
+   所以这里的选择器必须带上 .account-history-list（(0,2,0)）并把
+   width 重置为 auto，否则「查看」也会撑满整行，把主按钮压成一条竖排。 */
+.account-history-list li.account-row-with-view {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.account-history-list li.account-row-with-view > button:first-child {
+  flex: 1 1 auto;
+  width: auto;
+  min-width: 0;
+}
+
+.account-history-list .account-view-button {
+  flex: 0 0 auto;
+  width: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 12px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.account-history-list .account-view-button:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--bg-inset);
+}
+.account-history-list .account-view-button:disabled { opacity: .5; cursor: not-allowed; }
+/* 窄屏只留图标，避免挤压标题 */
+@media (max-width: 640px) {
+  .account-history-list .account-view-button span { display: none; }
+  .account-history-list .account-view-button { padding: 6px 8px; }
+}
+
+.account-load-more {
+  display: flex;
+  justify-content: center;
+  padding: 14px 0 4px;
+}
+
+/* ===== 轻量提示 ===== */
+.account-toast {
+  position: fixed;
+  left: 50%;
+  bottom: 32px;
+  z-index: 80;
+  transform: translateX(-50%);
+  max-width: min(520px, calc(100vw - 48px));
+  padding: 10px 18px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg-elevated, var(--bg-surface));
+  box-shadow: 0 12px 32px rgba(0, 0, 0, .28);
+  font-size: 13px;
+  color: var(--text-primary);
+  cursor: pointer;
+}
+.account-toast-error { border-color: var(--danger, #d9534f); color: var(--danger, #d9534f); }
