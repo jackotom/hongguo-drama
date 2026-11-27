@@ -1377,5 +1377,19 @@
   "上移": "Move up",
   "下移": "Move down",
   "取源顺序保存失败": "Could not save source priority",
-  "取源优先级已保存，下次播放或下载立即使用。": "Source priority saved. It takes effect for the next playback or download."
+  "取源优先级已保存，下次播放或下载立即使用。": "Source priority saved. It takes effect for the next playback or download.",
+  "分集与下载": "Episodes and downloads",
+  "查看分集与下载": "View episodes and downloads",
+  "正在读取…": "Loading…",
+  "正在读取分集…": "Loading episodes…",
+  "共 {0} 集": "{0} episodes",
+  "已下载 {0} 集": "{0} downloaded",
+  "锁定 {0} 集": "{0} locked",
+  "已选 {0} 集": "{0} selected",
+  "第 {0} 集": "Episode {0}",
+  "第 {0} 集，需在来源平台解锁": "Episode {0}, unlock in the source app",
+  "双击集数可直接播放": "Double-click an episode to play it",
+  "下载选中 ({0})": "Download selected ({0})",
+  "正在入队…": "Queueing…",
+  "再加载 {0} 部（已显示 {1} / {2}）": "Load {0} more (showing {1} / {2})"
 }

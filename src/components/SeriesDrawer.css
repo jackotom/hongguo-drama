@@ -1,0 +1,144 @@
+/* 分集抽屉（账号页复用）。集数格子沿用全局 .ep-chip / .btn-chip 样式。 */
+
+.sd-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(0, 0, 0, .45);
+}
+
+.sd-panel {
+  width: min(720px, 100%);
+  max-height: min(84vh, 760px);
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--bg-elevated, var(--bg-surface));
+  box-shadow: 0 24px 64px rgba(0, 0, 0, .32);
+  overflow: hidden;
+}
+
+.sd-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 18px 20px 14px;
+  border-bottom: 1px solid var(--border);
+}
+
+.sd-head-main { min-width: 0; flex: 1; }
+
+.sd-head h2 {
+  margin: 0;
+  font-size: 16px;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.sd-sub {
+  margin: 6px 0 0;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.sd-sub b { color: var(--text-primary); }
+
+.sd-close {
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.sd-close:hover { background: var(--bg-inset); color: var(--text-primary); }
+
+.sd-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 16px 20px;
+}
+
+.sd-state {
+  padding: 40px 12px;
+  text-align: center;
+  color: var(--text-secondary);
+}
+
+.sd-error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+.sd-range { display: flex; gap: 8px; }
+
+.sd-range .input-field { flex: 1; }
+
+.sd-range-error {
+  margin: 8px 0 0;
+  font-size: 13px;
+  color: var(--danger, #d9534f);
+}
+
+.sd-presets {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 12px 0 16px;
+}
+
+.sd-picked {
+  margin-left: auto;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.sd-eps {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(56px, 1fr));
+  gap: 8px;
+}
+
+.sd-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 20px;
+  border-top: 1px solid var(--border);
+  background: var(--bg-inset);
+}
+
+.sd-foot-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.sd-hint {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+@media (max-width: 640px) {
+  .sd-backdrop { padding: 0; }
+  .sd-panel { max-height: 100vh; border-radius: 0; width: 100%; }
+  .sd-hint { display: none; }
+  .sd-foot { flex-direction: column; align-items: stretch; }
+  .sd-foot-right { justify-content: flex-end; }
+}

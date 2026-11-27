@@ -1,7 +1,12 @@
 import { t, useLanguage, getLanguage } from '../i18n';
 import React, { useEffect, useRef, useState } from 'react';
-import { Play, RefreshCw, User } from './icons';
+import { Play, RefreshCw, User, Eye } from './icons';
+import SeriesDrawer from './SeriesDrawer';
 import './AccountManagement.css';
+
+// 收藏夹可能有近千部，逐个渲染「查看」按钮会让首屏和搜索输入变卡。
+// 分批渲染：先出一批，滚动到底部再追加。
+const FAVORITE_PAGE = 80;
 
 export default function AccountManagement({ active = true }) {
   useLanguage();
@@ -17,6 +22,9 @@ export default function AccountManagement({ active = true }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [status, setStatus] = useState('');
+  const [favoriteLimit, setFavoriteLimit] = useState(FAVORITE_PAGE);
+  const [drawer, setDrawer] = useState(null);
+  const [toast, setToast] = useState(null);
   const request = useRef(0);
   const historyRequest = useRef(0);
   const favoritesRequest = useRef(0);
@@ -24,6 +32,17 @@ export default function AccountManagement({ active = true }) {
   const pollTimer = useRef(null);
   const visibleRows = rows.filter(row => !query.trim() || row.series_title.includes(query.trim()));
   const visibleFavorites = favorites.filter(row => !favoriteQuery.trim() || row.series_title.includes(favoriteQuery.trim()));
+  // 只有收藏夹需要分批：官方收藏可达近千部。观看记录上游上限 50 条，不分批。
+  // 搜索时结果通常很少，同样不分批。
+  const shownFavorites = favoriteQuery.trim() ? visibleFavorites : visibleFavorites.slice(0, favoriteLimit);
+  const showToast = (text, type = 'info') => {
+    setToast({ text, type });
+    window.setTimeout(() => setToast(null), 3200);
+  };
+  const openDrawer = (row) => setDrawer({ seriesId: row.series_id, title: row.series_title });
+
+  useEffect(() => { setFavoriteLimit(FAVORITE_PAGE); }, [favoriteQuery]);
+
 
   // 官方收藏夹（账号云端书架），与本机收藏列表是两回事。
   const loadFavorites = async () => {
@@ -258,7 +277,7 @@ export default function AccountManagement({ active = true }) {
             {t(favoritesLoading && !favorites.length ? <div className="account-history-empty" role="status">{t("正在读取官方收藏…")}</div>
               : !favorites.length ? <div className="account-history-empty">{t("红果账号的收藏夹是空的。")}</div>
               : !visibleFavorites.length ? <div className="account-history-empty">{t("没有匹配的收藏。")}</div>
-              : <ul className="account-history-list">{visibleFavorites.map(row => <li key={row.series_id}>
+              : <ul className="account-history-list">{shownFavorites.map(row => <li key={row.series_id} className="account-row-with-view">
                 <button type="button" disabled={busy} onClick={() => openFavorite(row)} aria-label={t(`打开收藏的 ${row.series_title}`)}>
                   <span className="account-history-cover">
                     {row.cover && <img src={row.cover} alt="" loading="lazy" onError={event => event.currentTarget.remove()} />}
@@ -271,7 +290,17 @@ export default function AccountManagement({ active = true }) {
                   </span>
                   <span className="account-history-action"><Play size={14} />{t("打开")}</span>
                 </button>
+                <button type="button" className="account-view-button" disabled={busy} title={t("查看分集与下载")} aria-label={t(`查看《${row.series_title}》的分集与下载`)} onClick={() => openDrawer(row)}>
+                  <Eye size={14} /><span>{t("查看")}</span>
+                </button>
               </li>)}</ul>)}
+            {!favoriteQuery.trim() && visibleFavorites.length > favoriteLimit && (
+              <div className="account-load-more">
+                <button className="btn btn-outline btn-sm" type="button" onClick={() => setFavoriteLimit(value => value + FAVORITE_PAGE)}>
+                  {t('再加载 {0} 部（已显示 {1} / {2}）', [FAVORITE_PAGE, shownFavorites.length, visibleFavorites.length])}
+                </button>
+              </div>
+            )}
           </section>
         </div>
       </> : <>
@@ -288,5 +317,12 @@ export default function AccountManagement({ active = true }) {
       {status && <p className="account-page-status" role="status">{t(status)}</p>}
       {error && <div className="history-error" role="alert"><span>{t(error)}</span></div>}
     </section>
+    {drawer && <SeriesDrawer
+      seriesId={drawer.seriesId}
+      seriesTitle={drawer.title}
+      onClose={() => setDrawer(null)}
+      onToast={(text, type) => showToast(text, type)}
+    />}
+    {toast && <div className={`account-toast account-toast-${toast.type}`} role="status" onClick={() => setToast(null)}>{t(toast.text)}</div>}
   </div>;
 }
