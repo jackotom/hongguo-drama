@@ -1,6 +1,6 @@
 ﻿@echo off
-rem 8.4 official release.
-rem Hongguo Drama 8.4 official release - version metadata: package.json
+rem 8.5 official release.
+rem Hongguo Drama 8.5 official release - version metadata: package.json
 chcp 65001 >nul
 cd /d "%~dp0"
 if exist "dist\win-unpacked\红果短剧.exe" (

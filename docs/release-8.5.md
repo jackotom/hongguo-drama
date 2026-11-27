@@ -27,3 +27,7 @@
 - x64 App：`424c73c0-3020-444c-ad0e-695b03d69bed`
 - arm64 DMG：`57c4e31a-8172-4df0-869d-042c79741456`
 - x64 DMG：`5ce5ddc8-ce65-472b-ad8e-543005fb3d1e`
+
+## 致谢
+
+特别感谢 **[@beilunyang](https://github.com/beilunyang)**、**[@81199000](https://github.com/81199000)** 及社区反馈者（完整名单见 [CONTRIBUTORS.md](../CONTRIBUTORS.md)）。

@@ -1,4 +1,4 @@
-# Hongguo Drama 8.4: official release source.
+# Hongguo Drama 8.5: official release source.
 FROM node:22-bookworm-slim
 WORKDIR /app
 ENV NODE_ENV=production PORT=3000 DATA_DIR=/data DOWNLOAD_DIR=/downloads

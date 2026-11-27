@@ -1,0 +1,14 @@
+{
+  "publicVersion": "8.5",
+  "internalVersion": "8.5.0",
+  "desktopBuild": "8.5.1",
+  "platforms": [
+    "macOS arm64",
+    "macOS x64",
+    "Windows x64",
+    "Linux x64 AppImage"
+  ],
+  "status": "published",
+  "frozenSha": "d71d6472056969493a2aedff05d5e8662369efbe",
+  "releaseId": 459717507
+}

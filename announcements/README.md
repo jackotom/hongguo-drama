@@ -1,4 +1,4 @@
-<!-- 8.4 desktop official release; this directory keeps its existing scope. -->
+<!-- 8.5 desktop official release; this directory keeps its existing scope. -->
 <!-- 6.7 unified release. -->
 # 公告数据
 

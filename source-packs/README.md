@@ -1,4 +1,4 @@
-<!-- 8.4 official release. -->
+<!-- 8.5 official release. -->
 # Signed Source Packs
 
 This directory holds the Ed25519-signed declarative playback source policy (`hongguo-playback.pack.json` and `hongguo-playback.payload.json`).

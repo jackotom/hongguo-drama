@@ -1,4 +1,4 @@
-// 红果短剧 8.4 正式版：界面入口；发行记录与验证范围见 docs/release-8.4.md。
+// 红果短剧 8.5 正式版：界面入口；发行记录与验证范围见 docs/release-8.5.md。
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';

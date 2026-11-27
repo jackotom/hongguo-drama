@@ -1,5 +1,10 @@
-<!-- 8.4 official release; historical credits retained. -->
+<!-- 8.5 official release; historical credits retained. -->
 # 贡献者与问题反馈致谢
+
+## 8.5 社区反馈与方案致谢（2026-11-27）
+
+- **[@81199000](https://github.com/81199000)**：提交 [#217](https://github.com/jackotom/hongguo-drama/issues/217) 详尽分析官网 `vid_list` 变动及签名 App `video_detail/v1` 全集读取方案。
+- **[@13-shisan](https://github.com/13-shisan)**（[#215](https://github.com/jackotom/hongguo-drama/issues/215)）、**[@lonfund](https://github.com/lonfund)**（[#216](https://github.com/jackotom/hongguo-drama/issues/216)）：及时反馈双栈 Fake-IP 校验与兼容模式重复转码问题。
 
 ## 8.3 / 8.4 社区取源与云端书架致谢（2026-11-26）
 

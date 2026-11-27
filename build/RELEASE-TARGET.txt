@@ -1,4 +1,4 @@
-Hongguo Drama 8.5
+Hongguo Drama 8.5 (Official Release)
 Internal version: 8.5.0
 Desktop build: 8.5.1
 Platforms: macOS arm64, macOS x64, Windows x64, Linux x64 AppImage
