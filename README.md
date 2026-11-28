@@ -1,3 +1,11 @@
+> [!IMPORTANT]
+> **📢 暂停更新公告 / Maintenance Paused**
+>
+> 本项目（`hongguo-drama`）自 **v8.5** 起暂停更新与维护，归期未定——维护者暂别键盘，携女友远赴新加坡度假去啦 🇸🇬🌴。
+> 现版本可继续正常使用，代码遵循 GPL-3.0 协议完全开源，欢迎社区自由 Fork 延续。详情请参阅 👉 [完整多语公告 (#222)](https://github.com/jackotom/hongguo-drama/issues/222)。
+>
+> *Development is temporarily paused as the maintainer heads to Singapore with his girlfriend. Return date TBD. v8.5 remains available under GPL-3.0.*
+
 <p align="center">
   <img src="build/icon.png" alt="红果短剧桌面版图标" width="112" height="112">
 </p>
